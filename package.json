@@ -1,0 +1,24 @@
+{
+  "private": true,
+  "scripts": {
+    "audit": "tsx ./scripts/audit.mjs",
+    "build": "tsx ./scripts/build.mjs",
+    "clippy": "tsx ./scripts/clippy.mjs",
+    "doc": "tsx ./scripts/doc.mjs",
+    "format": "tsx ./scripts/format.mjs",
+    "hack": "tsx ./scripts/hack.mjs",
+    "lint": "tsx ./scripts/lint.mjs",
+    "semver": "tsx ./scripts/semver.mjs",
+    "test": "tsx ./scripts/test.mjs"
+  },
+  "devDependencies": {
+    "@iarna/toml": "^2.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.2",
+    "zx": "^7.2.3"
+  },
+  "engines": {
+    "node": ">=v20.0.0"
+  },
+  "packageManager": "pnpm@9.1.0"
+}

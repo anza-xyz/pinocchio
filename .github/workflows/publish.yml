@@ -6,53 +6,98 @@ on:
       crate:
         description: Crate
         required: true
-        default: pinocchio
+        default: sdk/pinocchio
         type: choice
         options:
-          - pinocchio
-          - pubkey
+          - programs/associated-token-account
+          - programs/system
+          - programs/token
+          - sdk/log/crate
+          - sdk/log/macro
+          - sdk/pinocchio
+          - sdk/pubkey
+      level:
+        description: Level
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
       dry_run:
         description: Dry run
         required: true
         default: true
         type: boolean
+      create_release:
+        description: Create a GitHub release
+        required: true
+        type: boolean
+        default: true
 
 env:
-  RUST_VERSION: 1.78.0
-  SOLANA_VERSION: 1.18.20
-  CARGO_CACHE: |
-    ~/.cargo/bin/
-    ~/.cargo/registry/index/
-    ~/.cargo/registry/cache/
-    ~/.cargo/git/db/
-    target/
+  CACHE: true
 
 jobs:
   publish_release:
     name: Publish
     runs-on: ubuntu-latest
     steps:
+      - name: Ensure CARGO_REGISTRY_TOKEN variable is set
+        env:
+          token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        if: ${{ env.token == '' }}
+        run: |
+          echo "The CARGO_REGISTRY_TOKEN secret variable is not set"
+          echo "Go to \"Settings\" -> \"Secrets and variables\" -> \"Actions\" -> \"New repository secret\"."
+          exit 1
+
       - name: Git checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: Setup Environment
+        uses: ./.github/actions/setup
         with:
-          toolchain: stable
+          cargo-cache-key: cargo-publish
+          toolchain: test
+          components: semver-checks
+          solana: true
+
+      - name: Build
+        run: pnpm build ${{ inputs.crate }}
+
+      - name: Test
+        run: pnpm test ${{ inputs.crate }}
+
+      - name: Set Git Author
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
 
       - name: Check semver
-        uses: obi1kenobi/cargo-semver-checks-action@v2
+        run: |
+          pnpm semver ${{ inputs.crate }} --release-type ${{ inputs.level }}
 
-      - name: Publish crate
+      - name: Publish Crate
+        id: publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          MANIFEST="./sdk/${{ inputs.crate }}/Cargo.toml"
-
           if [ "${{ inputs.dry_run }}" == "true" ]; then
             OPTIONS="--dry-run"
           else
             OPTIONS=""
           fi
 
-          cargo publish --manifest-path $MANIFEST $OPTIONS
+          pnpm tsx ./scripts/publish.mts ${{ inputs.crate }} ${{ inputs.level }} $OPTIONS
+
+      - name: Push Commit and Tag
+        if: github.event.inputs.dry_run != 'true'
+        run: git push origin --follow-tags
+
+      - name: Create GitHub release
+        if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.publish.outputs.crate }}@v${{ steps.publish.outputs.version }}
