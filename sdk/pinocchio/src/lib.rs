@@ -9,6 +9,10 @@
 //! [`solana-program`]: https://docs.rs/solana-program/latest/solana_program/
 
 #![no_std]
+#![cfg_attr(
+    all(feature = "asm", target_os = "solana"),
+    feature(asm_experimental_arch, asm_const)
+)]
 
 #[cfg(feature = "std")]
 extern crate std;

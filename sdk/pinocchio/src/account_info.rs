@@ -157,6 +157,7 @@ impl AccountInfo {
 
     /// Changes the owner of the account.
     #[allow(invalid_reference_casting)]
+    #[inline]
     pub fn assign(&self, new_owner: &Pubkey) {
         unsafe {
             core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Pubkey, *new_owner);
@@ -169,6 +170,7 @@ impl AccountInfo {
     ///
     /// This method is unsafe because it does not return a `Ref`, thus leaving the borrow
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
+    #[inline]
     pub unsafe fn borrow_lamports_unchecked(&self) -> &u64 {
         &(*self.raw).lamports
     }
@@ -180,6 +182,7 @@ impl AccountInfo {
     /// This method is unsafe because it does not return a `Ref`, thus leaving the borrow
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
     #[allow(clippy::mut_from_ref)]
+    #[inline]
     pub unsafe fn borrow_mut_lamports_unchecked(&self) -> &mut u64 {
         &mut (*self.raw).lamports
     }
@@ -190,6 +193,7 @@ impl AccountInfo {
     ///
     /// This method is unsafe because it does not return a `Ref`, thus leaving the borrow
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
+    #[inline]
     pub unsafe fn borrow_data_unchecked(&self) -> &[u8] {
         core::slice::from_raw_parts(self.data_ptr(), self.data_len())
     }
@@ -201,6 +205,7 @@ impl AccountInfo {
     /// This method is unsafe because it does not return a `Ref`, thus leaving the borrow
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
     #[allow(clippy::mut_from_ref)]
+    #[inline]
     pub unsafe fn borrow_mut_data_unchecked(&self) -> &mut [u8] {
         core::slice::from_raw_parts_mut(self.data_ptr(), self.data_len())
     }
@@ -391,6 +396,7 @@ impl AccountInfo {
     /// since the account data will need to be zeroed out as well; otherwise the lenght,
     /// lamports and owner can be set again before the data is wiped out from
     /// the ledger using the keypair of the account being close.
+    #[inline]
     pub fn close(&self) -> ProgramResult {
         {
             // make sure the account is not borrowed since we are about to
@@ -430,17 +436,45 @@ impl AccountInfo {
         // - 8 bytes for the data_len
         //
         // So we can zero out them directly.
+        #[cfg(target_os = "solana")]
+        sol_memset_(self.data_ptr().sub(48), 0, 48);
+    }
 
-        // Zero out the account owner. While the field is a `Pubkey`, it is quicker
-        // to zero the 32 bytes as 4 x `u64`s.
-        *(self.data_ptr().sub(48) as *mut u64) = 0u64;
-        *(self.data_ptr().sub(40) as *mut u64) = 0u64;
-        *(self.data_ptr().sub(32) as *mut u64) = 0u64;
-        *(self.data_ptr().sub(24) as *mut u64) = 0u64;
-        // Zero the account lamports.
-        (*self.raw).lamports = 0;
-        // Zero the account data length.
-        (*self.raw).data_len = 0;
+    /// Zero out the the account's data length, lamports and owner fields, effectively
+    /// closing the account.
+    ///
+    /// This doesn't protect against future reinitialization of the account
+    /// since the account data will need to be zeroed out as well; otherwise the length,
+    /// lamports and owner can be set again before the data is wiped out from
+    /// the ledger using the keypair of the account being close.
+    ///
+    /// # Safety
+    ///
+    /// This method is unsafe because it does not check if the account data is already
+    /// borrowed. It should only be called when the account is not being used.
+    ///
+    /// It also makes assumptions about the layout and location of memory
+    /// referenced by `AccountInfo` fields. It should only be called for
+    /// instances of `AccountInfo` that were created by the runtime and received
+    /// in the `process_instruction` entrypoint of a program.
+    #[cfg(feature = "asm")]
+    #[inline(always)]
+    pub unsafe fn close_unstable(&self) {
+        #[cfg(target_os = "solana")]
+        unsafe {
+            let zero = 0u64;
+            core::arch::asm!(
+                "stxdw [{0}-8], {1}",
+                "stxdw [{0}-16], {1}",
+                "stxdw [{0}-24], {1}",
+                "stxdw [{0}-32], {1}",
+                "stxdw [{0}-40], {1}",
+                "stxdw [{0}-48], {1}",
+                in(reg) self.data_ptr(),
+                in(reg) zero,
+                options(nostack, preserves_flags)
+            );
+        }
     }
 
     /// Returns the memory address of the account data.
