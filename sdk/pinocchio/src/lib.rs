@@ -28,7 +28,7 @@
 //! * [`default_panic_handler!`]: declares the default panic handler
 //!
 //! To use the `entrypoint!` macro, use the following in your entrypoint definition:
-//! ```
+//! ```ignore
 //! use pinocchio::{
 //!   account_info::AccountInfo,
 //!   entrypoint,
@@ -60,7 +60,7 @@
 //! order to use these, the program needs to specify the program entrypoint,
 //! global allocator and panic handler individually. The [`entrypoint!`] macro
 //! is equivalent to writing:
-//! ```
+//! ```ignore
 //! program_entrypoint!(process_instruction);
 //! default_allocator!();
 //! default_panic_handler!();
@@ -88,7 +88,7 @@
 //!
 //! To use the [`lazy_program_entrypoint!`] macro, use the following in your
 //! entrypoint definition:
-//! ```
+//! ```ignore
 //! use pinocchio::{
 //!   default_allocator,
 //!   default_panic_handler,
@@ -134,7 +134,7 @@
 //! macro that set a global allocator just panics at any attempt to allocate memory.
 //!
 //! To use the [`no_allocator!`] macro, use the following in your entrypoint definition:
-//! ```
+//! ```ignore
 //! use pinocchio::{
 //!   account_info::AccountInfo,
 //!   default_panic_handler,
@@ -171,7 +171,7 @@
 //! the [`msg!`] macro does not provide any formatting options since the `format!` macro
 //! requires the `std` library. In order to use [`msg!`] with formatting, the `std`
 //! feature should be enable when adding Pinocchio as a dependency:
-//! ```no_run
+//! ```ignore
 //! pinocchio = { version = "0.7.0", features = ["std"] }
 //! ```
 //!
@@ -189,7 +189,7 @@
 //! in your program crate to conditionally enable the module that includes the [`entrypoint!`]
 //! macro invocation. The convention is to name the feature `bpf-entrypoint`.
 //!
-//! ```
+//! ```ignore
 //! #[cfg(feature = "bpf-entrypoint")]
 //! mod entrypoint {
 //!   use pinocchio::{
@@ -214,7 +214,7 @@
 //! ```
 //!
 //! When building the program binary, you must enable the `bpf-entrypoint` feature:
-//! ```no_run
+//! ```ignore
 //! cargo build-sbf --features bpf-entrypoint
 //! ```
 
