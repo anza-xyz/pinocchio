@@ -27,7 +27,7 @@ macro_rules! lazy_entrypoint {
 /// The trade-off is that the program is responsible for managing potential duplicated
 /// accounts and set up a `global allocator` and `panic handler`.
 ///
-/// The usual use-case for a [`lazy_program_entrypoint!`] is small programs with a single
+/// The usual use-case for a [`crate::lazy_program_entrypoint!`] is small programs with a single
 /// instruction. For most use-cases, it is recommended to use the [`crate::program_entrypoint!`]
 /// macro instead.
 ///
@@ -161,7 +161,7 @@ impl InstructionContext {
 
     /// Returns the number of remaining accounts.
     ///
-    /// This value is decremented each time [`next_account`] is called.
+    /// This value is decremented each time [`Self::next_account`] is called.
     #[inline(always)]
     pub fn remaining(&self) -> u64 {
         self.remaining

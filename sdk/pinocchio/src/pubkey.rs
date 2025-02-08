@@ -75,7 +75,7 @@ pub fn log(pubkey: &Pubkey) {
 /// re-searching for the bump key by using the [`create_program_address`]
 /// function.
 ///
-/// [`create_program_address`]: Pubkey::create_program_address
+/// [`create_program_address`]: crate::pubkey::create_program_address
 ///
 /// **Warning**: Because of the way the seeds are hashed there is a potential
 /// for program address collisions for the same program id.  The seeds are

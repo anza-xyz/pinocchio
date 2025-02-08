@@ -166,9 +166,8 @@ pub fn slice_invoke_signed(
 
 /// Invoke a cross-program instruction but don't enforce Rust's aliasing rules.
 ///
-/// This function does not check that [`Ref`]s within [`Account`]s are properly
-/// borrowable as described in the documentation for that function. Those checks
-/// consume CPU cycles that this function avoids.
+/// This function does not check that [`Account`]s are properly borrowable.
+/// Those checks consume CPU cycles that this function avoids.
 ///
 /// # Safety
 ///
@@ -176,11 +175,6 @@ pub fn slice_invoke_signed(
 /// borrowed within the calling program, and that data is written to by the
 /// callee, then Rust's aliasing rules will be violated and cause undefined
 /// behavior.
-///
-/// # Important
-///
-/// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
 #[inline(always)]
 pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) {
     invoke_signed_unchecked(instruction, accounts, &[])
@@ -189,9 +183,8 @@ pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) 
 /// Invoke a cross-program instruction with signatures but don't enforce Rust's
 /// aliasing rules.
 ///
-/// This function does not check that [`Ref`]s within [`Account`]s are properly
-/// borrowable as described in the documentation for that function. Those checks
-/// consume CPU cycles that this function avoids.
+/// This function does not check that [`Account`]s are properly borrowable.
+/// Those checks consume CPU cycles that this function avoids.
 ///
 /// # Safety
 ///
@@ -199,11 +192,6 @@ pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) 
 /// borrowed within the calling program, and that data is written to by the
 /// callee, then Rust's aliasing rules will be violated and cause undefined
 /// behavior.
-///
-/// # Important
-///
-/// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
 pub unsafe fn invoke_signed_unchecked(
     instruction: &Instruction,
     accounts: &[Account],

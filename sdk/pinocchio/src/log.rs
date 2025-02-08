@@ -28,10 +28,10 @@
 //! [`RpcClient::get_transaction`]: https://docs.rs/solana-rpc-client/latest/solana_rpc_client/rpc_client/struct.RpcClient.html#method.get_transaction
 //!
 //! While most logging functions are defined in this module, [`Pubkey`]s can
-//! also be efficiently logged with the [`Pubkey::log`] function.
+//! also be efficiently logged with the [`pubkey::log`] function.
 //!
 //! [`Pubkey`]: crate::pubkey::Pubkey
-//! [`Pubkey::log`]: crate::pubkey::Pubkey::log
+//! [`pubkey::log`]: crate::pubkey::log
 
 use crate::{account_info::AccountInfo, pubkey::log};
 
