@@ -110,17 +110,18 @@ impl<'a> From<&'a AccountInfo> for Account<'a> {
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct AccountMeta<'a> {
-    // Public key of the account.
+    /// Public key of the account.
     pub pubkey: &'a Pubkey,
 
-    // Indicates whether the account is writable or not.
+    /// Indicates whether the account is writable or not.
     pub is_writable: bool,
 
-    // Indicates whether the account signed the instruction or not.
+    /// Indicates whether the account signed the instruction or not.
     pub is_signer: bool,
 }
 
 impl<'a> AccountMeta<'a> {
+    /// Creates a new `AccountMeta`.
     #[inline(always)]
     pub fn new(pubkey: &'a Pubkey, is_writable: bool, is_signer: bool) -> Self {
         Self {
@@ -130,21 +131,25 @@ impl<'a> AccountMeta<'a> {
         }
     }
 
+    /// Creates a new readonly `AccountMeta`.
     #[inline(always)]
     pub fn readonly(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, false, false)
     }
 
+    /// Creates a new writable `AccountMeta`.
     #[inline(always)]
     pub fn writable(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, true, false)
     }
 
+    /// Creates a new readonly and signer `AccountMeta`.
     #[inline(always)]
     pub fn readonly_signer(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, false, true)
     }
 
+    /// Creates a new writable and signer `AccountMeta`.
     #[inline(always)]
     pub fn writable_signer(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, true, true)
@@ -157,6 +162,11 @@ impl<'a> From<&'a AccountInfo> for AccountMeta<'a> {
     }
 }
 
+/// Represents a signer seed.
+///
+/// This struct contains the same information as a `[u8]`, but
+/// has the memory layout as expected by `sol_invoke_signed_c`
+/// syscall.
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct Seed<'a> {

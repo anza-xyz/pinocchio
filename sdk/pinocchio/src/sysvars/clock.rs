@@ -49,8 +49,8 @@ pub struct Clock {
     pub unix_timestamp: UnixTimestamp,
 }
 
-// At 160 ticks/s, 64 ticks per slot implies that leader rotation and voting will happen
-// every 400 ms. A fast voting cadence ensures faster finality and convergence
+/// At 160 ticks/s, 64 ticks per slot implies that leader rotation and voting will happen
+/// every 400 ms. A fast voting cadence ensures faster finality and convergence
 pub const DEFAULT_TICKS_PER_SLOT: u64 = 64;
 
 /// The default tick rate that the cluster attempts to achieve (160 per second).

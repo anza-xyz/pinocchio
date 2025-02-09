@@ -103,31 +103,57 @@ macro_rules! to_builtin {
     };
 }
 
+/// Builtin value for `ProgramError::Custom(0)`.
 pub const CUSTOM_ZERO: u64 = to_builtin!(1);
+/// Builtin value for `ProgramError::InvalidArgument`.
 pub const INVALID_ARGUMENT: u64 = to_builtin!(2);
+/// Builtin value for `ProgramError::InvalidInstructionData`.
 pub const INVALID_INSTRUCTION_DATA: u64 = to_builtin!(3);
+/// Builtin value for `ProgramError::InvalidAccountData`.
 pub const INVALID_ACCOUNT_DATA: u64 = to_builtin!(4);
+/// Builtin value for `ProgramError::AccountDataTooSmall`.
 pub const ACCOUNT_DATA_TOO_SMALL: u64 = to_builtin!(5);
+/// Builtin value for `ProgramError::InsufficientFunds`.
 pub const INSUFFICIENT_FUNDS: u64 = to_builtin!(6);
+/// Builtin value for `ProgramError::IncorrectProgramId`.
 pub const INCORRECT_PROGRAM_ID: u64 = to_builtin!(7);
+/// Builtin value for `ProgramError::MissingRequiredSignature`.
 pub const MISSING_REQUIRED_SIGNATURES: u64 = to_builtin!(8);
+/// Builtin value for `ProgramError::AccountAlreadyInitialized`.
 pub const ACCOUNT_ALREADY_INITIALIZED: u64 = to_builtin!(9);
+/// Builtin value for `ProgramError::UninitializedAccount`.
 pub const UNINITIALIZED_ACCOUNT: u64 = to_builtin!(10);
+/// Builtin value for `ProgramError::NotEnoughAccountKeys`.
 pub const NOT_ENOUGH_ACCOUNT_KEYS: u64 = to_builtin!(11);
+/// Builtin value for `ProgramError::AccountBorrowFailed`.
 pub const ACCOUNT_BORROW_FAILED: u64 = to_builtin!(12);
+/// Builtin value for `ProgramError::MaxSeedLengthExceeded`.
 pub const MAX_SEED_LENGTH_EXCEEDED: u64 = to_builtin!(13);
+/// Builtin value for `ProgramError::InvalidSeeds`.
 pub const INVALID_SEEDS: u64 = to_builtin!(14);
+/// Builtin value for `ProgramError::BorshIoError`.
 pub const BORSH_IO_ERROR: u64 = to_builtin!(15);
+/// Builtin value for `ProgramError::AccountNotRentExempt`.
 pub const ACCOUNT_NOT_RENT_EXEMPT: u64 = to_builtin!(16);
+/// Builtin value for `ProgramError::UnsupportedSysvar`.
 pub const UNSUPPORTED_SYSVAR: u64 = to_builtin!(17);
+/// Builtin value for `ProgramError::IllegalOwner`.
 pub const ILLEGAL_OWNER: u64 = to_builtin!(18);
+/// Builtin value for `ProgramError::MaxAccountsDataAllocationsExceeded`.
 pub const MAX_ACCOUNTS_DATA_ALLOCATIONS_EXCEEDED: u64 = to_builtin!(19);
+/// Builtin value for `ProgramError::InvalidRealloc`.
 pub const INVALID_ACCOUNT_DATA_REALLOC: u64 = to_builtin!(20);
+/// Builtin value for `ProgramError::MaxInstructionTraceLengthExceeded`.
 pub const MAX_INSTRUCTION_TRACE_LENGTH_EXCEEDED: u64 = to_builtin!(21);
+/// Builtin value for `ProgramError::BuiltinProgramsMustConsumeComputeUnits`.
 pub const BUILTIN_PROGRAMS_MUST_CONSUME_COMPUTE_UNITS: u64 = to_builtin!(22);
+/// Builtin value for `ProgramError::InvalidAccountOwner`.
 pub const INVALID_ACCOUNT_OWNER: u64 = to_builtin!(23);
+/// Builtin value for `ProgramError::ArithmeticOverflow`.
 pub const ARITHMETIC_OVERFLOW: u64 = to_builtin!(24);
+/// Builtin value for `ProgramError::Immutable`.
 pub const IMMUTABLE: u64 = to_builtin!(25);
+/// Builtin value for `ProgramError::IncorrectAuthority`.
 pub const INCORRECT_AUTHORITY: u64 = to_builtin!(26);
 
 impl From<u64> for ProgramError {
