@@ -1,3 +1,6 @@
+//! Defines the lazy program entrypoint and the context to access the
+//! input buffer.
+
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
     program_error::ProgramError,
@@ -5,7 +8,7 @@ use crate::{
     BPF_ALIGN_OF_U128, NON_DUP_MARKER,
 };
 
-/// Declare the program entrypoint.
+/// Declare the lazy program entrypoint.
 ///
 /// Use the `lazy_program_entrypoint!` macro instead.
 #[deprecated(
@@ -19,7 +22,7 @@ macro_rules! lazy_entrypoint {
     };
 }
 
-/// Declare the program entrypoint.
+/// Declare the lazy program entrypoint.
 ///
 /// This entrypoint is defined as *lazy* because it does not read the accounts upfront.
 /// Instead, it provides an [`InstructionContext`] to the access input information on demand.
@@ -27,7 +30,7 @@ macro_rules! lazy_entrypoint {
 /// The trade-off is that the program is responsible for managing potential duplicated
 /// accounts and set up a `global allocator` and `panic handler`.
 ///
-/// The usual use-case for a [`lazy_program_entrypoint!`] is small programs with a single
+/// The usual use-case for a [`crate::lazy_program_entrypoint!`] is small programs with a single
 /// instruction. For most use-cases, it is recommended to use the [`crate::program_entrypoint!`]
 /// macro instead.
 ///
@@ -161,7 +164,7 @@ impl InstructionContext {
 
     /// Returns the number of remaining accounts.
     ///
-    /// This value is decremented each time [`next_account`] is called.
+    /// This value is decremented each time [`Self::next_account`] is called.
     #[inline(always)]
     pub fn remaining(&self) -> u64 {
         self.remaining

@@ -30,6 +30,7 @@ macro_rules! define_syscall {
 macro_rules! define_syscall {
 	(fn $name:ident($($arg:ident: $typ:ty),*) -> $ret:ty) => {
 		extern "C" {
+            /// Syscall function.
 			pub fn $name($($arg: $typ),*) -> $ret;
 		}
 	};
