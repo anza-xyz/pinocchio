@@ -1,6 +1,6 @@
 [package]
 name = "pinocchio"
-description = "Create Solana programs with no dependencies attached"
+description = "Create Solana programs with minimal dependencies attached"
 version = "0.7.1"
 edition = { workspace = true }
 license = { workspace = true }
@@ -9,6 +9,9 @@ repository = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]
+
+[dependencies]
+solana-define-syscall = { workspace = true }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
