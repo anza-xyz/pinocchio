@@ -35,6 +35,17 @@
 
 use crate::{account_info::AccountInfo, pubkey::log};
 
+/// Print a message to the log.
+///
+/// Supports simple strings of type `&str`. The expression will be passed
+/// directly to [`sol_log`]. This is typically used for logging static strings.
+///
+/// # Examples
+///
+/// ```
+/// use pinocchio::msg;
+///
+/// msg!("verifying multisig");
 #[macro_export]
 #[cfg(not(feature = "std"))]
 macro_rules! msg {
@@ -43,6 +54,33 @@ macro_rules! msg {
     };
 }
 
+/// Print a message to the log.
+///
+/// Supports simple strings as well as Rust [format strings][fs]. When passed a
+/// single expression it will be passed directly to [`sol_log`]. The expression
+/// must have type `&str`, and is typically used for logging static strings.
+/// When passed something other than an expression, particularly
+/// a sequence of expressions, the tokens will be passed through the
+/// [`format!`] macro before being logged with `sol_log`.
+///
+/// [fs]: https://doc.rust-lang.org/std/fmt/
+/// [`format!`]: https://doc.rust-lang.org/std/fmt/fn.format.html
+///
+/// Note that Rust's formatting machinery is relatively CPU-intensive
+/// for constrained environments like the Solana VM.
+///
+/// # Examples
+///
+/// ```
+/// use pinocchio::msg;
+///
+/// // The fast form
+/// msg!("verifying multisig");
+///
+/// // With formatting
+/// let err = "not enough signers";
+/// msg!("multisig failed: {}", err);
+/// ```
 #[cfg(feature = "std")]
 #[macro_export]
 macro_rules! msg {

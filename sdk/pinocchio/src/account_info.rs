@@ -10,6 +10,9 @@ use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
 /// single realloc.
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
+/// Returns the account info at the given index.
+///
+/// This macro validates that the index is within the bounds of the accounts.
 #[macro_export]
 macro_rules! get_account_info {
     ( $accounts:ident, $index:expr ) => {{

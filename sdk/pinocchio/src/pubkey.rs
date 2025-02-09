@@ -2,13 +2,13 @@
 
 use crate::program_error::ProgramError;
 
-/// Number of bytes in a pubkey
+/// Number of bytes in a pubkey.
 pub const PUBKEY_BYTES: usize = 32;
 
-/// maximum length of derived `Pubkey` seed
+/// maximum length of derived `Pubkey` seed.
 pub const MAX_SEED_LEN: usize = 32;
 
-/// Maximum number of seeds
+/// Maximum number of seeds.
 pub const MAX_SEEDS: usize = 16;
 
 /// The address of a [Solana account][account].
@@ -16,7 +16,7 @@ pub const MAX_SEEDS: usize = 16;
 /// [account]: https://solana.com/docs/core/accounts
 pub type Pubkey = [u8; PUBKEY_BYTES];
 
-/// Log a `Pubkey` from a program
+/// Log a `Pubkey` from a program.
 #[inline(always)]
 pub fn log(pubkey: &Pubkey) {
     #[cfg(target_os = "solana")]
