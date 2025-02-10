@@ -1,11 +1,13 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+use {
+    pinocchio::{
+        account_info::AccountInfo,
+        instruction::{AccountMeta, Instruction, Signer},
+        pubkey::Pubkey,
+        ProgramResult,
+    },
+    pinocchio_cpi::invoke_signed,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};
