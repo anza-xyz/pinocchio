@@ -439,11 +439,9 @@ impl AccountInfo {
     /// lamports and owner can be set again before the data is wiped out from
     /// the ledger using the keypair of the account being close.
     pub fn close(&self) -> ProgramResult {
-        {
-            // make sure the account is not borrowed since we are about to
-            // resize the data to zero
-            let _ = self.try_borrow_mut_data()?;
-        }
+        // make sure the account is not borrowed since we are about to
+        // resize the data to zero
+        self.check_borrow_mut_data()?;
 
         unsafe {
             self.close_unchecked();
