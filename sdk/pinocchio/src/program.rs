@@ -101,11 +101,11 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
         }
 
         if account_meta.is_writable {
-            let _ = account_info.try_borrow_mut_data()?;
-            let _ = account_info.try_borrow_mut_lamports()?;
+            account_info.check_borrow_mut_data()?;
+            account_info.check_borrow_mut_lamports()?;
         } else {
-            let _ = account_info.try_borrow_data()?;
-            let _ = account_info.try_borrow_lamports()?;
+            account_info.check_borrow_data()?;
+            account_info.check_borrow_lamports()?;
         }
 
         accounts[index].write(Account::from(account_infos[index]));
@@ -147,11 +147,11 @@ pub fn slice_invoke_signed(
         }
 
         if account_meta.is_writable {
-            let _ = account_info.try_borrow_mut_data()?;
-            let _ = account_info.try_borrow_mut_lamports()?;
+            account_info.check_borrow_mut_data()?;
+            account_info.check_borrow_mut_lamports()?;
         } else {
-            let _ = account_info.try_borrow_data()?;
-            let _ = account_info.try_borrow_lamports()?;
+            account_info.check_borrow_data()?;
+            account_info.check_borrow_lamports()?;
         }
 
         accounts.push(Account::from(*account_info));

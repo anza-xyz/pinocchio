@@ -1,5 +1,10 @@
 //! Data structures to represent account information.
-use core::{marker::PhantomData, mem::ManuallyDrop, ptr::NonNull, slice::from_raw_parts_mut};
+use core::{
+    marker::PhantomData,
+    mem::ManuallyDrop,
+    ptr::NonNull,
+    slice::{from_raw_parts, from_raw_parts_mut},
+};
 
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_memset_;
@@ -211,18 +216,10 @@ impl AccountInfo {
     /// Tries to get a read-only reference to the lamport field, failing if the
     /// field is already mutable borrowed or if 7 borrows already exist.
     pub fn try_borrow_lamports(&self) -> Result<Ref<u64>, ProgramError> {
+        // check if the account lamports are already borrowed
+        self.check_borrow_lamports()?;
+
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-
-        // check if mutable borrow is already taken
-        if *borrow_state & 0b_1000_0000 != 0 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
-        // check if we have reached the max immutable borrow count
-        if *borrow_state & 0b_0111_0000 == 0b_0111_0000 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
         // increment the immutable borrow count
         *borrow_state += 1 << LAMPORTS_SHIFT;
 
@@ -238,13 +235,10 @@ impl AccountInfo {
     /// Tries to get a read only reference to the lamport field, failing if the field
     /// is already borrowed in any form.
     pub fn try_borrow_mut_lamports(&self) -> Result<RefMut<u64>, ProgramError> {
+        // check if the account lamports are already borrowed
+        self.check_borrow_mut_lamports()?;
+
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-
-        // check if any borrow (mutable or immutable) is already taken for lamports
-        if *borrow_state & 0b_1111_0000 != 0 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
         // set the mutable lamport borrow flag
         *borrow_state |= 0b_1000_0000;
 
@@ -257,49 +251,65 @@ impl AccountInfo {
         })
     }
 
-    /// Tries to get a read only reference to the data field, failing if the field
+    /// Checks if it is possible to get a read-only reference to the lamport field,
+    /// failing if the field is already mutable borrowed or if 7 borrows already exist.
+    #[inline(always)]
+    pub fn check_borrow_lamports(&self) -> Result<(), ProgramError> {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+
+        // check if mutable borrow is already taken
+        if borrow_state & 0b_1000_0000 != 0 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        // check if we have reached the max immutable borrow count
+        if borrow_state & 0b_0111_0000 == 0b_0111_0000 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        Ok(())
+    }
+
+    /// Checks if it is possible to get a mutable reference to the lamport field,
+    /// failing if the field is already borrowed in any form.
+    #[inline(always)]
+    pub fn check_borrow_mut_lamports(&self) -> Result<(), ProgramError> {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+
+        // check if any borrow (mutable or immutable) is already taken for lamports
+        if borrow_state & 0b_1111_0000 != 0 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        Ok(())
+    }
+
+    /// Tries to get a read-only reference to the data field, failing if the field
     /// is already mutable borrowed or if 7 borrows already exist.
     pub fn try_borrow_data(&self) -> Result<Ref<[u8]>, ProgramError> {
+        // check if the account data is already borrowed
+        self.check_borrow_data()?;
+
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-
-        // check if mutable data borrow is already taken (most significant bit
-        // of the data_borrow_state)
-        if *borrow_state & 0b_0000_1000 != 0 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
-        // check if we have reached the max immutable data borrow count (7)
-        if *borrow_state & 0b_0111 == 0b0111 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
         // increment the immutable data borrow count
         *borrow_state += 1;
 
         // return the reference to data
         Ok(Ref {
-            value: unsafe {
-                NonNull::from(core::slice::from_raw_parts(
-                    self.data_ptr(),
-                    self.data_len(),
-                ))
-            },
+            value: unsafe { NonNull::from(from_raw_parts(self.data_ptr(), self.data_len())) },
             state: unsafe { NonNull::new_unchecked(borrow_state) },
             borrow_shift: DATA_SHIFT,
             marker: PhantomData,
         })
     }
 
-    /// Tries to get a read only reference to the data field, failing if the field
+    /// Tries to get a mutable reference to the data field, failing if the field
     /// is already borrowed in any form.
     pub fn try_borrow_mut_data(&self) -> Result<RefMut<[u8]>, ProgramError> {
+        // check if the account data is already borrowed
+        self.check_borrow_mut_data()?;
+
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-
-        // check if any borrow (mutable or immutable) is already taken for data
-        if *borrow_state & 0b_0000_1111 != 0 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
         // set the mutable data borrow flag
         *borrow_state |= 0b_0000_1000;
 
@@ -310,6 +320,40 @@ impl AccountInfo {
             borrow_mask: DATA_MASK,
             marker: PhantomData,
         })
+    }
+
+    /// Checks if it is possible to get a read-only reference to the data field, failing
+    /// if the field is already mutable borrowed or if 7 borrows already exist.
+    #[inline(always)]
+    pub fn check_borrow_data(&self) -> Result<(), ProgramError> {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+
+        // check if mutable data borrow is already taken (most significant bit
+        // of the data_borrow_state)
+        if borrow_state & 0b_0000_1000 != 0 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        // check if we have reached the max immutable data borrow count (7)
+        if borrow_state & 0b_0111 == 0b0111 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        Ok(())
+    }
+
+    /// Checks if it is possible to get a mutable reference to the data field, failing
+    /// if the field is already borrowed in any form.
+    #[inline(always)]
+    pub fn check_borrow_mut_data(&self) -> Result<(), ProgramError> {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+
+        // check if any borrow (mutable or immutable) is already taken for data
+        if borrow_state & 0b_0000_1111 != 0 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        Ok(())
     }
 
     /// Realloc the account's data and optionally zero-initialize the new
@@ -395,11 +439,9 @@ impl AccountInfo {
     /// lamports and owner can be set again before the data is wiped out from
     /// the ledger using the keypair of the account being close.
     pub fn close(&self) -> ProgramResult {
-        {
-            // make sure the account is not borrowed since we are about to
-            // resize the data to zero
-            let _ = self.try_borrow_mut_data()?;
-        }
+        // make sure the account is not borrowed since we are about to
+        // resize the data to zero
+        self.check_borrow_mut_data()?;
 
         unsafe {
             self.close_unchecked();
