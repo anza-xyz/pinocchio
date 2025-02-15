@@ -1,9 +1,11 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+use {
+    pinocchio::{
+        account_info::AccountInfo,
+        instruction::{AccountMeta, Instruction, Signer},
+        pubkey::Pubkey,
+        ProgramResult,
+    },
+    pinocchio_cpi::invoke_signed,
 };
 
 /// Assign account to a program based on a seed.

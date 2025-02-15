@@ -41,7 +41,16 @@ name = "pinocchio-associated-token-account"
 version = "0.1.0"
 dependencies = [
  "pinocchio",
+ "pinocchio-cpi",
  "pinocchio-pubkey",
+]
+
+[[package]]
+name = "pinocchio-cpi"
+version = "0.1.0"
+dependencies = [
+ "pinocchio",
+ "solana-define-syscall",
 ]
 
 [[package]]
@@ -73,6 +82,7 @@ name = "pinocchio-system"
 version = "0.2.1"
 dependencies = [
  "pinocchio",
+ "pinocchio-cpi",
  "pinocchio-pubkey",
 ]
 
@@ -81,6 +91,7 @@ name = "pinocchio-token"
 version = "0.2.1"
 dependencies = [
  "pinocchio",
+ "pinocchio-cpi",
  "pinocchio-pubkey",
 ]
 
@@ -130,6 +141,12 @@ name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
+
+[[package]]
+name = "solana-define-syscall"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acfe725269aac42d044cca5a99cfe8bd3b3f10e8d429b51f0c274e434fb34556"
 
 [[package]]
 name = "syn"

@@ -1,8 +1,10 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use {
+    pinocchio::{
+        account_info::AccountInfo,
+        instruction::{AccountMeta, Instruction, Signer},
+        ProgramResult,
+    },
+    pinocchio_cpi::invoke_signed,
 };
 
 /// Allocate space in a (possibly new) account without funding.

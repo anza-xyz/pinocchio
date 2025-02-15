@@ -43,7 +43,7 @@ pub fn log(pubkey: &Pubkey) {
 /// program associated with this address is the caller and thus authorized
 /// to be the signer.
 ///
-/// [`invoke_signed`]: crate::program::invoke_signed
+/// [`invoke_signed`]: https://docs.rs/pinocchio-cpi/latest/pinocchio_cpi/fn.invoke_signed.html
 ///
 /// The `seeds` are application-specific, and must be carefully selected to
 /// uniquely derive accounts per application requirements. It is common to

@@ -1,8 +1,10 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use {
+    pinocchio::{
+        account_info::AccountInfo,
+        instruction::{AccountMeta, Instruction, Signer},
+        ProgramResult,
+    },
+    pinocchio_cpi::invoke_signed,
 };
 
 /// Thaw a Frozen account using the Mint's freeze_authority
