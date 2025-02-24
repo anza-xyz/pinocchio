@@ -11,7 +11,7 @@ repository = { workspace = true }
 crate-type = ["rlib"]
 
 [dependencies]
-pinocchio-log-macro = { version = "^0.3", path = "../macro", optional = true }
+pinocchio-log-macro = { workspace = true, optional = true }
 
 [lints.rust]
 unexpected_cfgs = {level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

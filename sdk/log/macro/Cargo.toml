@@ -11,6 +11,6 @@ repository = { workspace = true }
 proc-macro = true
 
 [dependencies]
-quote = "^1.0"
-regex = "^1"
-syn = { version = "^1.0", features = ["extra-traits", "full"] }
+quote = { workspace = true }
+regex = { workspace = true }
+syn = { workspace = true, features = ["extra-traits", "full"] }
