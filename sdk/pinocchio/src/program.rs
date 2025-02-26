@@ -10,6 +10,13 @@ use crate::{
     ProgramResult,
 };
 
+// JC: A few parts are lifted from `solana-cpi`, ie. get / set return data, but
+// the rest is different enough from `solana-cpi` because of the different
+// instruction, syscall, and account info layout. There are certainly some parts
+// to combine here too though!
+//
+// Also, maybe we call this `cpi.rs` to line up with `solana-cpi`?
+
 /// An `Instruction` as expected by `sol_invoke_signed_c`.
 ///
 /// DO NOT EXPOSE THIS STRUCT:
@@ -17,6 +24,9 @@ use crate::{
 /// To ensure pointers are valid upon use, the scope of this struct should
 /// only be limited to the stack where sol_invoke_signed_c happens and then
 /// discarded immediately after.
+///
+/// JC: Ah, now I understand why the layout isn't the same between the two --
+/// this looks correct!
 #[repr(C)]
 #[derive(Debug, PartialEq, Clone)]
 struct CInstruction<'a> {
@@ -129,6 +139,10 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
 /// `accounts` field of the `instruction`.
+///
+/// JC: I wonder if we can remove this and replace it with an array with the
+/// maximum possible number of instruction accounts -- this uses a huge stack,
+/// but it avoids any dynamic allocation.
 #[cfg(feature = "std")]
 pub fn slice_invoke_signed(
     instruction: &Instruction,

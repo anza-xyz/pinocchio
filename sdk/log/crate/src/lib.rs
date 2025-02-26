@@ -52,6 +52,10 @@ pub use pinocchio_log_macro::*;
 
 #[cfg(test)]
 mod tests {
+    // JC: it might be worth doing some fuzzing on this with different numbers
+    // and sizes to make sure this doesn't panic, since there's a lot of edge
+    // cases to consider. Or at the very least, running tests for all combinations
+    // of buffer size / argument size
     use crate::logger::{Argument, Logger};
 
     #[test]

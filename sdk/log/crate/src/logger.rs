@@ -32,6 +32,8 @@ pub struct Logger<const BUFFER: usize> {
     buffer: [MaybeUninit<u8>; BUFFER],
 
     // Remaining space in the buffer.
+    // JC nit: this isn't the remaining space in the buffer, maybe call it `len`
+    // directly?
     offset: usize,
 }
 
@@ -72,6 +74,8 @@ impl<const BUFFER: usize> Logger<BUFFER> {
                 }
             }
         } else {
+            // If someone implements `write_with_args` incorrectly, this can
+            // blow past the offset and cause undefined behavior, correct?
             self.offset += value.write_with_args(&mut self.buffer[self.offset..], args);
         }
 
@@ -91,6 +95,9 @@ impl<const BUFFER: usize> Logger<BUFFER> {
     }
 
     /// Check if the buffer is empty.
+    // JC nit: this was a bit confusing since `slice.is_empty()` means nearly
+    // the opposite, ie. BUFFER == 0 rather than offset == 0. Is this even
+    // used? If not, I'd recommend removing it or coming up with a better name
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.offset == 0
@@ -186,6 +193,10 @@ macro_rules! impl_log_for_unsigned_integer {
                 match *self {
                     // Handle zero as a special case.
                     0 => {
+                        // JC: I got worried that this was actually unsafe, since
+                        // there's no bounds check. Can you add a comment saying
+                        // we just checked that the buffer isn't empty, so this
+                        // is safe?
                         unsafe {
                             buffer.get_unchecked_mut(0).write(*DIGITS.get_unchecked(0));
                         }
@@ -217,6 +228,12 @@ macro_rules! impl_log_for_unsigned_integer {
                         };
 
                         // Number of available digits to write.
+                        //
+                        // JC: `offset` starts at max_digits, so if I write 1
+                        // digit, then offset will be `9`, which means available
+                        // would be `1`, which is not the number of available
+                        // digits, but rather the number of written digits. Am
+                        // I missing something?
                         let mut available = $max_digits - offset;
 
                         if precision > 0 {
@@ -250,6 +267,10 @@ macro_rules! impl_log_for_unsigned_integer {
 
                             #[cfg(target_os = "solana")]
                             {
+                                // JC: Should we do a check on the size so that
+                                // the syscall isn't always used? For example, if
+                                // `written` is less than 32 bytes, then we do a
+                                // normal copy
                                 if precision == 0 {
                                     sol_memcpy_(ptr as *mut _, source as *const _, written as u64);
                                 } else {
@@ -296,6 +317,12 @@ macro_rules! impl_log_for_unsigned_integer {
                         }
 
                         // There might not have been space for all the value.
+                        // JC: since this function uses an intermediate array
+                        // of `MaybeUninit<u8>`, it could be nicer to have this
+                        // function return the `MaybeUninit` array, so that the
+                        // logger decides how to deal with overflow if the
+                        // returned amount is too big. However, that isn't possible
+                        // at compile-time, so maybe this is the best option.
                         if overflow {
                             unsafe {
                                 let last = buffer.get_unchecked_mut(written - 1);
@@ -404,7 +431,7 @@ impl Log for &str {
         //
         // 1. No arguments were provided, so the entire string is copied to the buffer if it fits;
         //    otherwise, the buffer is filled as many characters as possible and the last character
-        //    is set to `TRUCATED`.
+        //    is set to `TRUNCATED`.
         //
         // Then cases only applicable when precision formatting is used:
         //
@@ -416,7 +443,7 @@ impl Log for &str {
         //    returned is `prefix` + number of characters copied.
         //
         // 4. The buffer is smaller than the string and the prefix: the buffer is filled with the
-        //    prefix and the last character is set to `TRUCATED`. The length returned is the length
+        //    prefix and the last character is set to `TRUNCATED`. The length returned is the length
         //    of the buffer.
         //
         // The length of the message is determined by whether a precision formatting was used or
@@ -433,7 +460,11 @@ impl Log for &str {
 
         // No truncate arguments were provided, so the entire string is copied to the buffer if
         // it fits; otherwise, the buffer is filled with as many characters as possible and the
-        // last character is set to `TRUCATED`.
+        // last character is set to `TRUNCATED`.
+        // JC nit: the variable name `offset` for a pointer is a little mean for
+        // readers :sweat-smile:, same with `length` for "length to write", and
+        // `prefix` can in fact also be a `suffix`, so maybe just be totally
+        // clear and call it `written_truncated_slice_length`
         let (offset, source, length, prefix, truncated) = if truncate_end.is_none() {
             let length = core::cmp::min(size, self.len());
             (
@@ -444,6 +475,9 @@ impl Log for &str {
                 length != self.len(),
             )
         } else {
+            // JC nit: again, some of the variable names are tough to understand
+            // without reading the code: `length` -> `max_length` and `ptr` ->
+            // `destination` would probably be better
             let length = core::cmp::min(size, buffer.len());
             let ptr = buffer.as_mut_ptr();
 
@@ -479,7 +513,7 @@ impl Log for &str {
                 }
             }
             // The buffer is smaller than the `PREFIX`: the buffer is filled with the `PREFIX`
-            // and the last character is set to `TRUCATED`.
+            // and the last character is set to `TRUNCATED`.
             else {
                 (ptr, TRUNCATED_SLICE.as_ptr(), length, 0, true)
             }
@@ -519,6 +553,7 @@ macro_rules! impl_log_for_slice {
             impl_log_for_slice!(@generate_write);
         }
     };
+    // JC: never seen this syntax before for macros, it's neat!
     ( @generate_write ) => {
         #[inline]
         fn write_with_args(&self, buffer: &mut [MaybeUninit<u8>], _args: &[Argument]) -> usize {
@@ -560,6 +595,8 @@ macro_rules! impl_log_for_slice {
                     }
                 }
 
+                // JC: shouldn't this call `write_with_args` instead? Or should
+                // this function be called `debug`? Or both?
                 offset += value.debug(&mut buffer[offset..]);
             }
 

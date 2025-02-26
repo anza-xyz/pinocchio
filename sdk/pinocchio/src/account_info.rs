@@ -13,11 +13,15 @@ use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
 
 /// Maximum number of bytes a program may add to an account during a
 /// single realloc.
+/// JC nit: to be totally clear, it's not in a single realloc, it's in a single
+/// top-level instruction
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
 /// Returns the account info at the given index.
 ///
 /// This macro validates that the index is within the bounds of the accounts.
+/// JC: Is this used? If so, can you give some info or example about how it's
+/// used?
 #[macro_export]
 macro_rules! get_account_info {
     ( $accounts:ident, $index:expr ) => {{
@@ -72,13 +76,15 @@ pub(crate) struct Account {
     /// Public key of the account
     key: Pubkey,
 
-    /// Program that owns this account
+    /// Program that owns this account.
+    /// JC nit: This is also modifiable by the program!
     owner: Pubkey,
 
     /// The lamports in the account.  Modifiable by programs.
     lamports: u64,
 
     /// Length of the data.
+    /// JC nit: also modifiable by the program!
     pub(crate) data_len: u64,
 }
 
@@ -118,6 +124,9 @@ impl AccountInfo {
     }
 
     /// Program that owns this account.
+    /// JC nit: *technically*, since this is returning a ref that can get
+    /// modified, we could do the same thing as with lamports / data and track
+    /// borrows, but the unsafe behavior probably isn't such a big deal
     #[inline(always)]
     pub fn owner(&self) -> &Pubkey {
         unsafe { &(*self.raw).owner }
@@ -412,6 +421,8 @@ impl AccountInfo {
         unsafe {
             let data_ptr = data.as_mut_ptr();
             // set new length in the serialized data
+            // JC nit: it might be clearer to just rewrite `data_len` directly
+            // rather than doing the pointer math
             *(data_ptr.offset(-8) as *mut u64) = new_len as u64;
             // recreate the local slice with the new length
             data.value = NonNull::from(from_raw_parts_mut(data_ptr, new_len));
@@ -421,6 +432,8 @@ impl AccountInfo {
             let len_increase = new_len.saturating_sub(current_len);
             if len_increase > 0 {
                 unsafe {
+                    // JC nit: this probably fine since reallocs tend to be big
+                    // but it would be good to avoid calling it always.
                     #[cfg(target_os = "solana")]
                     sol_memset_(
                         &mut data[current_len..] as *mut _ as *mut u8,
@@ -443,6 +456,10 @@ impl AccountInfo {
     /// since the account data will need to be zeroed out as well; otherwise the lenght,
     /// lamports and owner can be set again before the data is wiped out from
     /// the ledger using the keypair of the account being close.
+    ///
+    /// JC nit: can you add an explanation here and in the unchecked version that
+    /// the lamports must be moved somewhere else to avoid getting an unbalanced
+    /// instruction error (ie. creating or destroying lamports).
     #[inline]
     pub fn close(&self) -> ProgramResult {
         // make sure the account is not borrowed since we are about to

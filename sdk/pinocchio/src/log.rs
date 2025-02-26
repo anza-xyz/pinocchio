@@ -35,6 +35,13 @@
 
 use crate::{account_info::AccountInfo, pubkey::log};
 
+// JC: so these are all the same as `solana-msg`, with the exception of nostd
+// support here, and `solana-msg` falling back to `std::println!` in non-solana
+// builds
+// I'd prefer to see them merged together -- we can add println! usage in this
+// crate if `std` is enabled, and then have `solana-msg` re-export these if
+// you like, or go the other way around, and have pinocchio depend on `solana-msg`
+
 /// Print a message to the log.
 ///
 /// Supports simple strings of type `&str`. The expression will be passed

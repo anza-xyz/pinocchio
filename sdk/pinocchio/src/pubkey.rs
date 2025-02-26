@@ -1,5 +1,9 @@
 //! Public key type and functions.
 
+// JC: `solana-pubkey` could definitely call into a lot of these functions, so
+// this can safely stay as the lower-level crate with maximum code reuse, or
+// we can go the other way around as discussed, and have this use `solana-pubkey`
+
 use crate::program_error::ProgramError;
 
 /// Number of bytes in a pubkey.

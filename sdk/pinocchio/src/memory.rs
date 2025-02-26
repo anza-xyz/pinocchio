@@ -2,6 +2,11 @@
 //!
 //! Within the SBF environment, these are implemented as syscalls and executed by
 //! the runtime in native code.
+//!
+//! JC: looks like these are also very similar to what's in `solana-program-memory`,
+//! with the difference that these implementations use `blackbox` in non-solana
+//! builds, whereas `solana-program-memory` has stubs for non-solana builds.
+//! Let's combine them!
 
 #[cfg(target_os = "solana")]
 use crate::syscalls;
