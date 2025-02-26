@@ -25,7 +25,7 @@ jobs:
           components: audit
 
       - name: cargo-audit
-        run: pnpm audit
+        run: pnpm cargo-audit
 
       - name: Filter members
         id: filter
