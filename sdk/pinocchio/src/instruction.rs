@@ -5,6 +5,9 @@ use core::{marker::PhantomData, ops::Deref};
 use crate::{account_info::AccountInfo, pubkey::Pubkey};
 
 /// Information about a CPI instruction.
+/// JC question: what's `repr(C)` for a slice? Also, the syscall and the runtime
+/// have the order of program-id, then accounts, then data -- might be better to
+/// line that up for consistency.
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct Instruction<'a, 'b, 'c, 'd>
@@ -41,6 +44,10 @@ pub struct ProcessedSiblingInstruction {
 #[derive(Clone)]
 pub struct Account<'a> {
     // Public key of the account.
+    // JC nit: in a few other places, you're using a reference to stand in for
+    // a pointer, ie the `pubkey` in `AccountMeta` -- could we do the same thing
+    // here for all the pointers? That way we could avoid the need for PhantomData.
+    // I just don't think it'll work for data, but the others should work.
     key: *const Pubkey,
 
     // Number of lamports owned by this account.
@@ -87,7 +94,8 @@ impl<'a> From<&'a AccountInfo> for Account<'a> {
             data_len: account.data_len() as u64,
             data: offset(account.raw, 88),
             owner: offset(account.raw, 40),
-            rent_epoch: 0,
+            rent_epoch: 0, // This is probably ok, but the rent epoch is in the
+                           // account info and could be used!
             is_signer: account.is_signer(),
             is_writable: account.is_writable(),
             executable: account.executable(),
@@ -171,6 +179,11 @@ impl<'a> From<&'a AccountInfo> for AccountMeta<'a> {
 #[derive(Debug, Clone)]
 pub struct Seed<'a> {
     /// Seed bytes.
+    /// JC nit: same here, since a slice is a pointer followed by a length, maybe
+    /// we can do the same thing here and avoid the phantom data?
+    /// On the flip side, that would make the types work inconsistently on
+    /// non-Solana architectures, ie. a 32-bit build would not be the as a 64-bit
+    /// build. But since Solana is always 64-bit, maybe we're ok?
     pub(crate) seed: *const u8,
 
     /// Length of the seed bytes.
