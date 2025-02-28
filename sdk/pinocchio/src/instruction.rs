@@ -257,12 +257,13 @@ impl<'a, 'b, const SIZE: usize> From<&'b [Seed<'a>; SIZE]> for Signer<'a, 'b> {
 ///
 /// Creating seeds array and signer for a PDA with a single seed and bump value:
 /// ```
-/// use pinocchio::{seeds, Signer};
-/// use pinocchio::pubkey::find_program_address;
+/// use pinocchio::{seeds, instruction::Signer};
+/// use pinocchio::pubkey::Pubkey;
 ///
-/// let pda_bump = find_program_address(&[b"seed"], &some_key).1;
+/// let pda_bump = 0xffu8;
 /// let pda_ref = &[pda_bump];  // prevent temporary value being freed
-/// let seeds = seeds!(b"seed", &some_key, pda_ref);
+/// let example_key = Pubkey::default();
+/// let seeds = seeds!(b"seed", &example_key, pda_ref);
 /// let signer = Signer::from(&seeds);
 /// ```
 #[macro_export]
