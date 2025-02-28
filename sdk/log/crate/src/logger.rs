@@ -493,12 +493,12 @@ impl Log for &str {
                 )
             } else {
                 let max_length = core::cmp::min(size, buffer.len());
-                let destination = buffer.as_mut_ptr();
+                let ptr = buffer.as_mut_ptr();
 
                 // The buffer is large enough to hold the entire `str`, so no need to use the
                 // truncate args.
                 if max_length >= self.len() {
-                    (destination, self.as_ptr(), self.len(), 0, false)
+                    (ptr, self.as_ptr(), self.len(), 0, false)
                 }
                 // The buffer is large enough to hold the truncated slice and part of the string.
                 // In this case, the characters from the start or end of the string are copied to
@@ -506,21 +506,21 @@ impl Log for &str {
                 else if max_length > TRUNCATED_SLICE.len() {
                     // Number of characters that can be copied to the buffer.
                     let length = max_length - TRUNCATED_SLICE.len();
-                    // SAFETY: the `destination` is always within `length` bounds.
+                    // SAFETY: the `ptr` is always within `length` bounds.
                     unsafe {
                         let (offset, source, destination) = if truncate_end == Some(true) {
-                            (length, self.as_ptr(), destination)
+                            (length, self.as_ptr(), ptr)
                         } else {
                             (
                                 0,
                                 self.as_ptr().add(self.len() - length),
-                                destination.add(TRUNCATED_SLICE.len()),
+                                ptr.add(TRUNCATED_SLICE.len()),
                             )
                         };
                         // Copy the truncated slice to the buffer.
                         core::ptr::copy_nonoverlapping(
                             TRUNCATED_SLICE.as_ptr(),
-                            destination.add(offset) as *mut _,
+                            ptr.add(offset) as *mut _,
                             TRUNCATED_SLICE.len(),
                         );
 
@@ -530,7 +530,7 @@ impl Log for &str {
                 // The buffer is smaller than the `PREFIX`: the buffer is filled with the `PREFIX`
                 // and the last character is set to `TRUNCATED`.
                 else {
-                    (destination, TRUNCATED_SLICE.as_ptr(), max_length, 0, true)
+                    (ptr, TRUNCATED_SLICE.as_ptr(), max_length, 0, true)
                 }
             };
 
