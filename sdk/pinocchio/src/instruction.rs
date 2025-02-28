@@ -5,7 +5,6 @@ use core::{marker::PhantomData, ops::Deref};
 use crate::{account_info::AccountInfo, pubkey::Pubkey};
 
 /// Information about a CPI instruction.
-#[repr(C)]
 #[derive(Debug, Clone)]
 pub struct Instruction<'a, 'b, 'c, 'd>
 where
@@ -87,6 +86,9 @@ impl<'a> From<&'a AccountInfo> for Account<'a> {
             data_len: account.data_len() as u64,
             data: offset(account.raw, 88),
             owner: offset(account.raw, 40),
+            // The `rent_epoch` field is not present in the `AccountInfo` struct,
+            // since the value occurs after the variable data of the account in
+            // the runtime input data.
             rent_epoch: 0,
             is_signer: account.is_signer(),
             is_writable: account.is_writable(),

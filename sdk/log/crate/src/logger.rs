@@ -1,6 +1,7 @@
 use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
 #[cfg(target_os = "solana")]
+// Syscalls provided by the SVM runtime.
 extern "C" {
     pub fn sol_log_(message: *const u8, len: u64);
 
@@ -31,8 +32,8 @@ pub struct Logger<const BUFFER: usize> {
     // Byte buffer to store the log message.
     buffer: [MaybeUninit<u8>; BUFFER],
 
-    // Remaining space in the buffer.
-    offset: usize,
+    // Length of the log message.
+    len: usize,
 }
 
 impl<const BUFFER: usize> Default for Logger<BUFFER> {
@@ -40,7 +41,7 @@ impl<const BUFFER: usize> Default for Logger<BUFFER> {
     fn default() -> Self {
         Self {
             buffer: [UNINIT_BYTE; BUFFER],
-            offset: 0,
+            len: 0,
         }
     }
 }
@@ -49,7 +50,9 @@ impl<const BUFFER: usize> Deref for Logger<BUFFER> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        unsafe { from_raw_parts(self.buffer.as_ptr() as *const _, self.offset) }
+        // SAFETY: the slice is created from the buffer up to the length
+        // of the message.
+        unsafe { from_raw_parts(self.buffer.as_ptr() as *const _, self.len) }
     }
 }
 
@@ -66,13 +69,24 @@ impl<const BUFFER: usize> Logger<BUFFER> {
     pub fn append_with_args<T: Log>(&mut self, value: T, args: &[Argument]) -> &mut Self {
         if self.is_full() {
             if BUFFER > 0 {
+                // SAFETY: the buffer is checked to be full.
                 unsafe {
                     let last = self.buffer.get_unchecked_mut(BUFFER - 1);
                     last.write(TRUNCATED);
                 }
             }
         } else {
-            self.offset += value.write_with_args(&mut self.buffer[self.offset..], args);
+            self.len += value.write_with_args(&mut self.buffer[self.len..], args);
+
+            if self.len() > BUFFER {
+                // Indicates that the buffer is full.
+                self.len = BUFFER;
+                // SAFETY: the buffer length is checked to greater than `BUFFER`.
+                unsafe {
+                    let last = self.buffer.get_unchecked_mut(BUFFER - 1);
+                    last.write(TRUNCATED);
+                }
+            }
         }
 
         self
@@ -84,34 +98,34 @@ impl<const BUFFER: usize> Logger<BUFFER> {
         log_message(self);
     }
 
-    /// Clear the buffer.
+    /// Clear the message buffer.
     #[inline(always)]
     pub fn clear(&mut self) {
-        self.offset = 0;
+        self.len = 0;
     }
 
-    /// Check if the buffer is empty.
+    /// Check wheather the log buffer is empty or not.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.offset == 0
+        self.len == 0
     }
 
-    /// Check if the buffer is full.
+    /// Check whether the log buffer is at the maximum length or not.
     #[inline(always)]
     pub fn is_full(&self) -> bool {
-        self.offset == BUFFER
+        self.len == BUFFER
     }
 
-    /// Get the length of the buffer.
+    /// Get the length of log message.
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.offset
+        self.len
     }
 
-    /// Get the remaining space in the buffer.
+    /// Get the remaining space in the log buffer.
     #[inline(always)]
     pub fn remaining(&self) -> usize {
-        BUFFER - self.offset
+        BUFFER - self.len
     }
 }
 
@@ -119,6 +133,8 @@ impl<const BUFFER: usize> Logger<BUFFER> {
 #[inline(always)]
 pub fn log_message(message: &[u8]) {
     #[cfg(target_os = "solana")]
+    // SAFETY: the message is always a valid pointer to a slice of bytes
+    // and `sol_log_` is a syscall.
     unsafe {
         sol_log_(message.as_ptr(), message.len() as u64);
     }
@@ -186,6 +202,7 @@ macro_rules! impl_log_for_unsigned_integer {
                 match *self {
                     // Handle zero as a special case.
                     0 => {
+                        // SAFETY: the buffer is checked to be non-empty.
                         unsafe {
                             buffer.get_unchecked_mut(0).write(*DIGITS.get_unchecked(0));
                         }
@@ -199,7 +216,10 @@ macro_rules! impl_log_for_unsigned_integer {
                             let remainder = value % 10;
                             value /= 10;
                             offset -= 1;
-
+                            // SAFETY: the offset is always within the bounds of the array since
+                            // the `offset` is initialized with the maximum number of digits that
+                            // the type can have and decremented on each iteration. The `digits`
+                            // array is also initialized with the same length as the offset.
                             unsafe {
                                 digits
                                     .get_unchecked_mut(offset)
@@ -216,14 +236,17 @@ macro_rules! impl_log_for_unsigned_integer {
                             0
                         };
 
-                        // Number of available digits to write.
-                        let mut available = $max_digits - offset;
+                        // Number of digits written.
+                        let mut written = $max_digits - offset;
 
                         if precision > 0 {
-                            while precision >= available {
-                                available += 1;
+                            while precision >= written {
+                                written += 1;
                                 offset -= 1;
-
+                                // SAFETY: the offset is always within the bounds of the array since
+                                // the `offset` is initialized with the maximum number of digits that
+                                // the type can have and decremented on each iteration. The `digits`
+                                // array is also initialized with the same length as the offset.
                                 unsafe {
                                     digits
                                         .get_unchecked_mut(offset)
@@ -231,19 +254,21 @@ macro_rules! impl_log_for_unsigned_integer {
                                 }
                             }
                             // Space for the decimal point.
-                            available += 1;
+                            written += 1;
                         }
 
                         // Size of the buffer.
                         let length = buffer.len();
                         // Determines if the value was truncated or not by calculating the
                         // number of digits that can be written.
-                        let (overflow, written, fraction) = if available <= length {
-                            (false, available, precision)
+                        let (overflow, written, fraction) = if written <= length {
+                            (false, written, precision)
                         } else {
-                            (true, length, precision.saturating_sub(available - length))
+                            (true, length, precision.saturating_sub(written - length))
                         };
-
+                        // SAFETY: the length of both `digits` and `buffer` arrays are guaranteed
+                        // to be within bounds and the `written` value is always less than their
+                        // maximum length.
                         unsafe {
                             let source = digits.as_ptr().add(offset);
                             let ptr = buffer.as_mut_ptr();
@@ -297,6 +322,7 @@ macro_rules! impl_log_for_unsigned_integer {
 
                         // There might not have been space for all the value.
                         if overflow {
+                            // SAFETY: the buffer is checked to be within `written` bounds.
                             unsafe {
                                 let last = buffer.get_unchecked_mut(written - 1);
                                 last.write(TRUNCATED);
@@ -335,6 +361,7 @@ macro_rules! impl_log_for_signed {
                 match *self {
                     // Handle zero as a special case.
                     0 => {
+                        // SAFETY: the buffer is checked to be non-empty.
                         unsafe {
                             buffer.get_unchecked_mut(0).write(*DIGITS.get_unchecked(0));
                         }
@@ -344,6 +371,7 @@ macro_rules! impl_log_for_signed {
                         let mut prefix = 0;
 
                         if *self < 0 {
+                            // SAFETY: the buffer is checked to be non-empty.
                             unsafe {
                                 buffer.get_unchecked_mut(0).write(b'-');
                             }
@@ -375,7 +403,7 @@ impl Log for &str {
         if buffer.is_empty() {
             return 0;
         }
-
+        // SAFETY: the buffer is checked to be non-empty.
         unsafe {
             buffer.get_unchecked_mut(0).write(b'"');
         }
@@ -384,10 +412,14 @@ impl Log for &str {
         offset += self.write(&mut buffer[offset..]);
 
         match buffer.len() - offset {
-            0 => unsafe {
-                buffer.get_unchecked_mut(offset - 1).write(TRUNCATED);
-            },
+            0 => {
+                // SAFETY: the buffer is guaranteed to be within `offset` bounds.
+                unsafe {
+                    buffer.get_unchecked_mut(offset - 1).write(TRUNCATED);
+                }
+            }
             _ => {
+                // SAFETY: the buffer is guaranteed to be within `offset` bounds.
                 unsafe {
                     buffer.get_unchecked_mut(offset).write(b'"');
                 }
@@ -404,7 +436,7 @@ impl Log for &str {
         //
         // 1. No arguments were provided, so the entire string is copied to the buffer if it fits;
         //    otherwise, the buffer is filled as many characters as possible and the last character
-        //    is set to `TRUCATED`.
+        //    is set to `TRUNCATED`.
         //
         // Then cases only applicable when precision formatting is used:
         //
@@ -416,11 +448,11 @@ impl Log for &str {
         //    returned is `prefix` + number of characters copied.
         //
         // 4. The buffer is smaller than the string and the prefix: the buffer is filled with the
-        //    prefix and the last character is set to `TRUCATED`. The length returned is the length
+        //    prefix and the last character is set to `TRUNCATED`. The length returned is the length
         //    of the buffer.
         //
         // The length of the message is determined by whether a precision formatting was used or
-        //  not, and the length of the buffer.
+        // not, and the length of the buffer.
 
         let (size, truncate_end) = match args
             .iter()
@@ -431,73 +463,92 @@ impl Log for &str {
             _ => (buffer.len(), None),
         };
 
-        // No truncate arguments were provided, so the entire string is copied to the buffer if
-        // it fits; otherwise, the buffer is filled with as many characters as possible and the
-        // last character is set to `TRUCATED`.
-        let (offset, source, length, prefix, truncated) = if truncate_end.is_none() {
-            let length = core::cmp::min(size, self.len());
-            (
-                buffer.as_mut_ptr(),
-                self.as_ptr(),
-                length,
-                0,
-                length != self.len(),
-            )
-        } else {
-            let length = core::cmp::min(size, buffer.len());
-            let ptr = buffer.as_mut_ptr();
+        // Handles the write of the `str` to the buffer.
+        //
+        // - `destination`: pointer to the buffer where the string will be copied. This is always
+        //   the a pointer to the log buffer, but it could de in a different offset depending on
+        //   whether the trucated slice is copied or not.
+        //
+        // - `source`: pointer to the string that will be copied. This could either be a pointer
+        //   to the `str` itself or `TRUNCATE_SLICE`).
+        //
+        // - `length_to_write`: number of characters from `source` that will be copied.
+        //
+        // - `written_truncated_slice_length`: number of characters copied from `TRUNCATED_SLICE`.
+        //   This is used to determine the total number of characters copied to the buffer.
+        //
+        // - `truncated`: indicates whether the `str` was truncated or not. This is used to set
+        //   the last character of the buffer to `TRUNCATED`.
+        let (destination, source, length_to_write, written_truncated_slice_length, truncated) =
+            // No truncate arguments were provided, so the entire `str` is copied to the buffer
+            // if it fits; otherwise indicates that the `str` was truncated.
+            if truncate_end.is_none() {
+                let length = core::cmp::min(size, self.len());
+                (
+                    buffer.as_mut_ptr(),
+                    self.as_ptr(),
+                    length,
+                    0,
+                    length != self.len(),
+                )
+            } else {
+                let max_length = core::cmp::min(size, buffer.len());
+                let destination = buffer.as_mut_ptr();
 
-            // The buffer is large enough to hold the entire string.
-            if length >= self.len() {
-                (ptr, self.as_ptr(), self.len(), 0, false)
-            }
-            // The buffer is large enough to hold the truncated slice and part of the string. In
-            // In this case, the characters from the start or end of the string are copied to the
-            // buffer together with the `TRUNCATED_SLICE`.
-            else if length > TRUNCATED_SLICE.len() {
-                // Number of characters that can be copied to the buffer.
-                let length = length - TRUNCATED_SLICE.len();
-
-                unsafe {
-                    let (offset, source, destination) = if truncate_end == Some(true) {
-                        (length, self.as_ptr(), ptr)
-                    } else {
-                        (
-                            0,
-                            self.as_ptr().add(self.len() - length),
-                            ptr.add(TRUNCATED_SLICE.len()),
-                        )
-                    };
-                    // Copy the truncated slice to the buffer.
-                    core::ptr::copy_nonoverlapping(
-                        TRUNCATED_SLICE.as_ptr(),
-                        ptr.add(offset) as *mut _,
-                        TRUNCATED_SLICE.len(),
-                    );
-
-                    (destination, source, length, TRUNCATED_SLICE.len(), false)
+                // The buffer is large enough to hold the entire `str`, so no need to use the
+                // truncate args.
+                if max_length >= self.len() {
+                    (destination, self.as_ptr(), self.len(), 0, false)
                 }
-            }
-            // The buffer is smaller than the `PREFIX`: the buffer is filled with the `PREFIX`
-            // and the last character is set to `TRUCATED`.
-            else {
-                (ptr, TRUNCATED_SLICE.as_ptr(), length, 0, true)
-            }
-        };
+                // The buffer is large enough to hold the truncated slice and part of the string.
+                // In this case, the characters from the start or end of the string are copied to
+                // the buffer together with the `TRUNCATED_SLICE`.
+                else if max_length > TRUNCATED_SLICE.len() {
+                    // Number of characters that can be copied to the buffer.
+                    let length = max_length - TRUNCATED_SLICE.len();
+                    // SAFETY: the `destination` is always within `length` bounds.
+                    unsafe {
+                        let (offset, source, destination) = if truncate_end == Some(true) {
+                            (length, self.as_ptr(), destination)
+                        } else {
+                            (
+                                0,
+                                self.as_ptr().add(self.len() - length),
+                                destination.add(TRUNCATED_SLICE.len()),
+                            )
+                        };
+                        // Copy the truncated slice to the buffer.
+                        core::ptr::copy_nonoverlapping(
+                            TRUNCATED_SLICE.as_ptr(),
+                            destination.add(offset) as *mut _,
+                            TRUNCATED_SLICE.len(),
+                        );
 
+                        (destination, source, length, TRUNCATED_SLICE.len(), false)
+                    }
+                }
+                // The buffer is smaller than the `PREFIX`: the buffer is filled with the `PREFIX`
+                // and the last character is set to `TRUNCATED`.
+                else {
+                    (destination, TRUNCATED_SLICE.as_ptr(), max_length, 0, true)
+                }
+            };
+
+        // SAFETY: the `destination` is always within `length_to_write` bounds.
         unsafe {
-            core::ptr::copy_nonoverlapping(source, offset as *mut _, length);
+            core::ptr::copy_nonoverlapping(source, destination as *mut _, length_to_write);
         }
 
         // There might not have been space for all the value.
         if truncated {
+            // SAFETY: the `destination` is always within `length_to_write` bounds.
             unsafe {
-                let last = buffer.get_unchecked_mut(length - 1);
+                let last = buffer.get_unchecked_mut(length_to_write - 1);
                 last.write(TRUNCATED);
             }
         }
 
-        prefix + length
+        written_truncated_slice_length + length_to_write
     }
 }
 
@@ -528,7 +579,7 @@ macro_rules! impl_log_for_slice {
 
             // Size of the buffer.
             let length = buffer.len();
-
+            // SAFETY: the buffer is checked to be non-empty.
             unsafe {
                 buffer.get_unchecked_mut(0).write(b'[');
             }
@@ -537,6 +588,8 @@ macro_rules! impl_log_for_slice {
 
             for value in self.iter() {
                 if offset >= length {
+                    // SAFETY: the buffer is checked to be non-empty and the `length`
+                    // represents the buffer length.
                     unsafe {
                         buffer.get_unchecked_mut(length - 1).write(TRUNCATED);
                     }
@@ -546,12 +599,16 @@ macro_rules! impl_log_for_slice {
 
                 if offset > 1 {
                     if offset + 2 >= length {
+                        // SAFETY: the buffer is checked to be non-empty and the `length`
+                        // represents the buffer length.
                         unsafe {
                             buffer.get_unchecked_mut(length - 1).write(TRUNCATED);
                         }
                         offset = length;
                         break;
                     } else {
+                        // SAFETY: the buffer is checked to be non-empty and the `offset`
+                        // is smaller than the buffer length.
                         unsafe {
                             buffer.get_unchecked_mut(offset).write(b',');
                             buffer.get_unchecked_mut(offset + 1).write(b' ');
@@ -564,6 +621,8 @@ macro_rules! impl_log_for_slice {
             }
 
             if offset < length {
+                // SAFETY: the buffer is checked to be non-empty and the `offset`
+                // is smaller than the buffer length.
                 unsafe {
                     buffer.get_unchecked_mut(offset).write(b']');
                 }
