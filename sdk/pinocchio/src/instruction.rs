@@ -251,6 +251,28 @@ impl<'a, 'b, const SIZE: usize> From<&'b [Seed<'a>; SIZE]> for Signer<'a, 'b> {
     }
 }
 
+/// Convenience macro for constructing a `Signer` from a list of seeds
+/// represented as byte slices.
+///
+/// # Example
+///
+/// Creating a signer for a PDA with a single seed and bump value:
+/// ```
+/// use pinocchio::signer;
+///
+/// let pda_bump = 255;
+/// let signer = signer!(b"seed", &[pda_bump]);
+/// ```
+#[macro_export]
+#[deprecated(since = "0.8.0", note = "Use `seeds!` macro instead")]
+macro_rules! signer {
+    ( $($seed:expr),* ) => {
+            $crate::instruction::Signer::from(&[$(
+                $seed.into(),
+            )*])
+    };
+}
+
 /// Convenience macro for constructing a `[Seed; N]` array from a list of seeds.
 ///
 /// # Example
