@@ -1,5 +1,8 @@
 //! Syscall functions.
 
+// JC: these look to be exactly the same as `solana-define-syscall`, with a
+// couple of different definitions because of the `AccountMeta` difference.
+// Ripe to be combined!
 use crate::{
     instruction::{AccountMeta, ProcessedSiblingInstruction},
     pubkey::Pubkey,
