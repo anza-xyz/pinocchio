@@ -262,4 +262,67 @@ mod tests {
             assert_eq!(logger.len(), 19);
         }
     }
+
+    /// Generate test cases for numeric types.
+    ///
+    /// The test cases are generated for the given type and buffer size. The
+    /// assert compares that the logger buffer length is less than or equal to
+    /// the maximum length.
+    macro_rules! generate_numeric_test_case {
+        ( $ty:ident, $max_len:literal, $($size:expr),+ $(,)? ) => {
+            $(
+                let mut logger = Logger::<$size>::default();
+                logger.append($ty::MAX);
+                assert!((*logger).len() <= $max_len);
+            )*
+        };
+    }
+
+    /// Generate a test function for numeric types.
+    ///
+    /// The main objective is to ensure that the logger will not panic when appending
+    /// numeric types to the buffer.
+    macro_rules! fn_test_numeric_logger_buffer {
+        ( $test_name:ident, $( ($ty:ident, $max_len:literal) ),+ $(,)? ) => {
+            #[test]
+            fn $test_name() {
+                $(
+                    generate_numeric_test_case!($ty, $max_len, 1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17,
+                        18,
+                        19,
+                        20,
+                        50,
+                        100,
+                        1000);
+                )*
+            }
+        };
+    }
+
+    // Test function for numeric types.
+    fn_test_numeric_logger_buffer!(
+        test_logger_buffer_size_numeric,
+        (u8, 3),
+        (u16, 5),
+        (u32, 10),
+        (u64, 20),
+        (u128, 39),
+        (usize, 20)
+    );
 }
