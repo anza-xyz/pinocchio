@@ -13,7 +13,7 @@
 
 This crate contains [`pinocchio`](https://crates.io/crates/pinocchio) helpers to perform cross-program invocations (CPIs) for SPL Associated Token Account program instructions.
 
-Each instruction defines an `struct` with the accounts and parameters required. Once all values are set, you can call directly `invoke` or `invoke_signed` to perform the CPI.
+Each instruction defines a `struct` with the accounts and parameters required. Once all values are set, you can call directly `invoke` or `invoke_signed` to perform the CPI.
 
 This is a `no_std` crate.
 
@@ -33,7 +33,7 @@ This will add the `pinocchio-associated-token-account` dependency to your `Cargo
 
 Creating an associated token account:
 ```rust
-// Those examples assumes that each instruction receives writable and signer `funding_account` account,
+// Those examples assume that each instruction receives writable and signer `funding_account` account,
 // writable `account` account, and `wallet`, `mint`, `system_program`, `token_program` accounts.
 Create {
     funding_account,
