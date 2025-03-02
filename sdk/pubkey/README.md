@@ -4,7 +4,7 @@ Companion `Pubkey` helpers for [`pinocchio`](https://github.com/febo/pinocchio).
 
 This crate provides two convenience macros to resolve `Pubkey`s at compile time:
 
-* `pubkey!`: takes a pubkey value as a base58 `&str` and generates its correpondent `Pubkey` (byte array)
+* `pubkey!`: takes a pubkey value as a base58 `&str` and generates its correspondent `Pubkey` (byte array)
 * `declare_id!`: takes a pubkey value as a base58 `&str` (usually representing a program address) and generates an `ID` constant, `check_id()` and `id()` helpers
 
 It also defines a `from_str` helper that takes a `&str` and returns the correspondent `Pubkey` value.
