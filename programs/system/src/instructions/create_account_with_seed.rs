@@ -1,9 +1,11 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+use {
+    pinocchio::{
+        account_info::AccountInfo,
+        instruction::{AccountMeta, Instruction, Signer},
+        pubkey::Pubkey,
+        ProgramResult,
+    },
+    pinocchio_cpi::invoke_signed,
 };
 
 /// Create a new account at an address derived from a base pubkey and a seed.

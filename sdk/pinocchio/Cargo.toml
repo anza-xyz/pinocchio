@@ -10,11 +10,8 @@ repository = { workspace = true }
 [lib]
 crate-type = ["rlib"]
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = [
-    'cfg(target_os, values("solana"))',
-    'cfg(target_feature, values("static-syscalls"))',
-] }
-
 [features]
 std = []
+
+[lints]
+workspace = true
