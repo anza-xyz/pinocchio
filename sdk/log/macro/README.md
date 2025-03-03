@@ -26,7 +26,7 @@ use pinocchio_log::log
 log!("a simple log");
 ```
 
-To ouput a formatted message:
+To output a formatted message:
 ```rust
 use pinocchio_log::log
 
@@ -50,7 +50,7 @@ let lamports = 1_000_000_000;
 log!("transfer amount (SOL: {:.9}", lamports);
 ```
 
-For `&str` types, it is possible to specify a maximim length and a truncation strategy:
+For `&str` types, it is possible to specify a maximum length and a truncation strategy:
 ```rust
 use pinocchio_log::log
 
