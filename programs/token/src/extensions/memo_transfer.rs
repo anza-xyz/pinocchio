@@ -1,3 +1,5 @@
+use core::slice::from_raw_parts;
+
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     instruction::{AccountMeta, Instruction, Signer},
@@ -6,10 +8,18 @@ use pinocchio::{
 };
 
 use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 // State
 pub struct MemoTransfer {
     /// Require transfers into this account to be accompanied by a memo
     pub require_incoming_transfer_memos: bool,
+}
+
+impl super::Extension for MemoTransfer {
+    const TYPE: super::ExtensionType = super::ExtensionType::MemoTransfer;
+    const LEN: usize = Self::LEN;
+    const BASE_STATE: super::BaseState = super::BaseState::Mint;
 }
 
 impl MemoTransfer {
@@ -95,7 +105,7 @@ impl<'a> EnableMemoTransfer<'a> {
         let mut instruction_data = [UNINIT_BYTE; 2];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[todo!()]);
+        write_bytes(&mut instruction_data[0..1], &[30]);
 
         // Enable incoming transfer memos
         write_bytes(&mut instruction_data[1..2], &[0]);
@@ -103,7 +113,7 @@ impl<'a> EnableMemoTransfer<'a> {
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
         };
 
         invoke_signed(&instruction, &[self.account], signers)
@@ -135,7 +145,7 @@ impl<'a> DisableMemoTransfer<'a> {
         let mut instruction_data = [UNINIT_BYTE; 2];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[todo!()]);
+        write_bytes(&mut instruction_data[0..1], &[30]);
         // Disable incoming transfer memos
         write_bytes(&mut instruction_data[1..2], &[1]);
 

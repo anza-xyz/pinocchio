@@ -1,3 +1,5 @@
+use core::slice::from_raw_parts;
+
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     instruction::{AccountMeta, Instruction, Signer},
@@ -91,7 +93,7 @@ impl<'a> EnableCpiGuard<'a> {
         let mut instruction_data = [UNINIT_BYTE; 2];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], todo!());
+        write_bytes(&mut instruction_data[0..1], &[34]);
 
         // Enable the CPI guard
         write_bytes(&mut instruction_data[1..2], &[0]);
@@ -101,6 +103,8 @@ impl<'a> EnableCpiGuard<'a> {
             accounts: &account_metas,
             data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 2) },
         };
+
+        invoke_signed(&instruction, &[self.account, self.account_owner], signers)?;
 
         Ok(())
     }
@@ -130,7 +134,7 @@ impl<'a> DisableCpiGuard<'a> {
         let mut instruction_data = [UNINIT_BYTE; 2];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], todo!());
+        write_bytes(&mut instruction_data[0..1], &[34]);
 
         // Disable the CPI guard
         write_bytes(&mut instruction_data[1..2], &[1]);
@@ -138,7 +142,7 @@ impl<'a> DisableCpiGuard<'a> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
         };
 
         invoke_signed(&instruction, &[self.account, self.account_owner], signers)?;

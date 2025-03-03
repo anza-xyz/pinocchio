@@ -11,8 +11,11 @@ use pinocchio::{
 
 use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 
+use super::Extension;
+
 /// Transfer fee configuration
 #[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TransferFee {
     /// First epoch where the transfer fee takes effect
     pub epoch: [u8; 8],
@@ -20,19 +23,16 @@ pub struct TransferFee {
     pub maximum_fee: [u8; 8],
     /// Amount of transfer collected as fees, expressed as basis points of the
     /// transfer amount, ie. increments of 0.01%
-    pub transfer_fee_basis_points: [u8; 8],
+    pub transfer_fee_basis_points: [u8; 2],
 }
 
 /// State
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TransferFeeConfig {
-    /// flag to indicate if the transfer fee config authority is present
-    pub transfer_fee_config_authority_flag: [u8; 4],
     /// Optional authority to set the fee
     pub transfer_fee_config_authority: Pubkey,
-    /// flag to indicate if the withdraw authority is present
-    pub withdraw_withheld_authority_flag: [u8; 4],
     /// Withdraw from mint instructions must be signed by this key
     pub withdraw_withheld_authority: Pubkey,
     /// Withheld transfer fee tokens that have been moved to the mint for
@@ -100,6 +100,14 @@ impl TransferFeeConfig {
     }
 }
 
+impl Extension for TransferFeeConfig {
+    const TYPE: super::ExtensionType = super::ExtensionType::TransferFeeConfig;
+
+    const LEN: usize = Self::LEN;
+
+    const BASE_STATE: super::BaseState = super::BaseState::Mint;
+}
+
 /// Instructions
 
 /// Initialize the transfer fee configuration for a mint.
@@ -127,12 +135,12 @@ impl<'a> InitializeTransferFeeConfig<'a> {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1..33]: mint (32 bytes, Pubkey)
-        // -  [33]: transfer_fee_config_authority_flag (1 byte, u8)
-        // -  [34..66]: transfer_fee_config_authority (32 bytes, Pubkey)
-        // -  [66]: withdraw_withheld_authority_flag (1 byte, u8)
-        // -  [67..99]: withdraw_withheld_authority (32 bytes, Pubkey)
-        // -  [99..101]: transfer_fee_basis_points (2 bytes, u16)
-        // -  [101..109]: maximum_fee (8 bytes, u64)
+        // -  [33..37]: transfer_fee_config_authority_flag (4 byte, [u8;4])
+        // -  [37..69]: transfer_fee_config_authority (32 bytes, Pubkey)
+        // -  [69..73]: withdraw_withheld_authority_flag (4 byte, [u8;4])
+        // -  [73..105]: withdraw_withheld_authority (32 bytes, Pubkey)
+        // -  [105..107]: transfer_fee_basis_points (2 bytes, u16)
+        // -  [107..115]: maximum_fee (8 bytes, u64)
 
         let mut instruction_data = [UNINIT_BYTE; 109];
 
@@ -143,31 +151,35 @@ impl<'a> InitializeTransferFeeConfig<'a> {
         // Set transfer_fee_config_authority COption at offset [33..37]
         let mut offset = 33;
         if let Some(transfer_fee_config_authority) = self.transfer_fee_config_authority {
-            write_bytes(&mut instruction_data[33..34], &[1]);
+            write_bytes(&mut instruction_data[33..37], &[1, 0, 0, 0]);
             write_bytes(
-                &mut instruction_data[34..66],
+                &mut instruction_data[37..69],
                 transfer_fee_config_authority.as_ref(),
             );
-            offset += 33;
         } else {
-            write_bytes(&mut instruction_data[33..34], &[0]);
-            offset += 1;
+            write_bytes(&mut instruction_data[33..37], &[0, 0, 0, 0]);
+            write_bytes(&mut instruction_data[37..69], &[0; 32]);
         }
+        offset += 36;
 
         if let Some(withdraw_withheld_authority) = self.withdraw_withheld_authority {
-            write_bytes(&mut instruction_data[offset..offset + 1], &[1]);
+            write_bytes(&mut instruction_data[offset..offset + 4], &[1, 0, 0, 0]);
             write_bytes(
-                &mut instruction_data[(offset + 1)..(offset + 1 + 32)],
+                &mut instruction_data[(offset + 4)..(offset + 4 + 32)],
                 withdraw_withheld_authority.as_ref(),
             );
         } else {
-            write_bytes(&mut instruction_data[offset..offset + 33], &[0]);
+            write_bytes(&mut instruction_data[offset..offset + 4], &[0, 0, 0, 0]);
+            write_bytes(
+                &mut instruction_data[(offset + 4)..(offset + 4 + 32)],
+                &[0; 32],
+            );
         }
 
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &[AccountMeta::writable(self.mint.key())],
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 109) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 115) },
         };
 
         invoke_signed(&instruction, &[self.mint], signers)
