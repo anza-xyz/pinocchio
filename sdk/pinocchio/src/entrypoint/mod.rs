@@ -175,7 +175,8 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
                 offset += core::mem::size_of::<u64>();
                 // duplicate account, clone the original pointer
                 accounts[i].write(
-                    accounts[(*account_info).borrow_state as usize]
+                    accounts
+                        .get_unchecked((*account_info).borrow_state as usize)
                         .assume_init_ref()
                         .clone(),
                 );
