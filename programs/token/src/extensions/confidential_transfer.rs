@@ -95,7 +95,7 @@ impl<'a> UpdateMint<'a> {
         let mut instruction_data = [UNINIT_BYTE; 33];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[1]);
+        write_bytes(&mut instruction_data, &[27]);
         // Set mint_authority as Pubkey at offset [1..33]
         write_bytes(&mut instruction_data[1..33], self.mint_authority);
 

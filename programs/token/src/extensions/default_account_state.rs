@@ -1,12 +1,25 @@
+use core::slice::from_raw_parts;
+
 use pinocchio::{
     account_info::{AccountInfo, Ref},
+    instruction::{AccountMeta, Instruction, Signer},
+    program::invoke_signed,
     program_error::ProgramError,
+    ProgramResult,
 };
 
-use crate::{state::AccountState, TOKEN_2022_PROGRAM_ID};
+use crate::{state::AccountState, write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
+
+use super::Extension;
 
 pub struct DefaultAccountState {
     pub state: AccountState,
+}
+
+impl Extension for DefaultAccountState {
+    const TYPE: super::ExtensionType = super::ExtensionType::DefaultAccountState;
+    const LEN: usize = Self::LEN;
+    const BASE_STATE: super::BaseState = super::BaseState::Mint;
 }
 
 impl DefaultAccountState {
@@ -70,6 +83,35 @@ pub struct InitializeDefaultAccountState<'a> {
     pub mint: &'a AccountInfo,
     /// Default account state
     pub state: u8,
+}
+
+impl<'a> InitializeDefaultAccountState<'a> {
+    #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
+    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        // Account metadata
+        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.mint.key())];
+
+        // Instruction data layout:
+        // -  [0]: instruction discriminator (1 byte, u8)
+        let mut instruction_data = [UNINIT_BYTE; 1];
+
+        // Set discriminator as u8 at offset [0]
+        write_bytes(&mut instruction_data, &[28]);
+
+        write_bytes(&mut instruction_data[1..2], &[self.state]);
+
+        let instruction = Instruction {
+            program_id: &TOKEN_2022_PROGRAM_ID,
+            accounts: &account_metas,
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 1) },
+        };
+
+        invoke_signed(&instruction, &[self.mint], signers)
+    }
 }
 
 pub struct UpdateDefaultAccountState<'a> {
