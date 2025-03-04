@@ -65,6 +65,6 @@ impl TransferChecked<'_> {
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };
 
-        invoke_signed(&instruction, &[self.from, self.to, self.authority], signers)
+        invoke_signed(&instruction, &[self.from, self.mint, self.to, self.authority], signers)
     }
 }
