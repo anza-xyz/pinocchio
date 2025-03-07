@@ -104,22 +104,10 @@ impl<const BUFFER: usize> Logger<BUFFER> {
         self.len = 0;
     }
 
-    /// Check wheather the log buffer is empty or not.
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
     /// Check whether the log buffer is at the maximum length or not.
     #[inline(always)]
     pub fn is_full(&self) -> bool {
         self.len == BUFFER
-    }
-
-    /// Get the length of log message.
-    #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.len
     }
 
     /// Get the remaining space in the log buffer.
