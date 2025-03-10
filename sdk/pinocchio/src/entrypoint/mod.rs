@@ -263,6 +263,14 @@ macro_rules! default_panic_handler {
             $crate::log::sol_log("** PANICKED **");
             unsafe { $crate::syscalls::abort() }
         }
+
+        /// A dummy handler for clippy
+        #[cfg(all(not(feature = "custom-panic"), not(target_os = "solana")))]
+        #[no_mangle]
+        #[panic_handler]
+        fn dummy_handler(info: &core::panic::PanicInfo<'_>) -> ! {
+            unsafe { core::hint::unreachable_unchecked() }
+        }
     };
 }
 
