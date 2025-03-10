@@ -220,10 +220,11 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
     (program_id, processed, instruction_data)
 }
 
-/// Default panic handler.
+/// Default panic handler (std).
 ///
 /// This macro sets up a default panic handler that logs the panic message and the file where the
-/// panic occurred.
+/// panic occurred. Syscall "abort()" will be called after it returns. It acts as a hook after
+/// rust runtime panics.
 ///
 /// Note that this requires the `"std"` feature to be enabled.
 #[cfg(feature = "std")]
@@ -240,9 +241,10 @@ macro_rules! default_panic_handler {
     };
 }
 
-/// Default panic handler.
+/// Default panic handler (no std).
 ///
 /// This macro sets up a default panic handler that logs the file where the panic occurred.
+/// It takes over rust runtime panics. We call "abort()" directly in the handler.
 ///
 /// This is used when the `"std"` feature is disabled.
 #[cfg(not(feature = "std"))]
@@ -252,12 +254,24 @@ macro_rules! default_panic_handler {
         /// Default panic handler.
         #[cfg(all(not(feature = "custom-panic"), target_os = "solana"))]
         #[no_mangle]
-        fn custom_panic(info: &core::panic::PanicInfo<'_>) {
+        #[panic_handler]
+        fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
             if let Some(location) = info.location() {
                 $crate::log::sol_log(location.file());
             }
             // Panic reporting.
             $crate::log::sol_log("** PANICKED **");
+            unsafe { $crate::syscalls::abort() }
+        }
+
+        /// A dummy handler for clippy
+        ///
+        /// To make clippy work, add panic = "abort" under [profile.dev] in Cargo.toml
+        #[cfg(all(not(feature = "custom-panic"), not(target_os = "solana")))]
+        #[no_mangle]
+        #[panic_handler]
+        fn dummy_handler(info: &core::panic::PanicInfo<'_>) -> ! {
+            unsafe { core::hint::unreachable_unchecked() }
         }
     };
 }
