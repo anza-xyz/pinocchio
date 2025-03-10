@@ -18,3 +18,5 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [features]
 std = []
+custom-panic = []
+custom-heap = []
