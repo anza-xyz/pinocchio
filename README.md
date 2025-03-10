@@ -101,7 +101,7 @@ Any of these macros can be replaced by other implementations and `pinocchio` off
 
 📌 [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html)
 
-The `entrypoint!` macro looks similar to the "standard" one found in `solana-program`. It parsers the whole input and provides the `program_id`, `accounts` and `instruction_data` separately. This consumes compute units before the program begins its execution. In some cases, it is beneficial for a program to have more control when the input parsing is happening, even whether the parsing is needed or not &mdash; this is the purpose of the [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html) macro. This macro only wraps the program input and provides methods to parse the input on demand.
+The `entrypoint!` macro looks similar to the "standard" one found in `solana-program`. It parses the whole input and provides the `program_id`, `accounts` and `instruction_data` separately. This consumes compute units before the program begins its execution. In some cases, it is beneficial for a program to have more control when the input parsing is happening, even whether the parsing is needed or not &mdash; this is the purpose of the [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html) macro. This macro only wraps the program input and provides methods to parse the input on demand.
 
 The `lazy_entrypoint` is suitable for programs that have a single or very few instructions, since it requires the program to handle the parsing, which can become complex as the number of instructions increases. For *larger* programs, the [`program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.program_entrypoint.html) will likely be easier and more efficient to use.
 
@@ -132,7 +132,7 @@ The `InstructionContext` provides on-demand access to the information of the inp
 
 * `available()`: number of available accounts
 * `next_account()`: parsers the next available account (can be used as many times as accounts available)
-* `instruction_data()`: parsers the intruction data
+* `instruction_data()`: parsers the instruction data
 * `program_id()`: parsers the program id
 
 > ⚠️ **Note:**
@@ -140,7 +140,7 @@ The `InstructionContext` provides on-demand access to the information of the inp
 
 📌 [`no_allocator!`](https://docs.rs/pinocchio/latest/pinocchio/macro.no_allocator.html)
 
-When writing programs, it can be useful to make sure the program does not attempt to make any allocations. For this cases, `pinocchio` includes a [`no_allocator!`](https://docs.rs/pinocchio/latest/pinocchio/macro.no_allocator.html) macro that set a global allocator just panics at any attempt to allocate memory.
+When writing programs, it can be useful to make sure the program does not attempt to make any allocations. For this cases, `pinocchio` includes a [`no_allocator!`](https://docs.rs/pinocchio/latest/pinocchio/macro.no_allocator.html) macro that sets a global allocator just panics at any attempt to allocate memory.
 
 To use the `no_allocator!` macro, use the following in your entrypoint definition:
 ```rust
@@ -172,16 +172,16 @@ pub fn process_instruction(
 
 ## Crate feature: `std`
 
-By default, `pinocchio` is a `no_std` crate. This means that it does not use any code from the standard (`std`) library. While this does not affect how `pinocchio` is used, there is a one particular apparent difference. In a `no_std` environment, the `msg!` macro does not provide any formatting options since the `format!` macro requires the `std` library. In order to use `msg!` with formatting, the `std` feature should be enable when adding `pinocchio` as a dependency:
+By default, `pinocchio` is a `no_std` crate. This means that it does not use any code from the standard (`std`) library. While this does not affect how `pinocchio` is used, there is one particular apparent difference. In a `no_std` environment, the `msg!` macro does not provide any formatting options since the `format!` macro requires the `std` library. In order to use `msg!` with formatting, the `std` feature should be enabled when adding `pinocchio` as a dependency:
 ```
 pinocchio = { version = "0.7.0", features = ["std"] }
 ```
 
-Instead of enabling the `std` feature to be able to format log messages with `msg!`, it is recommented to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log) crate. This crate provides a lightweight `log!` macro with better compute units consumption than the standard `format!` macro without requiring the `std` library.
+Instead of enabling the `std` feature to be able to format log messages with `msg!`, it is recommended to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log) crate. This crate provides a lightweight `log!` macro with better compute units consumption than the standard `format!` macro without requiring the `std` library.
 
 ## Advance entrypoint configuration
 
-The symbols emitted by the entrypoint macros &mdash; program entrypoint, global allocator and default panic handler &mdash; can only be defined once globally. If the program crate is also intended to be use as a library, it is common practice to define a Cargo [feature](https://doc.rust-lang.org/cargo/reference/features.html) in your program crate to conditionally enable the module that includes the `entrypoint!` macro invocation. The convention is to name the feature `bpf-entrypoint`.
+The symbols emitted by the entrypoint macros &mdash; program entrypoint, global allocator and default panic handler &mdash; can only be defined once globally. If the program crate is also intended to be used as a library, it is common practice to define a Cargo [feature](https://doc.rust-lang.org/cargo/reference/features.html) in your program crate to conditionally enable the module that includes the `entrypoint!` macro invocation. The convention is to name the feature `bpf-entrypoint`.
 
 ```rust
 #[cfg(feature = "bpf-entrypoint")]
