@@ -233,13 +233,9 @@ macro_rules! default_panic_handler {
         /// Default panic handler.
         #[cfg(all(not(feature = "custom-panic"), target_os = "solana"))]
         #[no_mangle]
-        #[panic_handler]
-        fn custom_panic(info: &core::panic::PanicInfo<'_>) -> ! {
+        fn custom_panic(info: &core::panic::PanicInfo<'_>) {
             // Panic reporting.
             $crate::msg!("{}", info);
-            unsafe {
-                core::hint::unreachable_unchecked();
-            }
         }
     };
 }
@@ -257,15 +253,13 @@ macro_rules! default_panic_handler {
         #[cfg(all(not(feature = "custom-panic"), target_os = "solana"))]
         #[no_mangle]
         #[panic_handler]
-        fn custom_panic(info: &core::panic::PanicInfo<'_>) -> ! {
+        fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
             if let Some(location) = info.location() {
                 $crate::log::sol_log(location.file());
             }
             // Panic reporting.
             $crate::log::sol_log("** PANICKED **");
-            unsafe {
-                core::hint::unreachable_unchecked();
-            }
+            unsafe { $crate::syscalls::abort() }
         }
     };
 }
