@@ -265,6 +265,8 @@ macro_rules! default_panic_handler {
         }
 
         /// A dummy handler for clippy
+        ///
+        /// To make clippy work, add panic = "abort" under [profile.dev] in Cargo.toml
         #[cfg(all(not(feature = "custom-panic"), not(target_os = "solana")))]
         #[no_mangle]
         #[panic_handler]
