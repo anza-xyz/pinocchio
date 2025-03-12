@@ -288,7 +288,8 @@ mod tests {
             $(
                 let mut logger = Logger::<$size>::default();
                 logger.append($ty::MIN);
-                assert!((*logger).len() <= $max_len);
+                // Signed types have one extra character for the `-` sign.
+                assert!((*logger).len() <= ($max_len + 1));
             )*
         };
     }
