@@ -455,7 +455,7 @@ impl Log for &str {
         //
         // - `destination`: pointer to the buffer where the string will be copied. This is always
         //   the a pointer to the log buffer, but it could de in a different offset depending on
-        //   whether the trucated slice is copied or not.
+        //   whether the truncated slice is copied or not.
         //
         // - `source`: pointer to the string that will be copied. This could either be a pointer
         //   to the `str` itself or `TRUNCATE_SLICE`).

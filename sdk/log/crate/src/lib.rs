@@ -71,7 +71,7 @@ mod tests {
     }
 
     #[test]
-    fn test_logger_trucated() {
+    fn test_logger_truncated() {
         let mut logger = Logger::<8>::default();
         logger.append("Hello ");
         logger.append("world!");
@@ -263,12 +263,12 @@ mod tests {
         }
     }
 
-    /// Generate test cases for numeric types.
+    /// Generate test cases for unsigned (numeric) types.
     ///
     /// The test cases are generated for the given type and buffer size. The
     /// assert compares that the logger buffer length is less than or equal to
     /// the maximum length.
-    macro_rules! generate_numeric_test_case {
+    macro_rules! generate_unsigned_test_case {
         ( $ty:ident, $max_len:literal, $($size:expr),+ $(,)? ) => {
             $(
                 let mut logger = Logger::<$size>::default();
@@ -278,16 +278,46 @@ mod tests {
         };
     }
 
-    /// Generate a test function for numeric types.
+    /// Generate test cases for signed (numeric) types.
+    ///
+    /// The test cases are generated for the given type and buffer size. The
+    /// assert compares that the logger buffer length is less than or equal to
+    /// the maximum length.
+    macro_rules! generate_signed_test_case {
+        ( $ty:ident, $max_len:literal, $($size:expr),+ $(,)? ) => {
+            $(
+                let mut logger = Logger::<$size>::default();
+                logger.append($ty::MIN);
+                assert!((*logger).len() <= $max_len);
+            )*
+        };
+    }
+
+    /// Generate test cases for `str` type.
+    ///
+    /// The test cases are generated for the given value and buffer size. The
+    /// assert compares that the logger buffer length is equal to the minimum
+    /// between the buffer size and the `str` length.
+    macro_rules! generate_str_test_case {
+        ( $str:expr, $($size:expr),+ $(,)? ) => {
+            $(
+                let mut logger = Logger::<$size>::default();
+                logger.append(core::str::from_utf8($str).unwrap());
+                assert_eq!((*logger).len(), core::cmp::min($str.len(), $size));
+            )*
+        };
+    }
+
+    /// Generate a test function for unsigned (numeric) types.
     ///
     /// The main objective is to ensure that the logger will not panic when appending
-    /// numeric types to the buffer.
-    macro_rules! fn_test_numeric_logger_buffer {
+    /// a value of the type to the buffer.
+    macro_rules! fn_test_unsigned_logger_buffer {
         ( $test_name:ident, $( ($ty:ident, $max_len:literal) ),+ $(,)? ) => {
             #[test]
             fn $test_name() {
                 $(
-                    generate_numeric_test_case!($ty, $max_len, 1,
+                    generate_unsigned_test_case!($ty, $max_len, 1,
                         2,
                         3,
                         4,
@@ -315,9 +345,83 @@ mod tests {
         };
     }
 
-    // Test function for numeric types.
-    fn_test_numeric_logger_buffer!(
-        test_logger_buffer_size_numeric,
+    /// Generate a test function for signed (numeric) types.
+    ///
+    /// The main objective is to ensure that the logger will not panic when appending
+    /// a value of the type to the buffer.
+    macro_rules! fn_test_signed_logger_buffer {
+        ( $test_name:ident, $( ($ty:ident, $max_len:literal) ),+ $(,)? ) => {
+            #[test]
+            fn $test_name() {
+                $(
+                    generate_signed_test_case!($ty, $max_len, 1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17,
+                        18,
+                        19,
+                        20,
+                        50,
+                        100,
+                        1000);
+                )*
+            }
+        };
+    }
+
+    /// Generate a test function for `str` type.
+    ///
+    /// The main objective is to ensure that the logger will not panic when appending
+    /// `str` values to the buffer.
+    macro_rules! fn_test_str_logger_buffer {
+        ( $test_name:ident, $( $size:expr ),+ $(,)? ) => {
+            #[test]
+            fn $test_name() {
+                $(
+                    generate_str_test_case!(&[b'x'; $size], 1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17,
+                        18,
+                        19,
+                        20,
+                        50,
+                        100,
+                        1000);
+                )*
+            }
+        };
+    }
+
+    // Test function for unsigned types.
+    fn_test_unsigned_logger_buffer!(
+        test_logger_buffer_size_unsigned,
         (u8, 3),
         (u16, 5),
         (u32, 10),
@@ -325,4 +429,18 @@ mod tests {
         (u128, 39),
         (usize, 20)
     );
+
+    // Test function for signed types.
+    fn_test_signed_logger_buffer!(
+        test_logger_buffer_size_signed,
+        (i8, 3),
+        (i16, 5),
+        (i32, 10),
+        (i64, 20),
+        (i128, 39),
+        (isize, 20)
+    );
+
+    // Test function for str types.
+    fn_test_str_logger_buffer!(test_logger_buffer_size_str, 1, 5, 10, 50, 100, 1000, 10000);
 }
