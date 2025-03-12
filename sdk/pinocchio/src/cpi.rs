@@ -10,6 +10,9 @@ use crate::{
     ProgramResult,
 };
 
+/// Maximum number of accounts that can be passed to a cross-program invocation.
+const MAX_CPI_ACCOUNTS: usize = 64;
+
 /// An `Instruction` as expected by `sol_invoke_signed_c`.
 ///
 /// DO NOT EXPOSE THIS STRUCT:
@@ -68,7 +71,6 @@ pub fn invoke<const ACCOUNTS: usize>(
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
 /// `accounts` field of the `instruction`.
-#[cfg(feature = "std")]
 #[inline(always)]
 pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
     slice_invoke_signed(instruction, account_infos, &[])
@@ -129,7 +131,6 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
 /// `accounts` field of the `instruction`.
-#[cfg(feature = "std")]
 pub fn slice_invoke_signed(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
@@ -139,7 +140,13 @@ pub fn slice_invoke_signed(
         return Err(ProgramError::NotEnoughAccountKeys);
     }
 
-    let mut accounts = std::vec::Vec::with_capacity(account_infos.len());
+    if account_infos.len() > MAX_CPI_ACCOUNTS {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
+    let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
+    let mut index = 0;
 
     for (account_info, account_meta) in account_infos.iter().zip(instruction.accounts.iter()) {
         if account_info.key() != account_meta.pubkey {
@@ -153,12 +160,23 @@ pub fn slice_invoke_signed(
             account_info.check_borrow_data()?;
             account_info.check_borrow_lamports()?;
         }
+        // SAFETY: The number of accounts has been validated to be less than
+        // `MAX_CPI_ACCOUNTS`.
+        unsafe {
+            accounts
+                .get_unchecked_mut(index)
+                .write(Account::from(*account_info));
+        }
 
-        accounts.push(Account::from(*account_info));
+        index += 1;
     }
-
+    // SAFETY: The accounts have been validated.
     unsafe {
-        invoke_signed_unchecked(instruction, &accounts, signers_seeds);
+        invoke_signed_unchecked(
+            instruction,
+            core::slice::from_raw_parts(accounts.as_ptr() as _, index),
+            signers_seeds,
+        );
     }
 
     Ok(())
