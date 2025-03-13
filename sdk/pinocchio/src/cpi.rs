@@ -146,7 +146,7 @@ pub fn slice_invoke_signed(
 
     const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
     let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
-    let mut index = 0;
+    let mut len = 0;
 
     for (account_info, account_meta) in account_infos.iter().zip(instruction.accounts.iter()) {
         if account_info.key() != account_meta.pubkey {
@@ -164,17 +164,17 @@ pub fn slice_invoke_signed(
         // `MAX_CPI_ACCOUNTS`.
         unsafe {
             accounts
-                .get_unchecked_mut(index)
+                .get_unchecked_mut(len)
                 .write(Account::from(*account_info));
         }
 
-        index += 1;
+        len += 1;
     }
     // SAFETY: The accounts have been validated.
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            core::slice::from_raw_parts(accounts.as_ptr() as _, index),
+            core::slice::from_raw_parts(accounts.as_ptr() as _, len),
             signers_seeds,
         );
     }
