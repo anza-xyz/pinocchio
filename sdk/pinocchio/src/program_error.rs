@@ -4,10 +4,6 @@
 //! the Solana SDK:
 //!
 //! <https://github.com/anza-xyz/solana-sdk/blob/master/program-error/src/lib.rs>
-//!
-//! Considerations:
-//!
-//! - Not deriving `thiserror::Error` for now, as it's not clear if it's needed.
 
 /// Reasons the program may fail.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -233,6 +229,57 @@ impl From<ProgramError> for u64 {
                     error as u64
                 }
             }
+        }
+    }
+}
+
+/// A trait for converting a program error to a `&str`.
+pub trait ToStr {
+    fn to_str<E>(&self) -> &'static str
+    where
+        E: 'static + ToStr + TryFrom<u32>;
+}
+
+impl ToStr for ProgramError {
+    fn to_str<E>(&self) -> &'static str
+    where
+        E: 'static + ToStr + TryFrom<u32>,
+    {
+        match self {
+            Self::Custom(error) => {
+                if let Ok(custom_error) = E::try_from(*error) {
+                    custom_error.to_str::<E>()
+                } else {
+                    "Error: Unknown"
+                }
+            }
+            Self::InvalidArgument => "Error: InvalidArgument",
+            Self::InvalidInstructionData => "Error: InvalidInstructionData",
+            Self::InvalidAccountData => "Error: InvalidAccountData",
+            Self::AccountDataTooSmall => "Error: AccountDataTooSmall",
+            Self::InsufficientFunds => "Error: InsufficientFunds",
+            Self::IncorrectProgramId => "Error: IncorrectProgramId",
+            Self::MissingRequiredSignature => "Error: MissingRequiredSignature",
+            Self::AccountAlreadyInitialized => "Error: AccountAlreadyInitialized",
+            Self::UninitializedAccount => "Error: UninitializedAccount",
+            Self::NotEnoughAccountKeys => "Error: NotEnoughAccountKeys",
+            Self::AccountBorrowFailed => "Error: AccountBorrowFailed",
+            Self::MaxSeedLengthExceeded => "Error: MaxSeedLengthExceeded",
+            Self::InvalidSeeds => "Error: InvalidSeeds",
+            Self::BorshIoError => "Error: BorshIoError",
+            Self::AccountNotRentExempt => "Error: AccountNotRentExempt",
+            Self::UnsupportedSysvar => "Error: UnsupportedSysvar",
+            Self::IllegalOwner => "Error: IllegalOwner",
+            Self::MaxAccountsDataAllocationsExceeded => "Error: MaxAccountsDataAllocationsExceeded",
+            Self::InvalidRealloc => "Error: InvalidRealloc",
+            Self::MaxInstructionTraceLengthExceeded => "Error: MaxInstructionTraceLengthExceeded",
+            Self::BuiltinProgramsMustConsumeComputeUnits => {
+                "Error: BuiltinProgramsMustConsumeComputeUnits"
+            }
+            Self::InvalidAccountOwner => "Error: InvalidAccountOwner",
+            Self::ArithmeticOverflow => "Error: ArithmeticOverflow",
+            Self::Immutable => "Error: Immutable",
+            Self::IncorrectAuthority => "Error: IncorrectAuthority",
         }
     }
 }
