@@ -1,0 +1,23 @@
+[package]
+name = "pinocchio-cpi"
+description = "Cross program invocation helpers for Pinocchio"
+version = "0.1.0"
+edition = { workspace = true }
+license = { workspace = true }
+readme = "./README.md"
+repository = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+std = []
+
+[dependencies]
+pinocchio = { workspace = true }
+
+[target.'cfg(target_os = "solana")'.dependencies]
+solana-define-syscall = { workspace = true }
+
+[lints]
+workspace = true

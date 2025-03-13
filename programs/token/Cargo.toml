@@ -12,4 +12,5 @@ crate-type = ["rlib"]
 
 [dependencies]
 pinocchio = { workspace = true }
+pinocchio-cpi = { workspace = true }
 pinocchio-pubkey = { workspace = true }
