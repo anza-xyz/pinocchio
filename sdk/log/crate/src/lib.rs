@@ -299,7 +299,7 @@ mod tests {
         macro_rules! unsigned_test_case {
             ( $( ($ty:ident, $max_len:literal) ),+ $(,)? ) => {
                     $(
-                        generate_numeric_test_case!($ty::MIN, ($max_len + 1), 1,
+                        generate_numeric_test_case!($ty::MAX, $max_len, 1,
                         2,
                         3,
                         4,
