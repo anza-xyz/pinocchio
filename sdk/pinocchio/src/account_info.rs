@@ -105,9 +105,14 @@ impl AccountInfo {
     }
 
     /// Program that owns this account.
+    ///
+    /// # Safety
+    ///
+    /// A reference returned by this method is invalidated when [`Self::assign`]
+    /// is called.
     #[inline(always)]
-    pub fn owner(&self) -> &Pubkey {
-        unsafe { &(*self.raw).owner }
+    pub unsafe fn owner(&self) -> &Pubkey {
+        &(*self.raw).owner
     }
 
     /// Indicates whether the transaction was signed by this account.
@@ -150,13 +155,21 @@ impl AccountInfo {
         self.data_len() == 0
     }
 
-    /// Changes the owner of the account.
-    #[allow(invalid_reference_casting)]
+    /// Checks if the account is owned by the given program.
     #[inline(always)]
-    pub fn assign(&self, new_owner: &Pubkey) {
-        unsafe {
-            core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Pubkey, *new_owner);
-        }
+    pub fn is_owned_by(&self, program: &Pubkey) -> bool {
+        unsafe { &(*self.raw).owner == program }
+    }
+
+    /// Changes the owner of the account.
+    ///
+    /// # Safety
+    ///
+    /// Using this method invalidates any reference returned by [`Self::owner`].
+    #[inline(always)]
+    pub unsafe fn assign(&self, new_owner: &Pubkey) {
+        #[allow(invalid_reference_casting)]
+        core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Pubkey, *new_owner);
     }
 
     /// Returns a read-only reference to the lamports in the account.

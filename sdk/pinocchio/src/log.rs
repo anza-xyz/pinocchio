@@ -33,7 +33,7 @@
 //! [`Pubkey`]: crate::pubkey::Pubkey
 //! [`pubkey::log`]: crate::pubkey::log
 
-use crate::{account_info::AccountInfo, pubkey::log};
+use crate::{account_info::AccountInfo, pubkey};
 
 /// Print a message to the log.
 ///
@@ -144,13 +144,14 @@ pub fn sol_log_params(accounts: &[AccountInfo], data: &[u8]) {
         msg!("- Is signer");
         sol_log_64(0, 0, 0, 0, account.is_signer() as u64);
         msg!("- Key");
-        log(account.key());
+        pubkey::log(account.key());
         msg!("- Lamports");
         sol_log_64(0, 0, 0, 0, account.lamports());
         msg!("- Account data length");
         sol_log_64(0, 0, 0, 0, account.data_len() as u64);
         msg!("- Owner");
-        log(account.owner());
+        // SAFETY: The `owner` reference is only used for logging.
+        pubkey::log(unsafe { account.owner() });
     }
     msg!("Instruction data");
     sol_log_slice(data);
