@@ -77,6 +77,8 @@ define_syscall!(fn sol_remaining_compute_units() -> u64);
 define_syscall!(fn sol_alt_bn128_compression(op: u64, input: *const u8, input_size: u64, result: *mut u8) -> u64);
 define_syscall!(fn abort() -> !);
 define_syscall!(fn sol_panic_(filename: *const u8, filename_len: u64, line: u64, column: u64) -> !);
+define_syscall!(fn sol_get_sysvar(sysvar_id_addr: *const u8, result: *mut u8, offset: u64, length: u64) -> u64);
+define_syscall!(fn sol_get_epoch_stake(vote_address: *const u8) -> u64);
 
 #[cfg(target_feature = "static-syscalls")]
 pub const fn sys_hash(name: &str) -> usize {
