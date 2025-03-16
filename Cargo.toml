@@ -25,10 +25,10 @@ regex = "1"
 syn = "1.0"
 
 [workspace.metadata.cli]
-solana = "2.1.0"
+solana = "2.2.0"
 
 [workspace.metadata.toolchains]
-build = "1.81.0"
-format = "nightly-2024-08-08"
-lint = "nightly-2024-08-08"
-test = "1.81.0"
+build = "1.84.1"
+format = "nightly-2024-11-22"
+lint = "nightly-2024-11-22"
+test = "1.84.1"
