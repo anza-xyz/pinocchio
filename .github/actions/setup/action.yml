@@ -98,7 +98,7 @@ runs:
     - name: Install 'cargo-semver-checks'
       if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' && contains(inputs.components, 'semver-checks') }}
       shell: bash
-      run: cargo install cargo-semver-checks
+      run: cargo install cargo-semver-checks@0.39.0
 
     - name: Install 'cargo-edit'
       if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' && contains(inputs.components, 'edit') }}
