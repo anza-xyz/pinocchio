@@ -71,7 +71,7 @@ jobs:
             LEVEL="--bump ${{ inputs.level }}"
           fi
 
-          cargo set-version --workspace $LEVEL
+          cargo set-version $LEVEL
 
       - name: Check semver
         run: |
