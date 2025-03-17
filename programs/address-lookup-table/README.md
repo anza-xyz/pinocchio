@@ -1,4 +1,5 @@
-# Address Lookup Table
+# Address Lookup Table // TODO: fancy image insted of H1
+
 
 This crate contains [`pinocchio`](https://crates.io/crates/pinocchio) helpers to perform cross-program invocations (CPIs) for Address Lookup Table program instructions.
 
@@ -19,3 +20,8 @@ cargo add pinocchio-address-lookup-table
 This will add the `pinocchio-address-lookup-table` dependency to your `Cargo.toml` file.
 
 ## Examples
+// TODO: provide examples
+
+## License
+
+The code is licensed under the [Apache License Version 2.0](LICENSE)
