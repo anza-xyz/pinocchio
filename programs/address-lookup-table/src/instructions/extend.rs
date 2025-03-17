@@ -59,7 +59,7 @@ impl Extend<'_> {
                 let instruction = Instruction {
                     program_id: &crate::ID,
                     accounts: &account_metas,
-                    data: &instruction_data,
+                    data: &instruction_data[..4 + self.new_addresses.len() * 32],
                 };
 
                 invoke_signed(
@@ -81,7 +81,7 @@ impl Extend<'_> {
                 let instruction = Instruction {
                     program_id: &crate::ID,
                     accounts: &account_metas,
-                    data: &instruction_data,
+                    data: &instruction_data[..4 + self.new_addresses.len() * 32],
                 };
 
                 invoke_signed(&instruction, &[self.lookup_table, self.authority], signers)
