@@ -87,6 +87,11 @@ runs:
       shell: bash
       run: cargo install cargo-semver-checks
 
+    - name: Install 'cargo-edit'
+      if: ${{ contains(inputs.components, 'edit') }}
+      shell: bash
+      run: cargo install cargo-edit@0.13.1
+
     - name: Cache Cargo Dependencies
       if: ${{ inputs.cargo-cache-key && !inputs.cargo-cache-fallback-key }}
       uses: actions/cache@v4

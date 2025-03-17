@@ -25,6 +25,15 @@ on:
           - patch
           - minor
           - major
+          - rc
+          - beta
+          - alpha
+          - release
+          - version
+      version:
+        description: Version (used with level "version")
+        required: false
+        type: string
       dry_run:
         description: Dry run
         required: true
@@ -40,9 +49,39 @@ env:
   CACHE: true
 
 jobs:
+  semver_check:
+    name: Check Semver
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache-key: cargo-semver-checks
+          toolchain: test
+          components: edit, release, semver-checks
+
+      - name: Set Version
+        run: |
+          if [ "${{ inputs.level }}" == "version" ]; then
+            LEVEL=${{ inputs.version }}
+          else
+            LEVEL="--bump ${{ inputs.level }}"
+          fi
+
+          cargo set-version --workspace $LEVEL
+
+      - name: Check semver
+        run: |
+          pnpm semver ${{ inputs.crate }}
+
+
   publish_release:
     name: Publish
     runs-on: ubuntu-latest
+    needs: semver_check
     steps:
       - name: Ensure CARGO_REGISTRY_TOKEN variable is set
         env:
@@ -61,7 +100,7 @@ jobs:
         with:
           cargo-cache-key: cargo-publish
           toolchain: test
-          components: release, semver-checks
+          components: release
           solana: true
 
       - name: Build
@@ -75,22 +114,24 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
 
-      - name: Check semver
-        run: |
-          pnpm semver ${{ inputs.crate }} --release-type ${{ inputs.level }}
-
       - name: Publish Crate
         id: publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
+          if [ "${{ inputs.level }}" == "version" ]; then
+            LEVEL=${{ inputs.version }}
+          else
+            LEVEL=${{ inputs.level }}
+          fi
+
           if [ "${{ inputs.dry_run }}" == "true" ]; then
             OPTIONS="--dry-run"
           else
             OPTIONS=""
           fi
 
-          pnpm tsx ./scripts/publish.mts ${{ inputs.crate }} ${{ inputs.level }} $OPTIONS
+          pnpm tsx ./scripts/publish.mts ${{ inputs.crate }} $LEVEL $OPTIONS
 
       - name: Create GitHub release
         if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
