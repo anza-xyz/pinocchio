@@ -96,3 +96,15 @@ runs:
       uses: taiki-e/cache-cargo-install-action@v2
       with:
         tool: cargo-edit@0.13.1
+
+    - name: Cache Cargo Dependencies
+      if: ${{ inputs.cargo-cache-key }}
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-${{ inputs.cargo-cache-key }}-${{ hashFiles('**/Cargo.lock') }}
