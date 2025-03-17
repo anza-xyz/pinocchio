@@ -71,7 +71,7 @@ jobs:
             LEVEL="--bump ${{ inputs.level }}"
           fi
 
-          cargo set-version $LEVEL --manifest-path ${{ inputs.crate }}/Cargo.toml
+          cargo set-version --manifest-path ${{ inputs.crate }}/Cargo.toml $LEVEL
 
       - name: Check semver
         run: |
