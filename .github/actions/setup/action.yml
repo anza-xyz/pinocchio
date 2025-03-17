@@ -67,33 +67,9 @@ runs:
         version: ${{ env.SOLANA_VERSION }}
         cache: true
 
-    - name: Install 'cargo-audit'
-      if: ${{ contains(inputs.components, 'audit') }}
-      shell: bash
-      run: cargo install cargo-audit
-
-    - name: Install 'cargo-hack'
-      if: ${{ contains(inputs.components, 'hack') }}
-      shell: bash
-      run: cargo install cargo-hack
-
-    - name: Install 'cargo-release'
-      if: ${{ contains(inputs.components, 'release') }}
-      shell: bash
-      run: cargo install cargo-release@0.25.15
-
-    - name: Install 'cargo-semver-checks'
-      if: ${{ contains(inputs.components, 'semver-checks') }}
-      shell: bash
-      run: cargo install cargo-semver-checks
-
-    - name: Install 'cargo-edit'
-      if: ${{ contains(inputs.components, 'edit') }}
-      shell: bash
-      run: cargo install cargo-edit@0.13.1
-
-    - name: Cache Cargo Dependencies
-      if: ${{ inputs.cargo-cache-key && !inputs.cargo-cache-fallback-key }}
+    - name: Cache Cargo Components
+      id: cache-cargo
+      if: ${{ inputs.cargo-cache-key }}
       uses: actions/cache@v4
       with:
         path: |
@@ -103,4 +79,28 @@ runs:
           ~/.cargo/git/db/
           target/
         key: ${{ runner.os }}-${{ inputs.cargo-cache-key }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-${{ inputs.cargo-cache-key }}
+
+    - name: Install 'cargo-audit'
+      if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' && contains(inputs.components, 'audit') }}
+      shell: bash
+      run: cargo install cargo-audit
+
+    - name: Install 'cargo-hack'
+      if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' && contains(inputs.components, 'hack') }}
+      shell: bash
+      run: cargo install cargo-hack
+
+    - name: Install 'cargo-release'
+      if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' && contains(inputs.components, 'release') }}
+      shell: bash
+      run: cargo install cargo-release@0.25.15
+
+    - name: Install 'cargo-semver-checks'
+      if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' && contains(inputs.components, 'semver-checks') }}
+      shell: bash
+      run: cargo install cargo-semver-checks
+
+    - name: Install 'cargo-edit'
+      if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' && contains(inputs.components, 'edit') }}
+      shell: bash
+      run: cargo install cargo-edit@0.13.1
