@@ -85,6 +85,8 @@ jobs:
     name: Publish
     runs-on: ubuntu-latest
     needs: semver_check
+    permissions:
+      contents: write
     steps:
       - name: Ensure CARGO_REGISTRY_TOKEN variable is set
         env:
@@ -97,6 +99,8 @@ jobs:
 
       - name: Git checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.ANZA_TEAM_PAT }}
 
       - name: Setup Environment
         uses: ./.github/actions/setup
