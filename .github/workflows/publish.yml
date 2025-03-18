@@ -61,7 +61,7 @@ jobs:
         with:
           cargo-cache-key: cargo-semver-checks
           toolchain: test
-          components: edit, release, semver-checks
+          components: release, semver-checks
 
       - name: Set Version
         run: |
@@ -71,7 +71,7 @@ jobs:
             LEVEL="--bump ${{ inputs.level }}"
           fi
 
-          cargo set-version --manifest-path ${{ inputs.crate }}/Cargo.toml $LEVEL
+          cargo release $LEVEL --manifest-path ${{ inputs.crate }}/Cargo.toml --no-tag --no-publish --no-push --no-confirm --execute
 
       - name: Check semver
         run: |
