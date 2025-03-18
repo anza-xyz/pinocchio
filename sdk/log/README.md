@@ -1,14 +1,15 @@
-<h1 align="center">
-  <code>pinocchio-log</code>
-</h1>
 <p align="center">
- <img width="350" alt="pinocchio-log" src="https://github.com/user-attachments/assets/9b100f7c-216d-4849-b27d-3436f88af1bf"/>
+ <img alt="pinocchio-log" src="https://github.com/user-attachments/assets/4048fe96-9096-4441-85c3-5deffeb089a6" height="100"/>
 </p>
+<h3 align="center">
+  <code>pinocchio-log</code>
+</h3>
 <p align="center">
  Lightweight log utility for Solana programs.
 </p>
 <p align="center">
   <a href="https://crates.io/crates/pinocchio-log"><img src="https://img.shields.io/crates/v/pinocchio-log?logo=rust" /></a>
+  <a href="https://docs.rs/pinocchio-log"><img src="https://img.shields.io/docsrs/pinocchio-log?logo=docsdotrs" /></a>
 </p>
 
 ## Overview

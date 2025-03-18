@@ -1,4 +1,15 @@
-# <img width="229" alt="pinocchio-token" src="https://github.com/user-attachments/assets/12b0dc2a-94fb-4866-8e6a-60ac74e13b4f"/>
+<p align="center">
+ <img alt="pinocchio-token" src="https://github.com/user-attachments/assets/4048fe96-9096-4441-85c3-5deffeb089a6" height="100"/>
+</p>
+<h3 align="center">
+  <code>pinocchio-token</code>
+</h3>
+<p align="center">
+  <a href="https://crates.io/crates/pinocchio-token"><img src="https://img.shields.io/crates/v/pinocchio-token?logo=rust" /></a>
+  <a href="https://docs.rs/pinocchio-token"><img src="https://img.shields.io/docsrs/pinocchio-token?logo=docsdotrs" /></a>
+</p>
+
+## Overview
 
 This crate contains [`pinocchio`](https://crates.io/crates/pinocchio) helpers to perform cross-program invocations (CPIs) for SPL Token instructions.
 

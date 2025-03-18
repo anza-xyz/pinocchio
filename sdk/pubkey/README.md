@@ -1,6 +1,18 @@
-# <img width="250" alt="pinocchio-pubkey" src="https://github.com/user-attachments/assets/de950d77-1f02-4d52-a2a8-fbf4029aa2dc"/>
+<p align="center">
+ <img alt="pinocchio-pubkey" src="https://github.com/user-attachments/assets/4048fe96-9096-4441-85c3-5deffeb089a6" height="100"/>
+</p>
+<h3 align="center">
+  <code>pinocchio-pubkey</code>
+</h3>
+<p align="center">
+ Companion <code>Pubkey</code> helpers for <a href="https://github.com/febo/pinocchio"><code>pinocchio</code></a>.
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/pinocchio-pubkey"><img src="https://img.shields.io/crates/v/pinocchio-pubkey?logo=rust" /></a>
+  <a href="https://docs.rs/pinocchio-pubkey"><img src="https://img.shields.io/docsrs/pinocchio-pubkey?logo=docsdotrs" /></a>
+</p>
 
-Companion `Pubkey` helpers for [`pinocchio`](https://github.com/febo/pinocchio).
+## Overview
 
 This crate provides two convenience macros to resolve `Pubkey`s at compile time:
 
