@@ -1,7 +1,7 @@
 pub use five8_const::decode_32_const;
 pub use pinocchio;
 
-// Convenience macro to define a static `Pubkey` value.
+/// Convenience macro to define a static `Pubkey` value.
 #[macro_export]
 macro_rules! pubkey {
     ( $id:literal ) => {
@@ -9,6 +9,10 @@ macro_rules! pubkey {
     };
 }
 
+/// Convenience macro to define a static `Pubkey` value representing the program ID.
+///
+/// This macro also defines a helper function to check whether a given pubkey is
+/// equal to the program ID.
 #[macro_export]
 macro_rules! declare_id {
     ( $id:expr ) => {
@@ -29,6 +33,7 @@ macro_rules! declare_id {
     };
 }
 
+/// Create a `Pubkey` from a `&str`.
 #[inline(always)]
 pub const fn from_str(value: &str) -> pinocchio::pubkey::Pubkey {
     decode_32_const(value)
