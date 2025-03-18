@@ -5,7 +5,7 @@
   <code>pinocchio-pubkey</code>
 </h3>
 <p align="center">
- Companion <code>Pubkey</code> helpers for <a href="https://github.com/febo/pinocchio"><code>pinocchio</code></a>.
+ Companion <code>Pubkey</code> helpers for <a href="https://github.com/anza-xyz/pinocchio"><code>pinocchio</code></a>.
 </p>
 <p align="center">
   <a href="https://crates.io/crates/pinocchio-pubkey"><img src="https://img.shields.io/crates/v/pinocchio-pubkey?logo=rust" /></a>
