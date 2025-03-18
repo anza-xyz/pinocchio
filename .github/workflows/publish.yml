@@ -71,6 +71,9 @@ jobs:
             LEVEL=${{ inputs.level }}
           fi
 
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+
           cargo release $LEVEL --manifest-path ${{ inputs.crate }}/Cargo.toml --no-tag --no-publish --no-push --no-confirm --execute
 
       - name: Check semver
