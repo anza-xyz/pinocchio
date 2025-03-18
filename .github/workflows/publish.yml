@@ -68,7 +68,7 @@ jobs:
           if [ "${{ inputs.level }}" == "version" ]; then
             LEVEL=${{ inputs.version }}
           else
-            LEVEL="--bump ${{ inputs.level }}"
+            LEVEL=${{ inputs.level }}
           fi
 
           cargo release $LEVEL --manifest-path ${{ inputs.crate }}/Cargo.toml --no-tag --no-publish --no-push --no-confirm --execute
