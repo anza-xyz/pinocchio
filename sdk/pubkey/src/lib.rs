@@ -1,3 +1,5 @@
+#![no_std]
+
 pub use five8_const::decode_32_const;
 pub use pinocchio;
 
