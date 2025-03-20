@@ -5,6 +5,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use super::TokenProgramVariant;
+
 /// Initialize a new Token Account.
 ///
 /// ### Accounts:
@@ -25,11 +27,15 @@ pub struct InitializeAccount<'a> {
 
 impl InitializeAccount<'_> {
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+    pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
+        self.invoke_signed(&[], token_program)
     }
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers: &[Signer],
+        token_program: TokenProgramVariant,
+    ) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 4] = [
             AccountMeta::writable(self.account.key()),
@@ -39,7 +45,7 @@ impl InitializeAccount<'_> {
         ];
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: &token_program.into(),
             accounts: &account_metas,
             data: &[1],
         };

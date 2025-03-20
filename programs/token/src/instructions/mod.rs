@@ -31,9 +31,29 @@ pub use initialize_mint::*;
 pub use initialize_mint_2::*;
 pub use mint_to::*;
 pub use mint_to_checked::*;
+
 pub use revoke::*;
 pub use set_authority::*;
 pub use sync_native::*;
 pub use thaw_account::*;
 pub use transfer::*;
 pub use transfer_checked::*;
+
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum TokenProgramVariant {
+    Legacy,
+    Token2022,
+}
+
+use pinocchio::pubkey::Pubkey;
+
+use crate::{LEGACY_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID};
+impl Into<Pubkey> for TokenProgramVariant {
+    fn into(self) -> Pubkey {
+        match self {
+            TokenProgramVariant::Legacy => LEGACY_TOKEN_PROGRAM_ID,
+            TokenProgramVariant::Token2022 => TOKEN_2022_PROGRAM_ID,
+        }
+    }
+}
