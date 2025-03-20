@@ -36,7 +36,7 @@ pub struct TransferWithSeed<'a, 'b, 'c> {
     pub owner: &'c Pubkey,
 }
 
-impl<'a, 'b, 'c> TransferWithSeed<'a, 'b, 'c> {
+impl TransferWithSeed<'_, '_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

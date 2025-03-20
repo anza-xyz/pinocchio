@@ -16,7 +16,7 @@ use super::TokenProgramVariant;
 ///
 /// ### Accounts:
 ///   0. `[WRITABLE]` Mint account
-pub struct InitilizeMint2<'a> {
+pub struct InitializeMint2<'a> {
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Decimals.
@@ -27,7 +27,7 @@ pub struct InitilizeMint2<'a> {
     pub freeze_authority: Option<&'a Pubkey>,
 }
 
-impl<'a> InitilizeMint2<'a> {
+impl InitializeMint2<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)

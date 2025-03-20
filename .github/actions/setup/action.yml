@@ -1,0 +1,104 @@
+name: Setup environment
+
+inputs:
+  cargo-cache-key:
+    description: The key to cache cargo dependencies. Skips cargo caching if not provided.
+    required: false
+  toolchain:
+    description: Rust toolchain to install. Comma-separated string of [`build`, `format`, `lint`, `test`].
+    required: false
+  components:
+    description: Cargo components to install. Comma-separated string of [`audit`, `hack``, `release`, `semver-checks].
+    required: false
+  solana:
+    description: Install Solana if `true`. Defaults to `false`.
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+
+    - name: Install Dependencies
+      run: pnpm install --frozen-lockfile
+      shell: bash
+
+    - name: Set Environment Variables
+      shell: bash
+      run: pnpm tsx ./scripts/setup/ci.mts
+
+    - name: Install Rust 'build' Toolchain
+      if: ${{ contains(inputs.toolchain, 'build') }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ env.TOOLCHAIN_BUILD }}
+
+    - name: Install Rust 'format' Toolchain
+      if: ${{ contains(inputs.toolchain, 'format') }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ env.TOOLCHAIN_FORMAT }}
+        components: rustfmt
+
+    - name: Install Rust 'lint' Toolchain
+      if: ${{ contains(inputs.toolchain, 'lint') }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ env.TOOLCHAIN_LINT }}
+        components: clippy
+
+    - name: Install Rust 'test' Toolchain
+      if: ${{ contains(inputs.toolchain, 'test') }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ env.TOOLCHAIN_TEST }}
+
+    - name: Install Solana
+      if: ${{ inputs.solana == 'true' }}
+      uses: solana-program/actions/install-solana@v1
+      with:
+        version: ${{ env.SOLANA_VERSION }}
+        cache: true
+
+    - name: Install 'cargo-audit'
+      if: ${{ contains(inputs.components, 'audit') }}
+      uses: taiki-e/cache-cargo-install-action@v2
+      with:
+        tool: cargo-audit
+
+    - name: Install 'cargo-hack'
+      if: ${{ contains(inputs.components, 'hack') }}
+      uses: taiki-e/cache-cargo-install-action@v2
+      with:
+        tool: cargo-hack
+
+    - name: Install 'cargo-release'
+      if: ${{ contains(inputs.components, 'release') }}
+      uses: taiki-e/cache-cargo-install-action@v2
+      with:
+        tool: cargo-release@0.25.15
+
+    - name: Install 'cargo-semver-checks'
+      if: ${{ contains(inputs.components, 'semver-checks') }}
+      uses: taiki-e/cache-cargo-install-action@v2
+      with:
+        tool: cargo-semver-checks@0.39.0
+
+    - name: Cache Cargo Dependencies
+      if: ${{ inputs.cargo-cache-key }}
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-${{ inputs.cargo-cache-key }}-${{ hashFiles('**/Cargo.lock') }}

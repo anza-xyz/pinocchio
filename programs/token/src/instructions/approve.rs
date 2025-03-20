@@ -19,7 +19,7 @@ use super::TokenProgramVariant;
 ///   2. `[SIGNER]` The source account owner.
 pub struct Approve<'a> {
     /// Source Account.
-    pub token: &'a AccountInfo,
+    pub source: &'a AccountInfo,
     /// Delegate Account
     pub delegate: &'a AccountInfo,
     /// Source Owner Account
@@ -28,7 +28,7 @@ pub struct Approve<'a> {
     pub amount: u64,
 }
 
-impl<'a> Approve<'a> {
+impl Approve<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -41,7 +41,7 @@ impl<'a> Approve<'a> {
     ) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.token.key()),
+            AccountMeta::writable(self.source.key()),
             AccountMeta::readonly(self.delegate.key()),
             AccountMeta::readonly_signer(self.authority.key()),
         ];
@@ -64,7 +64,7 @@ impl<'a> Approve<'a> {
 
         invoke_signed(
             &instruction,
-            &[self.token, self.delegate, self.authority],
+            &[self.source, self.delegate, self.authority],
             signers,
         )
     }

@@ -24,7 +24,7 @@ pub struct AuthorizeNonceAccount<'a, 'b> {
     pub new_authority: &'b Pubkey,
 }
 
-impl<'a, 'b> AuthorizeNonceAccount<'a, 'b> {
+impl AuthorizeNonceAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

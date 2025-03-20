@@ -28,21 +28,20 @@ impl MemoTransfer {
     /// The length of the `MemoTranfer` account data.
     pub const LEN: usize = core::mem::size_of::<MemoTransfer>();
 
-    /// Return a `TransferFeeConfig` from the given account info.
+    /// Return a `MemoTransfer` from the given account info.
     ///
     /// This method performs owner on `AccountInfo`, safe borrowing
     /// the account data.
     #[inline(always)]
     pub fn from_account_info(account_info: &AccountInfo) -> Result<MemoTransfer, ProgramError> {
-        if account_info.owner() != &TOKEN_2022_PROGRAM_ID {
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
         let acc_data_bytes = account_info.try_borrow_data()?;
         let acc_data_bytes = acc_data_bytes.as_ref();
 
-        Ok(get_extension_from_bytes::<Self>(acc_data_bytes)
-            .ok_or(ProgramError::InvalidAccountData)?)
+        get_extension_from_bytes::<Self>(acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
     }
 }
 

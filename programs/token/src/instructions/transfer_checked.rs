@@ -33,7 +33,7 @@ pub struct TransferChecked<'a> {
     pub decimals: u8,
 }
 
-impl<'a> TransferChecked<'a> {
+impl TransferChecked<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -71,6 +71,10 @@ impl<'a> TransferChecked<'a> {
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };
 
-        invoke_signed(&instruction, &[self.from, self.to, self.authority], signers)
+        invoke_signed(
+            &instruction,
+            &[self.from, self.mint, self.to, self.authority],
+            signers,
+        )
     }
 }

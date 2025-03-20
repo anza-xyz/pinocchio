@@ -1,11 +1,14 @@
 [package]
 name = "pinocchio-token"
 description = "Pinocchio helpers to invoke Legacy Token and Token-2022 instructions"
-version = "0.2.0"
+version = "0.3.0"
 edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"
 repository = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
 
 [dependencies]
 pinocchio = { workspace = true }

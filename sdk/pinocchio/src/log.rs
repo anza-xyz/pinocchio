@@ -28,19 +28,67 @@
 //! [`RpcClient::get_transaction`]: https://docs.rs/solana-rpc-client/latest/solana_rpc_client/rpc_client/struct.RpcClient.html#method.get_transaction
 //!
 //! While most logging functions are defined in this module, [`Pubkey`]s can
-//! also be efficiently logged with the [`Pubkey::log`] function.
+//! also be efficiently logged with the [`pubkey::log`] function.
 //!
 //! [`Pubkey`]: crate::pubkey::Pubkey
-//! [`Pubkey::log`]: crate::pubkey::Pubkey::log
+//! [`pubkey::log`]: crate::pubkey::log
 
-use crate::{account_info::AccountInfo, pubkey::log};
+use crate::{account_info::AccountInfo, pubkey};
 
+/// Print a message to the log.
+///
+/// Supports simple strings of type `&str`. The expression will be passed
+/// directly to [`sol_log`]. This is typically used for logging static strings.
+///
+/// # Examples
+///
+/// ```
+/// use pinocchio::msg;
+///
+/// msg!("verifying multisig");
+/// ```
 #[macro_export]
+#[cfg(not(feature = "std"))]
 macro_rules! msg {
-    ($msg:expr) => {
+    ( $msg:expr ) => {
         $crate::log::sol_log($msg)
     };
-    ($($arg:tt)*) => ($crate::log::sol_log(&format!($($arg)*)));
+}
+
+/// Print a message to the log.
+///
+/// Supports simple strings as well as Rust [format strings][fs]. When passed a
+/// single expression it will be passed directly to [`sol_log`]. The expression
+/// must have type `&str`, and is typically used for logging static strings.
+/// When passed something other than an expression, particularly
+/// a sequence of expressions, the tokens will be passed through the
+/// [`format!`] macro before being logged with `sol_log`.
+///
+/// [fs]: https://doc.rust-lang.org/std/fmt/
+/// [`format!`]: https://doc.rust-lang.org/std/fmt/fn.format.html
+///
+/// Note that Rust's formatting machinery is relatively CPU-intensive
+/// for constrained environments like the Solana VM.
+///
+/// # Examples
+///
+/// ```
+/// use pinocchio::msg;
+///
+/// // The fast form
+/// msg!("verifying multisig");
+///
+/// // With formatting
+/// let err = "not enough signers";
+/// msg!("multisig failed: {}", err);
+/// ```
+#[cfg(feature = "std")]
+#[macro_export]
+macro_rules! msg {
+    ( $msg:expr ) => {
+        $crate::log::sol_log($msg)
+    };
+    ( $( $arg:tt )* ) => ($crate::log::sol_log(&format!($($arg)*)));
 }
 
 /// Print a string to the log.
@@ -96,13 +144,14 @@ pub fn sol_log_params(accounts: &[AccountInfo], data: &[u8]) {
         msg!("- Is signer");
         sol_log_64(0, 0, 0, 0, account.is_signer() as u64);
         msg!("- Key");
-        log(account.key());
+        pubkey::log(account.key());
         msg!("- Lamports");
         sol_log_64(0, 0, 0, 0, account.lamports());
         msg!("- Account data length");
         sol_log_64(0, 0, 0, 0, account.data_len() as u64);
         msg!("- Owner");
-        log(account.owner());
+        // SAFETY: The `owner` reference is only used for logging.
+        pubkey::log(unsafe { account.owner() });
     }
     msg!("Instruction data");
     sol_log_slice(data);

@@ -15,7 +15,7 @@ pub struct UpdateNonceAccount<'a> {
     pub account: &'a AccountInfo,
 }
 
-impl<'a> UpdateNonceAccount<'a> {
+impl UpdateNonceAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

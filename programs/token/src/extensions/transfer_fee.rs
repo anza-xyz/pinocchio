@@ -44,34 +44,33 @@ pub struct TransferFeeConfig {
     pub newer_transfer_fee: TransferFee,
 }
 
+impl Extension for TransferFeeConfig {
+    const TYPE: super::ExtensionType = super::ExtensionType::TransferFeeConfig;
+    const LEN: usize = Self::LEN;
+    const BASE_STATE: super::BaseState = super::BaseState::Mint;
+}
+
 impl TransferFeeConfig {
     /// The length of the `TransferFeeConfig` account data.
     pub const LEN: usize = core::mem::size_of::<TransferFeeConfig>();
 
     /// Return a `TransferFeeConfig` from the given Mint account info.
     ///
+    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// the account data.
     #[inline(always)]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Self, ProgramError> {
-        if account_info.owner() != &TOKEN_2022_PROGRAM_ID {
+    pub fn from_account_info(
+        account_info: &AccountInfo,
+    ) -> Result<TransferFeeConfig, ProgramError> {
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
         let acc_data_bytes = account_info.try_borrow_data()?;
         let acc_data_bytes = acc_data_bytes.as_ref();
 
-        let ext = get_extension_from_bytes::<Self>(acc_data_bytes)
-            .ok_or(ProgramError::InvalidAccountData)?;
-
-        Ok(ext)
+        get_extension_from_bytes::<Self>(acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
     }
-}
-
-impl Extension for TransferFeeConfig {
-    const TYPE: super::ExtensionType = super::ExtensionType::TransferFeeConfig;
-
-    const LEN: usize = Self::LEN;
-
-    const BASE_STATE: super::BaseState = super::BaseState::Mint;
 }
 
 /// Instructions

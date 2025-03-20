@@ -10,6 +10,9 @@ use crate::{
     ProgramResult,
 };
 
+/// Maximum number of accounts that can be passed to a cross-program invocation.
+const MAX_CPI_ACCOUNTS: usize = 64;
+
 /// An `Instruction` as expected by `sol_invoke_signed_c`.
 ///
 /// DO NOT EXPOSE THIS STRUCT:
@@ -62,6 +65,17 @@ pub fn invoke<const ACCOUNTS: usize>(
     invoke_signed(instruction, account_infos, &[])
 }
 
+/// Invoke a cross-program instruction from a slice of `AccountInfo`s.
+///
+/// # Important
+///
+/// The accounts on the `account_infos` slice must be in the same order as the
+/// `accounts` field of the `instruction`.
+#[inline(always)]
+pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
+    slice_invoke_signed(instruction, account_infos, &[])
+}
+
 /// Invoke a cross-program instruction with signatures.
 ///
 /// # Important
@@ -89,11 +103,11 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
         }
 
         if account_meta.is_writable {
-            let _ = account_info.try_borrow_mut_data()?;
-            let _ = account_info.try_borrow_mut_lamports()?;
+            account_info.check_borrow_mut_data()?;
+            account_info.check_borrow_mut_lamports()?;
         } else {
-            let _ = account_info.try_borrow_data()?;
-            let _ = account_info.try_borrow_lamports()?;
+            account_info.check_borrow_data()?;
+            account_info.check_borrow_lamports()?;
         }
 
         accounts[index].write(Account::from(account_infos[index]));
@@ -110,11 +124,68 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     Ok(())
 }
 
+/// Invoke a cross-program instruction with signatures from a slice of
+/// `AccountInfo`s.
+///
+/// # Important
+///
+/// The accounts on the `account_infos` slice must be in the same order as the
+/// `accounts` field of the `instruction`.
+pub fn slice_invoke_signed(
+    instruction: &Instruction,
+    account_infos: &[&AccountInfo],
+    signers_seeds: &[Signer],
+) -> ProgramResult {
+    if instruction.accounts.len() < account_infos.len() {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+
+    if account_infos.len() > MAX_CPI_ACCOUNTS {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
+    let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
+    let mut len = 0;
+
+    for (account_info, account_meta) in account_infos.iter().zip(instruction.accounts.iter()) {
+        if account_info.key() != account_meta.pubkey {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        if account_meta.is_writable {
+            account_info.check_borrow_mut_data()?;
+            account_info.check_borrow_mut_lamports()?;
+        } else {
+            account_info.check_borrow_data()?;
+            account_info.check_borrow_lamports()?;
+        }
+        // SAFETY: The number of accounts has been validated to be less than
+        // `MAX_CPI_ACCOUNTS`.
+        unsafe {
+            accounts
+                .get_unchecked_mut(len)
+                .write(Account::from(*account_info));
+        }
+
+        len += 1;
+    }
+    // SAFETY: The accounts have been validated.
+    unsafe {
+        invoke_signed_unchecked(
+            instruction,
+            core::slice::from_raw_parts(accounts.as_ptr() as _, len),
+            signers_seeds,
+        );
+    }
+
+    Ok(())
+}
+
 /// Invoke a cross-program instruction but don't enforce Rust's aliasing rules.
 ///
-/// This function does not check that [`Ref`]s within [`Account`]s are properly
-/// borrowable as described in the documentation for that function. Those checks
-/// consume CPU cycles that this function avoids.
+/// This function does not check that [`Account`]s are properly borrowable.
+/// Those checks consume CPU cycles that this function avoids.
 ///
 /// # Safety
 ///
@@ -122,11 +193,6 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 /// borrowed within the calling program, and that data is written to by the
 /// callee, then Rust's aliasing rules will be violated and cause undefined
 /// behavior.
-///
-/// # Important
-///
-/// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
 #[inline(always)]
 pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) {
     invoke_signed_unchecked(instruction, accounts, &[])
@@ -135,9 +201,8 @@ pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) 
 /// Invoke a cross-program instruction with signatures but don't enforce Rust's
 /// aliasing rules.
 ///
-/// This function does not check that [`Ref`]s within [`Account`]s are properly
-/// borrowable as described in the documentation for that function. Those checks
-/// consume CPU cycles that this function avoids.
+/// This function does not check that [`Account`]s are properly borrowable.
+/// Those checks consume CPU cycles that this function avoids.
 ///
 /// # Safety
 ///
@@ -145,11 +210,6 @@ pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) 
 /// borrowed within the calling program, and that data is written to by the
 /// callee, then Rust's aliasing rules will be violated and cause undefined
 /// behavior.
-///
-/// # Important
-///
-/// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
 pub unsafe fn invoke_signed_unchecked(
     instruction: &Instruction,
     accounts: &[Account],
@@ -225,12 +285,13 @@ pub fn set_return_data(data: &[u8]) {
 pub fn get_return_data() -> Option<ReturnData> {
     #[cfg(target_os = "solana")]
     {
-        let mut data = [0u8; MAX_RETURN_DATA];
+        const UNINIT_BYTE: core::mem::MaybeUninit<u8> = core::mem::MaybeUninit::<u8>::uninit();
+        let mut data = [UNINIT_BYTE; MAX_RETURN_DATA];
         let mut program_id = Pubkey::default();
 
         let size = unsafe {
             crate::syscalls::sol_get_return_data(
-                data.as_mut_ptr(),
+                data.as_mut_ptr() as *mut u8,
                 data.len() as u64,
                 &mut program_id,
             )
@@ -257,7 +318,7 @@ pub struct ReturnData {
     program_id: Pubkey,
 
     /// Return data set by the program.
-    data: [u8; MAX_RETURN_DATA],
+    data: [core::mem::MaybeUninit<u8>; MAX_RETURN_DATA],
 
     /// Length of the return data.
     size: usize,
@@ -271,7 +332,7 @@ impl ReturnData {
 
     /// Return the data set by the program.
     pub fn as_slice(&self) -> &[u8] {
-        &self.data[..self.size]
+        unsafe { core::slice::from_raw_parts(self.data.as_ptr() as _, self.size) }
     }
 }
 

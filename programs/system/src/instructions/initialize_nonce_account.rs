@@ -35,7 +35,7 @@ pub struct InitializeNonceAccount<'a, 'b> {
     pub authority: &'b Pubkey,
 }
 
-impl<'a, 'b> InitializeNonceAccount<'a, 'b> {
+impl InitializeNonceAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

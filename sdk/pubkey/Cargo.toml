@@ -1,11 +1,14 @@
 [package]
 name = "pinocchio-pubkey"
 description = "Companion pubkey helpers for Pinocchio"
-version = "0.2.1"
+version = "0.2.4"
 edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"
 repository = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
 
 [dependencies]
 five8_const = { workspace = true }

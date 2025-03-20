@@ -22,14 +22,14 @@ pub struct MintTo<'a> {
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Token Account.
-    pub token: &'a AccountInfo,
+    pub account: &'a AccountInfo,
     /// Mint Authority
     pub mint_authority: &'a AccountInfo,
     /// Amount
     pub amount: u64,
 }
 
-impl<'a> MintTo<'a> {
+impl MintTo<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -43,7 +43,7 @@ impl<'a> MintTo<'a> {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
             AccountMeta::writable(self.mint.key()),
-            AccountMeta::writable(self.token.key()),
+            AccountMeta::writable(self.account.key()),
             AccountMeta::readonly_signer(self.mint_authority.key()),
         ];
 
@@ -65,7 +65,7 @@ impl<'a> MintTo<'a> {
 
         invoke_signed(
             &instruction,
-            &[self.mint, self.token, self.mint_authority],
+            &[self.mint, self.account, self.mint_authority],
             signers,
         )
     }

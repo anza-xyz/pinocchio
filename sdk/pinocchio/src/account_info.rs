@@ -1,22 +1,19 @@
 //! Data structures to represent account information.
+use core::{
+    marker::PhantomData,
+    mem::ManuallyDrop,
+    ptr::NonNull,
+    slice::{from_raw_parts, from_raw_parts_mut},
+};
 
-use core::{marker::PhantomData, mem::ManuallyDrop, ptr::NonNull, slice::from_raw_parts_mut};
+#[cfg(target_os = "solana")]
+use crate::syscalls::sol_memset_;
 
-use crate::{program_error::ProgramError, pubkey::Pubkey, syscalls::sol_memset_};
+use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
 
 /// Maximum number of bytes a program may add to an account during a
-/// single realloc.
+/// single top-level instruction.
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
-
-#[macro_export]
-macro_rules! get_account_info {
-    ( $accounts:ident, $index:expr ) => {{
-        if $accounts.len() <= $index {
-            return Err($crate::program_error::ProgramError::NotEnoughAccountKeys);
-        }
-        &$accounts[$index]
-    }};
-}
 
 /// Raw account data.
 ///
@@ -59,16 +56,16 @@ pub(crate) struct Account {
     /// the maximum permitted data increase.
     original_data_len: u32,
 
-    /// Public key of the account
+    /// Public key of the account.
     key: Pubkey,
 
-    /// Program that owns this account
+    /// Program that owns this account. Modifiable by programs.
     owner: Pubkey,
 
-    /// The lamports in the account.  Modifiable by programs.
+    /// The lamports in the account. Modifiable by programs.
     lamports: u64,
 
-    /// Length of the data.
+    /// Length of the data. Modifiable by programs.
     pub(crate) data_len: u64,
 }
 
@@ -108,9 +105,14 @@ impl AccountInfo {
     }
 
     /// Program that owns this account.
+    ///
+    /// # Safety
+    ///
+    /// A reference returned by this method is invalidated when [`Self::assign`]
+    /// is called.
     #[inline(always)]
-    pub fn owner(&self) -> &Pubkey {
-        unsafe { &(*self.raw).owner }
+    pub unsafe fn owner(&self) -> &Pubkey {
+        &(*self.raw).owner
     }
 
     /// Indicates whether the transaction was signed by this account.
@@ -153,12 +155,21 @@ impl AccountInfo {
         self.data_len() == 0
     }
 
+    /// Checks if the account is owned by the given program.
+    #[inline(always)]
+    pub fn is_owned_by(&self, program: &Pubkey) -> bool {
+        unsafe { &(*self.raw).owner == program }
+    }
+
     /// Changes the owner of the account.
-    #[allow(invalid_reference_casting)]
-    pub fn assign(&self, new_owner: &Pubkey) {
-        unsafe {
-            core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Pubkey, *new_owner);
-        }
+    ///
+    /// # Safety
+    ///
+    /// Using this method invalidates any reference returned by [`Self::owner`].
+    #[inline(always)]
+    pub unsafe fn assign(&self, new_owner: &Pubkey) {
+        #[allow(invalid_reference_casting)]
+        core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Pubkey, *new_owner);
     }
 
     /// Returns a read-only reference to the lamports in the account.
@@ -167,6 +178,7 @@ impl AccountInfo {
     ///
     /// This method is unsafe because it does not return a `Ref`, thus leaving the borrow
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
+    #[inline(always)]
     pub unsafe fn borrow_lamports_unchecked(&self) -> &u64 {
         &(*self.raw).lamports
     }
@@ -178,6 +190,7 @@ impl AccountInfo {
     /// This method is unsafe because it does not return a `Ref`, thus leaving the borrow
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
     #[allow(clippy::mut_from_ref)]
+    #[inline(always)]
     pub unsafe fn borrow_mut_lamports_unchecked(&self) -> &mut u64 {
         &mut (*self.raw).lamports
     }
@@ -188,6 +201,7 @@ impl AccountInfo {
     ///
     /// This method is unsafe because it does not return a `Ref`, thus leaving the borrow
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
+    #[inline(always)]
     pub unsafe fn borrow_data_unchecked(&self) -> &[u8] {
         core::slice::from_raw_parts(self.data_ptr(), self.data_len())
     }
@@ -199,6 +213,7 @@ impl AccountInfo {
     /// This method is unsafe because it does not return a `Ref`, thus leaving the borrow
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
     #[allow(clippy::mut_from_ref)]
+    #[inline(always)]
     pub unsafe fn borrow_mut_data_unchecked(&self) -> &mut [u8] {
         core::slice::from_raw_parts_mut(self.data_ptr(), self.data_len())
     }
@@ -206,18 +221,10 @@ impl AccountInfo {
     /// Tries to get a read-only reference to the lamport field, failing if the
     /// field is already mutable borrowed or if 7 borrows already exist.
     pub fn try_borrow_lamports(&self) -> Result<Ref<u64>, ProgramError> {
+        // check if the account lamports are already borrowed
+        self.check_borrow_lamports()?;
+
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-
-        // check if mutable borrow is already taken
-        if *borrow_state & 0b_1000_0000 != 0 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
-        // check if we have reached the max immutable borrow count
-        if *borrow_state & 0b_0111_0000 == 0b_0111_0000 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
         // increment the immutable borrow count
         *borrow_state += 1 << LAMPORTS_SHIFT;
 
@@ -233,13 +240,10 @@ impl AccountInfo {
     /// Tries to get a read only reference to the lamport field, failing if the field
     /// is already borrowed in any form.
     pub fn try_borrow_mut_lamports(&self) -> Result<RefMut<u64>, ProgramError> {
+        // check if the account lamports are already borrowed
+        self.check_borrow_mut_lamports()?;
+
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-
-        // check if any borrow (mutable or immutable) is already taken for lamports
-        if *borrow_state & 0b_1111_0000 != 0 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
         // set the mutable lamport borrow flag
         *borrow_state |= 0b_1000_0000;
 
@@ -252,49 +256,65 @@ impl AccountInfo {
         })
     }
 
-    /// Tries to get a read only reference to the data field, failing if the field
+    /// Checks if it is possible to get a read-only reference to the lamport field,
+    /// failing if the field is already mutable borrowed or if 7 borrows already exist.
+    #[inline(always)]
+    pub fn check_borrow_lamports(&self) -> Result<(), ProgramError> {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+
+        // check if mutable borrow is already taken
+        if borrow_state & 0b_1000_0000 != 0 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        // check if we have reached the max immutable borrow count
+        if borrow_state & 0b_0111_0000 == 0b_0111_0000 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        Ok(())
+    }
+
+    /// Checks if it is possible to get a mutable reference to the lamport field,
+    /// failing if the field is already borrowed in any form.
+    #[inline(always)]
+    pub fn check_borrow_mut_lamports(&self) -> Result<(), ProgramError> {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+
+        // check if any borrow (mutable or immutable) is already taken for lamports
+        if borrow_state & 0b_1111_0000 != 0 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        Ok(())
+    }
+
+    /// Tries to get a read-only reference to the data field, failing if the field
     /// is already mutable borrowed or if 7 borrows already exist.
     pub fn try_borrow_data(&self) -> Result<Ref<[u8]>, ProgramError> {
+        // check if the account data is already borrowed
+        self.check_borrow_data()?;
+
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-
-        // check if mutable data borrow is already taken (most significant bit
-        // of the data_borrow_state)
-        if *borrow_state & 0b_0000_1000 != 0 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
-        // check if we have reached the max immutable data borrow count (7)
-        if *borrow_state & 0b_0111 == 0b0111 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
         // increment the immutable data borrow count
         *borrow_state += 1;
 
         // return the reference to data
         Ok(Ref {
-            value: unsafe {
-                NonNull::from(core::slice::from_raw_parts(
-                    self.data_ptr(),
-                    self.data_len(),
-                ))
-            },
+            value: unsafe { NonNull::from(from_raw_parts(self.data_ptr(), self.data_len())) },
             state: unsafe { NonNull::new_unchecked(borrow_state) },
             borrow_shift: DATA_SHIFT,
             marker: PhantomData,
         })
     }
 
-    /// Tries to get a read only reference to the data field, failing if the field
+    /// Tries to get a mutable reference to the data field, failing if the field
     /// is already borrowed in any form.
     pub fn try_borrow_mut_data(&self) -> Result<RefMut<[u8]>, ProgramError> {
+        // check if the account data is already borrowed
+        self.check_borrow_mut_data()?;
+
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-
-        // check if any borrow (mutable or immutable) is already taken for data
-        if *borrow_state & 0b_0000_1111 != 0 {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
-
         // set the mutable data borrow flag
         *borrow_state |= 0b_0000_1000;
 
@@ -307,11 +327,45 @@ impl AccountInfo {
         })
     }
 
+    /// Checks if it is possible to get a read-only reference to the data field, failing
+    /// if the field is already mutable borrowed or if 7 borrows already exist.
+    #[inline(always)]
+    pub fn check_borrow_data(&self) -> Result<(), ProgramError> {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+
+        // check if mutable data borrow is already taken (most significant bit
+        // of the data_borrow_state)
+        if borrow_state & 0b_0000_1000 != 0 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        // check if we have reached the max immutable data borrow count (7)
+        if borrow_state & 0b_0111 == 0b0111 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        Ok(())
+    }
+
+    /// Checks if it is possible to get a mutable reference to the data field, failing
+    /// if the field is already borrowed in any form.
+    #[inline(always)]
+    pub fn check_borrow_mut_data(&self) -> Result<(), ProgramError> {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+
+        // check if any borrow (mutable or immutable) is already taken for data
+        if borrow_state & 0b_0000_1111 != 0 {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        Ok(())
+    }
+
     /// Realloc the account's data and optionally zero-initialize the new
     /// memory.
     ///
     /// Note:  Account data can be increased within a single call by up to
-    /// `solana_program::entrypoint::MAX_PERMITTED_DATA_INCREASE` bytes.
+    /// [`MAX_PERMITTED_DATA_INCREASE`] bytes.
     ///
     /// Note: Memory used to grow is already zero-initialized upon program
     /// entrypoint and re-zeroing it wastes compute units.  If within the same
@@ -358,7 +412,7 @@ impl AccountInfo {
         unsafe {
             let data_ptr = data.as_mut_ptr();
             // set new length in the serialized data
-            *(data_ptr.offset(-8) as *mut u64) = new_len as u64;
+            (*self.raw).data_len = new_len as u64;
             // recreate the local slice with the new length
             data.value = NonNull::from(from_raw_parts_mut(data_ptr, new_len));
         }
@@ -367,16 +421,78 @@ impl AccountInfo {
             let len_increase = new_len.saturating_sub(current_len);
             if len_increase > 0 {
                 unsafe {
+                    #[cfg(target_os = "solana")]
                     sol_memset_(
                         &mut data[current_len..] as *mut _ as *mut u8,
                         0,
                         len_increase as u64,
                     );
+                    #[cfg(not(target_os = "solana"))]
+                    core::ptr::write_bytes(data.as_mut_ptr().add(current_len), 0, len_increase);
                 }
             }
         }
 
         Ok(())
+    }
+
+    /// Zero out the the account's data length, lamports and owner fields, effectively
+    /// closing the account.
+    ///
+    /// This doesn't protect against future reinitialization of the account
+    /// since the account data will need to be zeroed out as well; otherwise the lenght,
+    /// lamports and owner can be set again before the data is wiped out from
+    /// the ledger using the keypair of the account being closed.
+    ///
+    /// # Important
+    ///
+    /// The lamports must be moved from the account prior to closing it to prevent
+    /// an unbalanced instruction error.
+    #[inline]
+    pub fn close(&self) -> ProgramResult {
+        // make sure the account is not borrowed since we are about to
+        // resize the data to zero
+        self.check_borrow_mut_data()?;
+
+        unsafe {
+            self.close_unchecked();
+        }
+
+        Ok(())
+    }
+
+    /// Zero out the the account's data length, lamports and owner fields, effectively
+    /// closing the account.
+    ///
+    /// This doesn't protect against future reinitialization of the account
+    /// since the account data will need to be zeroed out as well; otherwise the lenght,
+    /// lamports and owner can be set again before the data is wiped out from
+    /// the ledger using the keypair of the account being closed.
+    ///
+    /// # Important
+    ///
+    /// The lamports must be moved from the account prior to closing it to prevent
+    /// an unbalanced instruction error.
+    ///
+    /// # Safety
+    ///
+    /// This method is unsafe because it does not check if the account data is already
+    /// borrowed. It should only be called when the account is not being used.
+    ///
+    /// It also makes assumptions about the layout and location of memory
+    /// referenced by `AccountInfo` fields. It should only be called for
+    /// instances of `AccountInfo` that were created by the runtime and received
+    /// in the `process_instruction` entrypoint of a program.
+    #[inline(always)]
+    pub unsafe fn close_unchecked(&self) {
+        // We take advantage that the 48 bytes before the account data are:
+        // - 32 bytes for the owner
+        // - 8 bytes for the lamports
+        // - 8 bytes for the data_len
+        //
+        // So we can zero out them directly.
+        #[cfg(target_os = "solana")]
+        sol_memset_(self.data_ptr().sub(48), 0, 48);
     }
 
     /// Returns the memory address of the account data.
@@ -404,6 +520,7 @@ pub struct Ref<'a, T: ?Sized> {
 }
 
 impl<'a, T: ?Sized> Ref<'a, T> {
+    /// Maps a reference to a new type.
     #[inline]
     pub fn map<U: ?Sized, F>(orig: Ref<'a, T>, f: F) -> Ref<'a, U>
     where
@@ -420,6 +537,7 @@ impl<'a, T: ?Sized> Ref<'a, T> {
         }
     }
 
+    /// Filters and maps a reference to a new type.
     #[inline]
     pub fn filter_map<U: ?Sized, F>(orig: Ref<'a, T>, f: F) -> Result<Ref<'a, U>, Self>
     where
@@ -440,14 +558,14 @@ impl<'a, T: ?Sized> Ref<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> core::ops::Deref for Ref<'a, T> {
+impl<T: ?Sized> core::ops::Deref for Ref<'_, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         unsafe { self.value.as_ref() }
     }
 }
 
-impl<'a, T: ?Sized> Drop for Ref<'a, T> {
+impl<T: ?Sized> Drop for Ref<'_, T> {
     // decrement the immutable borrow count
     fn drop(&mut self) {
         unsafe { *self.state.as_mut() -= 1 << self.borrow_shift };
@@ -473,6 +591,7 @@ pub struct RefMut<'a, T: ?Sized> {
 }
 
 impl<'a, T: ?Sized> RefMut<'a, T> {
+    /// Maps a mutable reference to a new type.
     #[inline]
     pub fn map<U: ?Sized, F>(orig: RefMut<'a, T>, f: F) -> RefMut<'a, U>
     where
@@ -489,6 +608,7 @@ impl<'a, T: ?Sized> RefMut<'a, T> {
         }
     }
 
+    /// Filters and maps a mutable reference to a new type.
     #[inline]
     pub fn filter_map<U: ?Sized, F>(orig: RefMut<'a, T>, f: F) -> Result<RefMut<'a, U>, Self>
     where
@@ -512,21 +632,21 @@ impl<'a, T: ?Sized> RefMut<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> core::ops::Deref for RefMut<'a, T> {
+impl<T: ?Sized> core::ops::Deref for RefMut<'_, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         unsafe { self.value.as_ref() }
     }
 }
-impl<'a, T: ?Sized> core::ops::DerefMut for RefMut<'a, T> {
+impl<T: ?Sized> core::ops::DerefMut for RefMut<'_, T> {
     fn deref_mut(&mut self) -> &mut <Self as core::ops::Deref>::Target {
         unsafe { self.value.as_mut() }
     }
 }
 
-impl<'a, T: ?Sized> Drop for RefMut<'a, T> {
-    // unset the mutable borrow flag
+impl<T: ?Sized> Drop for RefMut<'_, T> {
     fn drop(&mut self) {
+        // unset the mutable borrow flag
         unsafe { *self.state.as_mut() &= self.borrow_mask };
     }
 }

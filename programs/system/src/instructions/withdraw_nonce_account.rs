@@ -39,7 +39,7 @@ pub struct WithdrawNonceAccount<'a> {
     pub lamports: u64,
 }
 
-impl<'a> WithdrawNonceAccount<'a> {
+impl WithdrawNonceAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

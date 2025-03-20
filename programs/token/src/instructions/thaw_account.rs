@@ -15,14 +15,14 @@ use super::TokenProgramVariant;
 ///   2. `[SIGNER]` The mint freeze authority.
 pub struct ThawAccount<'a> {
     /// Token Account to thaw.
-    pub token: &'a AccountInfo,
+    pub account: &'a AccountInfo,
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Mint Freeze Authority Account
     pub freeze_authority: &'a AccountInfo,
 }
 
-impl<'a> ThawAccount<'a> {
+impl ThawAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -35,7 +35,7 @@ impl<'a> ThawAccount<'a> {
     ) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.token.key()),
+            AccountMeta::writable(self.account.key()),
             AccountMeta::readonly(self.mint.key()),
             AccountMeta::readonly_signer(self.freeze_authority.key()),
         ];
@@ -48,7 +48,7 @@ impl<'a> ThawAccount<'a> {
 
         invoke_signed(
             &instruction,
-            &[self.token, self.mint, self.freeze_authority],
+            &[self.account, self.mint, self.freeze_authority],
             signers,
         )
     }

@@ -1,3 +1,6 @@
+//! Defines the lazy program entrypoint and the context to access the
+//! input buffer.
+
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
     program_error::ProgramError,
@@ -5,21 +8,36 @@ use crate::{
     BPF_ALIGN_OF_U128, NON_DUP_MARKER,
 };
 
-/// Declare the program entrypoint.
+/// Declare the lazy program entrypoint.
 ///
-/// This entrypoint is defined as *lazy* because it does not read the accounts upfront
-/// nor set up global handlers. Instead, it provides an [`InstructionContext`] to the
-/// access input information on demand. This is useful when the program needs more control
-/// over the compute units it uses. The trade-off is that the program is responsible for
-/// managing potential duplicated accounts and set up a `global allocator`
-/// and `panic handler`.
+/// Use the `lazy_program_entrypoint!` macro instead.
+#[deprecated(
+    since = "0.7.0",
+    note = "Use the `lazy_program_entrypoint!` macro instead"
+)]
+#[macro_export]
+macro_rules! lazy_entrypoint {
+    ( $process_instruction:ident ) => {
+        $crate::lazy_program_entrypoint!($process_instruction);
+    };
+}
+
+/// Declare the lazy program entrypoint.
 ///
-/// The usual use-case for a `lazy_entrypoint` is small programs with a single instruction.
-/// For most use-cases, it is recommended to use the [`entrypoint`] macro instead.
+/// This entrypoint is defined as *lazy* because it does not read the accounts upfront.
+/// Instead, it provides an [`InstructionContext`] to the access input information on demand.
+/// This is useful when the program needs more control over the compute units it uses.
+/// The trade-off is that the program is responsible for managing potential duplicated
+/// accounts and set up a `global allocator` and `panic handler`.
+///
+/// The usual use-case for a [`crate::lazy_program_entrypoint!`] is small programs with a single
+/// instruction. For most use-cases, it is recommended to use the [`crate::program_entrypoint!`]
+/// macro instead.
 ///
 /// This macro emits the boilerplate necessary to begin program execution, calling a
 /// provided function to process the program instruction supplied by the runtime, and reporting
-/// its result to the runtime.
+/// its result to the runtime. Note that it does not set up a global allocator nor a panic
+/// handler.
 ///
 /// The only argument is the name of a function with this type signature:
 ///
@@ -29,7 +47,7 @@ use crate::{
 /// ) -> ProgramResult;
 /// ```
 ///
-/// # Examples
+/// # Example
 ///
 /// Defining an entrypoint and making it conditional on the `bpf-entrypoint` feature. Although
 /// the `entrypoint` module is written inline in this example, it is common to put it into its
@@ -40,30 +58,34 @@ use crate::{
 /// pub mod entrypoint {
 ///
 ///     use pinocchio::{
-///         lazy_entrypoint,
-///         lazy_entrypoint::InstructionContext,
+///         default_allocator,
+///         default_panic_handler,
+///         entrypoint::InstructionContext,
+///         lazy_program_entrypoint,
 ///         msg,
 ///         ProgramResult
 ///     };
 ///
-///     lazy_entrypoint!(process_instruction);
+///     lazy_program_entrypoint!(process_instruction);
+///     default_allocator!();
+///     default_panic_handler!();
 ///
 ///     pub fn process_instruction(
 ///         mut context: InstructionContext,
 ///     ) -> ProgramResult {
-///         msg!("Hello from my lazy program!");
+///         msg!("Hello from my `lazy` program!");
 ///         Ok(())
 ///     }
 ///
 /// }
 /// ```
 #[macro_export]
-macro_rules! lazy_entrypoint {
+macro_rules! lazy_program_entrypoint {
     ( $process_instruction:ident ) => {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            match $process_instruction($crate::lazy_entrypoint::InstructionContext::new(input)) {
+            match $process_instruction($crate::entrypoint::lazy::InstructionContext::new(input)) {
                 Ok(_) => $crate::SUCCESS,
                 Err(error) => error.into(),
             }
@@ -142,7 +164,7 @@ impl InstructionContext {
 
     /// Returns the number of remaining accounts.
     ///
-    /// This value is decremented each time [`next_account`] is called.
+    /// This value is decremented each time [`Self::next_account`] is called.
     #[inline(always)]
     pub fn remaining(&self) -> u64 {
         self.remaining
@@ -153,7 +175,7 @@ impl InstructionContext {
     /// This method can only be used after all accounts have been read; otherwise, it will
     /// return a [`ProgramError::InvalidInstructionData`] error.
     #[inline(always)]
-    pub fn instruction_data(&mut self) -> Result<(&[u8], &Pubkey), ProgramError> {
+    pub fn instruction_data(&self) -> Result<&[u8], ProgramError> {
         if self.remaining > 0 {
             return Err(ProgramError::InvalidInstructionData);
         }
@@ -168,13 +190,38 @@ impl InstructionContext {
     /// It is up to the caller to guarantee that all accounts have been read; calling this method
     /// before reading all accounts will result in undefined behavior.
     #[inline(always)]
-    pub unsafe fn instruction_data_unchecked(&mut self) -> (&[u8], &Pubkey) {
+    pub unsafe fn instruction_data_unchecked(&self) -> &[u8] {
         let data_len = *(self.input.add(self.offset) as *const usize);
         // shadowing the offset to avoid leaving it in an inconsistent state
         let offset = self.offset + core::mem::size_of::<u64>();
-        let data = core::slice::from_raw_parts(self.input.add(offset), data_len);
+        core::slice::from_raw_parts(self.input.add(offset), data_len)
+    }
 
-        (data, &*(self.input.add(offset + data_len) as *const Pubkey))
+    /// Returns the program id for the instruction.
+    ///
+    /// This method can only be used after all accounts have been read; otherwise, it will
+    /// return a [`ProgramError::InvalidInstructionData`] error.
+    #[inline(always)]
+    pub fn program_id(&self) -> Result<&Pubkey, ProgramError> {
+        if self.remaining > 0 {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        Ok(unsafe { self.program_id_unchecked() })
+    }
+
+    /// Returns the program id for the instruction.
+    ///
+    /// # Safety
+    ///
+    /// It is up to the caller to guarantee that all accounts have been read; calling this method
+    /// before reading all accounts will result in undefined behavior.
+    #[inline(always)]
+    pub unsafe fn program_id_unchecked(&self) -> &Pubkey {
+        let data_len = *(self.input.add(self.offset) as *const usize);
+        &*(self
+            .input
+            .add(self.offset + core::mem::size_of::<u64>() + data_len) as *const Pubkey)
     }
 }
 

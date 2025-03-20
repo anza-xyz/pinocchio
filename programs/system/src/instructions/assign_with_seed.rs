@@ -29,7 +29,7 @@ pub struct AssignWithSeed<'a, 'b, 'c> {
     pub owner: &'c Pubkey,
 }
 
-impl<'a, 'b, 'c> AssignWithSeed<'a, 'b, 'c> {
+impl AssignWithSeed<'_, '_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

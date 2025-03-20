@@ -2,13 +2,13 @@
 
 use crate::program_error::ProgramError;
 
-/// Number of bytes in a pubkey
+/// Number of bytes in a pubkey.
 pub const PUBKEY_BYTES: usize = 32;
 
-/// maximum length of derived `Pubkey` seed
+/// maximum length of derived `Pubkey` seed.
 pub const MAX_SEED_LEN: usize = 32;
 
-/// Maximum number of seeds
+/// Maximum number of seeds.
 pub const MAX_SEEDS: usize = 16;
 
 /// The address of a [Solana account][account].
@@ -16,7 +16,7 @@ pub const MAX_SEEDS: usize = 16;
 /// [account]: https://solana.com/docs/core/accounts
 pub type Pubkey = [u8; PUBKEY_BYTES];
 
-/// Log a `Pubkey` from a program
+/// Log a `Pubkey` from a program.
 #[inline(always)]
 pub fn log(pubkey: &Pubkey) {
     #[cfg(target_os = "solana")]
@@ -75,7 +75,7 @@ pub fn log(pubkey: &Pubkey) {
 /// re-searching for the bump key by using the [`create_program_address`]
 /// function.
 ///
-/// [`create_program_address`]: Pubkey::create_program_address
+/// [`create_program_address`]: crate::pubkey::create_program_address
 ///
 /// **Warning**: Because of the way the seeds are hashed there is a potential
 /// for program address collisions for the same program id.  The seeds are
@@ -120,19 +120,21 @@ pub fn find_program_address(seeds: &[&[u8]], program_id: &Pubkey) -> (Pubkey, u8
 pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Pubkey) -> Option<(Pubkey, u8)> {
     #[cfg(target_os = "solana")]
     {
-        let mut bytes = [0; 32];
+        let mut bytes = core::mem::MaybeUninit::<[u8; PUBKEY_BYTES]>::uninit();
         let mut bump_seed = u8::MAX;
+
         let result = unsafe {
             crate::syscalls::sol_try_find_program_address(
                 seeds as *const _ as *const u8,
                 seeds.len() as u64,
                 program_id as *const _,
-                &mut bytes as *mut _,
+                bytes.as_mut_ptr() as *mut _,
                 &mut bump_seed as *mut _,
             )
         };
         match result {
-            crate::SUCCESS => Some((bytes, bump_seed)),
+            // SAFETY: The syscall has initialized the bytes.
+            crate::SUCCESS => Some((unsafe { bytes.assume_init() }, bump_seed)),
             _ => None,
         }
     }
@@ -172,19 +174,20 @@ pub fn create_program_address(
     // Call via a system call to perform the calculation
     #[cfg(target_os = "solana")]
     {
-        let mut bytes = [0; 32];
+        let mut bytes = core::mem::MaybeUninit::<[u8; PUBKEY_BYTES]>::uninit();
 
         let result = unsafe {
             crate::syscalls::sol_create_program_address(
                 seeds as *const _ as *const u8,
                 seeds.len() as u64,
                 program_id as *const _ as *const u8,
-                &mut bytes as *mut _ as *mut u8,
+                bytes.as_mut_ptr() as *mut u8,
             )
         };
 
         match result {
-            crate::SUCCESS => Ok(bytes),
+            // SAFETY: The syscall has initialized the bytes.
+            crate::SUCCESS => Ok(unsafe { bytes.assume_init() }),
             _ => Err(result.into()),
         }
     }

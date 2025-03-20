@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::{AccountInfo, Ref},
+    account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     program_error::ProgramError,
@@ -9,9 +9,18 @@ use pinocchio::{
 
 use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 
+use super::get_extension_from_bytes;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CpiGuard {
     /// Lock privileged token operations from happening via CPI
     pub lock_cpi: bool,
+}
+
+impl super::Extension for CpiGuard {
+    const TYPE: super::ExtensionType = super::ExtensionType::CpiGuard;
+    const LEN: usize = Self::LEN;
+    const BASE_STATE: super::BaseState = super::BaseState::Mint;
 }
 
 impl CpiGuard {
@@ -23,48 +32,15 @@ impl CpiGuard {
     /// This method performs owner and length validation on `AccountInfo`, safe borrowing
     /// the account data.
     #[inline(always)]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<CpiGuard>, ProgramError> {
-        if account_info.data_len() != Self::LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
-        if account_info.owner() != &TOKEN_2022_PROGRAM_ID {
+    pub fn from_account_info(account_info: &AccountInfo) -> Result<CpiGuard, ProgramError> {
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
-            Self::from_bytes(data)
-        }))
-    }
 
-    /// Return a `CpiGuard` from the given account info.
-    ///
-    /// This method performs owner and length validation on `AccountInfo`, but does not
-    /// perform the borrow check.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that it is safe to borrow the account data – e.g., there are
-    /// no mutable borrows of the account data.
-    #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
-    ) -> Result<&Self, ProgramError> {
-        if account_info.data_len() != Self::LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
-        if account_info.owner() != &TOKEN_2022_PROGRAM_ID {
-            return Err(ProgramError::InvalidAccountOwner);
-        }
-        Ok(Self::from_bytes(account_info.borrow_data_unchecked()))
-    }
+        let acc_data_bytes = account_info.try_borrow_data()?;
+        let acc_data_bytes = acc_data_bytes.as_ref();
 
-    /// Return a `CpiGuard` from the given bytes.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that `bytes` contains a valid representation of `CpiGuard`.
-    #[inline(always)]
-    pub unsafe fn from_bytes(bytes: &[u8]) -> &Self {
-        &*(bytes.as_ptr() as *const &CpiGuard)
+        get_extension_from_bytes::<Self>(acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
     }
 }
 

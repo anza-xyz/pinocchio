@@ -17,16 +17,16 @@ use super::TokenProgramVariant;
 /// ### Accounts:
 ///   0. `[WRITE]`  The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
-pub struct InitilizeAccount3<'a> {
+pub struct InitializeAccount3<'a> {
     /// New Account.
-    pub token: &'a AccountInfo,
+    pub account: &'a AccountInfo,
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Owner of the new Account.
     pub owner: &'a Pubkey,
 }
 
-impl<'a> InitilizeAccount3<'a> {
+impl InitializeAccount3<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -39,7 +39,7 @@ impl<'a> InitilizeAccount3<'a> {
     ) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.token.key()),
+            AccountMeta::writable(self.account.key()),
             AccountMeta::readonly(self.mint.key()),
         ];
 
@@ -59,6 +59,6 @@ impl<'a> InitilizeAccount3<'a> {
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },
         };
 
-        invoke_signed(&instruction, &[self.token, self.mint], signers)
+        invoke_signed(&instruction, &[self.account, self.mint], signers)
     }
 }

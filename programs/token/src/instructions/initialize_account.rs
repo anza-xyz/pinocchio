@@ -14,9 +14,9 @@ use super::TokenProgramVariant;
 ///   1. `[]` The mint this account will be associated with.
 ///   2. `[]` The new account's owner/multisignature.
 ///   3. `[]` Rent sysvar
-pub struct InitilizeAccount<'a> {
+pub struct InitializeAccount<'a> {
     /// New Account.
-    pub token: &'a AccountInfo,
+    pub account: &'a AccountInfo,
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Owner of the new Account.
@@ -25,7 +25,7 @@ pub struct InitilizeAccount<'a> {
     pub rent_sysvar: &'a AccountInfo,
 }
 
-impl<'a> InitilizeAccount<'a> {
+impl InitializeAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -38,7 +38,7 @@ impl<'a> InitilizeAccount<'a> {
     ) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.token.key()),
+            AccountMeta::writable(self.account.key()),
             AccountMeta::readonly(self.mint.key()),
             AccountMeta::readonly(self.owner.key()),
             AccountMeta::readonly(self.rent_sysvar.key()),
@@ -52,7 +52,7 @@ impl<'a> InitilizeAccount<'a> {
 
         invoke_signed(
             &instruction,
-            &[self.token, self.mint, self.owner, self.rent_sysvar],
+            &[self.account, self.mint, self.owner, self.rent_sysvar],
             signers,
         )
     }

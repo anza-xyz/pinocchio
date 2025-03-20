@@ -13,13 +13,13 @@ use super::TokenProgramVariant;
 ///   0. `[WRITE]` The source account.
 ///   1. `[SIGNER]` The source account owner.
 pub struct Revoke<'a> {
-    /// New Account.
-    pub token: &'a AccountInfo,
-    /// Mint Account.
+    /// Source Account.
+    pub source: &'a AccountInfo,
+    ///  Source Owner Account.
     pub authority: &'a AccountInfo,
 }
 
-impl<'a> Revoke<'a> {
+impl Revoke<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -32,7 +32,7 @@ impl<'a> Revoke<'a> {
     ) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.token.key()),
+            AccountMeta::writable(self.source.key()),
             AccountMeta::readonly_signer(self.authority.key()),
         ];
 
@@ -42,6 +42,6 @@ impl<'a> Revoke<'a> {
             data: &[5],
         };
 
-        invoke_signed(&instruction, &[self.token, self.authority], signers)
+        invoke_signed(&instruction, &[self.source, self.authority], signers)
     }
 }

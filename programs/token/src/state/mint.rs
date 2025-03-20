@@ -48,8 +48,8 @@ impl Mint {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        if account_info.owner() != &TOKEN_2022_PROGRAM_ID
-            && account_info.owner() != &LEGACY_TOKEN_PROGRAM_ID
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID)
+            && !account_info.is_owned_by(&LEGACY_TOKEN_PROGRAM_ID)
         {
             return Err(ProgramError::InvalidAccountOwner);
         }
@@ -75,8 +75,8 @@ impl Mint {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        if account_info.owner() != &TOKEN_2022_PROGRAM_ID
-            && account_info.owner() != &LEGACY_TOKEN_PROGRAM_ID
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID)
+            && !account_info.is_owned_by(&LEGACY_TOKEN_PROGRAM_ID)
         {
             return Err(ProgramError::InvalidAccountOwner);
         }

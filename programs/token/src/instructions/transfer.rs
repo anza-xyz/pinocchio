@@ -28,7 +28,7 @@ pub struct Transfer<'a> {
     pub amount: u64,
 }
 
-impl<'a> Transfer<'a> {
+impl Transfer<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)

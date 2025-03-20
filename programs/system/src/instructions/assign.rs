@@ -18,7 +18,7 @@ pub struct Assign<'a, 'b> {
     pub owner: &'b Pubkey,
 }
 
-impl<'a, 'b> Assign<'a, 'b> {
+impl Assign<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

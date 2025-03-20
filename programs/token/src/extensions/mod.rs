@@ -139,7 +139,7 @@ pub trait Extension {
     const BASE_STATE: BaseState;
 }
 
-pub fn get_extension_from_bytes<T: Extension + Copy>(acc_data_bytes: &[u8]) -> Option<T> {
+pub fn get_extension_from_bytes<T: Extension + Clone + Copy>(acc_data_bytes: &[u8]) -> Option<T> {
     let ext_bytes = match T::BASE_STATE {
         BaseState::Mint => {
             &acc_data_bytes[Mint::LEN + EXTENSIONS_PADDING + EXTENSION_START_OFFSET..]

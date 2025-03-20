@@ -12,7 +12,7 @@ use pinocchio::{
 ///   0. `[WRITE, SIGNER]` Funding account
 ///   1. `[WRITE]` Created account
 ///   2. `[SIGNER]` (optional) Base account; the account matching the base Pubkey below must be
-///                 provided as a signer, but may be the same as the funding account
+///      provided as a signer, but may be the same as the funding account
 pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     /// Funding account.
     pub from: &'a AccountInfo,
@@ -40,7 +40,7 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     pub owner: &'c Pubkey,
 }
 
-impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
+impl CreateAccountWithSeed<'_, '_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

@@ -1,6 +1,8 @@
-use pinocchio::pubkey::Pubkey;
+use pinocchio::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
-use super::{BaseState, Extension, ExtensionType};
+use crate::TOKEN_2022_PROGRAM_ID;
+
+use super::{get_extension_from_bytes, BaseState, Extension, ExtensionType};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 /// Metadata for a token
@@ -24,6 +26,24 @@ pub struct TokenMetadata<'s> {
 impl<'t> TokenMetadata<'t> {
     /// The length of the `TokenMetadata` account data.
     pub const LEN: usize = core::mem::size_of::<TokenMetadata>();
+
+    /// Return a `TokenMetadata` from the given account info.
+    ///
+    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// the account data.
+    #[inline(always)]
+    pub fn from_account_info(
+        account_info: &'t AccountInfo,
+    ) -> Result<TokenMetadata<'t>, ProgramError> {
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
+            return Err(ProgramError::InvalidAccountOwner);
+        }
+
+        let acc_data_bytes = account_info.try_borrow_data()?;
+        let acc_data_bytes = acc_data_bytes.as_ref();
+
+        get_extension_from_bytes::<Self>(acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
+    }
 }
 
 impl Extension for TokenMetadata<'_> {

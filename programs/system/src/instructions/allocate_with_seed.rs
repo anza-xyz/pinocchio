@@ -33,7 +33,7 @@ pub struct AllocateWithSeed<'a, 'b, 'c> {
     pub owner: &'c Pubkey,
 }
 
-impl<'a, 'b, 'c> AllocateWithSeed<'a, 'b, 'c> {
+impl AllocateWithSeed<'_, '_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

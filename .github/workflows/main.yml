@@ -6,65 +6,64 @@ on:
   pull_request:
 
 env:
-  RUST_VERSION: 1.78.0
-  SOLANA_VERSION: 1.18.20
-  CARGO_CACHE: |
-    ~/.cargo/bin/
-    ~/.cargo/registry/index/
-    ~/.cargo/registry/cache/
-    ~/.cargo/git/db/
-    target/
+  CACHE: true
 
 jobs:
-  lint:
-    name: Lint
+  sanity:
+    name: Process Workspace
     runs-on: ubuntu-latest
+    outputs:
+      members: ${{ steps.filter.outputs.members }}
     steps:
       - name: Git checkout
         uses: actions/checkout@v4
-      - name: Install components
-        uses: dtolnay/rust-toolchain@master
-        with:
-          components: clippy, rustfmt
-          toolchain: ${{ env.RUST_VERSION }}
-      - name: Formatting
-        run: cargo fmt --all --check
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features --no-deps
 
-  build:
-    name: Build
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v4
-      - name: Install Solana
-        uses: nifty-oss/actions/install-solana@v1
+      - name: Setup Environment
+        uses: ./.github/actions/setup
         with:
-          version: ${{ env.SOLANA_VERSION }}
-          cache: true
-      - name: Cache cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.CARGO_CACHE }}
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo
-      - name: Build
-        run: cargo build-bpf
+          cargo-cache-key: cargo-audit
+          components: audit
 
-  test:
-    name: Test
-    needs: lint
+      - name: cargo-audit
+        run: pnpm cargo-audit
+
+      - name: Filter members
+        id: filter
+        run: pnpm tsx ./scripts/setup/members.mts
+
+  process:
+    name: Check
+    needs: sanity
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        member: ${{ fromJson(needs.sanity.outputs.members) }}
     steps:
-      - name: Git checkout
+      - name: Git Checkout
         uses: actions/checkout@v4
-      - name: Cache cargo dependencies
-        uses: actions/cache@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
         with:
-          path: ${{ env.CARGO_CACHE }}
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo
-      - name: Build
-        run: cargo test
+          cargo-cache-key: cargo-${{ matrix.member }}
+          toolchain: build, format, lint, test
+          components: hack
+          solana: true
+
+      - name: fmt
+        run: pnpm format ${{ matrix.member }}
+
+      - name: clippy
+        run: pnpm clippy ${{ matrix.member }}
+
+      - name: cargo-doc
+        run: pnpm doc ${{ matrix.member }}
+
+      - name: cargo-hack
+        run: pnpm hack ${{ matrix.member }}
+
+      - name: build-sbf
+        run: pnpm build-sbf ${{ matrix.member }}
+
+      - name: test
+        run: pnpm test ${{ matrix.member }}

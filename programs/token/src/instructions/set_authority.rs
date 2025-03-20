@@ -40,7 +40,7 @@ pub struct SetAuthority<'a> {
     pub new_authority: Option<&'a Pubkey>,
 }
 
-impl<'a> SetAuthority<'a> {
+impl SetAuthority<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)

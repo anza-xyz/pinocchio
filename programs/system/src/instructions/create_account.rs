@@ -28,7 +28,7 @@ pub struct CreateAccount<'a> {
     pub owner: &'a Pubkey,
 }
 
-impl<'a> CreateAccount<'a> {
+impl CreateAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

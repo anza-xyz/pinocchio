@@ -18,7 +18,7 @@ use super::TokenProgramVariant;
 ///   2. `[SIGNER]` The account's owner/delegate.
 pub struct BurnChecked<'a> {
     /// Source of the Burn Account
-    pub token: &'a AccountInfo,
+    pub account: &'a AccountInfo,
     /// Mint Account
     pub mint: &'a AccountInfo,
     /// Owner of the Token Account
@@ -29,7 +29,7 @@ pub struct BurnChecked<'a> {
     pub decimals: u8,
 }
 
-impl<'a> BurnChecked<'a> {
+impl BurnChecked<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -42,7 +42,7 @@ impl<'a> BurnChecked<'a> {
     ) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.token.key()),
+            AccountMeta::writable(self.account.key()),
             AccountMeta::writable(self.mint.key()),
             AccountMeta::readonly_signer(self.authority.key()),
         ];
@@ -68,7 +68,7 @@ impl<'a> BurnChecked<'a> {
 
         invoke_signed(
             &instruction,
-            &[self.token, self.mint, self.authority],
+            &[self.account, self.mint, self.authority],
             signers,
         )
     }

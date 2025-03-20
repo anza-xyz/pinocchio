@@ -1,8 +1,19 @@
-# <img width="250" alt="pinocchio-system" src="https://github.com/user-attachments/assets/6a775333-c3a1-4623-aa7a-afdc8c492594"/>
+<p align="center">
+ <img alt="pinocchio-system" src="https://github.com/user-attachments/assets/4048fe96-9096-4441-85c3-5deffeb089a6" height="100"/>
+</p>
+<h3 align="center">
+  <code>pinocchio-system</code>
+</h3>
+<p align="center">
+  <a href="https://crates.io/crates/pinocchio-system"><img src="https://img.shields.io/crates/v/pinocchio-system?logo=rust" /></a>
+  <a href="https://docs.rs/pinocchio-system"><img src="https://img.shields.io/docsrs/pinocchio-system?logo=docsdotrs" /></a>
+</p>
+
+## Overview
 
 This crate contains [`pinocchio`](https://crates.io/crates/pinocchio) helpers to perform cross-program invocations (CPIs) for System program instructions.
 
-Each instruction defines an `struct` with the accounts and parameters required. Once all values are set, you can call directly `invoke` or `invoke_signed` to perform the CPI.
+Each instruction defines a `struct` with the accounts and parameters required. Once all values are set, you can call directly `invoke` or `invoke_signed` to perform the CPI.
 
 This is a `no_std` crate.
 

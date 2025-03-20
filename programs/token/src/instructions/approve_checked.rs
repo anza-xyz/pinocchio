@@ -19,7 +19,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   3. `[SIGNER]` The source account owner.
 pub struct ApproveChecked<'a> {
     /// Source Account.
-    pub token: &'a AccountInfo,
+    pub source: &'a AccountInfo,
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Delegate Account.
@@ -32,7 +32,7 @@ pub struct ApproveChecked<'a> {
     pub decimals: u8,
 }
 
-impl<'a> ApproveChecked<'a> {
+impl ApproveChecked<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)
@@ -45,7 +45,7 @@ impl<'a> ApproveChecked<'a> {
     ) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.token.key()),
+            AccountMeta::writable(self.source.key()),
             AccountMeta::readonly(self.mint.key()),
             AccountMeta::readonly(self.delegate.key()),
             AccountMeta::readonly_signer(self.authority.key()),
@@ -72,7 +72,7 @@ impl<'a> ApproveChecked<'a> {
 
         invoke_signed(
             &instruction,
-            &[self.token, self.mint, self.delegate, self.authority],
+            &[self.source, self.mint, self.delegate, self.authority],
             signers,
         )
     }

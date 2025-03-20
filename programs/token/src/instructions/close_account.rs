@@ -22,7 +22,7 @@ pub struct CloseAccount<'a> {
     pub authority: &'a AccountInfo,
 }
 
-impl<'a> CloseAccount<'a> {
+impl CloseAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)

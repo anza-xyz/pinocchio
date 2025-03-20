@@ -17,7 +17,7 @@ pub struct Allocate<'a> {
     pub space: u64,
 }
 
-impl<'a> Allocate<'a> {
+impl Allocate<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

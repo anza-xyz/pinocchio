@@ -1,5 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
+use regex::Regex;
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, parse_str,
@@ -84,70 +85,137 @@ pub fn log(input: TokenStream) -> TokenStream {
     } = parse_macro_input!(input as LogArgs);
     let parsed_string = format_string.value();
 
-    // Check if there are any `{}` placeholders in the format string.
-    //
-    // When the format string has placeholders, the list of arguments must
-    // not be empty. The number of placehilders will be validated later.
-    let needs_formatting = parsed_string.contains("{}");
+    // Regex pattern to match placeholders in the format string.
+    let placeholder_regex = Regex::new(r"\{.*?\}").unwrap();
 
-    if !(needs_formatting || args.is_empty()) {
+    let placeholders: Vec<_> = placeholder_regex
+        .find_iter(&parsed_string)
+        .map(|m| m.as_str())
+        .collect();
+
+    // Check if there is an argument for each `{}` placeholder.
+    if placeholders.len() != args.len() {
+        let arg_message = if args.is_empty() {
+            "but no arguments were given".to_string()
+        } else {
+            format!(
+                "but there is {} {}",
+                args.len(),
+                if args.len() == 1 {
+                    "argument"
+                } else {
+                    "arguments"
+                }
+            )
+        };
+
         return Error::new_spanned(
             format_string,
-            "the format string must contain a `{}` placeholder for each value.",
+            format!(
+                "{} positional arguments in format string, {}",
+                placeholders.len(),
+                arg_message
+            ),
         )
         .to_compile_error()
         .into();
     }
 
-    if needs_formatting {
+    if !placeholders.is_empty() {
         // The parts of the format string with the placeholders replaced by arguments.
         let mut replaced_parts = Vec::new();
-        // The number of placeholders in the format string.
-        let mut part_count = 0;
-        // The number of arguments passed to the macro.
-        let mut arg_count = 0;
 
-        let part_iter = parsed_string.split("{}").peekable();
+        let parts: Vec<&str> = placeholder_regex.split(&parsed_string).collect();
+        let part_iter = parts.iter();
+
         let mut arg_iter = args.iter();
+        let mut ph_iter = placeholders.iter();
 
         // Replace each occurrence of `{}` with their corresponding argument value.
         for part in part_iter {
             if !part.is_empty() {
                 replaced_parts.push(quote! { logger.append(#part) });
             }
-            part_count += 1;
 
             if let Some(arg) = arg_iter.next() {
-                replaced_parts.push(quote! { logger.append(#arg) });
-                arg_count += 1;
-            }
-        }
+                // The number of placeholders was validated to be the same as
+                // the number of arguments, so this should never panic.
+                let placeholder = ph_iter.next().unwrap();
 
-        if (part_count - 1) != arg_count {
-            let arg_message = if arg_count == 0 {
-                "but no arguments were given".to_string()
-            } else {
-                format!(
-                    "but there is {} {}",
-                    arg_count,
-                    if arg_count == 1 {
-                        "argument"
-                    } else {
-                        "arguments"
+                match *placeholder {
+                    "{}" => {
+                        replaced_parts.push(quote! { logger.append(#arg) });
                     }
-                )
-            };
+                    value if value.starts_with("{:.") => {
+                        let precision =
+                            if let Ok(precision) = value[3..value.len() - 1].parse::<u8>() {
+                                precision
+                            } else {
+                                return Error::new_spanned(
+                                    format_string,
+                                    format!("invalid precision format: {}", value),
+                                )
+                                .to_compile_error()
+                                .into();
+                            };
 
-            return Error::new_spanned(
-                format_string,
-                format!(
-                    "{} positional arguments in format string, {}",
-                    part_count - 1,
-                    arg_message
-                ),
-            )
-            .to_compile_error()
-            .into();
+                        replaced_parts.push(quote! {
+                            logger.append_with_args(
+                                #arg,
+                                &[pinocchio_log::logger::Argument::Precision(#precision)]
+                            )
+                        });
+                    }
+                    value if value.starts_with("{:<.") || value.starts_with("{:>.") => {
+                        let size = if let Ok(size) = value[4..value.len() - 1].parse::<usize>() {
+                            size
+                        } else {
+                            return Error::new_spanned(
+                                format_string,
+                                format!("invalid truncate size format: {}", value),
+                            )
+                            .to_compile_error()
+                            .into();
+                        };
+
+                        match value.chars().nth(2) {
+                            Some('<') => {
+                                replaced_parts.push(quote! {
+                                    logger.append_with_args(
+                                        #arg,
+                                        &[pinocchio_log::logger::Argument::TruncateStart(#size)]
+                                    )
+                                });
+                            }
+                            Some('>') => {
+                                replaced_parts.push(quote! {
+                                    logger.append_with_args(
+                                        #arg,
+                                        &[pinocchio_log::logger::Argument::TruncateEnd(#size)]
+                                    )
+                                });
+                            }
+                            _ => {
+                                // This should not happen since we already checked the format.
+                                return Error::new_spanned(
+                                    format_string,
+                                    format!("invalid truncate format: {}", value),
+                                )
+                                .to_compile_error()
+                                .into();
+                            }
+                        }
+                    }
+                    _ => {
+                        return Error::new_spanned(
+                            format_string,
+                            format!("invalid placeholder: {}", placeholder),
+                        )
+                        .to_compile_error()
+                        .into();
+                    }
+                }
+            }
         }
 
         // Generate the output string as a compile-time constant

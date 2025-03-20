@@ -18,7 +18,7 @@ pub struct SyncNative<'a> {
     pub native_token: &'a AccountInfo,
 }
 
-impl<'a> SyncNative<'a> {
+impl SyncNative<'_> {
     #[inline(always)]
     pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
         self.invoke_signed(&[], token_program)

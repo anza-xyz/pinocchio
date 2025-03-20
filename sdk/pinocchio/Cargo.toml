@@ -1,14 +1,20 @@
 [package]
 name = "pinocchio"
 description = "Create Solana programs with no dependencies attached"
-version = "0.6.0"
+version = "0.8.0"
 edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"
 repository = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(target_os, values("solana"))',
     'cfg(target_feature, values("static-syscalls"))',
 ] }
+
+[features]
+std = []

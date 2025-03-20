@@ -21,7 +21,7 @@ pub struct Transfer<'a> {
     pub lamports: u64,
 }
 
-impl<'a> Transfer<'a> {
+impl Transfer<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

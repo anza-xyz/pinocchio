@@ -1,0 +1,15 @@
+[package]
+name = "pinocchio-associated-token-account"
+description = "Pinocchio helpers to invoke Associated Token Account program instructions"
+version = "0.1.1"
+edition = { workspace = true }
+license = { workspace = true }
+readme = "./README.md"
+repository = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+pinocchio = { workspace = true }
+pinocchio-pubkey = { workspace = true }

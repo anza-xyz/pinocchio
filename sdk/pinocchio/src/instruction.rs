@@ -5,7 +5,6 @@ use core::{marker::PhantomData, ops::Deref};
 use crate::{account_info::AccountInfo, pubkey::Pubkey};
 
 /// Information about a CPI instruction.
-#[repr(C)]
 #[derive(Debug, Clone)]
 pub struct Instruction<'a, 'b, 'c, 'd>
 where
@@ -87,6 +86,9 @@ impl<'a> From<&'a AccountInfo> for Account<'a> {
             data_len: account.data_len() as u64,
             data: offset(account.raw, 88),
             owner: offset(account.raw, 40),
+            // The `rent_epoch` field is not present in the `AccountInfo` struct,
+            // since the value occurs after the variable data of the account in
+            // the runtime input data.
             rent_epoch: 0,
             is_signer: account.is_signer(),
             is_writable: account.is_writable(),
@@ -110,17 +112,18 @@ impl<'a> From<&'a AccountInfo> for Account<'a> {
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct AccountMeta<'a> {
-    // Public key of the account.
+    /// Public key of the account.
     pub pubkey: &'a Pubkey,
 
-    // Indicates whether the account is writable or not.
+    /// Indicates whether the account is writable or not.
     pub is_writable: bool,
 
-    // Indicates whether the account signed the instruction or not.
+    /// Indicates whether the account signed the instruction or not.
     pub is_signer: bool,
 }
 
 impl<'a> AccountMeta<'a> {
+    /// Creates a new `AccountMeta`.
     #[inline(always)]
     pub fn new(pubkey: &'a Pubkey, is_writable: bool, is_signer: bool) -> Self {
         Self {
@@ -130,21 +133,25 @@ impl<'a> AccountMeta<'a> {
         }
     }
 
+    /// Creates a new readonly `AccountMeta`.
     #[inline(always)]
     pub fn readonly(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, false, false)
     }
 
+    /// Creates a new writable `AccountMeta`.
     #[inline(always)]
     pub fn writable(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, true, false)
     }
 
+    /// Creates a new readonly and signer `AccountMeta`.
     #[inline(always)]
     pub fn readonly_signer(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, false, true)
     }
 
+    /// Creates a new writable and signer `AccountMeta`.
     #[inline(always)]
     pub fn writable_signer(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, true, true)
@@ -157,6 +164,11 @@ impl<'a> From<&'a AccountInfo> for AccountMeta<'a> {
     }
 }
 
+/// Represents a signer seed.
+///
+/// This struct contains the same information as a `[u8]`, but
+/// has the memory layout as expected by `sol_invoke_signed_c`
+/// syscall.
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct Seed<'a> {
@@ -254,10 +266,35 @@ impl<'a, 'b, const SIZE: usize> From<&'b [Seed<'a>; SIZE]> for Signer<'a, 'b> {
 /// let signer = signer!(b"seed", &[pda_bump]);
 /// ```
 #[macro_export]
+#[deprecated(since = "0.8.0", note = "Use `seeds!` macro instead")]
 macro_rules! signer {
     ( $($seed:expr),* ) => {
             $crate::instruction::Signer::from(&[$(
                 $seed.into(),
             )*])
+    };
+}
+
+/// Convenience macro for constructing a `[Seed; N]` array from a list of seeds.
+///
+/// # Example
+///
+/// Creating seeds array and signer for a PDA with a single seed and bump value:
+/// ```
+/// use pinocchio::{seeds, instruction::Signer};
+/// use pinocchio::pubkey::Pubkey;
+///
+/// let pda_bump = 0xffu8;
+/// let pda_ref = &[pda_bump];  // prevent temporary value being freed
+/// let example_key = Pubkey::default();
+/// let seeds = seeds!(b"seed", &example_key, pda_ref);
+/// let signer = Signer::from(&seeds);
+/// ```
+#[macro_export]
+macro_rules! seeds {
+    ( $($seed:expr),* ) => {
+        [$(
+            $crate::instruction::Seed::from($seed),
+        )*]
     };
 }

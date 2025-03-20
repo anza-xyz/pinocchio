@@ -1,11 +1,14 @@
 [package]
 name = "pinocchio-system"
 description = "Pinocchio helpers to invoke System program instructions"
-version = "0.2.0"
+version = "0.2.2"
 edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"
 repository = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
 
 [dependencies]
 pinocchio = { workspace = true }
