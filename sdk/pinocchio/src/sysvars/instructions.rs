@@ -5,9 +5,9 @@ use crate::{
     pubkey::Pubkey
 };
 
+// Needs replacement
 use solana_sanitize::SanitizeError;
 
-use super::Sysvar;
 
 const INSTRUCTIONS_ID: Pubkey = [
     6, 167, 213, 23, 24, 123, 209, 102, 53, 218, 212, 4, 85, 253, 194, 192, 193, 36, 198, 143, 33,
