@@ -124,17 +124,19 @@ pub struct IntrospectedInstruction {
 }
 
 impl IntrospectedInstruction {
-    pub unsafe fn get_account_meta_at_unchecked(&self, index: usize) -> &IntrospectedAccountMeta {
-        &*(self
-            .raw
-            .add(size_of::<u16>() + index * IntrospectedAccountMeta::SPACE)
-                as *const IntrospectedAccountMeta)
+    pub unsafe fn get_account_meta_at_unchecked(&self, index: usize) -> IntrospectedAccountMeta {
+        IntrospectedAccountMeta {
+            raw: self
+                .raw
+                .add(size_of::<u16>() + index * IntrospectedAccountMeta::SPACE)
+                    as *const u8,
+        }
     }
 
     pub fn get_account_meta_at(
         &self,
         index: usize,
-    ) -> Result<&IntrospectedAccountMeta, SanitizeError> {
+    ) -> Result<IntrospectedAccountMeta, SanitizeError> {
         if index >= unsafe { *(self.raw as *const u16) } as usize {
             return Err(SanitizeError::IndexOutOfBounds);
         }
@@ -162,7 +164,7 @@ impl IntrospectedInstruction {
                         + size_of::<Pubkey>(),
                 ) as *const u16),
             );
-            
+
             core::slice::from_raw_parts(
                 self.raw.add(
                     size_of::<u16>()
