@@ -1,20 +1,16 @@
 use crate::{
-    account_info::AccountInfo,
-    instruction::AccountMeta,
-    program_error::ProgramError,
-    sanitize_error::SanitizeError,
-    pubkey::Pubkey
+    account_info::AccountInfo, instruction::AccountMeta, program_error::ProgramError,
+    pubkey::Pubkey, sanitize_error::SanitizeError, syscalls::sol_log_64_,
 };
 
 use core::mem::size_of;
 
 /// Sysvar1nstructions1111111111111111111111111
-const INSTRUCTIONS_ID: Pubkey = [
-    0x06, 0xa7, 0xd5, 0x17, 0x18, 0x7b, 0xd1, 0x66, 
-    0x35, 0xda, 0xd4, 0x04, 0x55, 0xfd, 0xc2, 0xc0, 
-    0xc1, 0x24, 0xc6, 0x8f, 0x21, 0x56, 0x75, 0xa5, 
-    0xdb, 0xba, 0xcb, 0x5f, 0x08, 0x00, 0x00, 0x00, 
+pub const INSTRUCTIONS_ID: Pubkey = [
+    0x06, 0xa7, 0xd5, 0x17, 0x18, 0x7b, 0xd1, 0x66, 0x35, 0xda, 0xd4, 0x04, 0x55, 0xfd, 0xc2, 0xc0,
+    0xc1, 0x24, 0xc6, 0x8f, 0x21, 0x56, 0x75, 0xa5, 0xdb, 0xba, 0xcb, 0x5f, 0x08, 0x00, 0x00, 0x00,
 ];
+const ACCOUNT_META_SIZE: usize = 33;
 
 pub struct Instructions();
 
@@ -28,9 +24,7 @@ pub struct Instructions();
 #[inline(always)]
 fn load_current_index(data: &[u8]) -> u16 {
     let len = data.len();
-    unsafe {
-        u16::from_le(*(data.as_ptr().add(len - 2) as *const u16))
-    }
+    unsafe { u16::from_le(*(data.as_ptr().add(len - 2) as *const u16)) }
 }
 
 /// Load the current `Instruction`'s index in the currently executing
@@ -69,16 +63,24 @@ pub fn store_current_index(data: &mut [u8], instruction_index: u16) {
 /// Unsafe because the sysvar accounts address is not checked; only used
 /// internally after such a check.
 #[inline(always)]
-fn load_instruction_at(index: usize, data: &[u8]) -> &IntrospectedInstruction {
+pub fn load_instruction_at(index: usize, data: &[u8]) -> IntrospectedInstruction {
     unsafe {
-        &*(data.as_ptr().add(size_of::<u16>() + index * size_of::<u16>()) as *const IntrospectedInstruction)
+        let offset = *(data
+            .as_ptr()
+            .add(size_of::<u16>() + index * size_of::<u16>()) as *const u16);
+        IntrospectedInstruction {
+            raw: data.as_ptr().add(offset as usize),
+        }
     }
 }
 
 #[inline(always)]
-fn load_instruction_at_checked(index: usize, data: &[u8]) -> Result<&IntrospectedInstruction, SanitizeError> {
+pub fn load_instruction_at_checked(
+    index: usize,
+    data: &[u8],
+) -> Result<IntrospectedInstruction, SanitizeError> {
     unsafe {
-        let num_instructions = u16::from_le(*(data.as_ptr() as *const u16));
+        let num_instructions = *(data.as_ptr() as *const u16);
         if index >= num_instructions as usize {
             return Err(SanitizeError::IndexOutOfBounds);
         }
@@ -108,23 +110,19 @@ pub fn get_instruction_relative(
         return Err(ProgramError::InvalidArgument);
     }
 
-    load_instruction_at_checked(
-        index as usize,
-        &instruction_sysvar,
-    ).map(|instr| instr.clone())
-     .map_err(|err| match err {
-        SanitizeError::IndexOutOfBounds => ProgramError::InvalidArgument,
-        _ => ProgramError::InvalidInstructionData,
-    })
+    load_instruction_at_checked(index as usize, &instruction_sysvar)
+        .map(|instr| instr.clone())
+        .map_err(|err| match err {
+            SanitizeError::IndexOutOfBounds => ProgramError::InvalidArgument,
+            _ => ProgramError::InvalidInstructionData,
+        })
 }
-
 
 // #[repr(C)]
 // #[derive(Clone, PartialEq, Eq)]
 // pub struct Instructions<'a> {
 //     pub(crate) account_info: &'a AccountInfo,
 // }
-
 
 // impl<'a> From<&'a AccountInfo> for Instructions<'a> {
 //     fn from(account_info: &'a AccountInfo) -> Self {
@@ -169,7 +167,10 @@ pub struct IntrospectedInstruction {
 impl IntrospectedInstruction {
     pub fn get_account_meta_at_unchecked(&self, index: usize) -> &IntrospectedAccountMeta {
         unsafe {
-            &*(self.raw.add(size_of::<u16>() + index * size_of::<IntrospectedAccountMeta>()) as *const IntrospectedAccountMeta)
+            &*(self
+                .raw
+                .add(size_of::<u16>() + index * ACCOUNT_META_SIZE)
+                as *const IntrospectedAccountMeta)
         }
     }
 
@@ -177,25 +178,45 @@ impl IntrospectedInstruction {
         &self,
         index: usize,
     ) -> Result<&IntrospectedAccountMeta, SanitizeError> {
-        if index >=  unsafe { u16::from_le(*(self.raw as *const u16)) } as usize {
+        if index >= unsafe { u16::from_le(*(self.raw as *const u16)) } as usize {
             return Err(SanitizeError::IndexOutOfBounds);
         }
 
         Ok(self.get_account_meta_at_unchecked(index))
     }
+    pub fn get_num_accounts(&self) -> u16 {
+        unsafe { *(self.raw as *const u16) }
+    }
 
     pub fn get_program_id(&self) -> &Pubkey {
         unsafe {
-            let num_accounts = u16::from_le(*(self.raw as *const u16));
-            &*(self.raw.add(size_of::<u16>() + num_accounts as usize * size_of::<IntrospectedAccountMeta>()) as *const Pubkey)
+            let num_accounts = *(self.raw as *const u16);
+            &*(self
+                .raw
+                .add(size_of::<u16>() + num_accounts as usize * ACCOUNT_META_SIZE)
+                as *const Pubkey)
         }
     }
 
-    pub fn get_data(&self) -> &[u8] {
+    pub fn get_instruction_data(&self) -> &[u8] {
         unsafe {
             let num_accounts = u16::from_le(*(self.raw as *const u16));
-            let data_len = u16::from_le(*(self.raw.add(size_of::<u16>() + num_accounts as usize * size_of::<IntrospectedAccountMeta>() + size_of::<Pubkey>()) as *const u16));
-            core::slice::from_raw_parts(self.raw.add(size_of::<u16>() + num_accounts as usize * size_of::<IntrospectedAccountMeta>() + size_of::<Pubkey>() + size_of::<u16>()), data_len as usize)
+            let data_len = u16::from_le(
+                *(self.raw.add(
+                    size_of::<u16>()
+                        + num_accounts as usize * ACCOUNT_META_SIZE
+                        + size_of::<Pubkey>(),
+                ) as *const u16),
+            );
+            core::slice::from_raw_parts(
+                self.raw.add(
+                    size_of::<u16>()
+                        + num_accounts as usize * ACCOUNT_META_SIZE
+                        + size_of::<Pubkey>()
+                        + size_of::<u16>(),
+                ),
+                data_len as usize,
+            )
         }
     }
 
@@ -242,21 +263,15 @@ const IS_WRITABLE_BIT: u8 = 1; // Assuming bit 0 for writable flag
 
 impl IntrospectedAccountMeta {
     pub fn is_writable(&self) -> bool {
-        unsafe {
-            (*self.raw & (1 << IS_WRITABLE_BIT)) != 0
-        }
+        unsafe { (*self.raw & (1 << IS_WRITABLE_BIT)) != 0 }
     }
 
     pub fn is_signer(&self) -> bool {
-        unsafe {
-            (*self.raw & (1 << IS_SIGNER_BIT)) != 0
-        }
+        unsafe { (*self.raw & (1 << IS_SIGNER_BIT)) != 0 }
     }
 
     pub fn key(&self) -> &Pubkey {
-        unsafe {
-            &*(self.raw.add(size_of::<u8>()) as *const Pubkey)
-        }
+        unsafe { &*(self.raw.add(size_of::<u8>()) as *const Pubkey) }
     }
 
     pub fn to_account_meta(&self) -> AccountMeta {
