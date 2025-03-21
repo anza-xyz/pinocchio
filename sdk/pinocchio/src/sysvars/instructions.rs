@@ -158,69 +158,6 @@ pub fn get_instruction_relative(
 //             .map_err(|_| ProgramError::Custom(InstructionSysvarError::InvalidAccountData as u32))?;
 //         Ok(num_instructions as usize)
 //     }
-//     pub fn load_instruction_at_checked(
-//         self,
-//         index: usize,
-//     ) -> Result<IntrospectedInstruction, ProgramError> {
-//         // We need to make calculations based on the data, but we don't need to keep
-//         // the Ref alive after this function returns
-//         unsafe {
-//             let data_ref = self.account_info.try_borrow_data()?;
-//             let data_ptr = data_ref.as_ptr();
-
-//             let mut current = 0;
-
-//             // Get number of instructions
-//             let num_instructions = read_u16(&mut current, &data_ref).map_err(|_| {
-//                 ProgramError::Custom(InstructionSysvarError::InvalidAccountData as u32)
-//             })?;
-
-//             if index >= num_instructions as usize {
-//                 return Err(ProgramError::Custom(
-//                     InstructionSysvarError::InvalidAccountData as u32,
-//                 ));
-//             }
-
-//             // Calculate offset to this instruction's location
-//             current += index * 2;
-//             let instruction_start = read_u16(&mut current, &data_ref).map_err(|_| {
-//                 ProgramError::Custom(InstructionSysvarError::InvalidAccountData as u32)
-//             })?;
-
-//             // Move to the start of the instruction
-//             current = instruction_start as usize;
-
-//             // Read the number of accounts
-//             let num_accounts = read_u16(&mut current, &data_ref).map_err(|_| {
-//                 ProgramError::Custom(InstructionSysvarError::InvalidAccountData as u32)
-//             })?;
-
-//             // Calculate important offsets
-//             let program_id_offset = current + (num_accounts as usize * 33);
-//             let ix_data_offset = program_id_offset + core::mem::size_of::<Pubkey>();
-
-//             // Read instruction data length
-//             let mut data_len_pos = ix_data_offset;
-//             let ix_data_len = read_u16(&mut data_len_pos, &data_ref).map_err(|_| {
-//                 ProgramError::Custom(InstructionSysvarError::InvalidAccountData as u32)
-//             })?;
-
-//             // Calculate total instruction length
-//             let total_len = ix_data_offset + 2 + ix_data_len as usize;
-
-//             // Create the IntrospectedInstruction with raw pointer and metadata
-//             Ok(IntrospectedInstruction {
-//                 data_ptr: data_ptr.add(instruction_start as usize),
-//                 data_len: total_len - instruction_start as usize,
-//                 num_accounts,
-//                 // Offset is relative to the start of the instruction
-//                 program_id_offset: program_id_offset - instruction_start as usize,
-//                 // Offset is relative to the start of the instruction
-//                 ix_data_offset: ix_data_offset + 2 - instruction_start as usize, // +2 to skip the length field
-//                 ix_data_len,
-//             })
-//         }
-//     }
 // }
 
 #[repr(C)]
