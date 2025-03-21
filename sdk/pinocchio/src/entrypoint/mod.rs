@@ -293,6 +293,16 @@ macro_rules! nostd_panic_handler {
                 unsafe { $crate::syscalls::abort() }
             }
         }
+
+        /// A placeholder for `cargo clippy`
+        ///
+        /// Add `panic = "abort"` to `[profile.dev]` in `Cargo.toml` for clippy
+        #[cfg(not(target_os = "solana"))]
+        #[no_mangle]
+        #[panic_handler]
+        fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
+            unsafe { core::hint::unreachable_unchecked() }
+        }
     };
 }
 
