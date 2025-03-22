@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.
-const MAX_CPI_ACCOUNTS: usize = 64;
+pub const MAX_CPI_ACCOUNTS: usize = 64;
 
 /// An `Instruction` as expected by `sol_invoke_signed_c`.
 ///

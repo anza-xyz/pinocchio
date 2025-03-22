@@ -61,6 +61,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pinocchio-memo"
+version = "0.1.0"
+dependencies = [
+ "pinocchio",
+ "pinocchio-pubkey",
+]
+
+[[package]]
 name = "pinocchio-pubkey"
 version = "0.2.4"
 dependencies = [
