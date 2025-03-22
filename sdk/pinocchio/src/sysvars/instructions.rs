@@ -184,9 +184,8 @@ pub struct IntrospectedAccountMeta {
     pub raw: *const u8,
 }
 
-// Define these constants at the top of your file
-const IS_SIGNER_BIT: u8 = 0; // Assuming bit 1 for signer flag
-const IS_WRITABLE_BIT: u8 = 1; // Assuming bit 0 for writable flag
+const IS_SIGNER_BIT: u8 = 0; // Assuming bit 0 for signer flag
+const IS_WRITABLE_BIT: u8 = 1; // Assuming bit 1 for writable flag
 
 impl IntrospectedAccountMeta {
     const SPACE: usize = 33; 
