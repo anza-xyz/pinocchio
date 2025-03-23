@@ -99,31 +99,34 @@ impl<'a> InitializeTransferFeeConfig<'a> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..33]: mint (32 bytes, Pubkey)
-        // -  [33..37]: transfer_fee_config_authority_flag (4 byte, [u8;4])
-        // -  [37..69]: transfer_fee_config_authority (32 bytes, Pubkey)
-        // -  [69..73]: withdraw_withheld_authority_flag (4 byte, [u8;4])
-        // -  [73..105]: withdraw_withheld_authority (32 bytes, Pubkey)
-        // -  [105..107]: transfer_fee_basis_points (2 bytes, u16)
-        // -  [107..115]: maximum_fee (8 bytes, u64)
+        // -  [1..2]: extension instruction discriminator (1 byte, u8)
+        // -  [2..34]: mint (32 bytes, Pubkey)
+        // -  [34..38]: transfer_fee_config_authority_flag (4 byte, [u8;4])
+        // -  [38..70]: transfer_fee_config_authority (32 bytes, Pubkey)
+        // -  [70..74]: withdraw_withheld_authority_flag (4 byte, [u8;4])
+        // -  [74..106]: withdraw_withheld_authority (32 bytes, Pubkey)
+        // -  [106..108]: transfer_fee_basis_points (2 bytes, u16)
+        // -  [108..116]: maximum_fee (8 bytes, u64)
 
-        let mut instruction_data = [UNINIT_BYTE; 109];
+        let mut instruction_data = [UNINIT_BYTE; 116];
 
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[27]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[0]);
         // Set mint as Pubkey at offset [1..33]
-        write_bytes(&mut instruction_data[1..33], self.mint.key().as_ref());
+        write_bytes(&mut instruction_data[2..34], self.mint.key().as_ref());
         // Set transfer_fee_config_authority COption at offset [33..37]
-        let mut offset = 33;
+        let mut offset = 34;
         if let Some(transfer_fee_config_authority) = self.transfer_fee_config_authority {
-            write_bytes(&mut instruction_data[33..37], &[1, 0, 0, 0]);
+            write_bytes(&mut instruction_data[34..38], &[1, 0, 0, 0]);
             write_bytes(
-                &mut instruction_data[37..69],
+                &mut instruction_data[38..70],
                 transfer_fee_config_authority.as_ref(),
             );
         } else {
-            write_bytes(&mut instruction_data[33..37], &[0, 0, 0, 0]);
-            write_bytes(&mut instruction_data[37..69], &[0; 32]);
+            write_bytes(&mut instruction_data[34..38], &[0, 0, 0, 0]);
+            write_bytes(&mut instruction_data[38..70], &Pubkey::default());
         }
         offset += 36;
 
@@ -144,7 +147,7 @@ impl<'a> InitializeTransferFeeConfig<'a> {
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &[AccountMeta::writable(self.mint.key())],
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 115) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 116) },
         };
 
         invoke_signed(&instruction, &[self.mint], signers)
@@ -189,24 +192,27 @@ impl<'a> TransferCheckedWithFee<'a> {
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..9]: amount (8 bytes, u64)
-        // -  [9]: decimals (1 byte, u8)
-        // -  [10..18]: fee (8 bytes, u64)
-        let mut instruction_data = [UNINIT_BYTE; 18];
+        // -  [1]: extension instruction discriminator (1 byte, u8)
+        // -  [2..10]: amount (8 bytes, u64)
+        // -  [10]: decimals (1 byte, u8)
+        // -  [11..19]: fee (8 bytes, u64)
+        let mut instruction_data = [UNINIT_BYTE; 19];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[28]);
+        write_bytes(&mut instruction_data[0..1], &[28]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[1]);
         // Set amount as u64 at offset [1..9]
-        write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
+        write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
         // Set decimals as u8 at offset [9]
-        write_bytes(&mut instruction_data[9..10], &[self.decimals]);
+        write_bytes(&mut instruction_data[10..11], &[self.decimals]);
         // Set fee as u64 at offset [10..18]
-        write_bytes(&mut instruction_data[10..18], &self.fee.to_le_bytes());
+        write_bytes(&mut instruction_data[11..19], &self.fee.to_le_bytes());
 
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 18) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 19) },
         };
 
         invoke_signed(
@@ -243,12 +249,18 @@ impl<'a> WithdrawWithheldTokensFromMint<'a> {
 
         // Instruction data layout:
         // -  [0]: instruction discriminator
-        let instruction_data = [29];
+        // -  [1]: extension instruction discriminator
+        let mut instruction_data = [UNINIT_BYTE; 2];
+
+        // Set discriminator as u8 at offset [0]
+        write_bytes(&mut instruction_data, &[29]);
+        // Set discriminator as u8 at offset [0]
+        write_bytes(&mut instruction_data[1..2], &[2]);
 
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: &instruction_data,
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
         };
 
         invoke_signed(
@@ -305,7 +317,12 @@ impl<'a, const ACCOUNTS_LEN: usize> WithdrawWithheldTokensFromAccounts<'a, ACCOU
 
         // Instruction data layout:
         // -  [0]: instruction discriminator
-        let instruction_data = [30];
+        // -  [1]: extension instruction discriminator
+        let mut instruction_data = [UNINIT_BYTE; 2];
+        // Set discriminator as u8 at offset [0]
+        write_bytes(&mut instruction_data, &[30]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[3]);
 
         let acc_metas = unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, ACCOUNTS_LEN)
@@ -314,7 +331,7 @@ impl<'a, const ACCOUNTS_LEN: usize> WithdrawWithheldTokensFromAccounts<'a, ACCOU
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: acc_metas,
-            data: &instruction_data,
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
         };
 
         const UNINIT_ACC_INFOS: MaybeUninit<&AccountInfo> = MaybeUninit::<&AccountInfo>::uninit();
@@ -373,7 +390,13 @@ impl<'a, const ACCOUNTS_LEN: usize> HarvestWithheldTokensToMint<'a, ACCOUNTS_LEN
 
         // Instruction data layout:
         // -  [0]: instruction discriminator
-        let instruction_data = [31];
+        // -  [1]: extension instruction discriminator
+        let mut instruction_data = [UNINIT_BYTE; 2];
+
+        // Set discriminator as u8 at offset [0]
+        write_bytes(&mut instruction_data, &[31]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[4]);
 
         let acc_metas = unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, ACCOUNTS_LEN)
@@ -382,7 +405,7 @@ impl<'a, const ACCOUNTS_LEN: usize> HarvestWithheldTokensToMint<'a, ACCOUNTS_LEN
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: acc_metas,
-            data: &instruction_data,
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
         };
 
         const UNINIT_ACC_INFOS: MaybeUninit<&AccountInfo> = MaybeUninit::<&AccountInfo>::uninit();
@@ -433,27 +456,30 @@ impl<'a> SetTransferFee<'a> {
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..3]: transfer_fee_basis_points (2 bytes, u16)
-        // -  [3..11]: maximum_fee (8 bytes, u64)
-        let mut instruction_data = [UNINIT_BYTE; 11];
+        // -  [1]: extension instruction discriminator (1 byte, u8)
+        // -  [2..4]: transfer_fee_basis_points (2 bytes, u16)
+        // -  [4..12]: maximum_fee (8 bytes, u64)
+        let mut instruction_data = [UNINIT_BYTE; 12];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[32]);
-        // Set transfer_fee_basis_points as u16 at offset [1..3]
+        write_bytes(&mut instruction_data[0..1], &[32]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[5]);
+        // Set transfer_fee_basis_points as u16 at offset [2..4]
         write_bytes(
-            &mut instruction_data[1..3],
+            &mut instruction_data[2..4],
             &self.transfer_fee_basis_points.to_le_bytes(),
         );
-        // Set maximum_fee as u64 at offset [3..11]
+        // Set maximum_fee as u64 at offset [3..12]
         write_bytes(
-            &mut instruction_data[3..11],
+            &mut instruction_data[4..12],
             &self.maximum_fee.to_le_bytes(),
         );
 
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 11) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 12) },
         };
 
         invoke_signed(&instruction, &[self.mint, self.mint_fee_acc_owner], signers)

@@ -11,6 +11,7 @@ use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 
 use super::get_extension_from_bytes;
 
+/// State of the CPI guard
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CpiGuard {
     /// Lock privileged token operations from happening via CPI
@@ -66,11 +67,10 @@ impl<'a> EnableCpiGuard<'a> {
 
         // Instruction data Layout:
         // -  [0]: instruction discriminator (1 byte, u8)
+        // -  [1]: enable the CPI guard (1 byte, u8)
         let mut instruction_data = [UNINIT_BYTE; 2];
-
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data[0..1], &[34]);
-
         // Enable the CPI guard
         write_bytes(&mut instruction_data[1..2], &[0]);
 
@@ -107,11 +107,10 @@ impl<'a> DisableCpiGuard<'a> {
 
         // Instruction data Layout:
         // -  [0]: instruction discriminator (1 byte, u8)
+        // -  [1]: extension instruction discriminator (1 byte, u8)
         let mut instruction_data = [UNINIT_BYTE; 2];
-
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data[0..1], &[34]);
-
         // Disable the CPI guard
         write_bytes(&mut instruction_data[1..2], &[1]);
 

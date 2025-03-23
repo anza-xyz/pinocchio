@@ -39,22 +39,21 @@ impl<'a> InitializeMint<'a> {
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
+        // -  [1]: extension instruction discriminator (1 byte, u8)
         let mut instruction_data = [UNINIT_BYTE; 1];
 
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[0]);
-
+        // Set auto_approve_new_accounts as u8 at offset [1]
         write_bytes(
             &mut instruction_data[1..2],
             &[self.auto_approve_new_accounts as u8],
         );
 
         if let Some(authority) = self.authority {
-            // Set authority as Pubkey at offset [2..34]
-            write_bytes(&mut instruction_data[2..3], &[1]);
             write_bytes(&mut instruction_data[2..34], authority);
         } else {
-            write_bytes(&mut instruction_data[2..3], &[0]);
+            write_bytes(&mut instruction_data[2..34], &Pubkey::default());
         }
 
         let instruction = Instruction {

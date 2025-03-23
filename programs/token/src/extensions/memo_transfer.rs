@@ -11,8 +11,8 @@ use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 
 use super::get_extension_from_bytes;
 
+/// State of the memo transfer extension
 #[derive(Debug, Clone, Copy, PartialEq)]
-// State
 pub struct MemoTransfer {
     /// Require transfers into this account to be accompanied by a memo
     pub require_incoming_transfer_memos: bool,
@@ -69,11 +69,10 @@ impl<'a> EnableMemoTransfer<'a> {
 
         // Instruction data Layout
         // -  [0]: instruction discriminator (1 byte, u8)
+        // -  [1]: enable incoming transfer memos (1 byte, u8)
         let mut instruction_data = [UNINIT_BYTE; 2];
-
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data[0..1], &[30]);
-
         // Enable incoming transfer memos
         write_bytes(&mut instruction_data[1..2], &[0]);
 
@@ -109,8 +108,8 @@ impl<'a> DisableMemoTransfer<'a> {
 
         // instruction data
         // -  [0]: instruction discriminator (1 byte, u8)
+        // -  [1]: disable incoming transfer memos (1 byte, u8)
         let mut instruction_data = [UNINIT_BYTE; 2];
-
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data[0..1], &[30]);
         // Disable incoming transfer memos
