@@ -53,16 +53,16 @@ impl TransferWithSeed<'_, '_, '_> {
         // instruction data
         // - [0..4  ]: instruction discriminator
         // - [4..12 ]: lamports amount
-        // - [12..16]: seed length
-        // - [16..  ]: seed (max 32)
+        // - [12..20]: seed length
+        // - [20..  ]: seed (max 32)
         // - [.. +32]: owner pubkey
         let mut instruction_data = [0; 80];
         instruction_data[0] = 11;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
-        instruction_data[12..16].copy_from_slice(&u32::to_le_bytes(self.seed.len() as u32));
+        instruction_data[12..20].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
 
-        let offset = 16 + self.seed.len();
-        instruction_data[16..offset].copy_from_slice(self.seed.as_bytes());
+        let offset = 20 + self.seed.len();
+        instruction_data[20..offset].copy_from_slice(self.seed.as_bytes());
         instruction_data[offset..offset + 32].copy_from_slice(self.owner.as_ref());
 
         let instruction = Instruction {
