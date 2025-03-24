@@ -8,6 +8,7 @@ pub mod default_account_state;
 pub mod interest_bearing_mint;
 pub mod memo_transfer;
 pub mod metadata;
+pub mod metadata_pointer;
 pub mod transfer_fee;
 
 pub const ELGAMAL_PUBKEY_LEN: usize = 32;
@@ -175,7 +176,10 @@ pub fn get_extension_from_bytes<T: Extension + Clone + Copy>(acc_data_bytes: &[u
 
 #[cfg(test)]
 mod tests {
-    use crate::extensions::{get_extension_from_bytes, transfer_fee::TransferFeeConfig};
+    use crate::extensions::{
+        get_extension_from_bytes, metadata_pointer::MetadataPointer,
+        transfer_fee::TransferFeeConfig,
+    };
 
     #[test]
     fn test_get_extension_from_bytes() {
@@ -222,9 +226,13 @@ mod tests {
             46, 106, 115, 111, 110, 0, 0, 0, 0,
         ];
 
-        let transfer_fee_ext =
+        let transfer_fee =
             get_extension_from_bytes::<TransferFeeConfig>(&TEST_MINT_WITH_EXTENSIONS_SLICE);
 
-        assert!(transfer_fee_ext.is_some());
+        let metadata_pointer =
+            get_extension_from_bytes::<MetadataPointer>(&TEST_MINT_WITH_EXTENSIONS_SLICE);
+
+        assert!(transfer_fee.is_some());
+        assert!(metadata_pointer.is_some());
     }
 }

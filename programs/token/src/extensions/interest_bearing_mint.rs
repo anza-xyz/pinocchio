@@ -55,6 +55,8 @@ impl InterestBearingConfig {
     }
 }
 
+/// Instructions
+
 pub struct Initialize<'a> {
     /// The mint to initialize as interest-bearing
     pub mint: &'a AccountInfo,
