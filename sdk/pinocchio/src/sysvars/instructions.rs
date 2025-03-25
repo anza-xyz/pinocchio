@@ -84,7 +84,7 @@ where
     /// Creates and returns an `IntrospectedInstruction` relative to the current `Instruction` in the
     /// currently executing `Transaction.
     #[inline(always)]
-    pub fn get_instruction_relative_unchecked(
+    pub fn get_instruction_relative(
         &self,
         index_relative_to_current: i64,
     ) -> Result<IntrospectedInstruction, ProgramError> {
