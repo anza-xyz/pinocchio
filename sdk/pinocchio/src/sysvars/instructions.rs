@@ -1,6 +1,9 @@
 use crate::{
-    account_info::{AccountInfo, Ref}, instruction::AccountMeta, program_error::ProgramError,
-    pubkey::Pubkey, sanitize_error::SanitizeError,
+    account_info::{AccountInfo, Ref},
+    instruction::AccountMeta,
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    sanitize_error::SanitizeError,
 };
 
 use core::{marker::PhantomData, mem::size_of, ops::Deref};
@@ -22,91 +25,85 @@ impl<T> Instructions<T>
 where
     T: Deref<Target = [u8]>,
 {
+    /// Creates a new `Instructions` struct.
+    ///
+    /// `data` is the instructions sysvar account data.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it does not check if the provided data is from the Sysvar Account.
     pub unsafe fn new(data: T) -> Self {
         Instructions { data }
     }
 
     /// Load the current `Instruction`'s index in the currently executing
     /// `Transaction`.
-    ///
-    /// # Safety
-    ///
-    /// This function is safe if the user decides to create the `Instructions` struct with the `try_from` function, 
-    /// which performs the necessary address verification. The same is not true for the `new` constructor, which
-    /// does not perform any verification and make this function unsafe.
-    pub unsafe fn load_current_index(&self) -> u16 {
-        let len = self.data.len();
-        u16::from_le_bytes(*(self.data.as_ptr().add(len - 2) as *const [u8; 2]))
+    pub fn load_current_index(&self) -> u16 {
+        unsafe {
+            let len = self.data.len();
+            u16::from_le_bytes(*(self.data.as_ptr().add(len - 2) as *const [u8; 2]))
+        }
     }
 
     /// Creates and returns an `IntrospectedInstruction` for the instruction at the specified index.
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it does not check if the provided index is out of bounds. It is 
+    /// This function is unsafe because it does not check if the provided index is out of bounds. It is
     /// typically used internally with the `load_instruction_at` or `get_instruction_relative` functions,
-    /// which perform the necessary address verification. 
-    /// 
-    /// Additionally, this function does not perform any verification of the sysvar account address if 
-    /// the `Instructions` struct was created using the `new` constructor.
-    pub unsafe fn deserialize_instruction(&self, index: usize) -> Result<IntrospectedInstruction, ProgramError> {
+    /// which perform the necessary index verification.
+    pub unsafe fn deserialize_instruction(&self, index: usize) -> IntrospectedInstruction {
         let offset = u16::from_le(
-            *(self.data
+            *(self
+                .data
                 .as_ptr()
                 .add(size_of::<u16>() + index * size_of::<u16>()) as *const u16),
         );
 
-        Ok(IntrospectedInstruction {
+        IntrospectedInstruction {
             raw: self.data.as_ptr().add(offset as usize),
             marker: PhantomData,
-        })
-    }
-    
-    /// Creates and returns an `IntrospectedInstruction` for the instruction at the specified index.
-    ///
-    /// # Safety
-    ///
-    /// This function is safe if the user decides to create the `Instructions` struct with the `try_from` function, 
-    /// which performs the necessary address verification. The same is not true for the `new` constructor, which
-    /// does not perform any verification and make this function unsafe.
-    #[inline(always)]
-    pub unsafe fn load_instruction_at(&self, index: usize) -> Result<IntrospectedInstruction, ProgramError> {
-        let num_instructions = u16::from_le(*(self.data.as_ptr() as *const u16));
-        if index >= num_instructions as usize {
-            return Err(SanitizeError::IndexOutOfBounds)
-                .map_err(|_| ProgramError::InvalidInstructionData);
         }
+    }
 
-        self.deserialize_instruction(index)
+    /// Creates and returns an `IntrospectedInstruction` for the instruction at the specified index.
+    #[inline(always)]
+    pub fn load_instruction_at(&self) -> Result<IntrospectedInstruction, ProgramError> {
+        unsafe {
+            let index = self.load_current_index() as usize;
+            let num_instructions = u16::from_le(*(self.data.as_ptr() as *const u16));
+            if index >= num_instructions as usize {
+                return Err(SanitizeError::IndexOutOfBounds)
+                    .map_err(|_| ProgramError::InvalidInstructionData);
+            }
+
+            Ok(self.deserialize_instruction(index))
+        }
     }
 
     /// Creates and returns an `IntrospectedInstruction` relative to the current `Instruction` in the
     /// currently executing `Transaction.
-    ///
-    /// # Safety
-    ///
-    /// This function is safe if the user decides to create the `Instructions` struct with the `try_from` function, 
-    /// which performs the necessary address verification. The same is not true for the `new` constructor, which
-    /// does not perform any verification and make this function unsafe.
     #[inline(always)]
-    pub unsafe fn get_instruction_relative_unchecked(
+    pub fn get_instruction_relative_unchecked(
         &self,
         index_relative_to_current: i64,
     ) -> Result<IntrospectedInstruction, ProgramError> {
-        let current_index = unsafe { self.load_current_index() } as i64;
-        let index = current_index.saturating_add(index_relative_to_current);
-        if index < 0 {
-            return Err(SanitizeError::IndexOutOfBounds)
-                .map_err(|_| ProgramError::InvalidArgument);
-        }
+        unsafe {
+            let current_index = self.load_current_index() as i64;
+            let index = current_index.saturating_add(index_relative_to_current);
+            if index < 0 {
+                return Err(SanitizeError::IndexOutOfBounds)
+                    .map_err(|_| ProgramError::InvalidArgument);
+            }
 
-        let num_instructions = u16::from_le(*(self.data.as_ptr() as *const u16));
-        if index >= num_instructions as i64 {
-            return Err(SanitizeError::IndexOutOfBounds)
-                .map_err(|_| ProgramError::InvalidArgument);
-        }
+            let num_instructions = u16::from_le(*(self.data.as_ptr() as *const u16));
+            if index >= num_instructions as i64 {
+                return Err(SanitizeError::IndexOutOfBounds)
+                    .map_err(|_| ProgramError::InvalidArgument);
+            }
 
-        self.deserialize_instruction(index as usize)
+            Ok(self.deserialize_instruction(index as usize))
+        }
     }
 }
 
