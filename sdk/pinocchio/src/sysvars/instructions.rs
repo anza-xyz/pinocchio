@@ -68,9 +68,11 @@ where
 
     /// Creates and returns an `IntrospectedInstruction` for the instruction at the specified index.
     #[inline(always)]
-    pub fn load_instruction_at(&self) -> Result<IntrospectedInstruction, ProgramError> {
+    pub fn load_instruction_at(
+        &self,
+        index: usize,
+    ) -> Result<IntrospectedInstruction, ProgramError> {
         unsafe {
-            let index = self.load_current_index() as usize;
             let num_instructions = u16::from_le(*(self.data.as_ptr() as *const u16));
             if index >= num_instructions as usize {
                 return Err(SanitizeError::IndexOutOfBounds)
