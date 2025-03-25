@@ -24,7 +24,7 @@ pub struct Instructions();
 ///
 /// This function is unsafe because it does not verify the address of the sysvar account.
 /// 
-/// It is typically used internally within the `load_current_index_checked` function, which
+/// It is typically used internally within the `load_current_index` function, which
 /// performs the necessary address verification. However, to optimize performance for users
 /// who have already conducted this check elsewhere in their code, we have exposed it as an
 /// unsafe function rather than making it private, as was done in the original implementation.
@@ -64,12 +64,12 @@ pub fn load_current_index(
 /// This function is unsafe because it does not verify the address of the sysvar account and
 /// does not check if the index is out of bounds.
 /// 
-/// It is typically used internally within the `load_instruction_at_checked` function, which
+/// It is typically used internally within the `load_instruction_at` function, which
 /// performs the necessary address and index verification. However, to optimize performance for 
 /// users who have already conducted this check elsewhere in their code or are sure that the 
 /// index is in bounds, we have exposed it as an unsafe function rather than making it private, 
 /// as was done in the original implementation.
-pub unsafe fn deserialize_instruction_unchecked<'a>(index: usize, data: &[u8]) -> Result<IntrospectedInstruction<'a>, SanitizeError> {
+pub unsafe fn deserialize_instruction_unchecked(index: usize, data: &[u8]) -> Result<IntrospectedInstruction, SanitizeError> {
     let offset = u16::from_le(*(data
         .as_ptr()
         .add(size_of::<u16>() + index * size_of::<u16>()) as *const u16));
@@ -89,7 +89,7 @@ pub unsafe fn deserialize_instruction_unchecked<'a>(index: usize, data: &[u8]) -
 /// 
 /// This function is unsafe because it does not verify the address of the sysvar account.
 /// 
-/// It is typically used internally within the `load_instruction_at_checked` function, which
+/// It is typically used internally within the `load_instruction_at` function, which
 /// performs the necessary address verification. However, to optimize performance for users 
 /// who have already conducted this check elsewhere in their code, we have exposed it as an 
 /// unsafe function rather than making it private, as was done in the original implementation.
@@ -114,10 +114,10 @@ pub unsafe fn load_instruction_at_unchecked(
 /// Returns [`ProgramError::UnsupportedSysvar`] if the given account's ID is not equal to [`ID`].
 /// Returns [`ProgramError::InvalidArgument`] if the index is out of bounds.
 #[inline(always)]
-pub fn load_instruction_at<'a>(
+pub fn load_instruction_at(
     index: usize,
     instruction_sysvar_account_info: &AccountInfo,
-) -> Result<IntrospectedInstruction<'a>, ProgramError> {
+) -> Result<IntrospectedInstruction, ProgramError> {
     if instruction_sysvar_account_info.key() != &INSTRUCTIONS_ID {
         return Err(ProgramError::UnsupportedSysvar);
     }
@@ -135,27 +135,55 @@ pub fn load_instruction_at<'a>(
 /// Returns the `Instruction` relative to the current `Instruction` in the
 /// currently executing `Transaction`.
 ///
+/// `data` is the instructions sysvar account data.
+///
+/// # Safety
+/// 
+/// This function is unsafe because it does not verify the address of the sysvar account.
+/// 
+/// It is typically used internally within the `get_instruction_relative` function, which
+/// performs the necessary address verification. However, to optimize performance for users 
+/// who have already conducted this check elsewhere in their code, we have exposed it as an 
+/// unsafe function rather than making it private, as was done in the original implementation.
+#[inline(always)]
+pub unsafe fn get_instruction_relative_unchecked(
+    current_index: i64, 
+    index_relative_to_current: i64,
+    data: &[u8]
+) -> Result<IntrospectedInstruction, SanitizeError> {
+    let index = current_index.saturating_add(index_relative_to_current);
+    if index < 0 {
+        return Err(SanitizeError::IndexOutOfBounds);
+    }
+
+    let num_instructions = u16::from_le(*(data.as_ptr() as *const u16));
+    if index >= num_instructions as i64 {
+        return Err(SanitizeError::IndexOutOfBounds);
+    }
+
+    deserialize_instruction_unchecked(index as usize, data)
+}
+
+/// Returns the `Instruction` relative to the current `Instruction` in the
+/// currently executing `Transaction`.
+///
 /// # Errors
 ///
 /// Returns [`ProgramError::UnsupportedSysvar`] if the given account's ID is not equal to [`ID`].
 /// Returns [`ProgramError::InvalidArgument`] if the index is out of bounds.
-pub fn get_instruction_relative<'a>(
+pub fn get_instruction_relative(
     index_relative_to_current: i64,
     instruction_sysvar_account_info: &AccountInfo,
-) -> Result<IntrospectedInstruction<'a>, ProgramError> {
+) -> Result<IntrospectedInstruction, ProgramError> {
     if instruction_sysvar_account_info.key() != &INSTRUCTIONS_ID {
         return Err(ProgramError::UnsupportedSysvar);
     }
 
     let current_index = load_current_index(&instruction_sysvar_account_info)? as i64;
-    let index = current_index.saturating_add(index_relative_to_current);
-    if index < 0 {
-        return Err(ProgramError::InvalidArgument);
-    }
-
     let instruction_sysvar_data = SysvarAccountInfo::from_account_info(instruction_sysvar_account_info)?;
+
     unsafe {
-        load_instruction_at_unchecked(index as usize, &instruction_sysvar_data.try_borrow_data()?)
+        get_instruction_relative_unchecked(current_index, index_relative_to_current, &instruction_sysvar_data.try_borrow_data()?)
             .map_err(|err| match err {
                 SanitizeError::IndexOutOfBounds => ProgramError::InvalidArgument,
                 _ => ProgramError::InvalidInstructionData,
