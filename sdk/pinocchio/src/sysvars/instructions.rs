@@ -69,13 +69,14 @@ pub fn load_current_index(
 /// users who have already conducted this check elsewhere in their code or are sure that the 
 /// index is in bounds, we have exposed it as an unsafe function rather than making it private, 
 /// as was done in the original implementation.
-pub unsafe fn deserialize_instruction_unchecked(index: usize, data: &[u8]) -> Result<IntrospectedInstruction, SanitizeError> {
+pub unsafe fn deserialize_instruction_unchecked<'a>(index: usize, data: &[u8]) -> Result<IntrospectedInstruction<'a>, SanitizeError> {
     let offset = u16::from_le(*(data
         .as_ptr()
         .add(size_of::<u16>() + index * size_of::<u16>()) as *const u16));
 
     Ok(IntrospectedInstruction {
         raw: data.as_ptr().add(offset as usize),
+        marker: PhantomData,
     })
 }
 
@@ -113,17 +114,17 @@ pub unsafe fn load_instruction_at_unchecked(
 /// Returns [`ProgramError::UnsupportedSysvar`] if the given account's ID is not equal to [`ID`].
 /// Returns [`ProgramError::InvalidArgument`] if the index is out of bounds.
 #[inline(always)]
-pub fn load_instruction_at(
+pub fn load_instruction_at<'a>(
     index: usize,
     instruction_sysvar_account_info: &AccountInfo,
-) -> Result<IntrospectedInstruction, ProgramError> {
+) -> Result<IntrospectedInstruction<'a>, ProgramError> {
     if instruction_sysvar_account_info.key() != &INSTRUCTIONS_ID {
         return Err(ProgramError::UnsupportedSysvar);
     }
 
-    let instruction_sysvar_data = instruction_sysvar_account_info.try_borrow_data()?;
+    let instruction_sysvar_data = SysvarAccountInfo::from_account_info(instruction_sysvar_account_info)?; 
     unsafe {
-        load_instruction_at_unchecked(index, &instruction_sysvar_data)
+        load_instruction_at_unchecked(index, &instruction_sysvar_data.try_borrow_data()?)
             .map_err(|err| match err {
                 SanitizeError::IndexOutOfBounds => ProgramError::InvalidArgument,
                 _ => ProgramError::InvalidInstructionData,
@@ -138,10 +139,10 @@ pub fn load_instruction_at(
 ///
 /// Returns [`ProgramError::UnsupportedSysvar`] if the given account's ID is not equal to [`ID`].
 /// Returns [`ProgramError::InvalidArgument`] if the index is out of bounds.
-pub fn get_instruction_relative(
+pub fn get_instruction_relative<'a>(
     index_relative_to_current: i64,
     instruction_sysvar_account_info: &AccountInfo,
-) -> Result<IntrospectedInstruction, ProgramError> {
+) -> Result<IntrospectedInstruction<'a>, ProgramError> {
     if instruction_sysvar_account_info.key() != &INSTRUCTIONS_ID {
         return Err(ProgramError::UnsupportedSysvar);
     }
@@ -152,9 +153,9 @@ pub fn get_instruction_relative(
         return Err(ProgramError::InvalidArgument);
     }
 
-    let instruction_sysvar_data = instruction_sysvar_account_info.try_borrow_data()?;
+    let instruction_sysvar_data = SysvarAccountInfo::from_account_info(instruction_sysvar_account_info)?;
     unsafe {
-        load_instruction_at_unchecked(index as usize, &instruction_sysvar_data)
+        load_instruction_at_unchecked(index as usize, &instruction_sysvar_data.try_borrow_data()?)
             .map_err(|err| match err {
                 SanitizeError::IndexOutOfBounds => ProgramError::InvalidArgument,
                 _ => ProgramError::InvalidInstructionData,
@@ -164,11 +165,32 @@ pub fn get_instruction_relative(
 
 #[repr(C)]
 #[derive(Clone, PartialEq, Eq)]
-pub struct IntrospectedInstruction {
+pub struct SysvarAccountInfo<'a> {
     pub raw: *const u8,
+    pub marker: PhantomData<&'a [u8]>,
 }
 
-impl IntrospectedInstruction {
+impl<'a> SysvarAccountInfo<'a> {
+    pub fn from_account_info(instruction_sysvar_account_info: &AccountInfo) -> Result<Self, ProgramError> {
+        let data = instruction_sysvar_account_info.try_borrow_data()?;
+        Ok(Self { raw: data.as_ptr(), marker: PhantomData })
+    }
+
+    pub fn try_borrow_data(&self) -> Result<&'a [u8], ProgramError> {
+        let data_len = unsafe { *self.raw.sub(8) as *mut u64 };
+        let data = unsafe { core::slice::from_raw_parts(self.raw, data_len as usize) };
+        Ok(data)
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, PartialEq, Eq)]
+pub struct IntrospectedInstruction<'a> {
+    pub raw: *const u8,
+    pub marker: PhantomData<&'a [u8]>,
+}
+
+impl<'a> IntrospectedInstruction<'a> {
     /// Get the account meta at the specified index.
     /// 
     /// # Safety
