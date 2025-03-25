@@ -91,9 +91,9 @@ where
     #[inline(always)]
     pub unsafe fn get_instruction_relative_unchecked(
         &self,
-        current_index: i64,
         index_relative_to_current: i64,
     ) -> Result<IntrospectedInstruction, ProgramError> {
+        let current_index = unsafe { self.load_current_index() } as i64;
         let index = current_index.saturating_add(index_relative_to_current);
         if index < 0 {
             return Err(SanitizeError::IndexOutOfBounds)
