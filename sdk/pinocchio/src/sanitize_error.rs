@@ -4,7 +4,7 @@ use crate::program_error::ProgramError;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SanitizeError {
-    /// 0 
+    /// 0
     /// The index of the instruction is out of bounds.
     IndexOutOfBounds,
     /// 1
