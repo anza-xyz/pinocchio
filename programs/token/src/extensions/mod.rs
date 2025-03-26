@@ -9,6 +9,8 @@ pub mod interest_bearing_mint;
 pub mod memo_transfer;
 pub mod metadata;
 pub mod metadata_pointer;
+pub mod mint_close_authority;
+pub mod permanent_delegate;
 pub mod transfer_fee;
 
 pub const ELGAMAL_PUBKEY_LEN: usize = 32;
@@ -178,6 +180,7 @@ pub fn get_extension_from_bytes<T: Extension + Clone + Copy>(acc_data_bytes: &[u
 mod tests {
     use crate::extensions::{
         get_extension_from_bytes, metadata_pointer::MetadataPointer,
+        mint_close_authority::MintCloseAuthority, permanent_delegate::PermanentDelegate,
         transfer_fee::TransferFeeConfig,
     };
 
@@ -232,7 +235,15 @@ mod tests {
         let metadata_pointer =
             get_extension_from_bytes::<MetadataPointer>(&TEST_MINT_WITH_EXTENSIONS_SLICE);
 
+        let mint_close_authority =
+            get_extension_from_bytes::<MintCloseAuthority>(&TEST_MINT_WITH_EXTENSIONS_SLICE);
+
+        let permanent_delegate =
+            get_extension_from_bytes::<PermanentDelegate>(&TEST_MINT_WITH_EXTENSIONS_SLICE);
+
         assert!(transfer_fee.is_some());
         assert!(metadata_pointer.is_some());
+        assert!(mint_close_authority.is_some());
+        assert!(permanent_delegate.is_some());
     }
 }
