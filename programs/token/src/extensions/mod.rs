@@ -5,6 +5,8 @@ use crate::{
 pub mod confidential_transfer;
 pub mod cpi_guard;
 pub mod default_account_state;
+pub mod group;
+pub mod group_pointer;
 pub mod immutable_owner;
 pub mod interest_bearing_mint;
 pub mod memo_transfer;
