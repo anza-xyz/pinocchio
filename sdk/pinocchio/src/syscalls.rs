@@ -1,7 +1,7 @@
 //! Syscall functions.
 
 use crate::{
-    instruction::{RawAccountMeta, ProcessedSiblingInstruction},
+    instruction::{ProcessedSiblingInstruction, RawAccountMeta},
     pubkey::Pubkey,
 };
 
