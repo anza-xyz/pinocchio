@@ -172,6 +172,12 @@ impl<'a> From<&'a AccountInfo> for AccountMeta<'a> {
 #[derive(Default, Debug, Clone, Copy)]
 pub struct RawAccountMeta(Pubkey, bool, bool);
 
+impl<'a> From<&'a RawAccountMeta> for AccountMeta<'a> {
+    fn from(value: &'a RawAccountMeta) -> Self {
+        AccountMeta::new(&value.0, value.1, value.2)
+    }
+}
+
 /// Represents a signer seed.
 ///
 /// This struct contains the same information as a `[u8]`, but
