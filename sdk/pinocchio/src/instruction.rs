@@ -164,6 +164,14 @@ impl<'a> From<&'a AccountInfo> for AccountMeta<'a> {
     }
 }
 
+/// This is a identical to AccountMeta, but with an owned Pubkey instead of a reference.
+/// For the sol_get_processed_sibling_instruction syscall, the syscall expects a pointer to an array
+/// of 34 bytes per account. The AccountMeta struct is only 16 bytes because of the use of a reference
+/// to the Pubkey. Other than the sol_get_processed_sibling_instruction syscall, AccountMeta shoudl be used.
+#[repr(C)]
+#[derive(Default, Debug, Clone, Copy)]
+pub struct RawAccountMeta(Pubkey, bool, bool);
+
 /// Represents a signer seed.
 ///
 /// This struct contains the same information as a `[u8]`, but
