@@ -28,5 +28,8 @@ solana-address = { workspace = true, features = ["syscalls"] }
 solana-instruction-view = { workspace = true, features = ["cpi"], optional = true }
 solana-program-error = { workspace = true }
 
+[dependencies]
+solana-program-error = "3.0"
+
 [dev-dependencies]
 five8_const = { workspace = true }
