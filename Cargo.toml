@@ -18,9 +18,9 @@ repository = "https://github.com/anza-xyz/pinocchio"
 
 [workspace.dependencies]
 five8_const = "0.1.4"
-pinocchio = { path = "sdk/pinocchio", version = "0.8" }
-pinocchio-pubkey = { path = "sdk/pubkey", version = "0.2" }
+pinocchio = { version = "0.8", path = "sdk/pinocchio" }
 pinocchio-log-macro = { version = "0.4", path = "sdk/log/macro" }
+pinocchio-pubkey = { version = "0.2", path = "sdk/pubkey" }
 quote = "1.0"
 regex = "1"
 syn = "1.0"
