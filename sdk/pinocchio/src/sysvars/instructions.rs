@@ -54,7 +54,10 @@ where
     /// typically used internally with the `load_instruction_at` or `get_instruction_relative` functions,
     /// which perform the necessary index verification.
     #[inline(always)]
-    pub unsafe fn deserialize_instruction(&self, index: usize) -> IntrospectedInstruction {
+    pub unsafe fn deserialize_instruction_unchecked(
+        &self,
+        index: usize,
+    ) -> IntrospectedInstruction {
         let offset = *(self
             .data
             .as_ptr()
@@ -81,7 +84,7 @@ where
         }
 
         // SAFETY: The index was checked to be in bounds.
-        Ok(unsafe { self.deserialize_instruction(index) })
+        Ok(unsafe { self.deserialize_instruction_unchecked(index) })
     }
 
     /// Creates and returns an `IntrospectedInstruction` relative to the current `Instruction` in the
@@ -144,7 +147,7 @@ impl IntrospectedInstruction<'_> {
     ///
     /// # Errors
     ///
-    /// Returns [`SanitizeError::IndexOutOfBounds`] if the index is out of bounds.
+    /// Returns [`ProgramError::InvalidArgument`] if the index is out of bounds.
     #[inline(always)]
     pub fn get_account_meta_at(
         &self,
