@@ -118,7 +118,7 @@
 //! * [`next_account()`](entrypoint::InstructionContext::next_account): parses the
 //!   next available account (can be used as many times as accounts available).
 //! * [`instruction_data()`](entrypoint::InstructionContext::instruction_data): parses
-//!   the intruction data.
+//!   the instruction data.
 //! * [`program_id()`](entrypoint::InstructionContext::program_id): parses the
 //!   program id.
 //!
