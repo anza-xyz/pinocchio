@@ -4,7 +4,7 @@ use pinocchio::{
     pubkey::Pubkey,
 };
 
-use crate::ID;
+use crate::{LEGACY_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID};
 
 /// Mint data.
 #[repr(C)]
@@ -47,7 +47,10 @@ impl Mint {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if !account_info.is_owned_by(&ID) {
+
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID)
+            && !account_info.is_owned_by(&LEGACY_TOKEN_PROGRAM_ID)
+        {
             return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
@@ -71,9 +74,13 @@ impl Mint {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner() != &ID {
+
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID)
+            && !account_info.is_owned_by(&LEGACY_TOKEN_PROGRAM_ID)
+        {
             return Err(ProgramError::InvalidAccountOwner);
         }
+
         Ok(Self::from_bytes(account_info.borrow_data_unchecked()))
     }
 

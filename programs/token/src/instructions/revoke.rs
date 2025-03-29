@@ -5,6 +5,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use super::TokenProgramVariant;
+
 /// Revokes the delegate's authority.
 ///
 /// ### Accounts:
@@ -19,11 +21,15 @@ pub struct Revoke<'a> {
 
 impl Revoke<'_> {
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+    pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
+        self.invoke_signed(&[], token_program)
     }
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers: &[Signer],
+        token_program: TokenProgramVariant,
+    ) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
             AccountMeta::writable(self.source.key()),
@@ -31,7 +37,7 @@ impl Revoke<'_> {
         ];
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: &token_program.into(),
             accounts: &account_metas,
             data: &[5],
         };
