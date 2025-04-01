@@ -4,9 +4,9 @@
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
     program_error::ProgramError,
-    pubkey::Pubkey,
     BPF_ALIGN_OF_U128, NON_DUP_MARKER,
 };
+use solana_address::Address;
 
 /// Declare the lazy program entrypoint.
 ///
@@ -202,7 +202,7 @@ impl InstructionContext {
     /// This method can only be used after all accounts have been read; otherwise, it will
     /// return a [`ProgramError::InvalidInstructionData`] error.
     #[inline(always)]
-    pub fn program_id(&self) -> Result<&Pubkey, ProgramError> {
+    pub fn program_id(&self) -> Result<&Address, ProgramError> {
         if self.remaining > 0 {
             return Err(ProgramError::InvalidInstructionData);
         }
@@ -217,11 +217,11 @@ impl InstructionContext {
     /// It is up to the caller to guarantee that all accounts have been read; calling this method
     /// before reading all accounts will result in undefined behavior.
     #[inline(always)]
-    pub unsafe fn program_id_unchecked(&self) -> &Pubkey {
+    pub unsafe fn program_id_unchecked(&self) -> &Address {
         let data_len = *(self.input.add(self.offset) as *const usize);
         &*(self
             .input
-            .add(self.offset + core::mem::size_of::<u64>() + data_len) as *const Pubkey)
+            .add(self.offset + core::mem::size_of::<u64>() + data_len) as *const Address)
     }
 }
 

@@ -9,9 +9,9 @@ pub use alloc::BumpAllocator;
 
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
-    pubkey::Pubkey,
     BPF_ALIGN_OF_U128, NON_DUP_MARKER,
 };
+use solana_address::Address;
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
@@ -46,7 +46,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 ///
 /// ```ignore
 /// fn process_instruction(
-///     program_id: &Pubkey,      // Public key of the account the program was loaded into
+///     program_id: &Address,      // Address of the account the program was loaded into
 ///     accounts: &[AccountInfo], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
@@ -72,14 +72,14 @@ pub const SUCCESS: u64 = super::SUCCESS;
 ///         account_info::AccountInfo,
 ///         entrypoint,
 ///         msg,
-///         pubkey::Pubkey,
+///         Address::Address,
 ///         ProgramResult
 ///     };
 ///
 ///     entrypoint!(process_instruction);
 ///
 ///     pub fn process_instruction(
-///         program_id: &Pubkey,
+///         program_id: &Address,
 ///         accounts: &[AccountInfo],
 ///         instruction_data: &[u8],
 ///     ) -> ProgramResult {
@@ -146,7 +146,7 @@ macro_rules! program_entrypoint {
 pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
     input: *mut u8,
     accounts: &mut [core::mem::MaybeUninit<AccountInfo>],
-) -> (&'a Pubkey, usize, &'a [u8]) {
+) -> (&'a Address, usize, &'a [u8]) {
     let mut offset: usize = 0;
 
     // total number of accounts present; it only process up to MAX_ACCOUNTS
@@ -215,7 +215,7 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
     offset += instruction_data_len;
 
     // program id
-    let program_id: &Pubkey = &*(input.add(offset) as *const Pubkey);
+    let program_id: &Address = &*(input.add(offset) as *const Address);
 
     (program_id, processed, instruction_data)
 }

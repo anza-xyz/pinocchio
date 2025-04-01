@@ -27,15 +27,15 @@ While the cost related to (1) is *fixed*, in the sense that it does not change w
 This crate defines a lightweight `Logger` type to format log messages and a companion `log!` macro. The logger is a fixed size buffer that can be used to format log messages before sending them to the log output. Any type that implements the `Log` trait can be appended to the logger. Additionally, the logger can the dereferenced to a `&[u8]` slice, which can be used for other purposes &mdash; e.g., it can be used to create `&str` to be stored on an account or return data of programs.
 
 Below is a sample of the improvements observed when formatting log messages, measured in terms of compute units (CU):
-| Ouput message                      | `log!` | `msg!`          | Improvement (%) |
-|------------------------------------|--------|-----------------|-----------------|
-| `"Hello world!"`                   | 104    | 104             | -               |
-| `"lamports={}"` + `u64`            | 286    | 625 (+339)      | 55%             |
-| `"{}"` + `[&str; 2]`               | 119    | 1610 (+1491)    | 93%             |
-| `"{}"` + `[u64; 2]`                | 483    | 1154 (+671)     | 49%             |
-| `"lamports={}"` + `i64`            | 299    | 659 (+360)      | 55%             |
-| `"{}"` + `[u8; 32]` (pubkey bytes) | 2783   | 8397 (+5614)    | 67%             |
-| `"lamports={:.9}"` + `u64`         | 438    | 2656 (+2218)`*` | 84%             |
+| Ouput message                       | `log!` | `msg!`          | Improvement (%) |
+|-------------------------------------|--------|-----------------|-----------------|
+| `"Hello world!"`                    | 104    | 104             | -               |
+| `"lamports={}"` + `u64`             | 286    | 625 (+339)      | 55%             |
+| `"{}"` + `[&str; 2]`                | 119    | 1610 (+1491)    | 93%             |
+| `"{}"` + `[u64; 2]`                 | 483    | 1154 (+671)     | 49%             |
+| `"lamports={}"` + `i64`             | 299    | 659 (+360)      | 55%             |
+| `"{}"` + `[u8; 32]` (address bytes) | 2783   | 8397 (+5614)    | 67%             |
+| `"lamports={:.9}"` + `u64`          | 438    | 2656 (+2218)`*` | 84%             |
 
 `*` For `msg!`, the value is logged as a `f64` otherwise the precision formatting is ignored.
 

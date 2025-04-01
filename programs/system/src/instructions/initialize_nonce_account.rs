@@ -2,13 +2,12 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Drive state of Uninitialized nonce account to Initialized, setting the nonce value.
 ///
-/// The `Pubkey` parameter specifies the entity authorized to execute nonce
+/// The [`Address`] parameter specifies the entity authorized to execute nonce
 /// instruction on the account
 ///
 /// No signatures are required to execute this instruction, enabling derived
@@ -32,7 +31,7 @@ pub struct InitializeNonceAccount<'a, 'b> {
     ///
     /// The account balance muat be left above the rent exempt reserve
     /// or at zero.
-    pub authority: &'b Pubkey,
+    pub authority: &'b Address,
 }
 
 impl InitializeNonceAccount<'_, '_> {
@@ -51,7 +50,7 @@ impl InitializeNonceAccount<'_, '_> {
 
         // instruction data
         // -  [0..4 ]: instruction discriminator
-        // -  [4..36]: authority pubkey
+        // -  [4..36]: authority address
         let mut instruction_data = [0; 36];
         instruction_data[0] = 6;
         instruction_data[4..36].copy_from_slice(self.authority);

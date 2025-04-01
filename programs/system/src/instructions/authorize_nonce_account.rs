@@ -2,13 +2,12 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Change the entity authorized to execute nonce instructions on the account.
 ///
-/// The `Pubkey` parameter identifies the entity to authorize.
+/// The [`Address`] parameter identifies the entity to authorize.
 ///
 /// ### Accounts:
 ///   0. `[WRITE]` Nonce account
@@ -21,7 +20,7 @@ pub struct AuthorizeNonceAccount<'a, 'b> {
     pub authority: &'a AccountInfo,
 
     /// New entity authorized to execute nonce instructions on the account.
-    pub new_authority: &'b Pubkey,
+    pub new_authority: &'b Address,
 }
 
 impl AuthorizeNonceAccount<'_, '_> {
