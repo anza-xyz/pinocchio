@@ -2,9 +2,9 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -21,9 +21,9 @@ pub struct InitializeAccount3<'a, 'b> {
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Owner of the new Account.
-    pub owner: &'a Pubkey,
+    pub owner: &'a Address,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl InitializeAccount3<'_, '_> {
@@ -43,7 +43,7 @@ impl InitializeAccount3<'_, '_> {
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[18]);
         // Set owner as [u8; 32] at offset [1..33]
-        write_bytes(&mut instruction_data[1..], self.owner);
+        write_bytes(&mut instruction_data[1..], self.owner.as_array());
 
         let instruction = Instruction {
             program_id: self.token_program,

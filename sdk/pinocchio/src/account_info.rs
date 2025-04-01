@@ -10,11 +10,7 @@ use core::{
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_memset_;
 
-use crate::{
-    error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
-    ProgramResult,
-};
+use crate::{error::ProgramError, Address, ProgramResult};
 
 /// Maximum number of bytes a program may add to an account during a
 /// single top-level instruction.
@@ -99,11 +95,11 @@ pub(crate) struct Account {
     /// value is zero at the start of the instruction.
     resize_delta: i32,
 
-    /// Public key of the account.
-    key: Pubkey,
+    /// Address of the account.
+    key: Address,
 
     /// Program that owns this account. Modifiable by programs.
-    owner: Pubkey,
+    owner: Address,
 
     /// The lamports in the account. Modifiable by programs.
     lamports: u64,
@@ -138,15 +134,15 @@ pub struct AccountInfo {
 }
 
 impl AccountInfo {
-    /// Public key of the account.
+    /// Address of the account.
     #[inline(always)]
-    pub fn key(&self) -> &Pubkey {
+    pub fn key(&self) -> &Address {
         unsafe { &(*self.raw).key }
     }
 
     /// Program that owns this account.
     #[inline(always)]
-    pub fn owner(&self) -> &Pubkey {
+    pub fn owner(&self) -> &Address {
         unsafe { &(*self.raw).owner }
     }
 
@@ -202,8 +198,8 @@ impl AccountInfo {
 
     /// Checks if the account is owned by the given program.
     #[inline(always)]
-    pub fn is_owned_by(&self, program: &Pubkey) -> bool {
-        pubkey_eq(self.owner(), program)
+    pub fn is_owned_by(&self, program: &Address) -> bool {
+        self.owner() == program
     }
 
     /// Changes the owner of the account.
@@ -213,7 +209,7 @@ impl AccountInfo {
     /// It is undefined behavior to use this method while there is an active reference
     /// to the `owner` returned by [`Self::owner`].
     #[inline(always)]
-    pub unsafe fn assign(&self, new_owner: &Pubkey) {
+    pub unsafe fn assign(&self, new_owner: &Address) {
         write(&mut (*self.raw).owner, *new_owner);
     }
 

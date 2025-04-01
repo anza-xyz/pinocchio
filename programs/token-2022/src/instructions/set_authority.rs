@@ -2,9 +2,9 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -32,9 +32,9 @@ pub struct SetAuthority<'a, 'b> {
     /// The type of authority to update.
     pub authority_type: AuthorityType,
     /// The new authority
-    pub new_authority: Option<&'a Pubkey>,
+    pub new_authority: Option<&'a Address>,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl SetAuthority<'_, '_> {
@@ -67,7 +67,7 @@ impl SetAuthority<'_, '_> {
         if let Some(new_authority) = self.new_authority {
             // Set new_authority as [u8; 32] at offset [2..35]
             write_bytes(&mut instruction_data[2..3], &[1]);
-            write_bytes(&mut instruction_data[3..], new_authority);
+            write_bytes(&mut instruction_data[3..], new_authority.as_array());
         } else {
             write_bytes(&mut instruction_data[2..3], &[0]);
             // Adjust length if no new authority

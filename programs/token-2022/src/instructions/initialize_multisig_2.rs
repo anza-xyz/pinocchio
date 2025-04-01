@@ -2,10 +2,10 @@ use core::{mem::MaybeUninit, slice};
 
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     cpi::invoke_with_bounds,
     error::ProgramError,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -29,7 +29,7 @@ where
     /// account.
     pub m: u8,
     /// Token Program.
-    pub token_program: &'c Pubkey,
+    pub token_program: &'c Address,
 }
 
 impl InitializeMultisig2<'_, '_, '_> {
