@@ -7,6 +7,7 @@ use crate::{
     error::ProgramError,
     Address, BPF_ALIGN_OF_U128,
 };
+use solana_address::Address;
 
 /// Declare the lazy program entrypoint.
 ///

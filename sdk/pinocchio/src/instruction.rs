@@ -1,6 +1,7 @@
 //! Instruction types.
 
 use core::{marker::PhantomData, ops::Deref};
+use solana_address::Address;
 
 use crate::{account::AccountView, Address};
 

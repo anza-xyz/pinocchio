@@ -21,6 +21,7 @@ use crate::{
     Address,
 };
 use core::{mem, ops::Deref, slice::from_raw_parts};
+use solana_address::Address;
 #[cfg(feature = "std")]
 use std::boxed::Box;
 
