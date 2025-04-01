@@ -1,8 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -23,7 +23,7 @@ pub struct InitializeAccount<'a, 'b> {
     /// Rent Sysvar Account
     pub rent_sysvar: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl InitializeAccount<'_, '_> {

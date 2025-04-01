@@ -3,9 +3,9 @@ use core::slice::from_raw_parts;
 use crate::{write_bytes, UNINIT_BYTE};
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -27,7 +27,7 @@ pub struct BurnChecked<'a, 'b> {
     /// Decimals
     pub decimals: u8,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl BurnChecked<'_, '_> {

@@ -1,8 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -16,7 +16,7 @@ pub struct SyncNative<'a, 'b> {
     /// Native Token Account
     pub native_token: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl SyncNative<'_, '_> {

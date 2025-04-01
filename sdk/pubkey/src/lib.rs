@@ -4,13 +4,13 @@
 #[doc(hidden)]
 // Re-export dependencies used in macros.
 pub mod reexport {
-    pub use pinocchio::pubkey::{pubkey_eq, Pubkey};
+    pub use pinocchio::Address;
 }
 
 use core::mem::MaybeUninit;
 #[cfg(feature = "const")]
 pub use five8_const::decode_32_const;
-use pinocchio::pubkey::{Pubkey, MAX_SEEDS, PDA_MARKER};
+use pinocchio::address::{Address, MAX_SEEDS, PDA_MARKER};
 #[cfg(target_os = "solana")]
 use pinocchio::syscalls::sol_sha256;
 #[cfg(feature = "const")]
@@ -44,8 +44,8 @@ use sha2_const_stable::Sha256;
 pub fn derive_address<const N: usize>(
     seeds: &[&[u8]; N],
     bump: Option<u8>,
-    program_id: &Pubkey,
-) -> Pubkey {
+    program_id: &Address,
+) -> Address {
     const {
         assert!(N < MAX_SEEDS, "number of seeds must be less than MAX_SEEDS");
     }
@@ -80,7 +80,7 @@ pub fn derive_address<const N: usize>(
 
     #[cfg(target_os = "solana")]
     {
-        let mut pda = MaybeUninit::<[u8; 32]>::uninit();
+        let mut pda = MaybeUninit::<Address>::uninit();
 
         // SAFETY: `data` has `i + 2` elements initialized.
         unsafe {
@@ -126,8 +126,10 @@ pub fn derive_address<const N: usize>(
 pub const fn derive_address_const<const N: usize>(
     seeds: &[&[u8]; N],
     bump: Option<u8>,
-    program_id: &Pubkey,
-) -> Pubkey {
+    program_id: &Address,
+) -> Address {
+    use pinocchio::address::PDA_MARKER;
+
     const {
         assert!(N < MAX_SEEDS, "number of seeds must be less than MAX_SEEDS");
     }
@@ -140,48 +142,35 @@ pub const fn derive_address_const<const N: usize>(
         i += 1;
     }
 
-    // TODO: replace this with `is_some` when the MSRV is upgraded
-    // to `1.84.0+`.
-    if let Some(bump) = bump {
+    Address::new_from_array(
         hasher
-            .update(&[bump])
-            .update(program_id)
+            .update(bump.as_slice())
+            .update(program_id.as_array())
             .update(PDA_MARKER)
-            .finalize()
-    } else {
-        hasher.update(program_id).update(PDA_MARKER).finalize()
-    }
+            .finalize(),
+    )
 }
 
-/// Convenience macro to define a static `Pubkey` value.
-#[cfg(feature = "const")]
-#[macro_export]
-macro_rules! pubkey {
-    ( $id:literal ) => {
-        $crate::from_str($id)
-    };
-}
-
-/// Convenience macro to define a static `Pubkey` value representing the program ID.
+/// Convenience macro to define a static [`Address`] value representing the program ID.
 ///
-/// This macro also defines a helper function to check whether a given pubkey is
+/// This macro also defines a helper function to check whether a given address is
 /// equal to the program ID.
 #[cfg(feature = "const")]
 #[macro_export]
 macro_rules! declare_id {
     ( $id:expr ) => {
         #[doc = "The constant program ID."]
-        pub const ID: $crate::reexport::Pubkey = $crate::from_str($id);
+        pub const ID: $crate::reexport::Address = $crate::from_str($id);
 
-        #[doc = "Returns `true` if given pubkey is the program ID."]
+        #[doc = "Returns `true` if the given address is equal to the program ID."]
         #[inline]
-        pub fn check_id(id: &$crate::reexport::Pubkey) -> bool {
-            $crate::reexport::pubkey_eq(id, &ID)
+        pub fn check_id(id: &$crate::reexport::Address) -> bool {
+            id == &ID
         }
 
         #[doc = "Returns the program ID."]
         #[inline]
-        pub const fn id() -> $crate::reexport::Pubkey {
+        pub const fn id() -> $crate::reexport::Address {
             ID
         }
     };
@@ -190,6 +179,6 @@ macro_rules! declare_id {
 /// Create a `Pubkey` from a `&str`.
 #[cfg(feature = "const")]
 #[inline(always)]
-pub const fn from_str(value: &str) -> Pubkey {
-    decode_32_const(value)
+pub const fn from_str(value: &str) -> Address {
+    Address::new_from_array(decode_32_const(value))
 }

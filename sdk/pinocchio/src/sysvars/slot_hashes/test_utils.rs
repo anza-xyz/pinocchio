@@ -5,7 +5,6 @@
 use super::*;
 extern crate std;
 use crate::account_info::{Account, AccountInfo};
-use crate::pubkey::Pubkey;
 use core::{mem, ptr};
 use std::vec::Vec;
 
@@ -20,8 +19,8 @@ pub struct AccountLayout {
     pub is_writable: u8,
     pub executable: u8,
     pub resize_delta: i32,
-    pub key: Pubkey,
-    pub owner: Pubkey,
+    pub key: Address,
+    pub owner: Address,
     pub lamports: u64,
     pub data_len: u64,
 }
@@ -117,7 +116,7 @@ pub fn create_mock_data(entries: &[(u64, Hash)]) -> Vec<u8> {
 /// or according to borrow rules because the Solana runtime invariants are not
 /// fully enforced in this hand-rolled representation.
 pub unsafe fn make_account_info(
-    key: Pubkey,
+    key: Address,
     data: &[u8],
     borrow_state: u8,
 ) -> (AccountInfo, Vec<u64>) {
@@ -140,7 +139,7 @@ pub unsafe fn make_account_info(
             executable: 0,
             resize_delta: 0,
             key,
-            owner: [0u8; 32],
+            owner: Address::new_from_array([0u8; 32]),
             lamports: 0,
             data_len: data.len() as u64,
         },
@@ -181,8 +180,8 @@ fn test_account_layout_compatibility() {
             is_writable: 1,
             executable: 0,
             resize_delta: 100,
-            key: [1u8; 32],
-            owner: [2u8; 32],
+            key: Address::new_from_array([1u8; 32]),
+            owner: Address::new_from_array([2u8; 32]),
             lamports: 1000,
             data_len: 256,
         };
