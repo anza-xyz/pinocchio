@@ -1,8 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -20,7 +20,7 @@ pub struct ThawAccount<'a, 'b> {
     /// Mint Freeze Authority Account
     pub freeze_authority: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl ThawAccount<'_, '_> {

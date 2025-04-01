@@ -1,8 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -18,7 +18,7 @@ pub struct TransferWithSeed<'a, 'b, 'c> {
 
     /// Base account.
     ///
-    /// The account matching the base Pubkey below must be provided as
+    /// The account matching the base [`Address`] below must be provided as
     /// a signer, but may be the same as the funding account and provided
     /// as account 0.
     pub base: &'a AccountInfo,
@@ -29,11 +29,11 @@ pub struct TransferWithSeed<'a, 'b, 'c> {
     /// Amount of lamports to transfer.
     pub lamports: u64,
 
-    /// String of ASCII chars, no longer than `Pubkey::MAX_SEED_LEN`.
+    /// String of ASCII chars, no longer than `solana_address::MAX_SEED_LEN`.
     pub seed: &'b str,
 
     /// Address of program that will own the new account.
-    pub owner: &'c Pubkey,
+    pub owner: &'c Address,
 }
 
 impl TransferWithSeed<'_, '_, '_> {
@@ -56,7 +56,7 @@ impl TransferWithSeed<'_, '_, '_> {
         // - [4..12 ]: lamports amount
         // - [12..20]: seed length
         // - [20..  ]: seed (max 32)
-        // - [.. +32]: owner pubkey
+        // - [.. +32]: owner address
         let mut instruction_data = [0; 80];
         instruction_data[0] = 11;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());

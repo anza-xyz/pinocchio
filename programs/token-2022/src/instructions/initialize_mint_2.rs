@@ -2,9 +2,9 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -20,11 +20,11 @@ pub struct InitializeMint2<'a, 'b> {
     /// Decimals.
     pub decimals: u8,
     /// Mint Authority.
-    pub mint_authority: &'a Pubkey,
+    pub mint_authority: &'a Address,
     /// Freeze Authority.
-    pub freeze_authority: Option<&'a Pubkey>,
+    pub freeze_authority: Option<&'a Address>,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl InitializeMint2<'_, '_> {
@@ -47,12 +47,12 @@ impl InitializeMint2<'_, '_> {
         // Set decimals as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[self.decimals]);
         // Set mint_authority as Pubkey at offset [2..34]
-        write_bytes(&mut instruction_data[2..34], self.mint_authority);
+        write_bytes(&mut instruction_data[2..34], self.mint_authority.as_array());
 
         if let Some(freeze_auth) = self.freeze_authority {
             // Set Option = `true` & freeze_authority at offset [34..67]
             write_bytes(&mut instruction_data[34..35], &[1]);
-            write_bytes(&mut instruction_data[35..], freeze_auth);
+            write_bytes(&mut instruction_data[35..], freeze_auth.as_array());
         } else {
             // Set Option = `false`
             write_bytes(&mut instruction_data[34..35], &[0]);
