@@ -2,7 +2,7 @@ use super::AccountState;
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     program_error::ProgramError,
-    pubkey::Pubkey,
+    Address,
 };
 
 use crate::ID;
@@ -11,10 +11,10 @@ use crate::ID;
 #[repr(C)]
 pub struct TokenAccount {
     /// The mint associated with this account
-    mint: Pubkey,
+    mint: Address,
 
     /// The owner of this account.
-    owner: Pubkey,
+    owner: Address,
 
     /// The amount of tokens this account holds.
     amount: [u8; 8],
@@ -24,7 +24,7 @@ pub struct TokenAccount {
 
     /// If `delegate` is `Some` then `delegated_amount` represents
     /// the amount authorized by the delegate.
-    delegate: Pubkey,
+    delegate: Address,
 
     /// The account's state.
     state: u8,
@@ -45,7 +45,7 @@ pub struct TokenAccount {
     close_authority_flag: [u8; 4],
 
     /// Optional authority to close the account.
-    close_authority: Pubkey,
+    close_authority: Address,
 }
 
 impl TokenAccount {
@@ -102,11 +102,11 @@ impl TokenAccount {
         &*(bytes.as_ptr() as *const TokenAccount)
     }
 
-    pub fn mint(&self) -> &Pubkey {
+    pub fn mint(&self) -> &Address {
         &self.mint
     }
 
-    pub fn owner(&self) -> &Pubkey {
+    pub fn owner(&self) -> &Address {
         &self.owner
     }
 
@@ -119,7 +119,7 @@ impl TokenAccount {
         self.delegate_flag[0] == 1
     }
 
-    pub fn delegate(&self) -> Option<&Pubkey> {
+    pub fn delegate(&self) -> Option<&Address> {
         if self.has_delegate() {
             Some(self.delegate_unchecked())
         } else {
@@ -129,7 +129,7 @@ impl TokenAccount {
 
     /// Use this when you know the account will have a delegate and want to skip the `Option` check.
     #[inline(always)]
-    pub fn delegate_unchecked(&self) -> &Pubkey {
+    pub fn delegate_unchecked(&self) -> &Address {
         &self.delegate
     }
 
@@ -169,7 +169,7 @@ impl TokenAccount {
         self.close_authority_flag[0] == 1
     }
 
-    pub fn close_authority(&self) -> Option<&Pubkey> {
+    pub fn close_authority(&self) -> Option<&Address> {
         if self.has_close_authority() {
             Some(self.close_authority_unchecked())
         } else {
@@ -182,7 +182,7 @@ impl TokenAccount {
     /// This method should be used when the caller knows that the token will have a close
     /// authority set since it skips the `Option` check.
     #[inline(always)]
-    pub fn close_authority_unchecked(&self) -> &Pubkey {
+    pub fn close_authority_unchecked(&self) -> &Address {
         &self.close_authority
     }
 

@@ -34,13 +34,13 @@
 //!   entrypoint,
 //!   msg,
 //!   ProgramResult,
-//!   pubkey::Pubkey
+//!   Address
 //! };
 //!
 //! entrypoint!(process_instruction);
 //!
 //! pub fn process_instruction(
-//!   program_id: &Pubkey,
+//!   program_id: &Address,
 //!   accounts: &[AccountInfo],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
@@ -142,7 +142,7 @@
 //!   no_allocator,
 //!   program_entrypoint,
 //!   ProgramResult,
-//!   pubkey::Pubkey
+//!   Address
 //! };
 //!
 //! program_entrypoint!(process_instruction);
@@ -150,7 +150,7 @@
 //! no_allocator!();
 //!
 //! pub fn process_instruction(
-//!   program_id: &Pubkey,
+//!   program_id: &Address,
 //!   accounts: &[AccountInfo],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
@@ -197,13 +197,13 @@
 //!     entrypoint,
 //!     msg,
 //!     ProgramResult,
-//!     pubkey::Pubkey
+//!     Address
 //!   };
 //!
 //!   entrypoint!(process_instruction);
 //!
 //!   pub fn process_instruction(
-//!     program_id: &Pubkey,
+//!     program_id: &Address,
 //!     accounts: &[AccountInfo],
 //!     instruction_data: &[u8],
 //!   ) -> ProgramResult {
@@ -233,12 +233,13 @@ pub mod memory;
 pub mod program {
     pub use crate::cpi::*;
 }
-pub mod pubkey;
 pub mod syscalls;
 pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
 pub use entrypoint::lazy as lazy_entrypoint;
+// Re-export the `Address` type for downstream use.
+pub use solana_address::Address;
 pub use solana_program_error as program_error;
 
 /// Maximum number of accounts that a transaction may process.

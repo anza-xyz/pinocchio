@@ -9,7 +9,8 @@ use core::{
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_memset_;
 
-use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
+use crate::{program_error::ProgramError, ProgramResult};
+use solana_address::Address;
 
 /// Maximum number of bytes a program may add to an account during a
 /// single top-level instruction.
@@ -56,11 +57,11 @@ pub(crate) struct Account {
     /// the maximum permitted data increase.
     original_data_len: u32,
 
-    /// Public key of the account.
-    key: Pubkey,
+    /// Address of the account.
+    key: Address,
 
     /// Program that owns this account. Modifiable by programs.
-    owner: Pubkey,
+    owner: Address,
 
     /// The lamports in the account. Modifiable by programs.
     lamports: u64,
@@ -98,9 +99,9 @@ pub struct AccountInfo {
 }
 
 impl AccountInfo {
-    /// Public key of the account.
+    /// Address of the account.
     #[inline(always)]
-    pub fn key(&self) -> &Pubkey {
+    pub fn key(&self) -> &Address {
         unsafe { &(*self.raw).key }
     }
 
@@ -111,7 +112,7 @@ impl AccountInfo {
     /// A reference returned by this method is invalidated when [`Self::assign`]
     /// is called.
     #[inline(always)]
-    pub unsafe fn owner(&self) -> &Pubkey {
+    pub unsafe fn owner(&self) -> &Address {
         &(*self.raw).owner
     }
 
@@ -157,7 +158,7 @@ impl AccountInfo {
 
     /// Checks if the account is owned by the given program.
     #[inline(always)]
-    pub fn is_owned_by(&self, program: &Pubkey) -> bool {
+    pub fn is_owned_by(&self, program: &Address) -> bool {
         unsafe { &(*self.raw).owner == program }
     }
 
@@ -167,9 +168,9 @@ impl AccountInfo {
     ///
     /// Using this method invalidates any reference returned by [`Self::owner`].
     #[inline(always)]
-    pub unsafe fn assign(&self, new_owner: &Pubkey) {
+    pub unsafe fn assign(&self, new_owner: &Address) {
         #[allow(invalid_reference_casting)]
-        core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Pubkey, *new_owner);
+        core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Address, *new_owner);
     }
 
     /// Returns a read-only reference to the lamports in the account.

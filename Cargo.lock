@@ -36,6 +36,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 name = "pinocchio"
 version = "0.8.0"
 dependencies = [
+ "solana-address",
  "solana-program-error",
 ]
 
@@ -68,7 +69,7 @@ name = "pinocchio-pubkey"
 version = "0.2.4"
 dependencies = [
  "five8_const",
- "pinocchio",
+ "solana-address",
 ]
 
 [[package]]
@@ -133,6 +134,20 @@ name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
+
+[[package]]
+name = "solana-address"
+version = "0.0.0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=solana-address#626d9c0d25da15cd2b0a53a37edf510d4e5ea430"
+dependencies = [
+ "solana-define-syscall",
+ "solana-program-error",
+]
+
+[[package]]
+name = "solana-define-syscall"
+version = "2.2.1"
+source = "git+https://github.com/febo/solana-sdk.git?branch=solana-address#626d9c0d25da15cd2b0a53a37edf510d4e5ea430"
 
 [[package]]
 name = "solana-program-error"

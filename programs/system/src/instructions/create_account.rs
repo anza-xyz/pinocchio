@@ -2,8 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Create a new account.
@@ -25,7 +24,7 @@ pub struct CreateAccount<'a> {
     pub space: u64,
 
     /// Address of program that will own the new account.
-    pub owner: &'a Pubkey,
+    pub owner: &'a Address,
 }
 
 impl CreateAccount<'_> {
@@ -45,7 +44,7 @@ impl CreateAccount<'_> {
         // - [0..4  ]: instruction discriminator
         // - [4..12 ]: lamports
         // - [12..20]: account space
-        // - [20..52]: owner pubkey
+        // - [20..52]: owner address
         let mut instruction_data = [0; 52];
         // create account instruction has a '0' discriminator
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());

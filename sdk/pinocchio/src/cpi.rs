@@ -6,9 +6,9 @@ use crate::{
     account_info::AccountInfo,
     instruction::{Account, AccountMeta, Instruction, Signer},
     program_error::ProgramError,
-    pubkey::Pubkey,
     ProgramResult,
 };
+use solana_address::Address;
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.
 const MAX_CPI_ACCOUNTS: usize = 64;
@@ -23,8 +23,8 @@ const MAX_CPI_ACCOUNTS: usize = 64;
 #[repr(C)]
 #[derive(Debug, PartialEq, Clone)]
 struct CInstruction<'a> {
-    /// Public key of the program.
-    program_id: *const Pubkey,
+    /// Address of the program.
+    program_id: *const Address,
 
     /// Accounts expected by the program instruction.
     accounts: *const AccountMeta<'a>,
@@ -98,7 +98,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
         let account_info = account_infos[index];
         let account_meta = &instruction.accounts[index];
 
-        if account_info.key() != account_meta.pubkey {
+        if account_info.key() != account_meta.address {
             return Err(ProgramError::InvalidArgument);
         }
 
@@ -149,7 +149,7 @@ pub fn slice_invoke_signed(
     let mut len = 0;
 
     for (account_info, account_meta) in account_infos.iter().zip(instruction.accounts.iter()) {
-        if account_info.key() != account_meta.pubkey {
+        if account_info.key() != account_meta.address {
             return Err(ProgramError::InvalidArgument);
         }
 
@@ -256,7 +256,7 @@ pub fn set_return_data(data: &[u8]) {
 /// Get the return data from an invoked program.
 ///
 /// For every transaction there is a single buffer with maximum length
-/// [`MAX_RETURN_DATA`], paired with a [`Pubkey`] representing the program ID of
+/// [`MAX_RETURN_DATA`], paired with an [`Address`] representing the program ID of
 /// the program that most recently set the return data. Thus the return data is
 /// a global resource and care must be taken to ensure that it represents what
 /// is expected: called programs are free to set or not set the return data; and
@@ -287,7 +287,7 @@ pub fn get_return_data() -> Option<ReturnData> {
     {
         const UNINIT_BYTE: core::mem::MaybeUninit<u8> = core::mem::MaybeUninit::<u8>::uninit();
         let mut data = [UNINIT_BYTE; MAX_RETURN_DATA];
-        let mut program_id = Pubkey::default();
+        let mut program_id = Address::default();
 
         let size = unsafe {
             crate::syscalls::sol_get_return_data(
@@ -315,7 +315,7 @@ pub fn get_return_data() -> Option<ReturnData> {
 /// Struct to hold the return data from an invoked program.
 pub struct ReturnData {
     /// Program that most recently set the return data.
-    program_id: Pubkey,
+    program_id: Address,
 
     /// Return data set by the program.
     data: [core::mem::MaybeUninit<u8>; MAX_RETURN_DATA],
@@ -326,7 +326,7 @@ pub struct ReturnData {
 
 impl ReturnData {
     /// Returns the program that most recently set the return data.
-    pub fn program_id(&self) -> &Pubkey {
+    pub fn program_id(&self) -> &Address {
         &self.program_id
     }
 

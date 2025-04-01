@@ -4,8 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};
@@ -20,9 +19,9 @@ pub struct InitializeMint2<'a> {
     /// Decimals.
     pub decimals: u8,
     /// Mint Authority.
-    pub mint_authority: &'a Pubkey,
+    pub mint_authority: &'a Address,
     /// Freeze Authority.
-    pub freeze_authority: Option<&'a Pubkey>,
+    pub freeze_authority: Option<&'a Address>,
 }
 
 impl InitializeMint2<'_> {
@@ -38,16 +37,16 @@ impl InitializeMint2<'_> {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: decimals (1 byte, u8)
-        // -  [2..34]: mint_authority (32 bytes, Pubkey)
+        // -  [2..34]: mint_authority (32 bytes, Address)
         // -  [34]: freeze_authority presence flag (1 byte, u8)
-        // -  [35..67]: freeze_authority (optional, 32 bytes, Pubkey)
+        // -  [35..67]: freeze_authority (optional, 32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 67];
 
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[20]);
         // Set decimals as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[self.decimals]);
-        // Set mint_authority as Pubkey at offset [2..34]
+        // Set mint_authority as Address at offset [2..34]
         write_bytes(&mut instruction_data[2..34], self.mint_authority);
         // Set COption & freeze_authority at offset [34..67]
         if let Some(freeze_auth) = self.freeze_authority {
