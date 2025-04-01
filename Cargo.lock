@@ -284,6 +284,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1af32c995a7b692a915bb7414d5f8e838450cf7c70414e763d8abcae7b51f28"
 
 [[package]]
+name = "solana-program-error"
+version = "3.0.0"
+source = "git+https://github.com/anza-xyz/solana-sdk.git#3707245e12d198bac1866ef2117fa444934d1405"
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"

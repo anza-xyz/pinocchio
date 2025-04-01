@@ -4,7 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    Address, ProgramResult,
+    Address, Address, ProgramResult,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};

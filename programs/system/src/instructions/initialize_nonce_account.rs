@@ -2,7 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    Address, ProgramResult,
+    Address, Address, ProgramResult,
 };
 
 /// Drive state of Uninitialized nonce account to Initialized, setting the nonce value.

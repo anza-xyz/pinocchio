@@ -5,7 +5,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    Address, ProgramResult,
+    Address, Address, ProgramResult,
 };
 
 /// Burns tokens by removing them from an account.

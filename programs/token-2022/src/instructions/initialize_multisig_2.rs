@@ -5,7 +5,7 @@ use pinocchio::{
     cpi::invoke_with_bounds,
     error::ProgramError,
     instruction::{AccountMeta, Instruction},
-    Address, ProgramResult,
+    Address, Address, ProgramResult,
 };
 
 use crate::instructions::MAX_MULTISIG_SIGNERS;

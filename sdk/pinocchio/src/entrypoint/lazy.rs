@@ -5,7 +5,7 @@ use crate::{
     account_info::{Account, AccountInfo},
     entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
     error::ProgramError,
-    Address, BPF_ALIGN_OF_U128,
+    Address, Address, BPF_ALIGN_OF_U128,
 };
 
 /// Declare the lazy program entrypoint.

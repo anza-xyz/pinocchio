@@ -18,7 +18,7 @@ use crate::{
     error::ProgramError,
     hint::unlikely,
     sysvars::clock::Slot,
-    Address,
+    Address, Address,
 };
 use core::{mem, ops::Deref, slice::from_raw_parts};
 #[cfg(feature = "std")]
