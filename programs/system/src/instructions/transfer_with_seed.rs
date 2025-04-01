@@ -29,7 +29,7 @@ pub struct TransferWithSeed<'a, 'b, 'c> {
     /// Amount of lamports to transfer.
     pub lamports: u64,
 
-    /// String of ASCII chars, no longer than `solana_address::MAX_SEED_LEN`.
+    /// String of ASCII chars, no longer than [MAX_SEED_LEN](https://docs.rs/solana-address/latest/solana_address/constant.MAX_SEED_LEN.html).
     pub seed: &'b str,
 
     /// Address of program that will own the new account.
