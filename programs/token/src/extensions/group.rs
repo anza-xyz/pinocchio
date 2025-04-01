@@ -1,4 +1,11 @@
-use pinocchio::{account_info::AccountInfo, cpi::invoke_signed, instruction::{AccountMeta, Instruction, Signer}, program_error::ProgramError, pubkey::Pubkey, ProgramResult};
+use pinocchio::{
+    account_info::AccountInfo,
+    cpi::invoke_signed,
+    instruction::{AccountMeta, Instruction, Signer},
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    ProgramResult,
+};
 
 use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 
@@ -61,7 +68,8 @@ pub struct InitializeGroup<'a> {
 }
 
 impl<'a> InitializeGroup<'a> {
-    const LEN: usize = 42;
+    const LEN: usize = 48;
+    const DISCRIMINATOR: [u8; 8] = [230, 184, 242, 217, 196, 161, 231, 179];
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -70,23 +78,20 @@ impl<'a> InitializeGroup<'a> {
 
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data layout:
-        // -  [0] u8: instruction discriminator
-        // -  [1] u8: extension instruction discriminator
-        // -  [2..34] u8: update_authority
-        // -  [34..42] u8: max_size
+        // -  [0..8] [u8; 8]: instruction discriminator
+        // -  [8..40] Pubkey: update_authority
+        // -  [40..48] u64: max_size
         let mut instruction_data = [UNINIT_BYTE; Self::LEN];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[40]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[0]);
-        // Set update_authority as u8 at offset [2..34]
+        // Set 8-byte discriminator [0..8]
+        write_bytes(&mut instruction_data[0..8], &Self::DISCRIMINATOR);
+        // Set update_authority as u8 at offset [8..40]
         if let Some(update_authority) = self.update_authority {
-            write_bytes(&mut instruction_data[2..34], &update_authority);
+            write_bytes(&mut instruction_data[8..40], &update_authority);
         } else {
-            write_bytes(&mut instruction_data[2..34], &Pubkey::default());
+            write_bytes(&mut instruction_data[8..40], &Pubkey::default());
         }
-        // Set max_size as u8 at offset [34..42]
-        write_bytes(&mut instruction_data[34..42], &self.max_size.to_le_bytes());
+        // Set max_size as u8 at offset [40..48]
+        write_bytes(&mut instruction_data[40..48], &self.max_size.to_le_bytes());
 
         let account_metas: [AccountMeta; 3] = [
             AccountMeta::writable(self.group.key()),
@@ -109,7 +114,7 @@ impl<'a> InitializeGroup<'a> {
 }
 
 pub struct UpdateGroupMaxSize<'a> {
-    /// The group to be initialized
+    /// The group to be updated
     pub group: &'a AccountInfo,
     /// The public key for the account that can update the group
     pub update_authority: &'a AccountInfo,
@@ -118,7 +123,8 @@ pub struct UpdateGroupMaxSize<'a> {
 }
 
 impl<'a> UpdateGroupMaxSize<'a> {
-    const LEN: usize = 10;
+    const LEN: usize = 16;
+    const DISCRIMINATOR: [u8; 8] = [169, 211, 232, 241, 178, 197, 167, 228];
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -127,16 +133,13 @@ impl<'a> UpdateGroupMaxSize<'a> {
 
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data layout:
-        // -  [0] u8: instruction discriminator
-        // -  [1] u8: extension instruction discriminator
-        // -  [2..10] u8: max_size
+        // -  [0..8] [u8; 8]: instruction discriminator
+        // -  [8..16] u8: max_size
         let mut instruction_data = [UNINIT_BYTE; Self::LEN];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[40]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[1]);
-        // Set max_size as u8 at offset [2..10]
-        write_bytes(&mut instruction_data[2..10], &self.max_size.to_le_bytes());
+        // Set 8-byte discriminator [0..8]
+        write_bytes(&mut instruction_data[0..8], &Self::DISCRIMINATOR);
+        // Set max_size as u8 at offset [8..16]
+        write_bytes(&mut instruction_data[8..16], &self.max_size.to_le_bytes());
         let account_metas: [AccountMeta; 2] = [
             AccountMeta::writable(self.group.key()),
             AccountMeta::readonly_signer(self.update_authority.key()),
@@ -152,4 +155,105 @@ impl<'a> UpdateGroupMaxSize<'a> {
     }
 }
 
-// TODO UpdateGroupAuthority
+pub struct UpdateGroupAuthority<'a> {
+    /// The group to be updated
+    pub group: &'a AccountInfo,
+    /// The public key for the account that can update the group
+    pub current_authority: &'a AccountInfo,
+    /// The new authority for the TokenGroup
+    pub new_authority: Option<Pubkey>,
+}
+
+impl<'a> UpdateGroupAuthority<'a> {
+    const LEN: usize = 40;
+    const DISCRIMINATOR: [u8; 8] = [194, 247, 164, 233, 209, 184, 229, 195];
+
+    #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
+    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        // Instruction data layout:
+        // -  [0..8] [u8; 8]: instruction discriminator
+        // -  [8..40] Pubkey: new authority
+        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        // Set 8-byte discriminator [0..8]
+        write_bytes(&mut instruction_data[0..8], &Self::DISCRIMINATOR);
+        // Set update_authority as u8 at offset [8..40]
+        if let Some(update_authority) = self.new_authority {
+            write_bytes(&mut instruction_data[8..40], &update_authority);
+        } else {
+            write_bytes(&mut instruction_data[8..40], &Pubkey::default());
+        }
+        let account_metas: [AccountMeta; 2] = [
+            AccountMeta::writable(self.group.key()),
+            AccountMeta::readonly_signer(self.current_authority.key()),
+        ];
+
+        let instruction = Instruction {
+            program_id: &TOKEN_2022_PROGRAM_ID,
+            accounts: &account_metas,
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+        };
+
+        invoke_signed(&instruction, &[self.group, self.current_authority], signers)
+    }
+}
+
+pub struct InitializeMember<'a> {
+    /// The group the member belongs to
+    pub group: &'a AccountInfo,
+    /// Update authority of the group
+    pub group_update_authority: &'a AccountInfo,
+    /// Member account
+    pub member: &'a AccountInfo,
+    /// Token Mint of the Member to be added to the group
+    pub member_mint: &'a AccountInfo,
+    /// Mint authority of the `member_mint`
+    pub member_mint_authority: &'a AccountInfo,
+}
+
+impl<'a> InitializeMember<'a> {
+    const LEN: usize = 8;
+    const DISCRIMINATOR: [u8; 8] = [213, 225, 185, 243, 167, 194, 232, 212];
+
+    #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
+    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        // Instruction data layout:
+        // -  [0..8] [u8; 8]: instruction discriminator
+        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        // Set 8-byte discriminator [0..8]
+        write_bytes(&mut instruction_data[0..8], &Self::DISCRIMINATOR);
+
+        let account_metas: [AccountMeta; 5] = [
+            AccountMeta::writable(self.member.key()),
+            AccountMeta::readonly(self.member_mint.key()),
+            AccountMeta::readonly_signer(self.member_mint_authority.key()),
+            AccountMeta::writable(self.group.key()),
+            AccountMeta::readonly_signer(self.group_update_authority.key()),
+        ];
+
+        let instruction = Instruction {
+            program_id: &TOKEN_2022_PROGRAM_ID,
+            accounts: &account_metas,
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+        };
+
+        invoke_signed(
+            &instruction,
+            &[
+                self.member,
+                self.member_mint,
+                self.member_mint_authority,
+                self.group,
+                self.group_update_authority,
+            ],
+            signers,
+        )
+    }
+}
