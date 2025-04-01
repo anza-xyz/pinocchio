@@ -3,9 +3,9 @@
 
 use crate::{
     account_info::{Account, AccountInfo},
+    Address,
     entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
     error::ProgramError,
-    pubkey::Pubkey,
     BPF_ALIGN_OF_U128,
 };
 
@@ -230,7 +230,7 @@ impl InstructionContext {
     /// This method can only be used after all accounts have been read; otherwise, it will
     /// return a [`ProgramError::InvalidInstructionData`] error.
     #[inline(always)]
-    pub fn program_id(&self) -> Result<&Pubkey, ProgramError> {
+    pub fn program_id(&self) -> Result<&Address, ProgramError> {
         if self.remaining > 0 {
             return Err(ProgramError::InvalidInstructionData);
         }
@@ -245,9 +245,9 @@ impl InstructionContext {
     /// It is up to the caller to guarantee that all accounts have been read; calling this method
     /// before reading all accounts will result in undefined behavior.
     #[inline(always)]
-    pub unsafe fn program_id_unchecked(&self) -> &Pubkey {
+    pub unsafe fn program_id_unchecked(&self) -> &Address {
         let data_len = *(self.buffer as *const usize);
-        &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Pubkey)
+        &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Address)
     }
 
     /// Read an account from the input buffer.

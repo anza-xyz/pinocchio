@@ -1,9 +1,9 @@
 use pinocchio::{
     account_info::AccountInfo,
+    Address,
     error::ProgramError,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
     sysvars::rent::Rent,
     ProgramResult,
 };
@@ -27,7 +27,7 @@ pub struct CreateAccount<'a> {
     pub space: u64,
 
     /// Address of program that will own the new account.
-    pub owner: &'a Pubkey,
+    pub owner: &'a Address,
 }
 
 impl<'a> CreateAccount<'a> {
@@ -37,7 +37,7 @@ impl<'a> CreateAccount<'a> {
         to: &'a AccountInfo,
         rent_sysvar: &'a AccountInfo,
         space: u64,
-        owner: &'a Pubkey,
+        owner: &'a Address,
     ) -> Result<Self, ProgramError> {
         let rent = Rent::from_account_info(rent_sysvar)?;
         let lamports = rent.minimum_balance(space as usize);
@@ -68,7 +68,7 @@ impl<'a> CreateAccount<'a> {
         // - [0..4  ]: instruction discriminator
         // - [4..12 ]: lamports
         // - [12..20]: account space
-        // - [20..52]: owner pubkey
+        // - [20..52]: owner address
         let mut instruction_data = [0; 52];
         // create account instruction has a '0' discriminator
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());

@@ -1,17 +1,17 @@
 use crate::{
     account_info::{AccountInfo, Ref},
+    address::{Address, ADDRESS_BYTES},
     error::ProgramError,
     instruction::AccountMeta,
-    pubkey::{Pubkey, PUBKEY_BYTES},
 };
 
 use core::{marker::PhantomData, mem::size_of, ops::Deref};
 
 /// Instructions sysvar ID `Sysvar1nstructions1111111111111111111111111`.
-pub const INSTRUCTIONS_ID: Pubkey = [
+pub const INSTRUCTIONS_ID: Address = Address::new_from_array([
     0x06, 0xa7, 0xd5, 0x17, 0x18, 0x7b, 0xd1, 0x66, 0x35, 0xda, 0xd4, 0x04, 0x55, 0xfd, 0xc2, 0xc0,
     0xc1, 0x24, 0xc6, 0x8f, 0x21, 0x56, 0x75, 0xa5, 0xdb, 0xba, 0xcb, 0x5f, 0x08, 0x00, 0x00, 0x00,
-];
+]);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Instructions<T>
@@ -171,7 +171,7 @@ impl IntrospectedInstruction<'_> {
 
     /// Get the program ID of the `Instruction`.
     #[inline(always)]
-    pub fn get_program_id(&self) -> &Pubkey {
+    pub fn get_program_id(&self) -> &Address {
         // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
         let num_accounts = u16::from_le_bytes(unsafe { *(self.raw as *const [u8; 2]) });
 
@@ -179,7 +179,7 @@ impl IntrospectedInstruction<'_> {
         unsafe {
             &*(self.raw.add(
                 size_of::<u16>() + num_accounts as usize * size_of::<IntrospectedAccountMeta>(),
-            ) as *const Pubkey)
+            ) as *const Address)
         }
     }
 
@@ -189,7 +189,7 @@ impl IntrospectedInstruction<'_> {
         // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
         let offset = u16::from_le_bytes(unsafe { *(self.raw as *const [u8; 2]) }) as usize
             * size_of::<IntrospectedAccountMeta>()
-            + PUBKEY_BYTES;
+            + ADDRESS_BYTES;
 
         // SAFETY: The instruction data length is located after the program ID.
         let data_len = u16::from_le_bytes(unsafe {
@@ -221,7 +221,7 @@ pub struct IntrospectedAccountMeta {
     flags: u8,
 
     /// The account key.
-    pub key: Pubkey,
+    pub key: Address,
 }
 
 impl IntrospectedAccountMeta {

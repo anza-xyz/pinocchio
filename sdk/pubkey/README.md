@@ -14,12 +14,12 @@
 
 ## Overview
 
-This crate provides two convenience macros to resolve `Pubkey`s at compile time:
+This crate provides two convenience macros to resolve `Address`es at compile time:
 
-* `pubkey!`: takes a pubkey value as a base58 `&str` and generates its correspondent `Pubkey` (byte array)
-* `declare_id!`: takes a pubkey value as a base58 `&str` (usually representing a program address) and generates an `ID` constant, `check_id()` and `id()` helpers
+* `address!`: takes an address value as a base58 `&str` and generates its correspondent `Address` (byte array)
+* `declare_id!`: takes an address value as a base58 `&str` (usually representing a program address) and generates an `ID` constant, `check_id()` and `id()` helpers
 
-It also defines a `from_str` helper that takes a `&str` and returns the correspondent `Pubkey` value.
+It also defines a `from_str` helper that takes a `&str` and returns the correspondent `Address` value.
 
 ## Examples
 
@@ -36,9 +36,9 @@ Public keys can be embedded into the program code in the following ways.
 
 1) Creating a `Pubkey` constant value from a static `&str`:
 ```rust
-use pinocchio::pubkey::Pubkey;
+use pinocchio::Address;
 
-pub const AUTHORITY: Pubkey = pinocchio_pubkey::pubkey!("7qtAvP4CJuSKauWHtHZJt9wmQRgvcFeUcU3xKrFzxKf1");
+pub const AUTHORITY: Address = pinocchio_pubkey::address!("7qtAvP4CJuSKauWHtHZJt9wmQRgvcFeUcU3xKrFzxKf1");
 ```
 
 2) Declaring the program address of a program (usually on your `lib.rs`):
