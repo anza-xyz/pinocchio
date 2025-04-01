@@ -13,6 +13,7 @@ use super::{get_extension_from_bytes, BaseState, Extension, ExtensionType};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TokenGroup {
+    pub _discriminator: [u8; 8],
     /// The authority that can sign to update the group
     /// NOTE: Default Pubkey is equivalent to None.
     pub update_authority: Pubkey,
@@ -27,7 +28,10 @@ pub struct TokenGroup {
 
 impl TokenGroup {
     /// The length of the `TokenGroup` account data inlcuding the discriminator.
-    pub const LEN: usize = core::mem::size_of::<TokenGroup>() + 8;
+    pub const LEN: usize = core::mem::size_of::<TokenGroup>();
+
+    // Discriminator for the TokenGroup state.
+    // const DISCRIMINATOR: [u8; 8] = [214, 15, 63, 132, 49, 119, 209, 40];
 
     /// Return a `TokenGroup` from the given account info.
     ///
@@ -52,6 +56,48 @@ impl Extension for TokenGroup {
     const BASE_STATE: BaseState = BaseState::Mint;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TokenGroupMember {
+    pub _discriminator: [u8; 8],
+    /// The associated mint, used to counter spoofing to be sure that member
+    /// belongs to a particular mint
+    pub mint: Pubkey,
+    /// The pubkey of the `TokenGroup`
+    pub group: Pubkey,
+    /// The member number
+    pub member_number: [u8; 8],
+}
+
+impl TokenGroupMember {
+    /// The length of the `TokenGroupMember` account data inlcuding the discriminator.
+    pub const LEN: usize = core::mem::size_of::<TokenGroupMember>() + 8;
+
+    // Discriminator for the TokenGroupMember state
+    // const DISCRIMINATOR: [u8; 8] = [254, 50, 168, 134, 88, 126, 100, 186];
+
+    /// Return a `TokenGroupMember` from the given account info.
+    ///
+    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// the account data.
+    #[inline(always)]
+    pub fn from_account_info(account_info: &AccountInfo) -> Result<TokenGroupMember, ProgramError> {
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
+            return Err(ProgramError::InvalidAccountOwner);
+        }
+
+        let acc_data_bytes = account_info.try_borrow_data()?;
+        let acc_data_bytes = acc_data_bytes.as_ref();
+
+        get_extension_from_bytes::<Self>(acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
+    }
+}
+
+impl Extension for TokenGroupMember {
+    const TYPE: ExtensionType = ExtensionType::TokenGroupMember;
+    const LEN: usize = Self::LEN;
+    const BASE_STATE: BaseState = BaseState::Mint;
+}
+
 /// Instructions
 
 pub struct InitializeGroup<'a> {
@@ -69,7 +115,7 @@ pub struct InitializeGroup<'a> {
 
 impl<'a> InitializeGroup<'a> {
     const LEN: usize = 48;
-    const DISCRIMINATOR: [u8; 8] = [230, 184, 242, 217, 196, 161, 231, 179];
+    const DISCRIMINATOR: [u8; 8] = [121, 113, 108, 39, 54, 51, 0, 4];
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -124,7 +170,7 @@ pub struct UpdateGroupMaxSize<'a> {
 
 impl<'a> UpdateGroupMaxSize<'a> {
     const LEN: usize = 16;
-    const DISCRIMINATOR: [u8; 8] = [169, 211, 232, 241, 178, 197, 167, 228];
+    const DISCRIMINATOR: [u8; 8] = [108, 37, 171, 143, 248, 30, 18, 110];
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -166,7 +212,7 @@ pub struct UpdateGroupAuthority<'a> {
 
 impl<'a> UpdateGroupAuthority<'a> {
     const LEN: usize = 40;
-    const DISCRIMINATOR: [u8; 8] = [194, 247, 164, 233, 209, 184, 229, 195];
+    const DISCRIMINATOR: [u8; 8] = [161, 105, 88, 1, 237, 221, 216, 203];
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -216,7 +262,7 @@ pub struct InitializeMember<'a> {
 
 impl<'a> InitializeMember<'a> {
     const LEN: usize = 8;
-    const DISCRIMINATOR: [u8; 8] = [213, 225, 185, 243, 167, 194, 232, 212];
+    const DISCRIMINATOR: [u8; 8] = [152, 32, 222, 176, 223, 237, 116, 134];
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
