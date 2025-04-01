@@ -1,19 +1,20 @@
 //! Information about the network's clock, ticks, slots, etc.
 
+use solana_address::Address;
+
 use super::Sysvar;
 use crate::{
     account_info::{AccountInfo, Ref},
     hint::unlikely,
     impl_sysvar_get,
     program_error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
 };
 
 /// The ID of the clock sysvar.
-pub const CLOCK_ID: Pubkey = [
+pub const CLOCK_ID: Address = Address::new_from_array([
     6, 167, 213, 23, 24, 199, 116, 201, 40, 86, 99, 152, 105, 29, 94, 182, 139, 94, 184, 163, 155,
     75, 109, 92, 115, 85, 91, 33, 0, 0, 0, 0,
-];
+]);
 
 /// The unit of time given to a leader for encoding a block.
 ///
@@ -87,7 +88,7 @@ impl Clock {
     /// This method performs a check on the account info key.
     #[inline]
     pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Clock>, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &CLOCK_ID)) {
+        if unlikely(account_info.key() != &CLOCK_ID) {
             return Err(ProgramError::InvalidArgument);
         }
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
@@ -108,7 +109,7 @@ impl Clock {
     pub unsafe fn from_account_info_unchecked(
         account_info: &AccountInfo,
     ) -> Result<&Self, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &CLOCK_ID)) {
+        if unlikely(account_info.key() != &CLOCK_ID) {
             return Err(ProgramError::InvalidArgument);
         }
         Ok(Self::from_bytes_unchecked(

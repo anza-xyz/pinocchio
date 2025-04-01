@@ -1,8 +1,10 @@
 //! Provides access to cluster system accounts.
 
+use solana_address::Address;
+
+use crate::program_error::ProgramError;
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_get_sysvar;
-use crate::{program_error::ProgramError, pubkey::Pubkey};
 #[cfg(not(target_os = "solana"))]
 use core::hint::black_box;
 
@@ -76,7 +78,7 @@ macro_rules! impl_sysvar_get {
 #[inline]
 pub unsafe fn get_sysvar_unchecked(
     dst: *mut u8,
-    sysvar_id: &Pubkey,
+    sysvar_id: &Address,
     offset: usize,
     len: usize,
 ) -> Result<(), ProgramError> {
@@ -110,7 +112,7 @@ pub unsafe fn get_sysvar_unchecked(
 /// Handler for retrieving a slice of sysvar data from the `sol_get_sysvar`
 /// syscall.
 #[inline(always)]
-pub fn get_sysvar(dst: &mut [u8], sysvar_id: &Pubkey, offset: usize) -> Result<(), ProgramError> {
+pub fn get_sysvar(dst: &mut [u8], sysvar_id: &Address, offset: usize) -> Result<(), ProgramError> {
     // SAFETY: Use the length of the slice as the length parameter.
     unsafe { get_sysvar_unchecked(dst.as_mut_ptr(), sysvar_id, offset, dst.len()) }
 }
