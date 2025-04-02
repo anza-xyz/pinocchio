@@ -47,5 +47,104 @@ impl Extension for GroupPointer {
     const BASE_STATE: BaseState = BaseState::Mint;
 }
 
-// TODO Initialize
-// TODO Update
+pub struct Initialize<'a> {
+    /// Mint of the group pointer
+    pub mint: &'a AccountInfo,
+    /// The public key for the account that can update the group address
+    pub authority: Option<Pubkey>,
+    /// The account address that holds the group
+    pub group_address: Option<Pubkey>,
+}
+
+impl<'a> Initialize<'a> {
+    const LEN: usize = 66;
+
+    #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
+    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        // Instruction data layout:
+        // -  [0] u8: instruction discriminator
+        // -  [1] u8: extension instruction discriminator
+        // -  [2..34] u8: authority
+        // -  [34..66] u8: group_address
+        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        // Set discriminator as u8 at offset [0]
+        write_bytes(&mut instruction_data[0..1], &[40]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[0]);
+        // Set authority as u8 at offset [2..34]
+        if let Some(authority) = self.authority {
+            write_bytes(&mut instruction_data[2..34], &authority);
+        } else {
+            write_bytes(&mut instruction_data[2..34], &Pubkey::default());
+        }
+        // Set group_address as u8 at offset [34..66]
+        if let Some(group_address) = self.group_address {
+            write_bytes(&mut instruction_data[34..66], &group_address);
+        } else {
+            write_bytes(&mut instruction_data[34..66], &Pubkey::default());
+        }
+
+        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.mint.key())];
+
+        let instruction = Instruction {
+            program_id: &TOKEN_2022_PROGRAM_ID,
+            accounts: &account_metas,
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+        };
+
+        invoke_signed(&instruction, &[self.mint], signers)
+    }
+}
+
+pub struct Update<'a> {
+    /// Mint of the group pointer
+    pub mint: &'a AccountInfo,
+    /// The public key for the account that can update the group address
+    pub authority: &'a AccountInfo,
+    /// The new account address that holds the group configurations
+    pub group_address: Option<Pubkey>,
+}
+
+impl<'a> Update<'a> {
+    const LEN: usize = 34;
+
+    #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
+    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        // Instruction data layout:
+        // -  [0] u8: instruction discriminator
+        // -  [1] u8: extension instruction discriminator
+        // -  [2..34] u8: group_address
+        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        // Set discriminator as u8 at offset [0]
+        write_bytes(&mut instruction_data[0..1], &[40]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[1]);
+        // Set group_address as u8 at offset [2..34]
+        if let Some(group_address) = self.group_address {
+            write_bytes(&mut instruction_data[2..34], &group_address);
+        } else {
+            write_bytes(&mut instruction_data[2..34], &Pubkey::default());
+        }
+
+        let account_metas: [AccountMeta; 2] = [
+            AccountMeta::writable(self.mint.key()),
+            AccountMeta::readonly_signer(self.authority.key()),
+        ];
+
+        let instruction = Instruction {
+            program_id: &TOKEN_2022_PROGRAM_ID,
+            accounts: &account_metas,
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+        };
+
+        invoke_signed(&instruction, &[self.mint, self.authority], signers)
+    }
+}

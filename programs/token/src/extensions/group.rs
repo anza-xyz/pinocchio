@@ -70,7 +70,7 @@ pub struct TokenGroupMember {
 
 impl TokenGroupMember {
     /// The length of the `TokenGroupMember` account data inlcuding the discriminator.
-    pub const LEN: usize = core::mem::size_of::<TokenGroupMember>() + 8;
+    pub const LEN: usize = core::mem::size_of::<TokenGroupMember>();
 
     // Discriminator for the TokenGroupMember state
     // const DISCRIMINATOR: [u8; 8] = [254, 50, 168, 134, 88, 126, 100, 186];
