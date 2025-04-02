@@ -3,11 +3,8 @@
 //! This is required for the rent sysvar implementation.
 
 use super::Sysvar;
-use crate::{
-    account_info::{AccountInfo, Ref},
-    impl_sysvar_get,
-    program_error::ProgramError,
-};
+use crate::{impl_sysvar_get, program_error::ProgramError};
+use solana_account_view::{AccountView, Ref};
 use solana_address::Address;
 
 /// The ID of the rent sysvar.
@@ -72,7 +69,7 @@ impl Rent {
     ///
     /// This method performs a check on the account info key.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Rent>, ProgramError> {
+    pub fn from_account_info(account_info: &AccountView) -> Result<Ref<Rent>, ProgramError> {
         if account_info.key() != &RENT_ID {
             return Err(ProgramError::InvalidArgument);
         }
@@ -92,7 +89,7 @@ impl Rent {
     /// no mutable borrows of the account data.
     #[inline]
     pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+        account_info: &AccountView,
     ) -> Result<&Self, ProgramError> {
         if account_info.key() != &RENT_ID {
             return Err(ProgramError::InvalidArgument);

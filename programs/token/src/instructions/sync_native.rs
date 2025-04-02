@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -13,7 +13,7 @@ use pinocchio::{
 ///      lamports.
 pub struct SyncNative<'a> {
     /// Native Token Account
-    pub native_token: &'a AccountInfo,
+    pub native_token: &'a AccountView,
 }
 
 impl SyncNative<'_> {
