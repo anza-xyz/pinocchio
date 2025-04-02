@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     Address, ProgramResult,
@@ -17,11 +17,11 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   3. `[]` Rent sysvar
 pub struct InitializeAccount2<'a> {
     /// New Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Rent Sysvar Account
-    pub rent_sysvar: &'a AccountInfo,
+    pub rent_sysvar: &'a AccountView,
     /// Owner of the new Account.
     pub owner: &'a Address,
 }

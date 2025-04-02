@@ -22,6 +22,7 @@ copy = ["solana-address/copy"]
 std = ["solana-address/std"]
 
 [dependencies]
+solana-account-view = { workspace = true }
 solana-address = { workspace = true, features = ["syscalls"] }
 solana-program-error = "3.0"
 

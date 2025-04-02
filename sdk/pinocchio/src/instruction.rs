@@ -35,7 +35,7 @@ pub struct ProcessedSiblingInstruction {
 
 /// An `Account` for CPI invocations.
 ///
-/// This struct contains the same information as an [`AccountInfo`], but has
+/// This struct contains the same information as an [`AccountView`], but has
 /// the memory layout as expected by `sol_invoke_signed_c` syscall.
 #[repr(C)]
 #[cfg_attr(feature = "copy", derive(Copy))]
@@ -68,8 +68,8 @@ pub struct Account<'a> {
     // This account's data contains a loaded program (and is now read-only).
     executable: bool,
 
-    /// The pointers to the `AccountInfo` data are only valid for as long as the
-    /// `&'a AccountInfo` lives. Instead of holding a reference to the actual `AccountInfo`,
+    /// The pointers to the `AccountView` data are only valid for as long as the
+    /// `&'a AccountView` lives. Instead of holding a reference to the actual `AccountView`,
     /// which would increase the size of the type, we claim to hold a reference without
     /// actually holding one using a `PhantomData<&'a AccountInfo>`.
     _account_info: PhantomData<&'a AccountInfo>,
@@ -92,8 +92,8 @@ const unsafe fn field_at_offset<T, U>(ptr: *const T, offset: usize) -> *const U 
     unsafe { (ptr as *const u8).add(offset) as *const U }
 }
 
-impl<'a> From<&'a AccountInfo> for Account<'a> {
-    fn from(account: &'a AccountInfo) -> Self {
+impl<'a> From<&'a AccountView> for Account<'a> {
+    fn from(account: &'a AccountView) -> Self {
         Account {
             // SAFETY: offset `8` is the `key` field in the `Account` struct.
             key: unsafe { field_at_offset(account.raw, 8) },
@@ -111,7 +111,7 @@ impl<'a> From<&'a AccountInfo> for Account<'a> {
             is_signer: account.is_signer(),
             is_writable: account.is_writable(),
             executable: account.executable(),
-            _account_info: PhantomData::<&'a AccountInfo>,
+            _account_info: PhantomData::<&'a AccountView>,
         }
     }
 }
@@ -176,8 +176,8 @@ impl<'a> AccountMeta<'a> {
     }
 }
 
-impl<'a> From<&'a AccountInfo> for AccountMeta<'a> {
-    fn from(account: &'a crate::account_info::AccountInfo) -> Self {
+impl<'a> From<&'a AccountView> for AccountMeta<'a> {
+    fn from(account: &'a AccountView) -> Self {
         AccountMeta::new(account.key(), account.is_writable(), account.is_signer())
     }
 }

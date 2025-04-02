@@ -30,7 +30,7 @@
 //! To use the `entrypoint!` macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account_info::AccountInfo,
+//!   AccountView,
 //!   entrypoint,
 //!   msg,
 //!   ProgramResult,
@@ -41,7 +41,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountInfo],
+//!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   msg!("Hello from my program!");
@@ -136,7 +136,7 @@
 //! To use the [`no_allocator!`] macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account_info::AccountInfo,
+//!   AccountView,
 //!   default_panic_handler,
 //!   msg,
 //!   no_allocator,
@@ -151,7 +151,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountInfo],
+//!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   msg!("Hello from `no_std` program!");
@@ -193,7 +193,7 @@
 //! #[cfg(feature = "bpf-entrypoint")]
 //! mod entrypoint {
 //!   use pinocchio::{
-//!     account_info::AccountInfo,
+//!     AccountView,
 //!     entrypoint,
 //!     msg,
 //!     ProgramResult,
@@ -204,7 +204,7 @@
 //!
 //!   pub fn process_instruction(
 //!     program_id: &Address,
-//!     accounts: &[AccountInfo],
+//!     accounts: &[AccountView],
 //!     instruction_data: &[u8],
 //!   ) -> ProgramResult {
 //!     msg!("Hello from my program!");
@@ -223,7 +223,6 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-pub mod account_info;
 pub mod cpi;
 pub mod entrypoint;
 pub mod instruction;

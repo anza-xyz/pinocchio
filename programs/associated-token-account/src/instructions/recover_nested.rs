@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -26,19 +26,19 @@ use pinocchio::{
 ///   6. `[]`  SPL Token program
 pub struct RecoverNested<'a> {
     /// Nested associated token account, must be owned by `owner_associated_token_account`
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Token mint for the nested associated token account
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Wallet's associated token account
-    pub destination_account: &'a AccountInfo,
+    pub destination_account: &'a AccountView,
     /// Owner associated token account address, must be owned by `wallet_account`
-    pub owner_account: &'a AccountInfo,
+    pub owner_account: &'a AccountView,
     /// Token mint for the owner associated token account
-    pub owner_mint: &'a AccountInfo,
+    pub owner_mint: &'a AccountView,
     /// Wallet address for the owner associated token account
-    pub wallet: &'a AccountInfo,
+    pub wallet: &'a AccountView,
     /// SPL Token program
-    pub token_program: &'a AccountInfo,
+    pub token_program: &'a AccountView,
 }
 
 impl RecoverNested<'_> {
