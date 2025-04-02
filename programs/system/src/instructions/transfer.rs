@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -12,10 +12,10 @@ use pinocchio::{
 ///   1. `[WRITE]` Recipient account
 pub struct Transfer<'a> {
     /// Funding account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
 
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
 
     /// Amount of lamports to transfer.
     pub lamports: u64,

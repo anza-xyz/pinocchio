@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -17,17 +17,17 @@ use pinocchio::{
 ///   5. `[]` SPL Token program
 pub struct Create<'a> {
     /// Funding account (must be a system account)
-    pub funding_account: &'a AccountInfo,
+    pub funding_account: &'a AccountView,
     /// Associated token account address to be created
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Wallet address for the new associated token account
-    pub wallet: &'a AccountInfo,
+    pub wallet: &'a AccountView,
     /// The token mint for the new associated token account
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// System program
-    pub system_program: &'a AccountInfo,
+    pub system_program: &'a AccountView,
     /// SPL Token program
-    pub token_program: &'a AccountInfo,
+    pub token_program: &'a AccountView,
 }
 
 impl Create<'_> {

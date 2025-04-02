@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     error::ProgramError,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
@@ -14,10 +14,10 @@ use pinocchio::{
 ///   1. `[WRITE, SIGNER]` New account
 pub struct CreateAccount<'a> {
     /// Funding account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
 
     /// New account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
 
     /// Number of lamports to transfer to the new account.
     pub lamports: u64,

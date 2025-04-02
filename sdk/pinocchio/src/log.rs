@@ -32,7 +32,7 @@
 //!
 //! [`Address`]: solana_address
 
-use crate::account_info::AccountInfo;
+use solana_account_view::AccountView;
 
 /// Print a message to the log.
 ///
@@ -134,7 +134,7 @@ pub fn sol_log_slice(slice: &[u8]) {
 
 /// Print the hexadecimal representation of the program's input parameters.
 ///
-/// - `accounts` - A slice of [`AccountInfo`].
+/// - `accounts` - A slice of [`AccountView`].
 /// - `data` - The instruction data.
 pub fn sol_log_params(accounts: &[AccountInfo], data: &[u8]) {
     #[cfg(target_os = "solana")]
