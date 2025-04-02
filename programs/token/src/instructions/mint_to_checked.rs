@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -17,11 +17,11 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   2. `[SIGNER]` The mint's minting authority.
 pub struct MintToChecked<'a> {
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Token Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Authority
-    pub mint_authority: &'a AccountInfo,
+    pub mint_authority: &'a AccountView,
     /// Amount
     pub amount: u64,
     /// Decimals

@@ -9,6 +9,7 @@ use crate::{
     instruction::{Account, Instruction, Signer},
     Address, ProgramResult,
 };
+use solana_account_view::AccountView;
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.
 pub const MAX_CPI_ACCOUNTS: usize = 64;
@@ -89,7 +90,7 @@ pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
-pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
+pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountView]) -> ProgramResult {
     slice_invoke_signed(instruction, account_infos, &[])
 }
 
@@ -124,7 +125,7 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 #[inline(always)]
 pub fn invoke_signed<const ACCOUNTS: usize>(
     instruction: &Instruction,
-    account_infos: &[&AccountInfo; ACCOUNTS],
+    account_infos: &[&AccountView; ACCOUNTS],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
     // SAFETY: The array of `AccountInfo`s will be checked to ensure that it has
@@ -226,6 +227,49 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 pub fn slice_invoke_signed(
+    instruction: &Instruction,
+    account_infos: &[&AccountView],
+    signers_seeds: &[Signer],
+) -> ProgramResult {
+    // Check that the stack allocated account storage `MAX_CPI_ACCOUNTS` is
+    // sufficient for the number of accounts expected by the instruction.
+    //
+    // The check for the slice of `AccountInfo`s not being less than the
+    // number of accounts expected by the instruction is done in
+    // `invoke_signed_with_bounds`.
+    if MAX_CPI_ACCOUNTS < instruction.accounts.len() {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    // SAFETY: The stack allocated account storage `MAX_CPI_ACCOUNTS` was validated.
+    unsafe {
+        inner_invoke_signed_with_bounds::<MAX_CPI_ACCOUNTS>(
+            instruction,
+            account_infos,
+            signers_seeds,
+        )
+    }
+}
+
+/// Internal function to invoke a cross-program instruction with signatures
+/// from a slice of `AccountInfo`s performing borrow checking.
+///
+/// This function performs validation of the `account_infos` slice to ensure that:
+///   1. It has at least as many accounts as the number of accounts expected by
+///      the instruction.
+///   2. The accounts match the expected accounts in the instruction, i.e., their
+///      `Address` matches the address in the `AccountMeta`.
+///   3. The borrow state of the accounts is compatible with the mutability of the
+///      accounts in the instruction.
+///
+/// # Safety
+///
+/// This function is unsafe because it does not check that the stack allocated account
+/// storage `MAX_ACCOUNTS` is sufficient for the number of accounts expected by the
+/// instruction. Using a value of `MAX_ACCOUNTS` that is less than the number of accounts
+/// expected by the instruction will result in undefined behavior.
+#[inline(always)]
+unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],

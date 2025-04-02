@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -12,14 +12,14 @@ use pinocchio::{
 ///   1. `[SIGNER]` Base account
 pub struct AssignWithSeed<'a, 'b, 'c> {
     /// Allocated account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Base account.
     ///
     /// The account matching the base `Address` below must be provided as
     /// a signer, but may be the same as the funding account and provided
     /// as account 0.
-    pub base: &'a AccountInfo,
+    pub base: &'a AccountView,
 
     /// String of ASCII chars, no longer than [`solana_address::MAX_SEED_LEN`].
     pub seed: &'b str,
