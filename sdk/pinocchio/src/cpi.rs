@@ -3,11 +3,11 @@
 use core::{mem::MaybeUninit, ops::Deref};
 
 use crate::{
-    account_info::AccountInfo,
     instruction::{Account, AccountMeta, Instruction, Signer},
     program_error::ProgramError,
     ProgramResult,
 };
+use solana_account_view::AccountView;
 use solana_address::Address;
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.
@@ -60,19 +60,19 @@ impl<'a> From<&Instruction<'a, '_, '_, '_>> for CInstruction<'a> {
 #[inline(always)]
 pub fn invoke<const ACCOUNTS: usize>(
     instruction: &Instruction,
-    account_infos: &[&AccountInfo; ACCOUNTS],
+    account_infos: &[&AccountView; ACCOUNTS],
 ) -> ProgramResult {
     invoke_signed(instruction, account_infos, &[])
 }
 
-/// Invoke a cross-program instruction from a slice of `AccountInfo`s.
+/// Invoke a cross-program instruction from a slice of `AccountView`s.
 ///
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
 /// `accounts` field of the `instruction`.
 #[inline(always)]
-pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
+pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountView]) -> ProgramResult {
     slice_invoke_signed(instruction, account_infos, &[])
 }
 
@@ -84,7 +84,7 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 /// `accounts` field of the `instruction`.
 pub fn invoke_signed<const ACCOUNTS: usize>(
     instruction: &Instruction,
-    account_infos: &[&AccountInfo; ACCOUNTS],
+    account_infos: &[&AccountView; ACCOUNTS],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
     if instruction.accounts.len() < ACCOUNTS {
@@ -125,7 +125,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 }
 
 /// Invoke a cross-program instruction with signatures from a slice of
-/// `AccountInfo`s.
+/// `AccountView`s.
 ///
 /// # Important
 ///
@@ -133,7 +133,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 /// `accounts` field of the `instruction`.
 pub fn slice_invoke_signed(
     instruction: &Instruction,
-    account_infos: &[&AccountInfo],
+    account_infos: &[&AccountView],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
     if instruction.accounts.len() < account_infos.len() {

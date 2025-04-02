@@ -22,6 +22,7 @@ pinocchio-pubkey = { path = "sdk/pubkey", version = "0.2" }
 pinocchio-log-macro = { version = "0.4", path = "sdk/log/macro" }
 quote = "1.0"
 regex = "1"
+solana-account-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "account-view" }
 solana-address = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-address" }
 syn = "1.0"
 

@@ -2,7 +2,7 @@
 
 use core::{marker::PhantomData, ops::Deref};
 
-use crate::account_info::AccountInfo;
+use solana_account_view::AccountView;
 use solana_address::Address;
 
 /// Information about a CPI instruction.
@@ -35,7 +35,7 @@ pub struct ProcessedSiblingInstruction {
 
 /// An `Account` for CPI invocations.
 ///
-/// This struct contains the same information as an [`AccountInfo`], but has
+/// This struct contains the same information as an [`AccountView`], but has
 /// the memory layout as expected by `sol_invoke_signed_c` syscall.
 #[repr(C)]
 #[derive(Clone)]
@@ -67,34 +67,32 @@ pub struct Account<'a> {
     // This account's data contains a loaded program (and is now read-only).
     executable: bool,
 
-    /// The pointers to the `AccountInfo` data are only valid for as long as the
-    /// `&'a AccountInfo` lives. Instead of holding a reference to the actual `AccountInfo`,
+    /// The pointers to the `AccountView` data are only valid for as long as the
+    /// `&'a AccountView` lives. Instead of holding a reference to the actual `AccountView`,
     /// which would increase the size of the type, we claim to hold a reference without
-    /// actually holding one using a `PhantomData<&'a AccountInfo>`.
-    _account_info: PhantomData<&'a AccountInfo>,
+    /// actually holding one using a `PhantomData<&'a AccountView>`.
+    _account_info: PhantomData<&'a AccountView>,
 }
 
-#[inline(always)]
-const fn offset<T, U>(ptr: *const T, offset: usize) -> *const U {
-    unsafe { (ptr as *const u8).add(offset) as *const U }
-}
-
-impl<'a> From<&'a AccountInfo> for Account<'a> {
-    fn from(account: &'a AccountInfo) -> Self {
+impl<'a> From<&'a AccountView> for Account<'a> {
+    fn from(account: &'a AccountView) -> Self {
         Account {
-            key: offset(account.raw, 8),
-            lamports: offset(account.raw, 72),
+            key: account.key(),
+            lamports: &account.lamports(),
             data_len: account.data_len() as u64,
-            data: offset(account.raw, 88),
-            owner: offset(account.raw, 40),
-            // The `rent_epoch` field is not present in the `AccountInfo` struct,
+            // SAFETY: The caller ensures that the `AccountView` data is not mutably
+            // borrowed, so that the data pointer is valid.
+            data: unsafe { account.data_ptr() },
+            // SAFETY: The caller ensures that the `AccountView` owner is valid.
+            owner: unsafe { account.owner() },
+            // The `rent_epoch` field is not present in the `AccountView` struct,
             // since the value occurs after the variable data of the account in
             // the runtime input data.
             rent_epoch: 0,
             is_signer: account.is_signer(),
             is_writable: account.is_writable(),
             executable: account.executable(),
-            _account_info: PhantomData::<&'a AccountInfo>,
+            _account_info: PhantomData::<&'a AccountView>,
         }
     }
 }
@@ -159,8 +157,8 @@ impl<'a> AccountMeta<'a> {
     }
 }
 
-impl<'a> From<&'a AccountInfo> for AccountMeta<'a> {
-    fn from(account: &'a crate::account_info::AccountInfo) -> Self {
+impl<'a> From<&'a AccountView> for AccountMeta<'a> {
+    fn from(account: &'a AccountView) -> Self {
         AccountMeta::new(account.key(), account.is_writable(), account.is_signer())
     }
 }

@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -11,7 +11,7 @@ use pinocchio::{
 ///   0. `[WRITE, SIGNER]` New account
 pub struct Allocate<'a> {
     /// Account to be assigned.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Number of bytes of memory to allocate.
     pub space: u64,
