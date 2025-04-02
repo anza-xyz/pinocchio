@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     ProgramResult,
@@ -12,7 +12,7 @@ use pinocchio::{
 ///   0. `[WRITE]` Nonce account
 pub struct UpgradeNonceAccount<'a> {
     /// Nonce account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 }
 
 impl UpgradeNonceAccount<'_> {

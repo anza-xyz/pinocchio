@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -17,11 +17,11 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   2. `[SIGNER]` Authority account
 pub struct Transfer<'a> {
     /// Sender account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
     /// Authority account.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Amount of micro-tokens to transfer.
     pub amount: u64,
 }

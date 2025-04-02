@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -11,7 +11,7 @@ use pinocchio::{
 ///   0. `[WRITE, SIGNER]` Assigned account address
 pub struct Assign<'a, 'b> {
     /// Account to be assigned.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Program account to assign as owner.
     pub owner: &'b Address,

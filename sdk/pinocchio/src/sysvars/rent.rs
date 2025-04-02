@@ -117,7 +117,7 @@ impl Rent {
     /// no mutable borrows of the account data.
     #[inline]
     pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+        account_info: &AccountView,
     ) -> Result<&Self, ProgramError> {
         if unlikely(account_info.key() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);

@@ -2,7 +2,7 @@ use core::slice::from_raw_parts;
 
 use crate::{write_bytes, UNINIT_BYTE};
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -16,11 +16,11 @@ use pinocchio::{
 ///   2. `[SIGNER]` The account's owner/delegate.
 pub struct BurnChecked<'a> {
     /// Source of the Burn Account
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Account
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Owner of the Token Account
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Amount
     pub amount: u64,
     /// Decimals
