@@ -27,7 +27,7 @@ pub struct InitializeMint<'a> {
     pub auditor_elgamal_pubkey: Option<&'a ElagamalPubkey>,
 }
 
-impl<'a> InitializeMint<'a> {
+impl InitializeMint<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -40,26 +40,29 @@ impl<'a> InitializeMint<'a> {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: extension instruction discriminator (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 1];
-
+        // -  [2]: auto_approve_new_accounts (1 byte, u8)
+        // -  [3..35]: authority (32 bytes, Pubkey)
+        let mut instruction_data = [UNINIT_BYTE; 35];
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[0]);
+        write_bytes(&mut instruction_data, &[27]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[0]);
         // Set auto_approve_new_accounts as u8 at offset [1]
         write_bytes(
-            &mut instruction_data[1..2],
+            &mut instruction_data[2..3],
             &[self.auto_approve_new_accounts as u8],
         );
 
         if let Some(authority) = self.authority {
-            write_bytes(&mut instruction_data[2..34], authority);
+            write_bytes(&mut instruction_data[3..35], authority);
         } else {
-            write_bytes(&mut instruction_data[2..34], &Pubkey::default());
+            write_bytes(&mut instruction_data[3..35], &Pubkey::default());
         }
 
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 1) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 35) },
         };
 
         invoke_signed(&instruction, &[self.mint], signers)
@@ -78,7 +81,7 @@ pub struct UpdateMint<'a> {
     pub auditor_elgamal_pubkey: Option<&'a ElagamalPubkey>,
 }
 
-impl<'a> UpdateMint<'a> {
+impl UpdateMint<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -90,18 +93,21 @@ impl<'a> UpdateMint<'a> {
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
+        // -  [1]: extension instruction discriminator (1 byte, u8)
         // -  [1..33]: mint_authority (32 bytes, Pubkey)
-        let mut instruction_data = [UNINIT_BYTE; 33];
+        let mut instruction_data = [UNINIT_BYTE; 34];
 
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[27]);
+        // Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[1..2], &[1]);
         // Set mint_authority as Pubkey at offset [1..33]
-        write_bytes(&mut instruction_data[1..33], self.mint_authority);
+        write_bytes(&mut instruction_data[2..34], self.mint_authority);
 
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 34) },
         };
 
         invoke_signed(&instruction, &[self.mint], signers)

@@ -4,8 +4,9 @@ use crate::TOKEN_2022_PROGRAM_ID;
 
 use super::{get_extension_from_bytes, BaseState, Extension, ExtensionType};
 
+/// State for Metadata for a token
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
-/// Metadata for a token
 pub struct TokenMetadata<'s> {
     /// The authority that can sign to update the metadata
     pub update_authority: Pubkey,

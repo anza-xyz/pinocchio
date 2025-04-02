@@ -5,11 +5,14 @@ use crate::{
 pub mod confidential_transfer;
 pub mod cpi_guard;
 pub mod default_account_state;
+pub mod immutable_owner;
 pub mod interest_bearing_mint;
 pub mod memo_transfer;
 pub mod metadata;
 pub mod metadata_pointer;
 pub mod mint_close_authority;
+pub mod non_transferable;
+pub mod pausable;
 pub mod permanent_delegate;
 pub mod transfer_fee;
 
@@ -161,6 +164,7 @@ pub fn get_extension_from_bytes<T: Extension + Clone + Copy>(acc_data_bytes: &[u
             .try_into()
             .ok()?;
         let ext_type = ExtensionType::from_bytes(ext_type)?;
+        println!("ext_type: {:?}", ext_type);
         let ext_len: [u8; 2] = ext_bytes[ext_len_idx..ext_len_idx + EXTENSION_LEN]
             .try_into()
             .ok()?;

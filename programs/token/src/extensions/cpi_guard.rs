@@ -1,5 +1,3 @@
-use core::slice::from_raw_parts;
-
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
@@ -7,11 +5,12 @@ use pinocchio::{
     program_error::ProgramError,
 };
 
-use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
+use crate::TOKEN_2022_PROGRAM_ID;
 
 use super::get_extension_from_bytes;
 
 /// State of the CPI guard
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CpiGuard {
     /// Lock privileged token operations from happening via CPI
@@ -53,7 +52,7 @@ pub struct EnableCpiGuard<'a> {
     pub account_owner: &'a AccountInfo,
 }
 
-impl<'a> EnableCpiGuard<'a> {
+impl EnableCpiGuard<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> Result<(), ProgramError> {
         self.invoke_signed(&[])
@@ -67,17 +66,12 @@ impl<'a> EnableCpiGuard<'a> {
 
         // Instruction data Layout:
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1]: enable the CPI guard (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 2];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[34]);
-        // Enable the CPI guard
-        write_bytes(&mut instruction_data[1..2], &[0]);
+        // -  [1]: extension instruction discriminator (1 byte, u8)
 
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: &[34, 0],
         };
 
         invoke_signed(&instruction, &[self.account, self.account_owner], signers)?;
@@ -93,7 +87,7 @@ pub struct DisableCpiGuard<'a> {
     pub account_owner: &'a AccountInfo,
 }
 
-impl<'a> DisableCpiGuard<'a> {
+impl DisableCpiGuard<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> Result<(), ProgramError> {
         self.invoke_signed(&[])
@@ -108,16 +102,11 @@ impl<'a> DisableCpiGuard<'a> {
         // Instruction data Layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: extension instruction discriminator (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 2];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[34]);
-        // Disable the CPI guard
-        write_bytes(&mut instruction_data[1..2], &[1]);
 
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: &[34, 1],
         };
 
         invoke_signed(&instruction, &[self.account, self.account_owner], signers)?;

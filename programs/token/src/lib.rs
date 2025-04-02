@@ -1,4 +1,4 @@
-#![no_std]
+// #![no_std]
 
 pub mod extensions;
 pub mod instructions;

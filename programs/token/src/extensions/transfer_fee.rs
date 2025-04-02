@@ -26,8 +26,7 @@ pub struct TransferFee {
     pub transfer_fee_basis_points: [u8; 2],
 }
 
-/// State
-
+/// State of the transfer fee configuration
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TransferFeeConfig {
@@ -73,8 +72,7 @@ impl TransferFeeConfig {
     }
 }
 
-/// Instructions
-
+// Instructions
 /// Initialize the transfer fee configuration for a mint.
 pub struct InitializeTransferFeeConfig<'a> {
     // Mint account
@@ -90,7 +88,7 @@ pub struct InitializeTransferFeeConfig<'a> {
     pub maximum_fee: u64,
 }
 
-impl<'a> InitializeTransferFeeConfig<'a> {
+impl InitializeTransferFeeConfig<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -111,13 +109,12 @@ impl<'a> InitializeTransferFeeConfig<'a> {
         let mut instruction_data = [UNINIT_BYTE; 116];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[27]);
+        write_bytes(&mut instruction_data, &[26]);
         // Set extension discriminator as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[0]);
         // Set mint as Pubkey at offset [1..33]
         write_bytes(&mut instruction_data[2..34], self.mint.key().as_ref());
         // Set transfer_fee_config_authority COption at offset [33..37]
-        let mut offset = 34;
         if let Some(transfer_fee_config_authority) = self.transfer_fee_config_authority {
             write_bytes(&mut instruction_data[34..38], &[1, 0, 0, 0]);
             write_bytes(
@@ -128,21 +125,28 @@ impl<'a> InitializeTransferFeeConfig<'a> {
             write_bytes(&mut instruction_data[34..38], &[0, 0, 0, 0]);
             write_bytes(&mut instruction_data[38..70], &Pubkey::default());
         }
-        offset += 36;
 
         if let Some(withdraw_withheld_authority) = self.withdraw_withheld_authority {
-            write_bytes(&mut instruction_data[offset..offset + 4], &[1, 0, 0, 0]);
+            write_bytes(&mut instruction_data[70..74], &[1, 0, 0, 0]);
             write_bytes(
-                &mut instruction_data[(offset + 4)..(offset + 4 + 32)],
+                &mut instruction_data[74..106],
                 withdraw_withheld_authority.as_ref(),
             );
         } else {
-            write_bytes(&mut instruction_data[offset..offset + 4], &[0, 0, 0, 0]);
-            write_bytes(
-                &mut instruction_data[(offset + 4)..(offset + 4 + 32)],
-                &[0; 32],
-            );
+            write_bytes(&mut instruction_data[70..74], &[0, 0, 0, 0]);
+            write_bytes(&mut instruction_data[74..106], &Pubkey::default());
         }
+
+        // Set transfer_fee_basis_points as u16 at offset [106..108]
+        write_bytes(
+            &mut instruction_data[106..108],
+            &self.transfer_fee_basis_points.to_le_bytes(),
+        );
+        // Set maximum_fee as u64 at offset [108..116]
+        write_bytes(
+            &mut instruction_data[108..116],
+            &self.maximum_fee.to_le_bytes(),
+        );
 
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
@@ -155,7 +159,6 @@ impl<'a> InitializeTransferFeeConfig<'a> {
 }
 
 /// Transfer tokens from one account to another, with a fee.
-
 pub struct TransferCheckedWithFee<'a> {
     /// Source account
     pub source: &'a AccountInfo,
@@ -175,7 +178,7 @@ pub struct TransferCheckedWithFee<'a> {
     pub fee: u64,
 }
 
-impl<'a> TransferCheckedWithFee<'a> {
+impl TransferCheckedWithFee<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -199,14 +202,14 @@ impl<'a> TransferCheckedWithFee<'a> {
         let mut instruction_data = [UNINIT_BYTE; 19];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[28]);
+        write_bytes(&mut instruction_data[0..1], &[26]);
         // Set extension discriminator as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[1]);
-        // Set amount as u64 at offset [1..9]
+        // Set amount as u64 at offset [2..10]
         write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
-        // Set decimals as u8 at offset [9]
+        // Set decimals as u8 at offset [10]
         write_bytes(&mut instruction_data[10..11], &[self.decimals]);
-        // Set fee as u64 at offset [10..18]
+        // Set fee as u64 at offset [11..19]
         write_bytes(&mut instruction_data[11..19], &self.fee.to_le_bytes());
 
         let instruction = Instruction {
@@ -233,7 +236,7 @@ pub struct WithdrawWithheldTokensFromMint<'a> {
     pub withraw_withheld_authority: &'a AccountInfo,
 }
 
-impl<'a> WithdrawWithheldTokensFromMint<'a> {
+impl WithdrawWithheldTokensFromMint<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -250,17 +253,11 @@ impl<'a> WithdrawWithheldTokensFromMint<'a> {
         // Instruction data layout:
         // -  [0]: instruction discriminator
         // -  [1]: extension instruction discriminator
-        let mut instruction_data = [UNINIT_BYTE; 2];
-
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[29]);
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[1..2], &[2]);
 
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: &[26, 2],
         };
 
         invoke_signed(
@@ -287,7 +284,7 @@ pub struct WithdrawWithheldTokensFromAccounts<'a, const ACCOUNTS_LEN: usize> {
     pub source_accounts: &'a [&'a AccountInfo],
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> WithdrawWithheldTokensFromAccounts<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> WithdrawWithheldTokensFromAccounts<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         if 3 + self.source_accounts.len() != ACCOUNTS_LEN {
@@ -318,11 +315,6 @@ impl<'a, const ACCOUNTS_LEN: usize> WithdrawWithheldTokensFromAccounts<'a, ACCOU
         // Instruction data layout:
         // -  [0]: instruction discriminator
         // -  [1]: extension instruction discriminator
-        let mut instruction_data = [UNINIT_BYTE; 2];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[30]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[3]);
 
         let acc_metas = unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, ACCOUNTS_LEN)
@@ -331,7 +323,7 @@ impl<'a, const ACCOUNTS_LEN: usize> WithdrawWithheldTokensFromAccounts<'a, ACCOU
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: acc_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: &[26, 3],
         };
 
         const UNINIT_ACC_INFOS: MaybeUninit<&AccountInfo> = MaybeUninit::<&AccountInfo>::uninit();
@@ -364,7 +356,7 @@ pub struct HarvestWithheldTokensToMint<'a, const ACCOUNTS_LEN: usize> {
     source_accounts: &'a [&'a AccountInfo],
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> HarvestWithheldTokensToMint<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> HarvestWithheldTokensToMint<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         if 1 + self.source_accounts.len() != ACCOUNTS_LEN {
@@ -391,12 +383,6 @@ impl<'a, const ACCOUNTS_LEN: usize> HarvestWithheldTokensToMint<'a, ACCOUNTS_LEN
         // Instruction data layout:
         // -  [0]: instruction discriminator
         // -  [1]: extension instruction discriminator
-        let mut instruction_data = [UNINIT_BYTE; 2];
-
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[31]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[4]);
 
         let acc_metas = unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, ACCOUNTS_LEN)
@@ -405,7 +391,7 @@ impl<'a, const ACCOUNTS_LEN: usize> HarvestWithheldTokensToMint<'a, ACCOUNTS_LEN
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: acc_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: &[26, 4],
         };
 
         const UNINIT_ACC_INFOS: MaybeUninit<&AccountInfo> = MaybeUninit::<&AccountInfo>::uninit();
@@ -441,7 +427,7 @@ pub struct SetTransferFee<'a> {
     pub maximum_fee: u64,
 }
 
-impl<'a> SetTransferFee<'a> {
+impl SetTransferFee<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -462,7 +448,7 @@ impl<'a> SetTransferFee<'a> {
         let mut instruction_data = [UNINIT_BYTE; 12];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[32]);
+        write_bytes(&mut instruction_data[0..1], &[26]);
         // Set extension discriminator as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[5]);
         // Set transfer_fee_basis_points as u16 at offset [2..4]

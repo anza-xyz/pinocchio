@@ -12,6 +12,7 @@ use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 use super::get_extension_from_bytes;
 
 /// State of the mint close authority
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MintCloseAuthority {
     /// Optional authority to close the mint
@@ -55,7 +56,7 @@ pub struct InitializeMintCloseAuthority<'a> {
     pub close_authority: Option<Pubkey>,
 }
 
-impl<'a> InitializeMintCloseAuthority<'a> {
+impl InitializeMintCloseAuthority<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

@@ -12,6 +12,7 @@ use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 use super::get_extension_from_bytes;
 
 /// State of the permanent delegate
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PermanentDelegate {
     /// Optional permanent delegate for transferring or burning tokens

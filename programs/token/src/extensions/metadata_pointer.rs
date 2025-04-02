@@ -12,6 +12,7 @@ use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 use super::get_extension_from_bytes;
 
 /// State of the metadata pointer
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetadataPointer {
     /// Authority that can set the metadata address
@@ -47,8 +48,7 @@ impl MetadataPointer {
     }
 }
 
-/// Instructions
-
+// Instructions
 pub struct Initialize<'a> {
     /// The mint that this metadata pointer is associated with
     pub mint: &'a AccountInfo,
@@ -58,7 +58,7 @@ pub struct Initialize<'a> {
     pub metadata_address: Option<Pubkey>,
 }
 
-impl<'a> Initialize<'a> {
+impl Initialize<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -109,7 +109,7 @@ pub struct Update<'a> {
     pub new_metadata_address: Option<Pubkey>,
 }
 
-impl<'a> Update<'a> {
+impl Update<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

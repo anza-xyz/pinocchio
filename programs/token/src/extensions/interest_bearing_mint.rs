@@ -12,6 +12,7 @@ use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 use super::get_extension_from_bytes;
 
 /// State for an interest-bearing token
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InterestBearingConfig {
     /// Authority that can set the interest rate and authority
@@ -55,8 +56,7 @@ impl InterestBearingConfig {
     }
 }
 
-/// Instructions
-
+// Instructions
 pub struct Initialize<'a> {
     /// The mint to initialize as interest-bearing
     pub mint: &'a AccountInfo,
@@ -66,7 +66,7 @@ pub struct Initialize<'a> {
     pub rate: u16,
 }
 
-impl<'a> Initialize<'a> {
+impl Initialize<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -109,7 +109,7 @@ pub struct Update<'a> {
     pub new_rate: u16,
 }
 
-impl<'a> Update<'a> {
+impl Update<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

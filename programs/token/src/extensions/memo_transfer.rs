@@ -1,5 +1,3 @@
-use core::slice::from_raw_parts;
-
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
@@ -7,11 +5,12 @@ use pinocchio::{
     program_error::ProgramError,
 };
 
-use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
+use crate::TOKEN_2022_PROGRAM_ID;
 
 use super::get_extension_from_bytes;
 
 /// State of the memo transfer extension
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MemoTransfer {
     /// Require transfers into this account to be accompanied by a memo
@@ -54,7 +53,7 @@ pub struct EnableMemoTransfer<'a> {
     pub account_owner: &'a AccountInfo,
 }
 
-impl<'a> EnableMemoTransfer<'a> {
+impl EnableMemoTransfer<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> Result<(), ProgramError> {
         self.invoke_signed(&[])
@@ -70,16 +69,11 @@ impl<'a> EnableMemoTransfer<'a> {
         // Instruction data Layout
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: enable incoming transfer memos (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 2];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[30]);
-        // Enable incoming transfer memos
-        write_bytes(&mut instruction_data[1..2], &[0]);
 
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: &[30, 0],
         };
 
         invoke_signed(&instruction, &[self.account], signers)
@@ -93,7 +87,7 @@ pub struct DisableMemoTransfer<'a> {
     pub account_owner: &'a AccountInfo,
 }
 
-impl<'a> DisableMemoTransfer<'a> {
+impl DisableMemoTransfer<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> Result<(), ProgramError> {
         self.invoke_signed(&[])
@@ -109,16 +103,11 @@ impl<'a> DisableMemoTransfer<'a> {
         // instruction data
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: disable incoming transfer memos (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 2];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[30]);
-        // Disable incoming transfer memos
-        write_bytes(&mut instruction_data[1..2], &[1]);
 
         let instruction = Instruction {
             program_id: &crate::TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 1) },
+            data: &[30, 1],
         };
 
         invoke_signed(&instruction, &[self.account, self.account_owner], signers)

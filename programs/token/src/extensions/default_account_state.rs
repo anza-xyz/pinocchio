@@ -1,5 +1,3 @@
-use core::slice::from_raw_parts;
-
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
@@ -8,11 +6,12 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::{state::AccountState, write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
+use crate::{state::AccountState, TOKEN_2022_PROGRAM_ID};
 
 use super::{get_extension_from_bytes, Extension};
 
 /// State of the default account state
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DefaultAccountState {
     pub state: AccountState,
@@ -54,7 +53,7 @@ pub struct InitializeDefaultAccountState<'a> {
     pub state: u8,
 }
 
-impl<'a> InitializeDefaultAccountState<'a> {
+impl InitializeDefaultAccountState<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -68,18 +67,11 @@ impl<'a> InitializeDefaultAccountState<'a> {
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: extension instruction discriminator (1 byte, u8)
         // -  [2]: state (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 3];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[28]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[0]);
-        // Set state as u8
-        write_bytes(&mut instruction_data[2..3], &[self.state]);
 
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 3) },
+            data: &[28, 0, self.state],
         };
 
         invoke_signed(&instruction, &[self.mint], signers)
@@ -95,7 +87,7 @@ pub struct UpdateDefaultAccountState<'a> {
     pub new_state: u8,
 }
 
-impl<'a> UpdateDefaultAccountState<'a> {
+impl UpdateDefaultAccountState<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -112,18 +104,11 @@ impl<'a> UpdateDefaultAccountState<'a> {
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: extension instruction discriminator (1 byte, u8)
         // -  [2]: new state (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 3];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[28]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[0]);
-        // Set new state as u8
-        write_bytes(&mut instruction_data[2..3], &[self.new_state]);
 
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 3) },
+            data: &[28, 1, self.new_state],
         };
 
         invoke_signed(
