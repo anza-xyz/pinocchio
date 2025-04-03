@@ -13,3 +13,6 @@ crate-type = ["rlib"]
 [dependencies]
 pinocchio = { workspace = true }
 pinocchio-pubkey = { workspace = true }
+
+[features]
+std = []

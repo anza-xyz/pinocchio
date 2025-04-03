@@ -11,7 +11,7 @@ use super::get_extension_from_bytes;
 
 /// State of the CPI guard
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct CpiGuard {
     /// Lock privileged token operations from happening via CPI
     pub lock_cpi: bool,
