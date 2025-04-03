@@ -98,7 +98,7 @@ impl Extension for TokenGroupMember {
     const BASE_STATE: BaseState = BaseState::Mint;
 }
 
-/// Instructions
+// Instructions
 
 pub struct InitializeGroup<'a> {
     /// The group to be initialized
@@ -113,7 +113,7 @@ pub struct InitializeGroup<'a> {
     pub max_size: u64,
 }
 
-impl<'a> InitializeGroup<'a> {
+impl InitializeGroup<'_> {
     const LEN: usize = 48;
     const DISCRIMINATOR: [u8; 8] = [121, 113, 108, 39, 54, 51, 0, 4];
 
@@ -168,7 +168,7 @@ pub struct UpdateGroupMaxSize<'a> {
     pub max_size: u64,
 }
 
-impl<'a> UpdateGroupMaxSize<'a> {
+impl UpdateGroupMaxSize<'_> {
     const LEN: usize = 16;
     const DISCRIMINATOR: [u8; 8] = [108, 37, 171, 143, 248, 30, 18, 110];
 
@@ -210,7 +210,7 @@ pub struct UpdateGroupAuthority<'a> {
     pub new_authority: Option<Pubkey>,
 }
 
-impl<'a> UpdateGroupAuthority<'a> {
+impl UpdateGroupAuthority<'_> {
     const LEN: usize = 40;
     const DISCRIMINATOR: [u8; 8] = [161, 105, 88, 1, 237, 221, 216, 203];
 
@@ -260,7 +260,7 @@ pub struct InitializeMember<'a> {
     pub member_mint_authority: &'a AccountInfo,
 }
 
-impl<'a> InitializeMember<'a> {
+impl InitializeMember<'_> {
     const LEN: usize = 8;
     const DISCRIMINATOR: [u8; 8] = [152, 32, 222, 176, 223, 237, 116, 134];
 

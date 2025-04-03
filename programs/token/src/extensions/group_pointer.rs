@@ -56,7 +56,7 @@ pub struct Initialize<'a> {
     pub group_address: Option<Pubkey>,
 }
 
-impl<'a> Initialize<'a> {
+impl Initialize<'_> {
     const LEN: usize = 66;
 
     #[inline(always)]
@@ -109,7 +109,7 @@ pub struct Update<'a> {
     pub group_address: Option<Pubkey>,
 }
 
-impl<'a> Update<'a> {
+impl Update<'_> {
     const LEN: usize = 34;
 
     #[inline(always)]
