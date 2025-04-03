@@ -1,4 +1,7 @@
-// #![no_std]
+#![no_std]
+
+#[cfg(feature = "std")]
+extern crate std;
 
 pub mod extensions;
 pub mod instructions;
