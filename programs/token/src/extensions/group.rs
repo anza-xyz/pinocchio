@@ -13,7 +13,6 @@ use super::{get_extension_from_bytes, BaseState, Extension, ExtensionType};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TokenGroup {
-    pub _discriminator: [u8; 8],
     /// The authority that can sign to update the group
     /// NOTE: Default Pubkey is equivalent to None.
     pub update_authority: Pubkey,
@@ -29,9 +28,6 @@ pub struct TokenGroup {
 impl TokenGroup {
     /// The length of the `TokenGroup` account data inlcuding the discriminator.
     pub const LEN: usize = core::mem::size_of::<TokenGroup>();
-
-    // Discriminator for the TokenGroup state.
-    // const DISCRIMINATOR: [u8; 8] = [214, 15, 63, 132, 49, 119, 209, 40];
 
     /// Return a `TokenGroup` from the given account info.
     ///
@@ -58,7 +54,6 @@ impl Extension for TokenGroup {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TokenGroupMember {
-    pub _discriminator: [u8; 8],
     /// The associated mint, used to counter spoofing to be sure that member
     /// belongs to a particular mint
     pub mint: Pubkey,
@@ -71,9 +66,6 @@ pub struct TokenGroupMember {
 impl TokenGroupMember {
     /// The length of the `TokenGroupMember` account data inlcuding the discriminator.
     pub const LEN: usize = core::mem::size_of::<TokenGroupMember>();
-
-    // Discriminator for the TokenGroupMember state
-    // const DISCRIMINATOR: [u8; 8] = [254, 50, 168, 134, 88, 126, 100, 186];
 
     /// Return a `TokenGroupMember` from the given account info.
     ///
