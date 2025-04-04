@@ -5,7 +5,7 @@ use crate::{
 pub mod confidential_transfer;
 pub mod cpi_guard;
 pub mod default_account_state;
-pub mod token_group;
+pub mod group_member_pointer;
 pub mod group_pointer;
 pub mod immutable_owner;
 pub mod interest_bearing_mint;
@@ -17,6 +17,7 @@ pub mod mint_close_authority;
 pub mod non_transferable;
 pub mod pausable;
 pub mod permanent_delegate;
+pub mod token_group;
 pub mod transfer_fee;
 
 pub const ELGAMAL_PUBKEY_LEN: usize = 32;
@@ -219,15 +220,12 @@ pub fn get_extension_data_bytes_for_variable_pack<T: Extension + Clone>(
 }
 #[cfg(test)]
 mod tests {
-    use pinocchio::pubkey::Pubkey;
-
     use crate::extensions::{
-        get_extension_from_bytes, token_group::TokenGroup, group_pointer::GroupPointer,
-        metadata_pointer::MetadataPointer, mint_close_authority::MintCloseAuthority,
-        permanent_delegate::PermanentDelegate, transfer_fee::TransferFeeConfig,
+        get_extension_from_bytes, group_member_pointer::GroupMemberPointer,
+        group_pointer::GroupPointer, metadata_pointer::MetadataPointer,
+        mint_close_authority::MintCloseAuthority, permanent_delegate::PermanentDelegate,
+        token_group::TokenGroup, transfer_fee::TransferFeeConfig,
     };
-
-    const TMP: Pubkey = [2u8; 32];
 
     pub const TEST_MINT_WITH_EXTENSIONS_SLICE: &[u8] = &[
         1, 0, 0, 0, 221, 76, 72, 108, 144, 248, 182, 240, 7, 195, 4, 239, 36, 129, 248, 5, 24, 107,
@@ -288,6 +286,19 @@ mod tests {
         1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
         2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
     ];
+    pub const TEST_GROUP_MEMBER_MINT_SLICE: &[u8] = &[
+        1, 0, 0, 0, 221, 76, 72, 108, 144, 248, 182, 240, 7, 195, 4, 239, 36, 129, 248, 5, 24, 107,
+        232, 253, 95, 82, 172, 209, 2, 92, 183, 155, 159, 103, 255, 33, 133, 204, 6, 44, 35, 140,
+        0, 0, 6, 1, 1, 0, 0, 0, 23, 133, 50, 97, 239, 106, 184, 83, 42, 103, 240, 83, 134, 90, 173,
+        49, 41, 63, 207, 7, 207, 18, 10, 181, 185, 161, 87, 6, 84, 141, 192, 43, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        /*                  GroupMemberPointer Extension                                      */
+        22, 0, 64, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2,
+    ];
 
     #[test]
     fn test_transfer_fee_config() {
@@ -337,6 +348,17 @@ mod tests {
             assert!(tg.mint.eq(&[2u8; 32]));
             assert_eq!(u64::from_le_bytes(tg.size), 1);
             assert_eq!(u64::from_le_bytes(tg.max_size), 2);
+        });
+    }
+
+    #[test]
+    fn test_group_member_pointer() {
+        let group_member_pointer =
+            get_extension_from_bytes::<GroupMemberPointer>(&TEST_GROUP_MEMBER_MINT_SLICE);
+        assert!(group_member_pointer.is_some());
+        group_member_pointer.map(|gmp| {
+            assert!(gmp.authority.eq(&[1u8; 32]));
+            assert!(gmp.member_address.eq(&[2u8; 32]));
         });
     }
 
