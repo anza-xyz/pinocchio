@@ -5,7 +5,7 @@ use crate::{
 pub mod confidential_transfer;
 pub mod cpi_guard;
 pub mod default_account_state;
-pub mod group;
+pub mod token_group;
 pub mod group_pointer;
 pub mod immutable_owner;
 pub mod interest_bearing_mint;
@@ -222,7 +222,7 @@ mod tests {
     use pinocchio::pubkey::Pubkey;
 
     use crate::extensions::{
-        get_extension_from_bytes, group::TokenGroup, group_pointer::GroupPointer,
+        get_extension_from_bytes, token_group::TokenGroup, group_pointer::GroupPointer,
         metadata_pointer::MetadataPointer, mint_close_authority::MintCloseAuthority,
         permanent_delegate::PermanentDelegate, transfer_fee::TransferFeeConfig,
     };
