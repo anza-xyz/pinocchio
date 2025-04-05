@@ -10,13 +10,9 @@ use pinocchio::{
 
 use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 
-use super::ElagamalPubkey;
+use super::{get_extension_from_bytes, Extension};
 
-// Define necessary types locally to avoid external dependencies
-pub const POD_AE_CIPHERTEXT_LEN: usize = 36;
-
-/// Local definition mirroring spl_token_confidential_transfer::pod::PodElGamalCiphertext
-pub const POD_ELGAMAL_CIPHERTEXT_LEN: usize = 64;
+use super::{ElagamalPubkey, PodAeCiphertext, PodElGamalCiphertext, POD_AE_CIPHERTEXT_LEN, POD_ELGAMAL_CIPHERTEXT_LEN};
 
 /// Local definition mirroring spl_token_confidential_transfer::pod::PodElGamalCiphertext
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
@@ -30,6 +26,117 @@ pub struct PodAeCiphertext(pub [u8; POD_AE_CIPHERTEXT_LEN]);
 
 /// Alias for clarity, mirroring spl_token_confidential_transfer::instruction::DecryptableBalance
 pub type DecryptableBalance = PodAeCiphertext;
+/// Alias for clarity, mirroring spl_token_confidential_transfer::state::EncryptedBalance
+pub type EncryptedBalance = PodElGamalCiphertext;
+
+// State Structs and Extension Implementations
+
+/// Confidential transfer mint configuration state mirroring SPL definition.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ConfidentialTransferMintState {
+    /// Authority to modify the `ConfidentialTransferMint` configuration and to
+    /// approve new accounts (if `auto_approve_new_accounts` is true)
+    pub authority: Pubkey, // Simplified from OptionalNonZeroPubkey
+
+    /// Indicate if newly configured accounts must be approved by the
+    /// `authority` before they may be used by the user.
+    pub auto_approve_new_accounts: u8, // Simplified from PodBool
+
+    /// Authority to decode any transfer amount in a confidential transfer.
+    pub auditor_elgamal_pubkey: ElagamalPubkey, // Simplified from OptionalNonZeroElGamalPubkey
+}
+
+impl Extension for ConfidentialTransferMintState {
+    const TYPE: super::ExtensionType = super::ExtensionType::ConfidentialTransferMint;
+    const LEN: usize = std::mem::size_of::<Self>(); // Should be 65 bytes
+    const BASE_STATE: super::BaseState = super::BaseState::Mint;
+}
+
+impl ConfidentialTransferMintState {
+     /// The length of the `ConfidentialTransferMintState` data.
+     pub const LEN: usize = std::mem::size_of::<ConfidentialTransferMintState>();
+
+    /// Return a `ConfidentialTransferMintState` from the given Mint account info.
+    #[inline(always)]
+    pub fn from_account_info(
+        account_info: &AccountInfo,
+    ) -> Result<Self, ProgramError> {
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
+            return Err(ProgramError::InvalidAccountOwner);
+        }
+
+        let acc_data_bytes = account_info.try_borrow_data()?;
+
+        get_extension_from_bytes::<Self>(&acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
+    }
+}
+
+/// Confidential account state mirroring SPL definition.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ConfidentialTransferAccountState {
+    /// `true` if this account has been approved for use.
+    pub approved: u8, // Simplified from PodBool
+
+    /// The public key associated with ElGamal encryption
+    pub elgamal_pubkey: ElagamalPubkey,
+
+    /// The low 16 bits of the pending balance (encrypted by `elgamal_pubkey`)
+    pub pending_balance_lo: EncryptedBalance,
+
+    /// The high 48 bits of the pending balance (encrypted by `elgamal_pubkey`)
+    pub pending_balance_hi: EncryptedBalance,
+
+    /// The available balance (encrypted by `elgamal_pubkey`)
+    pub available_balance: EncryptedBalance,
+
+    /// The decryptable available balance
+    pub decryptable_available_balance: DecryptableBalance,
+
+    /// If `false`, the extended account rejects any incoming confidential transfers
+    pub allow_confidential_credits: u8, // Simplified from PodBool
+
+    /// If `false`, the base account rejects any incoming transfers
+    pub allow_non_confidential_credits: u8, // Simplified from PodBool
+
+    /// The total number of credits (`Deposit` or `Transfer`) to `pending_balance`
+    pub pending_balance_credit_counter: u64, // Simplified from PodU64
+
+    /// The maximum number of credits before `ApplyPendingBalance` is required
+    pub maximum_pending_balance_credit_counter: u64, // Simplified from PodU64
+
+    /// The `expected_pending_balance_credit_counter` from the last `ApplyPendingBalance`
+    pub expected_pending_balance_credit_counter: u64, // Simplified from PodU64
+
+    /// The actual `pending_balance_credit_counter` during the last `ApplyPendingBalance`
+    pub actual_pending_balance_credit_counter: u64, // Simplified from PodU64
+}
+
+impl Extension for ConfidentialTransferAccountState {
+    const TYPE: super::ExtensionType = super::ExtensionType::ConfidentialTransferAccount;
+     const LEN: usize = std::mem::size_of::<Self>(); // Should be 295 bytes
+    const BASE_STATE: super::BaseState = super::BaseState::TokenAccount;
+}
+
+impl ConfidentialTransferAccountState {
+     /// The length of the `ConfidentialTransferAccountState` data.
+     pub const LEN: usize = std::mem::size_of::<ConfidentialTransferAccountState>();
+
+    /// Return a `ConfidentialTransferAccountState` from the given Token account info.
+    #[inline(always)]
+    pub fn from_account_info(
+        account_info: &AccountInfo,
+    ) -> Result<Self, ProgramError> {
+        if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
+            return Err(ProgramError::InvalidAccountOwner);
+        }
+
+        let acc_data_bytes = account_info.try_borrow_data()?;
+
+        get_extension_from_bytes::<Self>(&acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
+    }
+}
 
 // Instructions
 
@@ -1128,26 +1235,27 @@ impl Transfer<'_> {
 
         write_bytes(&mut instruction_data[0..1], &[27]); // Main discriminator
         write_bytes(&mut instruction_data[1..2], &[7]); // Transfer discriminator
+
         write_bytes(
             &mut instruction_data[balance_start..balance_end],
             &self.new_source_decryptable_available_balance.0,
-        ); // Source balance ciphertext bytes
+        );
         write_bytes(
             &mut instruction_data[eq_offset_start..eq_offset_start + 1],
             &[self.equality_proof_instruction_offset as u8],
-        ); // Equality offset
+        );
         write_bytes(
             &mut instruction_data[valid_offset_start..valid_offset_start + 1],
             &[self.transfer_amount_ciphertext_validity_proof_instruction_offset as u8],
-        ); // Validity offset
+        );
         write_bytes(
             &mut instruction_data[send_offset_start..send_offset_start + 1],
             &[self.sender_range_proof_instruction_offset as u8],
-        ); // Sender range offset
+        );
         write_bytes(
             &mut instruction_data[recip_offset_start..recip_offset_start + 1],
             &[self.recipient_range_proof_instruction_offset as u8],
-        ); // Recipient range offset
+        );
 
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
