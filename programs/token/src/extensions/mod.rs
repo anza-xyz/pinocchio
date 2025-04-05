@@ -333,22 +333,20 @@ mod tests {
         let group_pointer =
             get_extension_from_bytes::<GroupPointer>(&TEST_MINT_WITH_EXTENSIONS_SLICE);
         assert!(group_pointer.is_some());
-        group_pointer.map(|gp| {
-            assert!(gp.authority.eq(&[1u8; 32]));
-            assert!(gp.group_address.eq(&[2u8; 32]));
-        });
+        let gp = group_pointer.unwrap();
+        assert!(gp.authority.eq(&[1u8; 32]));
+        assert!(gp.group_address.eq(&[2u8; 32]));
     }
 
     #[test]
     fn test_token_group() {
         let token_group = get_extension_from_bytes::<TokenGroup>(&TEST_MINT_WITH_EXTENSIONS_SLICE);
         assert!(token_group.is_some());
-        token_group.map(|tg| {
-            assert!(tg.update_authority.eq(&[1u8; 32]));
-            assert!(tg.mint.eq(&[2u8; 32]));
-            assert_eq!(u64::from_le_bytes(tg.size), 1);
-            assert_eq!(u64::from_le_bytes(tg.max_size), 2);
-        });
+        let tg = token_group.unwrap();
+        assert!(tg.update_authority.eq(&[1u8; 32]));
+        assert!(tg.mint.eq(&[2u8; 32]));
+        assert_eq!(u64::from_le_bytes(tg.size), 1);
+        assert_eq!(u64::from_le_bytes(tg.max_size), 2);
     }
 
     #[test]
@@ -356,10 +354,9 @@ mod tests {
         let group_member_pointer =
             get_extension_from_bytes::<GroupMemberPointer>(&TEST_GROUP_MEMBER_MINT_SLICE);
         assert!(group_member_pointer.is_some());
-        group_member_pointer.map(|gmp| {
-            assert!(gmp.authority.eq(&[1u8; 32]));
-            assert!(gmp.member_address.eq(&[2u8; 32]));
-        });
+        let gmp = group_member_pointer.unwrap();
+        assert!(gmp.authority.eq(&[1u8; 32]));
+        assert!(gmp.member_address.eq(&[2u8; 32]));
     }
 
     #[cfg(feature = "std")]

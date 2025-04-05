@@ -107,7 +107,6 @@ pub struct InitializeGroup<'a> {
 }
 
 impl InitializeGroup<'_> {
-    const LEN: usize = 48;
     const DISCRIMINATOR: [u8; 8] = [121, 113, 108, 39, 54, 51, 0, 4];
 
     #[inline(always)]
@@ -120,7 +119,7 @@ impl InitializeGroup<'_> {
         // -  [0..8] [u8; 8]: instruction discriminator
         // -  [8..40] Pubkey: update_authority
         // -  [40..48] u64: max_size
-        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        let mut instruction_data = [UNINIT_BYTE; 48];
         // Set 8-byte discriminator [0..8]
         write_bytes(&mut instruction_data[0..8], &Self::DISCRIMINATOR);
         // Set update_authority as u8 at offset [8..40]
@@ -141,7 +140,7 @@ impl InitializeGroup<'_> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 48) },
         };
 
         invoke_signed(
@@ -162,7 +161,6 @@ pub struct UpdateGroupMaxSize<'a> {
 }
 
 impl UpdateGroupMaxSize<'_> {
-    const LEN: usize = 16;
     const DISCRIMINATOR: [u8; 8] = [108, 37, 171, 143, 248, 30, 18, 110];
 
     #[inline(always)]
@@ -174,7 +172,7 @@ impl UpdateGroupMaxSize<'_> {
         // Instruction data layout:
         // -  [0..8] [u8; 8]: instruction discriminator
         // -  [8..16] u8: max_size
-        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        let mut instruction_data = [UNINIT_BYTE; 16];
         // Set 8-byte discriminator [0..8]
         write_bytes(&mut instruction_data[0..8], &Self::DISCRIMINATOR);
         // Set max_size as u8 at offset [8..16]
@@ -187,7 +185,7 @@ impl UpdateGroupMaxSize<'_> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 16) },
         };
 
         invoke_signed(&instruction, &[self.group, self.update_authority], signers)
@@ -204,7 +202,6 @@ pub struct UpdateGroupAuthority<'a> {
 }
 
 impl UpdateGroupAuthority<'_> {
-    const LEN: usize = 40;
     const DISCRIMINATOR: [u8; 8] = [161, 105, 88, 1, 237, 221, 216, 203];
 
     #[inline(always)]
@@ -216,7 +213,7 @@ impl UpdateGroupAuthority<'_> {
         // Instruction data layout:
         // -  [0..8] [u8; 8]: instruction discriminator
         // -  [8..40] Pubkey: new authority
-        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        let mut instruction_data = [UNINIT_BYTE; 40];
         // Set 8-byte discriminator [0..8]
         write_bytes(&mut instruction_data[0..8], &Self::DISCRIMINATOR);
         // Set update_authority as u8 at offset [8..40]
@@ -233,7 +230,7 @@ impl UpdateGroupAuthority<'_> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 40) },
         };
 
         invoke_signed(&instruction, &[self.group, self.current_authority], signers)
@@ -254,7 +251,6 @@ pub struct InitializeMember<'a> {
 }
 
 impl InitializeMember<'_> {
-    const LEN: usize = 8;
     const DISCRIMINATOR: [u8; 8] = [152, 32, 222, 176, 223, 237, 116, 134];
 
     #[inline(always)]
@@ -265,7 +261,7 @@ impl InitializeMember<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data layout:
         // -  [0..8] [u8; 8]: instruction discriminator
-        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        let mut instruction_data = [UNINIT_BYTE; 8];
         // Set 8-byte discriminator [0..8]
         write_bytes(&mut instruction_data[0..8], &Self::DISCRIMINATOR);
 
@@ -280,7 +276,7 @@ impl InitializeMember<'_> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 8) },
         };
 
         invoke_signed(

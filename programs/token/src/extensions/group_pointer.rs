@@ -57,8 +57,6 @@ pub struct Initialize<'a> {
 }
 
 impl Initialize<'_> {
-    const LEN: usize = 66;
-
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -70,7 +68,7 @@ impl Initialize<'_> {
         // -  [1] u8: extension instruction discriminator
         // -  [2..34] u8: authority
         // -  [34..66] u8: group_address
-        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        let mut instruction_data = [UNINIT_BYTE; 66];
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data[0..1], &[40]);
         // Set extension discriminator as u8 at offset [1]
@@ -93,7 +91,7 @@ impl Initialize<'_> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 66) },
         };
 
         invoke_signed(&instruction, &[self.mint], signers)
@@ -110,8 +108,6 @@ pub struct Update<'a> {
 }
 
 impl Update<'_> {
-    const LEN: usize = 34;
-
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -122,7 +118,7 @@ impl Update<'_> {
         // -  [0] u8: instruction discriminator
         // -  [1] u8: extension instruction discriminator
         // -  [2..34] u8: group_address
-        let mut instruction_data = [UNINIT_BYTE; Self::LEN];
+        let mut instruction_data = [UNINIT_BYTE; 34];
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data[0..1], &[40]);
         // Set extension discriminator as u8 at offset [1]
@@ -142,7 +138,7 @@ impl Update<'_> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, Self::LEN) },
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 34) },
         };
 
         invoke_signed(&instruction, &[self.mint, self.authority], signers)
