@@ -22,6 +22,9 @@ pub mod transfer_fee;
 
 pub const ELGAMAL_PUBKEY_LEN: usize = 32;
 
+pub const POD_AE_CIPHERTEXT_LEN: usize = 36;
+pub const POD_ELGAMAL_CIPHERTEXT_LEN: usize = 64;
+
 pub struct ElagamalPubkey(pub [u8; ELGAMAL_PUBKEY_LEN]);
 
 pub const EXTENSIONS_PADDING: usize = 83;
