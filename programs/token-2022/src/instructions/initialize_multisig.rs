@@ -1,12 +1,9 @@
 use core::{mem::MaybeUninit, slice};
 
-use pinocchio::{
-    account::AccountView,
-    cpi::invoke_with_bounds,
-    error::ProgramError,
-    instruction::{AccountMeta, Instruction},
-    Address, ProgramResult,
-};
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{cpi::invoke_with_bounds, AccountRole, InstructionView};
+use solana_program_error::{ProgramError, ProgramResult};
 
 /// Maximum number of multisignature signers.
 pub const MAX_MULTISIG_SIGNERS: usize = 11;
@@ -53,7 +50,7 @@ impl InitializeMultisig<'_, '_, '_> {
         let num_accounts = 2 + signers.len();
 
         // Account metadata
-        const UNINIT_META: MaybeUninit<AccountMeta> = MaybeUninit::<AccountMeta>::uninit();
+        const UNINIT_META: MaybeUninit<AccountRole> = MaybeUninit::<AccountRole>::uninit();
         let mut acc_metas = [UNINIT_META; 2 + MAX_MULTISIG_SIGNERS];
 
         unsafe {
@@ -62,14 +59,14 @@ impl InitializeMultisig<'_, '_, '_> {
             // - Index 0 and 1 are always present
             acc_metas
                 .get_unchecked_mut(0)
-                .write(AccountMeta::writable(multisig.address()));
+                .write(AccountRole::writable(multisig.address()));
             acc_metas
                 .get_unchecked_mut(1)
-                .write(AccountMeta::readonly(rent_sysvar.address()));
+                .write(AccountRole::readonly(rent_sysvar.address()));
         }
 
         for (account_meta, signer) in acc_metas[2..].iter_mut().zip(signers.iter()) {
-            account_meta.write(AccountMeta::readonly(signer.address()));
+            account_meta.write(AccountRole::readonly(signer.address()));
         }
 
         // Instruction data layout:
@@ -77,7 +74,7 @@ impl InitializeMultisig<'_, '_, '_> {
         // -  [1]: m (1 byte, u8)
         let data = &[2, m];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: token_program,
             accounts: unsafe { slice::from_raw_parts(acc_metas.as_ptr() as _, num_accounts) },
             data,

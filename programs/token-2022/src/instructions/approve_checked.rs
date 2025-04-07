@@ -1,11 +1,12 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    Address, ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountRole, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -42,11 +43,11 @@ impl ApproveChecked<'_, '_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Account metadata
-        let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.source.address()),
-            AccountMeta::readonly(self.mint.address()),
-            AccountMeta::readonly(self.delegate.address()),
-            AccountMeta::readonly_signer(self.authority.address()),
+        let account_metas: [AccountRole; 4] = [
+            AccountRole::writable(self.source.address()),
+            AccountRole::readonly(self.mint.address()),
+            AccountRole::readonly(self.delegate.address()),
+            AccountRole::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data
@@ -62,7 +63,7 @@ impl ApproveChecked<'_, '_> {
         // Set decimals as u8 at offset [9]
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: self.token_program,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },

@@ -21,9 +21,6 @@ use crate::{
     account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
-use solana_address::Address;
-
-use crate::{BPF_ALIGN_OF_U128, NON_DUP_MARKER};
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;

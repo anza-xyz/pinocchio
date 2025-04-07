@@ -1,11 +1,9 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account::AccountView,
-    cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    Address, ProgramResult,
-};
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{cpi::invoke, AccountRole, InstructionView};
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -33,9 +31,9 @@ impl InitializeMint<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.mint.address()),
-            AccountMeta::readonly(self.rent_sysvar.address()),
+        let account_metas: [AccountRole; 2] = [
+            AccountRole::writable(self.mint.address()),
+            AccountRole::readonly(self.rent_sysvar.address()),
         ];
 
         // Instruction data layout:
@@ -65,7 +63,7 @@ impl InitializeMint<'_, '_> {
             length = 35;
         }
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: self.token_program,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },

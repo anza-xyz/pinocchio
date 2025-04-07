@@ -1,13 +1,12 @@
 use core::{marker::PhantomData, mem::size_of, ops::Deref};
-use solana_address::{Address, ADDRESS_BYTES};
 
 use crate::{
     account::{AccountView, Ref},
-    address::{Address, ADDRESS_BYTES},
+    address::ADDRESS_BYTES,
     error::ProgramError,
-    instruction::AccountMeta,
+    instruction::AccountRole,
+    Address,
 };
-use core::{marker::PhantomData, mem::size_of, ops::Deref};
 
 /// Instructions sysvar ID `Sysvar1nstructions1111111111111111111111111`.
 pub const INSTRUCTIONS_ID: Address = Address::new_from_array([
@@ -146,9 +145,9 @@ impl IntrospectedInstruction<'_> {
     /// performs the necessary index verification. However, to optimize performance for users
     /// who are sure that the index is in bounds, we have exposed it as an unsafe function.
     #[inline(always)]
-    pub unsafe fn get_account_meta_at_unchecked(&self, index: usize) -> &IntrospectedAccountMeta {
-        let offset = core::mem::size_of::<u16>() + (index * IntrospectedAccountMeta::LEN);
-        &*(self.raw.add(offset) as *const IntrospectedAccountMeta)
+    pub unsafe fn get_account_meta_at_unchecked(&self, index: usize) -> &IntrospectedAccountRole {
+        let offset = core::mem::size_of::<u16>() + (index * IntrospectedAccountRole::LEN);
+        &*(self.raw.add(offset) as *const IntrospectedAccountRole)
     }
 
     /// Get the account meta at the specified index.
@@ -160,7 +159,7 @@ impl IntrospectedInstruction<'_> {
     pub fn get_account_meta_at(
         &self,
         index: usize,
-    ) -> Result<&IntrospectedAccountMeta, ProgramError> {
+    ) -> Result<&IntrospectedAccountRole, ProgramError> {
         // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
         let num_accounts = u16::from_le_bytes(unsafe { *(self.raw as *const [u8; 2]) });
 
@@ -181,7 +180,7 @@ impl IntrospectedInstruction<'_> {
         // SAFETY: The program ID is located after the account metas.
         unsafe {
             &*(self.raw.add(
-                size_of::<u16>() + num_accounts as usize * size_of::<IntrospectedAccountMeta>(),
+                size_of::<u16>() + num_accounts as usize * size_of::<IntrospectedAccountRole>(),
             ) as *const Address)
         }
     }
@@ -191,7 +190,7 @@ impl IntrospectedInstruction<'_> {
     pub fn get_instruction_data(&self) -> &[u8] {
         // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
         let offset = u16::from_le_bytes(unsafe { *(self.raw as *const [u8; 2]) }) as usize
-            * size_of::<IntrospectedAccountMeta>()
+            * size_of::<IntrospectedAccountRole>()
             + ADDRESS_BYTES;
 
         // SAFETY: The instruction data length is located after the program ID.
@@ -209,16 +208,16 @@ impl IntrospectedInstruction<'_> {
     }
 }
 
-/// The bit positions for the signer flags in the `AccountMeta`.
+/// The bit positions for the signer flags in the `AccountRole`.
 const IS_SIGNER: u8 = 0b00000001;
 
-/// The bit positions for the writable flags in the `AccountMeta`.
+/// The bit positions for the writable flags in the `AccountRole`.
 const IS_WRITABLE: u8 = 0b00000010;
 
 #[repr(C)]
 #[cfg_attr(feature = "copy", derive(Copy))]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IntrospectedAccountMeta {
+pub struct IntrospectedAccountRole {
     /// Account flags:
     ///   * bit `0`: signer
     ///   * bit `1`: writable
@@ -228,7 +227,7 @@ pub struct IntrospectedAccountMeta {
     pub key: Address,
 }
 
-impl IntrospectedAccountMeta {
+impl IntrospectedAccountRole {
     const LEN: usize = core::mem::size_of::<Self>();
 
     /// Indicate whether the account is writable or not.
@@ -243,9 +242,9 @@ impl IntrospectedAccountMeta {
         (self.flags & IS_SIGNER) != 0
     }
 
-    /// Convert the `IntrospectedAccountMeta` to an `AccountMeta`.
+    /// Convert the `IntrospectedAccountRole` to an `AccountRole`.
     #[inline(always)]
-    pub fn to_account_meta(&self) -> AccountMeta {
-        AccountMeta::new(&self.key, self.is_writable(), self.is_signer())
+    pub fn to_account_role(&self) -> AccountRole {
+        AccountRole::new(&self.key, self.is_writable(), self.is_signer())
     }
 }

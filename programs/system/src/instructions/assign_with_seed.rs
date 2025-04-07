@@ -1,9 +1,10 @@
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    Address, ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountRole, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Assign account to a program based on a seed.
 ///
@@ -37,9 +38,9 @@ impl AssignWithSeed<'_, '_, '_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly_signer(self.base.address()),
+        let account_metas: [AccountRole; 2] = [
+            AccountRole::writable(self.account.address()),
+            AccountRole::readonly_signer(self.base.address()),
         ];
 
         // instruction data
@@ -57,7 +58,7 @@ impl AssignWithSeed<'_, '_, '_> {
         instruction_data[44..offset].copy_from_slice(self.seed.as_bytes());
         instruction_data[offset..offset + 32].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data[..offset + 32],
