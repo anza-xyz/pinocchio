@@ -228,7 +228,6 @@ extern crate std;
 
 pub mod entrypoint;
 pub mod log;
-pub mod memory;
 pub mod syscalls;
 pub mod sysvars;
 
