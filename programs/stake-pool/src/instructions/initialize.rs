@@ -4,7 +4,6 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::{find_program_address, Pubkey},
     ProgramResult,
 };
 
@@ -52,10 +51,6 @@ pub struct Initialize<'a> {
     pub deposit_authority: Option<&'a AccountInfo>,
 
     /// input
-    /// Amount.
-    pub amount: u64,
-    /// Deposit Authority Pubkey(Optional)
-    pub deposit_authority_key: Option<&'a Pubkey>,
     /// Fee.
     pub fee: Fee,
     /// Withdrawal Fee.
@@ -68,20 +63,6 @@ pub struct Initialize<'a> {
     pub max_validators: u32,
 }
 
-/// Seed for deposit authority seed
-const AUTHORITY_DEPOSIT: &[u8] = b"deposit";
-
-/// Generates the deposit authority program address for the stake pool
-pub fn find_deposit_authority_program_address(
-    program_id: &Pubkey,
-    stake_pool_address: &Pubkey,
-) -> (Pubkey, u8) {
-    find_program_address(
-        &[stake_pool_address.as_ref(), AUTHORITY_DEPOSIT],
-        program_id,
-    )
-}
-
 impl Initialize<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -89,111 +70,121 @@ impl Initialize<'_> {
     }
 
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        let deposit_authority: Pubkey;
-
-        if let Some(info) = self.deposit_authority {
-            deposit_authority = *info.key();
-        } else {
-            deposit_authority =
-                find_deposit_authority_program_address(&crate::ID, &self.stake_pool.key()).0;
-        }
-
         // Account metadata
-        let account_metas: [AccountMeta; 10] = [
-            AccountMeta::writable(self.stake_pool.key()),
-            AccountMeta::readonly_signer(self.manager.key()),
-            AccountMeta::readonly(self.staker.key()),
-            AccountMeta::readonly(self.stake_pool_withdraw_authority.key()),
-            AccountMeta::writable(self.validator_list.key()),
-            AccountMeta::readonly(self.reserve_stake.key()),
-            AccountMeta::readonly(self.pool_mint.key()),
-            AccountMeta::readonly(self.manager_pool_account.key()),
-            AccountMeta::readonly(self.token_program.key()),
-            AccountMeta::readonly(&deposit_authority),
-        ];
+        let account_metas: &[AccountMeta] = if let Some(deposit_info) = self.deposit_authority {
+            &[
+                AccountMeta::writable(self.stake_pool.key()),
+                AccountMeta::readonly_signer(self.manager.key()),
+                AccountMeta::readonly(self.staker.key()),
+                AccountMeta::readonly(self.stake_pool_withdraw_authority.key()),
+                AccountMeta::writable(self.validator_list.key()),
+                AccountMeta::readonly(self.reserve_stake.key()),
+                AccountMeta::readonly(self.pool_mint.key()),
+                AccountMeta::readonly(self.manager_pool_account.key()),
+                AccountMeta::readonly(self.token_program.key()),
+                AccountMeta::readonly(deposit_info.key()),
+            ]
+        } else {
+            &[
+                AccountMeta::writable(self.stake_pool.key()),
+                AccountMeta::readonly_signer(self.manager.key()),
+                AccountMeta::readonly(self.staker.key()),
+                AccountMeta::readonly(self.stake_pool_withdraw_authority.key()),
+                AccountMeta::writable(self.validator_list.key()),
+                AccountMeta::readonly(self.reserve_stake.key()),
+                AccountMeta::readonly(self.pool_mint.key()),
+                AccountMeta::readonly(self.manager_pool_account.key()),
+                AccountMeta::readonly(self.token_program.key()),
+            ]
+        };
 
-        // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..9]: amount (8 bytes, u64)
-        // -  [9]: deposit_authority_key presence flag (1 byte, u8)
-        // -  [10..42]: deposit_authority_key  (optional, 32 bytes, Pubkey)
-        // -  [42..58]: fee (16 bytes, Fee(u64, u64))
-        // -  [58..74]: withdrawal_fee (16 bytes, Fee(u64, u64))
-        // -  [74..90]: deposit_fee (16 bytes, Fee(u64, u64))
-        // -  [90]: referral_fee (1 byte, u8)
-        // -  [91..95]: max_validators (4 bytes, u32)
-        let mut instruction_data = [UNINIT_BYTE; 95];
+        // -  [1..17]: fee (16 bytes, Fee(u64, u64))
+        // -  [17..33]: withdrawal_fee (16 bytes, Fee(u64, u64))
+        // -  [33..49]: deposit_fee (16 bytes, Fee(u64, u64))
+        // -  [49]: referral_fee (1 byte, u8)
+        // -  [50..54] max_validators (4 bytes, u32)
+        let mut instruction_data = [UNINIT_BYTE; 54];
 
         // Set discriminator as u8 at offet [0]
         write_bytes(&mut instruction_data, &[0]);
-        // Set amount as u64 at offset [1]
-        write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
-        // Set COption & deposit_authority_key at offset [9..42]
-        if let Some(deposit_auth) = self.deposit_authority_key {
-            write_bytes(&mut instruction_data[9..10], &[1]);
-            write_bytes(&mut instruction_data[10..42], deposit_auth);
-        } else {
-            write_bytes(&mut instruction_data[9..10], &[0]);
-        }
-        // Set fee.denominator as u64 at offset [42..50]
+        // Set fee.denominator as u64 at offset [1..9]
         write_bytes(
-            &mut instruction_data[42..50],
+            &mut instruction_data[1..9],
             &self.fee.denominator.to_le_bytes(),
         );
-        // Set fee.numerator as u64 at offset [42..58]
+        // Set fee.numerator as u64 at offset [9..17]
         write_bytes(
-            &mut instruction_data[50..58],
+            &mut instruction_data[9..17],
             &self.fee.numerator.to_le_bytes(),
         );
-        // Set withdrawal_fee.denominator as u64 at offset [58..66]
+        // Set withdrawal_fee.denominator as u64 at offset [17..25]
         write_bytes(
-            &mut instruction_data[58..66],
+            &mut instruction_data[17..25],
             &self.withdrawal_fee.denominator.to_le_bytes(),
         );
-        // Set withdrawal_fee.numerator as u64 at offset [66..74]
+        // Set withdrawal_fee.numerator as u64 at offset [25..33]
         write_bytes(
-            &mut instruction_data[66..74],
+            &mut instruction_data[25..33],
             &self.withdrawal_fee.numerator.to_le_bytes(),
         );
-        // Set deposit_fee.denominator as u64 at offset [74..82]
+        // Set deposit_fee.denominator as u64 at offset [33..41]
         write_bytes(
-            &mut instruction_data[74..82],
+            &mut instruction_data[33..41],
             &self.deposit_fee.denominator.to_le_bytes(),
         );
-        // Set deposit_fee.numerator as u64 at offset [82..90]
+        // Set deposit_fee.numerator as u64 at offset [41..49]
         write_bytes(
-            &mut instruction_data[82..90],
+            &mut instruction_data[41..49],
             &self.deposit_fee.numerator.to_le_bytes(),
         );
-        // Set referral_fee as u8 at offset [90]
-        write_bytes(&mut instruction_data[90..91], &[self.referral_fee]);
-        // Set max_validators as u32 at offet [91..95]
+        // Set referral_fee as u8 at offset [49]
+        write_bytes(&mut instruction_data[49..50], &[self.referral_fee]);
+        // Set max_validators as u32 at offet [50..54]
         write_bytes(
-            &mut instruction_data[91..95],
+            &mut instruction_data[50..54],
             &self.max_validators.to_le_bytes(),
         );
 
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 95) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 56) },
         };
 
-        invoke_signed(
-            &instruction,
-            &[
-                self.stake_pool,
-                self.manager,
-                self.staker,
-                self.stake_pool_withdraw_authority,
-                self.validator_list,
-                self.reserve_stake,
-                self.pool_mint,
-                self.manager_pool_account,
-                self.token_program,
-                // self.deposit_authority.unwrap_or(),
-            ],
-            signers,
-        )
+        if let Some(deposit_info) = self.deposit_authority {
+            invoke_signed(
+                &instruction,
+                &[
+                    self.stake_pool,
+                    self.manager,
+                    self.staker,
+                    self.stake_pool_withdraw_authority,
+                    self.validator_list,
+                    self.reserve_stake,
+                    self.pool_mint,
+                    self.manager_pool_account,
+                    self.token_program,
+                    deposit_info,
+                ],
+                signers,
+            )
+        } else {
+            invoke_signed(
+                &instruction,
+                &[
+                    self.stake_pool,
+                    self.manager,
+                    self.staker,
+                    self.stake_pool_withdraw_authority,
+                    self.validator_list,
+                    self.reserve_stake,
+                    self.pool_mint,
+                    self.manager_pool_account,
+                    self.token_program,
+                ],
+                signers,
+            )
+        }
     }
 }
