@@ -74,7 +74,7 @@ impl<'a> CreateAccount<'a> {
         instruction_data[12..20].copy_from_slice(&self.space.to_le_bytes());
         instruction_data[20..52].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data,

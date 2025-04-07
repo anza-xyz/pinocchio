@@ -1,9 +1,9 @@
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountMeta, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Creates an associated token account for the given wallet address and token mint.
 /// Returns an error if the account exists.
@@ -53,7 +53,7 @@ impl Create<'_> {
 
         let instruction_data = [0u8];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data,

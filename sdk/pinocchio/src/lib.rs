@@ -223,15 +223,9 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-pub mod cpi;
 pub mod entrypoint;
-pub mod instruction;
 pub mod log;
 pub mod memory;
-#[deprecated(since = "0.8.0", note = "Use the `cpi` module instead")]
-pub mod program {
-    pub use crate::cpi::*;
-}
 pub mod syscalls;
 pub mod sysvars;
 

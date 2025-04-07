@@ -71,7 +71,7 @@ impl SetAuthority<'_> {
             length = 3;
         }
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },

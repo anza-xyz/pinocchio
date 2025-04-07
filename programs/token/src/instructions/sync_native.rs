@@ -22,7 +22,7 @@ impl SyncNative<'_> {
         // account metadata
         let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.native_token.address())];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &[17],
