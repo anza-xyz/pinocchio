@@ -190,10 +190,10 @@ name = "solana-account-view"
 <<<<<<< HEAD
 =======
 version = "0.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=instruction-view#ede330efc009fcb39b28fc3a09a974d5614279cb"
 dependencies = [
- "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=account-view)",
- "solana-define-syscall 2.2.1 (git+https://github.com/febo/solana-sdk.git?branch=account-view)",
+ "solana-address",
+ "solana-define-syscall",
  "solana-program-error",
 ]
 
@@ -245,7 +245,7 @@ dependencies = [
 ]
 =======
 version = "2.2.1"
-source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=instruction-view#ede330efc009fcb39b28fc3a09a974d5614279cb"
 
 [[package]]
 name = "solana-define-syscall"
