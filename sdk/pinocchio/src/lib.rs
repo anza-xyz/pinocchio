@@ -1,13 +1,16 @@
 //! # Pinocchio
 //!
-//! Pinocchio is a zero-dependency library to create Solana programs in Rust.
-//! It takes advantage of the way SVM loaders serialize the program input parameters
-//! into a byte array that is then passed to the program's entrypoint to define
-//! zero-copy types to read the input - these types are defined in an efficient way
-//! taking into consideration that they will be used in on-chain programs.
+//! Pinocchio is a "no-external" dependencies library to create Solana programs
+//! in Rust, which means that the only dependencies are from the Solana SDK. This
+//! reduces the chance of dependency conflicts when compiling the program.
+//!
+//! It takes advantage of the way SVM loaders serialize the program input
+//! parameters into a byte array that is then passed to the program's entrypoint
+//! to use zero-copy types to read the input - these types are defined in an efficient
+//! way taking into consideration that they will be used in on-chain programs.
 //!
 //! It is intended to be used by on-chain programs only; for off-chain programs,
-//! use instead the [`solana-sdk`] crate.
+//! use instead [`solana-sdk`] crates.
 //!
 //! [`solana-sdk`]: https://docs.rs/solana-sdk/latest/solana_sdk/
 //!
@@ -31,10 +34,10 @@
 //! ```ignore
 //! use pinocchio::{
 //!   AccountView,
+//!   Address,
 //!   entrypoint,
 //!   msg,
-//!   ProgramResult,
-//!   Address
+//!   ProgramResult
 //! };
 //!
 //! entrypoint!(process_instruction);
@@ -71,7 +74,7 @@
 //! ### [`lazy_program_entrypoint!`]
 //!
 //! The [`entrypoint!`] macro looks similar to the "standard" one found in
-//! [`solana-program`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html).
+//! [`solana-program-entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html).
 //! It parses the whole input and provides the `program_id`, `accounts` and
 //! `instruction_data` separately. This consumes compute units before the program
 //! begins its execution. In some cases, it is beneficial for a program to have
@@ -137,12 +140,12 @@
 //! ```ignore
 //! use pinocchio::{
 //!   AccountView,
+//!   Address,
 //!   default_panic_handler,
 //!   msg,
 //!   no_allocator,
 //!   program_entrypoint,
-//!   ProgramResult,
-//!   Address
+//!   ProgramResult
 //! };
 //!
 //! program_entrypoint!(process_instruction);
@@ -194,10 +197,10 @@
 //! mod entrypoint {
 //!   use pinocchio::{
 //!     AccountView,
+//!     Address,
 //!     entrypoint,
 //!     msg,
-//!     ProgramResult,
-//!     Address
+//!     ProgramResult
 //!   };
 //!
 //!   entrypoint!(process_instruction);
@@ -223,20 +226,15 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-pub mod cpi;
 pub mod entrypoint;
-pub mod instruction;
 pub mod log;
 pub mod memory;
-#[deprecated(since = "0.8.0", note = "Use the `cpi` module instead")]
-pub mod program {
-    pub use crate::cpi::*;
-}
 pub mod syscalls;
 pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
 pub use entrypoint::lazy as lazy_entrypoint;
+
 // Re-export the `solana_account_view` for downstream use.
 pub use solana_account_view as account_view;
 
@@ -250,6 +248,9 @@ pub use solana_account_view::AccountView;
 // Re-export the `solana_address` for downstream use.
 pub use solana_address as address;
 pub use solana_address::Address;
+
+// Re-export the `solana_instruction_view` for downstream use.
+pub use solana_instruction_view as instruction;
 
 // Re-export the `solana_program_error` for downstream use.
 pub use solana_program_error as error;

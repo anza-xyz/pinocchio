@@ -1,9 +1,6 @@
 //! Syscall functions.
 
-use crate::{
-    instruction::{AccountMeta, ProcessedSiblingInstruction},
-    Address,
-};
+use crate::Address;
 
 #[cfg(target_feature = "static-syscalls")]
 macro_rules! define_syscall {
@@ -63,7 +60,7 @@ define_syscall!(fn sol_invoke_signed_rust(instruction_addr: *const u8, account_v
 define_syscall!(fn sol_set_return_data(data: *const u8, length: u64));
 define_syscall!(fn sol_get_return_data(data: *mut u8, length: u64, program_id: *mut Address) -> u64);
 define_syscall!(fn sol_log_data(data: *const u8, data_len: u64));
-define_syscall!(fn sol_get_processed_sibling_instruction(index: u64, meta: *mut ProcessedSiblingInstruction, program_id: *mut Address, data: *mut u8, accounts: *mut AccountMeta) -> u64);
+define_syscall!(fn sol_get_processed_sibling_instruction(index: u64, meta: *mut u8, program_id: *mut Address, data: *mut u8, accounts: *mut u8) -> u64);
 define_syscall!(fn sol_get_stack_height() -> u64);
 define_syscall!(fn sol_curve_validate_point(curve_id: u64, point_addr: *const u8, result: *mut u8) -> u64);
 define_syscall!(fn sol_curve_group_op(curve_id: u64, group_op: u64, left_input_addr: *const u8, right_input_addr: *const u8, result_point_addr: *mut u8) -> u64);

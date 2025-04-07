@@ -13,6 +13,8 @@ mod test_raw;
 #[cfg(test)]
 mod test_utils;
 
+use core::{mem, ops::Deref, slice::from_raw_parts};
+
 use crate::{
     account::{AccountView, Ref},
     error::ProgramError,
@@ -20,8 +22,7 @@ use crate::{
     sysvars::clock::Slot,
     Address,
 };
-use core::{mem, ops::Deref, slice::from_raw_parts};
-use solana_address::Address;
+
 #[cfg(feature = "std")]
 use std::boxed::Box;
 

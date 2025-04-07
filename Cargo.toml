@@ -25,6 +25,8 @@ quote = "1.0"
 regex = "1"
 solana-account-view = "1.0"
 solana-address = "2.0"
+solana-instruction-view = "1.0"
+solana-program-error = "3.0"
 syn = "1.0"
 
 [workspace.metadata.cli]
