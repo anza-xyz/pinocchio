@@ -1,9 +1,9 @@
-use pinocchio::{
-    account_view::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountMeta, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Allocate space in a (possibly new) account without funding.
 ///
@@ -34,7 +34,7 @@ impl Allocate<'_> {
         instruction_data[0] = 8;
         instruction_data[4..12].copy_from_slice(&self.space.to_le_bytes());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data,

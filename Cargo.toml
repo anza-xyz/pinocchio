@@ -22,8 +22,10 @@ pinocchio-pubkey = { path = "sdk/pubkey", version = "0.2" }
 pinocchio-log-macro = { version = "0.4", path = "sdk/log/macro" }
 quote = "1.0"
 regex = "1"
-solana-account-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "account-view" }
-solana-address = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-address" }
+solana-account-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "instruction-view" }
+solana-address = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "instruction-view" }
+solana-instruction-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "instruction-view" }
+solana-program-error = { version = "2.2.1", git = "https://github.com/kevinheavey/solana-sdk.git", branch = "program-error-pinocchio-compat" }
 syn = "1.0"
 
 [workspace.metadata.cli]
