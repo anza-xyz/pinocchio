@@ -2,14 +2,14 @@
 
 use super::Sysvar;
 use crate::{
-    program_error::ProgramError,
-    sysvars::clock::Slot,
+    program_error::ProgramError, 
+    pubkey::Pubkey, 
+    sysvars::clock::Slot
 };
 
 /// The ID of the slot hashes sysvar.
-pub const SLOT_HASHES_ID: [u8; 43] = [83, 121, 115, 118, 97, 114, 83, 49, 111, 116, 72, 97, 115, 
-    104, 101, 115, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 
-    49, 49, 49, 49, 49, 49, 49];
+pub const SLOT_HASHES_ID: Pubkey = [ 6, 167, 213, 23, 25, 47, 10, 175, 200, 117, 226, 225, 132, 
+    87, 124, 80, 105, 207, 200, 70, 73, 227, 235, 146, 120, 47, 149, 141, 72, 0, 0, 0 ];
 
 /// Hash type used to track slot hashes
 pub type Hash = [u8; 32];
