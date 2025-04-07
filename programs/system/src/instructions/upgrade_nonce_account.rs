@@ -22,7 +22,7 @@ impl UpgradeNonceAccount<'_> {
         let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.account.address())];
 
         // instruction
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &[12, 0, 0, 0],

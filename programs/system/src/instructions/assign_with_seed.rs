@@ -57,7 +57,7 @@ impl AssignWithSeed<'_, '_, '_> {
         instruction_data[44..offset].copy_from_slice(self.seed.as_bytes());
         instruction_data[offset..offset + 32].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data[..offset + 32],

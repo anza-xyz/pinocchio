@@ -42,7 +42,7 @@ impl InitializeAccount3<'_> {
         // Set owner as [u8; 32] at offset [1..33]
         write_bytes(&mut instruction_data[1..], self.owner.as_array());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },

@@ -63,7 +63,7 @@ impl AllocateWithSeed<'_, '_, '_> {
         instruction_data[offset..offset + 8].copy_from_slice(&self.space.to_le_bytes());
         instruction_data[offset + 8..offset + 40].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data[..offset + 40],
