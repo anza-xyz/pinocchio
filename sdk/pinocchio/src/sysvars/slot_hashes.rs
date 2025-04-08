@@ -105,10 +105,9 @@ impl SlotHashesSysvar {
         }
 
         // First 8 bytes are the Slot
-        let slot = u64::from_le_bytes([
-            entry_buf[0], entry_buf[1], entry_buf[2], entry_buf[3],
-            entry_buf[4], entry_buf[5], entry_buf[6], entry_buf[7],
-        ]);
+        let mut slot_bytes = [0u8; SLOT_SIZE];
+        slot_bytes.copy_from_slice(&entry_buf);
+        let slot = u64::from_le_bytes(slot_bytes);
 
         // Next 32 bytes are the hash
         let mut hash = [0u8; HASH_SIZE];
