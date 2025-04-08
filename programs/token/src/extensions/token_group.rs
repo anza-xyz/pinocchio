@@ -52,7 +52,6 @@ impl Extension for TokenGroup {
     const BASE_STATE: BaseState = BaseState::Mint;
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TokenGroupMember {
     /// The associated mint, used to counter spoofing to be sure that member
