@@ -1,8 +1,8 @@
 use crate::{
-    from_bytes,
+    from_bytes_ref,
     state::{Mint, TokenAccount},
 };
-pub mod confidential_transfer;
+// pub mod confidential_transfer;
 pub mod cpi_guard;
 pub mod default_account_state;
 pub mod group_member_pointer;
@@ -153,7 +153,7 @@ pub trait Extension {
     const BASE_STATE: BaseState;
 }
 
-pub fn get_extension_from_bytes<T: Extension + Clone + Copy>(acc_data_bytes: &[u8]) -> Option<T> {
+pub fn get_extension_from_bytes<T: Extension + Clone + Copy>(acc_data_bytes: &[u8]) -> Option<&T> {
     let ext_bytes = match T::BASE_STATE {
         BaseState::Mint => {
             &acc_data_bytes[Mint::LEN + EXTENSIONS_PADDING + EXTENSION_START_OFFSET..]
@@ -178,7 +178,9 @@ pub fn get_extension_from_bytes<T: Extension + Clone + Copy>(acc_data_bytes: &[u
         let ext_len = u16::from_le_bytes(ext_len);
 
         if ext_type == T::TYPE && ext_len as usize == T::LEN {
-            return Some(unsafe { from_bytes(&ext_bytes[ext_data_idx..ext_data_idx + T::LEN]) });
+            return Some(unsafe {
+                from_bytes_ref(&ext_bytes[ext_data_idx..ext_data_idx + T::LEN])
+            });
         }
 
         start = start + EXTENSION_TYPE_LEN + EXTENSION_LENGTH_LEN + ext_len as usize;
