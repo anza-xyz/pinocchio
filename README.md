@@ -68,7 +68,7 @@ If all dependencies are `no_std`, you should append [`nostd_panic_handler!`](htt
 To use the `entrypoint!` macro, use the following in your entrypoint definition:
 ```rust
 use pinocchio::{
-  account_info::AccountInfo,
+  account_view::AccountView,
   entrypoint,
   msg,
   ProgramResult,
@@ -79,7 +79,7 @@ entrypoint!(process_instruction);
 
 pub fn process_instruction(
   program_id: &Address,
-  accounts: &[AccountInfo],
+  accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
   msg!("Hello from my program!");
@@ -147,7 +147,7 @@ When writing programs, it can be useful to make sure the program does not attemp
 To use the `no_allocator!` macro, use the following in your entrypoint definition:
 ```rust
 use pinocchio::{
-  account_info::AccountInfo,
+  account_view::AccountView,
   default_panic_handler,
   msg,
   no_allocator,
@@ -162,7 +162,7 @@ no_allocator!();
 
 pub fn process_instruction(
   program_id: &Address,
-  accounts: &[AccountInfo],
+  accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
   msg!("Hello from `no_std` program!");
@@ -189,7 +189,7 @@ The symbols emitted by the entrypoint macros &mdash; program entrypoint, global 
 #[cfg(feature = "bpf-entrypoint")]
 mod entrypoint {
   use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     entrypoint,
     msg,
     ProgramResult,
@@ -200,7 +200,7 @@ mod entrypoint {
 
   pub fn process_instruction(
     program_id: &Address,
-    accounts: &[AccountInfo],
+    accounts: &[AccountView],
     instruction_data: &[u8],
   ) -> ProgramResult {
     msg!("Hello from my program!");

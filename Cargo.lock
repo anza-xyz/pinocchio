@@ -36,7 +36,8 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 name = "pinocchio"
 version = "0.8.0"
 dependencies = [
- "solana-address",
+ "solana-account-view",
+ "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
  "solana-program-error",
 ]
 
@@ -69,7 +70,7 @@ name = "pinocchio-pubkey"
 version = "0.2.4"
 dependencies = [
  "five8_const",
- "solana-address",
+ "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
 ]
 
 [[package]]
@@ -136,13 +137,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
+name = "solana-account-view"
+version = "0.0.0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
+dependencies = [
+ "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=account-view)",
+ "solana-define-syscall 2.2.1 (git+https://github.com/febo/solana-sdk.git?branch=account-view)",
+ "solana-program-error",
+]
+
+[[package]]
+name = "solana-address"
+version = "0.0.0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
+
+[[package]]
 name = "solana-address"
 version = "0.0.0"
 source = "git+https://github.com/febo/solana-sdk.git?branch=solana-address#626d9c0d25da15cd2b0a53a37edf510d4e5ea430"
 dependencies = [
- "solana-define-syscall",
+ "solana-define-syscall 2.2.1 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
  "solana-program-error",
 ]
+
+[[package]]
+name = "solana-define-syscall"
+version = "2.2.1"
+source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
 
 [[package]]
 name = "solana-define-syscall"

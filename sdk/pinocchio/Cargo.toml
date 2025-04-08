@@ -20,5 +20,6 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 std = ["solana-program-error/std"]
 
 [dependencies]
+solana-account-view = { workspace = true }
 solana-address = { workspace = true, features = ["syscalls"] }
 solana-program-error = { version = "2.2.1", git = "https://github.com/kevinheavey/solana-sdk.git", branch = "program-error-pinocchio-compat" }

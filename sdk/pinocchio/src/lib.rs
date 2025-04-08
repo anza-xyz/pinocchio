@@ -30,7 +30,7 @@
 //! To use the `entrypoint!` macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account_info::AccountInfo,
+//!   AccountView,
 //!   entrypoint,
 //!   msg,
 //!   ProgramResult,
@@ -41,7 +41,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountInfo],
+//!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   msg!("Hello from my program!");
@@ -136,7 +136,7 @@
 //! To use the [`no_allocator!`] macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account_info::AccountInfo,
+//!   AccountView,
 //!   default_panic_handler,
 //!   msg,
 //!   no_allocator,
@@ -151,7 +151,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountInfo],
+//!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   msg!("Hello from `no_std` program!");
@@ -193,7 +193,7 @@
 //! #[cfg(feature = "bpf-entrypoint")]
 //! mod entrypoint {
 //!   use pinocchio::{
-//!     account_info::AccountInfo,
+//!     AccountView,
 //!     entrypoint,
 //!     msg,
 //!     ProgramResult,
@@ -204,7 +204,7 @@
 //!
 //!   pub fn process_instruction(
 //!     program_id: &Address,
-//!     accounts: &[AccountInfo],
+//!     accounts: &[AccountView],
 //!     instruction_data: &[u8],
 //!   ) -> ProgramResult {
 //!     msg!("Hello from my program!");
@@ -223,7 +223,6 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-pub mod account_info;
 pub mod cpi;
 pub mod entrypoint;
 pub mod instruction;
@@ -238,6 +237,8 @@ pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
 pub use entrypoint::lazy as lazy_entrypoint;
+// Re-export the `solana_account_view` type for downstream use.
+pub use solana_account_view as account_view;
 // Re-export the `Address` type for downstream use.
 pub use solana_address::Address;
 pub use solana_program_error as program_error;
@@ -245,7 +246,7 @@ pub use solana_program_error as program_error;
 /// Maximum number of accounts that a transaction may process.
 ///
 /// This value is used to set the maximum number of accounts that a program
-/// is expecting and statically initialize the array of `AccountInfo`.
+/// is expecting and statically initialize the array of `AccountView`.
 ///
 /// This is based on the current [maximum number of accounts] that a transaction
 /// may lock in a block.

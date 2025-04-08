@@ -7,11 +7,10 @@ pub use lazy::{InstructionContext, MaybeAccount};
 #[cfg(target_os = "solana")]
 pub use alloc::BumpAllocator;
 
-use crate::{
-    account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
-    BPF_ALIGN_OF_U128, NON_DUP_MARKER,
-};
+use solana_account_view::{Account, AccountView, MAX_PERMITTED_DATA_INCREASE};
 use solana_address::Address;
+
+use crate::{BPF_ALIGN_OF_U128, NON_DUP_MARKER};
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
@@ -47,7 +46,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// ```ignore
 /// fn process_instruction(
 ///     program_id: &Address,      // Address of the account the program was loaded into
-///     accounts: &[AccountInfo], // All accounts required to process the instruction
+///     accounts: &[AccountView], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
@@ -69,7 +68,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// pub mod entrypoint {
 ///
 ///     use pinocchio::{
-///         account_info::AccountInfo,
+///         AccountView,
 ///         entrypoint,
 ///         msg,
 ///         Address::Address,
@@ -80,7 +79,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 ///
 ///     pub fn process_instruction(
 ///         program_id: &Address,
-///         accounts: &[AccountInfo],
+///         accounts: &[AccountView],
 ///         instruction_data: &[u8],
 ///     ) -> ProgramResult {
 ///         msg!("Hello from my program!");
@@ -115,8 +114,8 @@ macro_rules! program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account_info::AccountInfo> =
-                core::mem::MaybeUninit::<$crate::account_info::AccountInfo>::uninit();
+            const UNINIT: core::mem::MaybeUninit<$crate::account_view::AccountView> =
+                core::mem::MaybeUninit::<$crate::account_view::AccountView>::uninit();
             // Create an array of uninitialized account infos.
             let mut accounts = [UNINIT; $maximum];
 
@@ -124,7 +123,7 @@ macro_rules! program_entrypoint {
                 $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
 
             // Call the program's entrypoint passing `count` account infos; we know that
-            // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
+            // they are initialized so we cast the pointer to a slice of `[AccountView]`.
             match $process_instruction(
                 &program_id,
                 core::slice::from_raw_parts(accounts.as_ptr() as _, count),
@@ -145,7 +144,7 @@ macro_rules! program_entrypoint {
 #[inline(always)]
 pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
     input: *mut u8,
-    accounts: &mut [core::mem::MaybeUninit<AccountInfo>],
+    accounts: &mut [core::mem::MaybeUninit<AccountView>],
 ) -> (&'a Address, usize, &'a [u8]) {
     let mut offset: usize = 0;
 
@@ -158,26 +157,26 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
         let processed = core::cmp::min(total_accounts, MAX_ACCOUNTS);
 
         for i in 0..processed {
-            let account_info: *mut Account = input.add(offset) as *mut _;
+            let account: *mut Account = input.add(offset) as *mut _;
 
-            if (*account_info).borrow_state == NON_DUP_MARKER {
+            if (*account).borrow_state == NON_DUP_MARKER {
                 // repurpose the borrow state to track borrows
-                (*account_info).borrow_state = 0b_0000_0000;
+                (*account).borrow_state = 0b_0000_0000;
 
                 offset += core::mem::size_of::<Account>();
-                offset += (*account_info).data_len as usize;
+                offset += (*account).data_len as usize;
                 offset += MAX_PERMITTED_DATA_INCREASE;
                 offset += (offset as *const u8).align_offset(BPF_ALIGN_OF_U128);
                 offset += core::mem::size_of::<u64>();
 
-                accounts[i].write(AccountInfo { raw: account_info });
+                accounts[i].write(account.into());
             } else {
                 offset += core::mem::size_of::<u64>();
                 // duplicated account – clone the original pointer using `borrow_state` since it represents the
                 // index of the duplicated account passed by the runtime.
                 accounts[i].write(
                     accounts
-                        .get_unchecked((*account_info).borrow_state as usize)
+                        .get_unchecked((*account).borrow_state as usize)
                         .assume_init_ref()
                         .clone(),
                 );
