@@ -1,9 +1,10 @@
-use pinocchio::{
-    account_view::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    Address, ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountMeta, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Assign account to a program
 ///
@@ -34,7 +35,7 @@ impl Assign<'_, '_> {
         instruction_data[0] = 1;
         instruction_data[4..36].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data,

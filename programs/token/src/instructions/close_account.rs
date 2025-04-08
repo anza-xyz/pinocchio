@@ -1,9 +1,9 @@
-use pinocchio::{
-    account_view::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountMeta, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Close an account by transferring all its SOL to the destination account.
 ///
@@ -34,7 +34,7 @@ impl CloseAccount<'_> {
             AccountMeta::readonly_signer(self.authority.key()),
         ];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &[9],

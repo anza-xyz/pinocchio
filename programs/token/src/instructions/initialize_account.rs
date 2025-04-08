@@ -1,9 +1,9 @@
-use pinocchio::{
-    account_view::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountMeta, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Initialize a new Token Account.
 ///
@@ -38,7 +38,7 @@ impl InitializeAccount<'_> {
             AccountMeta::readonly(self.rent_sysvar.key()),
         ];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &[1],

@@ -1,11 +1,12 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_view::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    Address, ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountMeta, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -46,7 +47,7 @@ impl InitializeAccount3<'_> {
         // Set owner as [u8; 32] at offset [1..33]
         write_bytes(&mut instruction_data[1..], self.owner);
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },

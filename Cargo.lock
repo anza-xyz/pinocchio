@@ -37,7 +37,7 @@ name = "pinocchio"
 version = "0.8.0"
 dependencies = [
  "solana-account-view",
- "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
+ "solana-address",
  "solana-program-error",
 ]
 
@@ -45,8 +45,10 @@ dependencies = [
 name = "pinocchio-associated-token-account"
 version = "0.1.1"
 dependencies = [
- "pinocchio",
  "pinocchio-pubkey",
+ "solana-account-view",
+ "solana-instruction-view",
+ "solana-program-error",
 ]
 
 [[package]]
@@ -70,23 +72,29 @@ name = "pinocchio-pubkey"
 version = "0.2.4"
 dependencies = [
  "five8_const",
- "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
+ "solana-address",
 ]
 
 [[package]]
 name = "pinocchio-system"
 version = "0.2.2"
 dependencies = [
- "pinocchio",
  "pinocchio-pubkey",
+ "solana-account-view",
+ "solana-address",
+ "solana-instruction-view",
+ "solana-program-error",
 ]
 
 [[package]]
 name = "pinocchio-token"
 version = "0.3.0"
 dependencies = [
- "pinocchio",
  "pinocchio-pubkey",
+ "solana-account-view",
+ "solana-address",
+ "solana-instruction-view",
+ "solana-program-error",
 ]
 
 [[package]]
@@ -139,41 +147,42 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 [[package]]
 name = "solana-account-view"
 version = "0.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=instruction-view#ede330efc009fcb39b28fc3a09a974d5614279cb"
 dependencies = [
- "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=account-view)",
- "solana-define-syscall 2.2.1 (git+https://github.com/febo/solana-sdk.git?branch=account-view)",
+ "solana-address",
+ "solana-define-syscall",
  "solana-program-error",
 ]
 
 [[package]]
 name = "solana-address"
 version = "0.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
-
-[[package]]
-name = "solana-address"
-version = "0.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=solana-address#626d9c0d25da15cd2b0a53a37edf510d4e5ea430"
+source = "git+https://github.com/febo/solana-sdk.git?branch=instruction-view#ede330efc009fcb39b28fc3a09a974d5614279cb"
 dependencies = [
- "solana-define-syscall 2.2.1 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
+ "solana-define-syscall",
  "solana-program-error",
 ]
 
 [[package]]
 name = "solana-define-syscall"
 version = "2.2.1"
-source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=instruction-view#ede330efc009fcb39b28fc3a09a974d5614279cb"
 
 [[package]]
-name = "solana-define-syscall"
-version = "2.2.1"
-source = "git+https://github.com/febo/solana-sdk.git?branch=solana-address#626d9c0d25da15cd2b0a53a37edf510d4e5ea430"
+name = "solana-instruction-view"
+version = "0.0.0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=instruction-view#ede330efc009fcb39b28fc3a09a974d5614279cb"
+dependencies = [
+ "solana-account-view",
+ "solana-address",
+ "solana-define-syscall",
+ "solana-program-error",
+]
 
 [[package]]
 name = "solana-program-error"
 version = "2.2.1"
-source = "git+https://github.com/kevinheavey/solana-sdk.git?branch=program-error-pinocchio-compat#19430020ac0b45344a22dff070240dec4de818bf"
+source = "git+https://github.com/kevinheavey/solana-sdk.git?branch=program-error-pinocchio-compat#d5cd36e744d2df090b2bc8bb32182a136f4eb24f"
 
 [[package]]
 name = "syn"
