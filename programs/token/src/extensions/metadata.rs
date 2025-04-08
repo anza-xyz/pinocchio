@@ -1,177 +1,134 @@
 use super::{get_extension_data_bytes_for_variable_pack, BaseState, Extension, ExtensionType};
-use crate::std::{
-    convert::TryInto,
-    string::{String, ToString},
-    vec::Vec,
-};
 use crate::TOKEN_2022_PROGRAM_ID;
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
+
+/// The fixed size of the metadata account: 80 bytes
+/// [32 (update_authority) + 32 (mint) + 4 (size of name ) + 4 (size of symbol) + 4 (size of uri) + 4 (size of additional_metadata)]
+const SIZE_METADATA_LEN: usize = 80;
 
 /// State for Metadata for a token
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq)]
-pub struct TokenMetadata {
+pub struct TokenMetadata<'a> {
     /// The authority that can sign to update the metadata
     pub update_authority: Pubkey,
     /// The associated mint, used to counter spoofing to be sure that metadata
     /// belongs to a particular mint
     pub mint: Pubkey,
+    /// The length of the name
+    pub name_len: u32,
     /// The longer name of the token
-    pub name: String,
+    pub name: &'a str,
+    /// The length of the symbol
+    pub symbol_len: u32,
     /// The shortened symbol for the token
-    pub symbol: String,
+    pub symbol: &'a str,
+    /// The length of the URI
+    pub uri_len: u32,
     /// The URI pointing to richer metadata
-    pub uri: String,
-    /// Any additional metadata about the token as key-value pairs. The program
+    pub uri: &'a str,
+    /// The length of the additional metadata
+    pub additional_metadata_len: u32,
+    /// The additional metadata about the token as key-value pairs. The program
     /// must avoid storing the same key twice.
-    pub additional_metadata: Vec<(String, String)>,
+    pub additional_metadata: &'a [u8],
 }
 
-impl TokenMetadata {
-    /// The length of the `TokenMetadata` account data.
-    pub const LEN: usize = core::mem::size_of::<TokenMetadata>();
-
+impl TokenMetadata<'_> {
     /// Return a `TokenMetadata` from the given account info.
     ///
     /// This method performs owner and length validation on `AccountInfo`, safe borrowing
     /// the account data.
     #[inline(always)]
-    pub fn from_account_info(account_info: AccountInfo) -> Result<TokenMetadata, ProgramError> {
+    pub fn from_account_info<'a>(
+        account_info: AccountInfo
+    ) -> Result<TokenMetadata<'a>, ProgramError> {
+        if account_info.data_len() < SIZE_METADATA_LEN {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
-        let acc_data_bytes = account_info.try_borrow_data()?;
-        let acc_data_bytes = acc_data_bytes.as_ref();
+        let account_data = account_info.try_borrow_data()?;
 
-        let ext_bytes = get_extension_data_bytes_for_variable_pack::<TokenMetadata>(acc_data_bytes)
+        let metadata_bytes = get_extension_data_bytes_for_variable_pack::<TokenMetadata>(
+            account_data.as_ref()
+        )
             .ok_or(ProgramError::InvalidAccountData)?;
 
-        Self::unpack_from_ext_bytes(ext_bytes)
+        Self::from_bytes(metadata_bytes)
     }
 
-    pub(crate) fn unpack_from_ext_bytes(data: &[u8]) -> Result<Self, ProgramError> {
-        // 80 = 32 (update_authority) + 32 (mint) + 4 (size of name ) + 4 (size of symbol) + 4 (size of uri) + 4 (size of additional_metadata)
-        if data.len() < 80 {
+    pub(crate) fn from_bytes<'a>(data: &[u8]) -> Result<TokenMetadata<'a>, ProgramError> {
+        if data.len() < SIZE_METADATA_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let mut current_offset = 0usize;
+        let mut offset: usize = 0;
 
-        let update_authority: Pubkey = data[0..32].try_into().unwrap();
+        let update_authority = unsafe { &*(data.as_ptr() as *const [u8; 32]) };
 
-        current_offset += 32;
+        offset += 32;
 
-        let mint: Pubkey = data[current_offset..current_offset + 32]
-            .try_into()
-            .unwrap();
+        let mint = unsafe { &*(data.as_ptr().add(offset) as *const [u8; 32]) };
+        
+        offset += 32;
 
-        current_offset += 32;
+        let name_len = &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
 
-        let name_len = u32::from_le_bytes(
-            data[current_offset..(current_offset + 4)]
-                .try_into()
-                .unwrap(),
-        ) as usize;
-        current_offset += 4;
+        offset += 4;
 
-        let name = core::str::from_utf8(&data[current_offset..(current_offset + name_len)])
-            .unwrap()
-            .to_string();
+        let name = unsafe { core::str::from_utf8_unchecked(
+            core::slice::from_raw_parts(data.as_ptr().add(offset), *name_len as usize)
+        ) };
 
-        current_offset += name_len;
+        offset += *name_len as usize;
 
-        let symbol_len = u32::from_le_bytes(
-            data[current_offset..(current_offset + 4)]
-                .try_into()
-                .unwrap(),
-        ) as usize;
+        let symbol_len = &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
 
-        current_offset += 4;
+        offset += 4;
 
-        let symbol = core::str::from_utf8(&data[current_offset..(current_offset + symbol_len)])
-            .unwrap()
-            .to_string();
+        let symbol = unsafe { core::str::from_utf8_unchecked(
+            core::slice::from_raw_parts(data.as_ptr().add(offset), *symbol_len as usize)
+        ) };
 
-        current_offset += symbol_len;
+        offset += *symbol_len as usize;
 
-        let uri_len = u32::from_le_bytes(
-            data[current_offset..(current_offset + 4)]
-                .try_into()
-                .unwrap(),
-        ) as usize;
+        let uri_len = &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
 
-        current_offset += 4;
+        offset += 4;
 
-        let uri = core::str::from_utf8(&data[current_offset..(current_offset + uri_len)])
-            .unwrap()
-            .to_string();
+        let uri = unsafe { core::str::from_utf8_unchecked(
+            core::slice::from_raw_parts(data.as_ptr().add(offset), *uri_len as usize)
+        ) };
 
-        current_offset += uri_len;
+        offset += *uri_len as usize;
 
-        let additional_metadata_len = u32::from_le_bytes(
-            data[current_offset..(current_offset + 4)]
-                .try_into()
-                .unwrap(),
-        ) as usize;
+        let additional_metadata_len = &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
 
-        current_offset += 4;
+        offset += 4;
 
-        let additional_metadata_bytes =
-            &data[current_offset..(current_offset + additional_metadata_len)];
-
-        let mut additional_metadata: Vec<(String, String)> =
-            Vec::with_capacity(additional_metadata_len);
-
-        for _ in 0..additional_metadata_len {
-            let key_len = u32::from_le_bytes(
-                additional_metadata_bytes[current_offset..(current_offset + 4)]
-                    .try_into()
-                    .unwrap(),
-            ) as usize;
-
-            current_offset += 4;
-
-            let key = core::str::from_utf8(
-                &additional_metadata_bytes[current_offset..(current_offset + key_len)],
-            )
-            .unwrap()
-            .to_string();
-
-            current_offset += key_len;
-
-            let value_len = u32::from_le_bytes(
-                additional_metadata_bytes[current_offset..(current_offset + 4)]
-                    .try_into()
-                    .unwrap(),
-            ) as usize;
-
-            current_offset += 4;
-
-            let value = core::str::from_utf8(
-                &additional_metadata_bytes[current_offset..(current_offset + value_len)],
-            )
-            .unwrap()
-            .to_string();
-
-            current_offset += value_len;
-
-            additional_metadata.push((key, value));
-        }
+        let additional_metadata = unsafe { core::slice::from_raw_parts( data.as_ptr().add(offset), data.len() - offset) };
 
         Ok(TokenMetadata {
-            update_authority,
-            mint,
+            update_authority: *update_authority,
+            mint: *mint,
+            name_len: *name_len,
             name,
+            symbol_len: *symbol_len,
             symbol,
+            uri_len: *uri_len,
             uri,
+            additional_metadata_len: *additional_metadata_len,
             additional_metadata,
         })
     }
 }
 
-impl Extension for TokenMetadata {
+impl Extension for TokenMetadata<'_> {
     const TYPE: ExtensionType = ExtensionType::TokenMetadata;
-    const LEN: usize = Self::LEN;
+    const LEN: usize = SIZE_METADATA_LEN;
     const BASE_STATE: BaseState = BaseState::Mint;
 }

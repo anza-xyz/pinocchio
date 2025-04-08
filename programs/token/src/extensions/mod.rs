@@ -2,7 +2,7 @@ use crate::{
     from_bytes,
     state::{Mint, TokenAccount},
 };
-pub mod confidential_transfer;
+// pub mod confidential_transfer;
 pub mod cpi_guard;
 pub mod default_account_state;
 pub mod group_member_pointer;
@@ -10,7 +10,6 @@ pub mod group_pointer;
 pub mod immutable_owner;
 pub mod interest_bearing_mint;
 pub mod memo_transfer;
-#[cfg(feature = "std")]
 pub mod metadata;
 pub mod metadata_pointer;
 pub mod mint_close_authority;
