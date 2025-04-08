@@ -2,10 +2,6 @@ use super::{get_extension_data_bytes_for_variable_pack, BaseState, Extension, Ex
 use crate::TOKEN_2022_PROGRAM_ID;
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
-/// The fixed size of the metadata account: 80 bytes
-/// [32 (update_authority) + 32 (mint) + 4 (size of name ) + 4 (size of symbol) + 4 (size of uri) + 4 (size of additional_metadata)]
-const SIZE_METADATA_LEN: usize = 80;
-
 /// State for Metadata for a token
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq)]
@@ -35,6 +31,10 @@ pub struct TokenMetadata<'a> {
 }
 
 impl TokenMetadata<'_> {
+    /// The fixed size of the metadata account: 80 bytes
+    /// [32 (update_authority) + 32 (mint) + 4 (size of name ) + 4 (size of symbol) + 4 (size of uri) + 4 (size of additional_metadata)]
+    pub const SIZE_METADATA_LEN: usize = 80;
+
     /// Return a `TokenMetadata` from the given account info.
     ///
     /// This method performs owner and length validation on `AccountInfo`, safe borrowing
@@ -43,7 +43,7 @@ impl TokenMetadata<'_> {
     pub fn from_account_info<'a>(
         account_info: AccountInfo
     ) -> Result<TokenMetadata<'a>, ProgramError> {
-        if account_info.data_len() < SIZE_METADATA_LEN {
+        if account_info.data_len() < Self::SIZE_METADATA_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
 
@@ -62,7 +62,7 @@ impl TokenMetadata<'_> {
     }
 
     pub(crate) fn from_bytes<'a>(data: &[u8]) -> Result<TokenMetadata<'a>, ProgramError> {
-        if data.len() < SIZE_METADATA_LEN {
+        if data.len() < Self::SIZE_METADATA_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
 
@@ -129,6 +129,6 @@ impl TokenMetadata<'_> {
 
 impl Extension for TokenMetadata<'_> {
     const TYPE: ExtensionType = ExtensionType::TokenMetadata;
-    const LEN: usize = SIZE_METADATA_LEN;
+    const LEN: usize = Self::SIZE_METADATA_LEN;
     const BASE_STATE: BaseState = BaseState::Mint;
 }
