@@ -22,6 +22,8 @@ use crate::{
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
+use crate::{BPF_ALIGN_OF_U128, NON_DUP_MARKER};
+
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
 
@@ -170,8 +172,8 @@ macro_rules! program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::AccountView> =
-                core::mem::MaybeUninit::<$crate::AccountView>::uninit();
+            const UNINIT: core::mem::MaybeUninit<$crate::account_view::AccountView> =
+                core::mem::MaybeUninit::<$crate::account_view::AccountView>::uninit();
             // Create an array of uninitialized account infos.
             let mut accounts = [UNINIT; $maximum];
 
