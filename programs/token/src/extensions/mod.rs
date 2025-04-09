@@ -10,7 +10,6 @@ pub mod group_pointer;
 pub mod immutable_owner;
 pub mod interest_bearing_mint;
 pub mod memo_transfer;
-#[cfg(feature = "std")]
 pub mod metadata;
 pub mod metadata_pointer;
 pub mod mint_close_authority;
@@ -364,7 +363,6 @@ mod tests {
         assert!(gmp.member_address.eq(&[2u8; 32]));
     }
 
-    #[cfg(feature = "std")]
     #[test]
     fn test_token_metadata() {
         use crate::extensions::get_extension_data_bytes_for_variable_pack;
@@ -375,7 +373,7 @@ mod tests {
         )
         .unwrap();
 
-        let token_metadata = TokenMetadata::unpack_from_ext_bytes(token_metadata);
+        let token_metadata = TokenMetadata::from_bytes(token_metadata);
 
         assert!(token_metadata.is_ok());
 
