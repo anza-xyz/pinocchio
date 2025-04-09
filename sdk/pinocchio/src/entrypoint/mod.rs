@@ -344,6 +344,43 @@ macro_rules! no_allocator {
         #[cfg(target_os = "solana")]
         #[global_allocator]
         static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
+
+        /// Allocates memory for the given type `T` at the specified offset in the
+        /// heap reserved address space.
+        ///
+        /// # Safety
+        ///
+        /// It is the caller's responsibility to ensure that the offset does not
+        /// overlap with previous allocations and that type `T` can hold the bit-pattern
+        /// `0` as a valid value.
+        ///
+        /// For types that cannot hold the bit-pattern `0` as a valid value, use
+        /// `core::mem::MaybeUninit<T>` to allocate memory for the type and
+        /// initialize it later.
+        #[inline]
+        pub const unsafe fn allocate_unchecked<T: Sized>(offset: usize) -> &'static mut T {
+            unsafe {
+                let start = $crate::entrypoint::HEAP_START_ADDRESS as usize
+                    + core::mem::size_of::<*mut u8>()
+                    + offset;
+                let end = start + core::mem::size_of::<T>();
+
+                // Assert that the allocation does not exceed the heap size.
+                assert!(
+                    end <= $crate::entrypoint::HEAP_START_ADDRESS as usize
+                        + $crate::entrypoint::HEAP_LENGTH,
+                    "allocation exceeds heap size"
+                );
+
+                // Assert that the allocation is aligned to `T`.
+                assert!(
+                    start % core::mem::align_of::<T>() == 0,
+                    "offset is not aligned"
+                );
+
+                &mut *(start as *mut T)
+            }
+        }
     };
 }
 
