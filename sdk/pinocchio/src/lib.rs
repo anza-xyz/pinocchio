@@ -235,6 +235,7 @@ pub mod program {
 }
 pub mod program_error;
 pub mod pubkey;
+pub mod runtime;
 pub mod syscalls;
 pub mod sysvars;
 

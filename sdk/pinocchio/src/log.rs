@@ -33,7 +33,10 @@
 //! [`Pubkey`]: crate::pubkey::Pubkey
 //! [`pubkey::log`]: crate::pubkey::log
 
-use crate::{account_info::AccountInfo, pubkey};
+use crate::{
+    account_info::AccountInfo,
+    runtime::{Runtime, TargetRuntime},
+};
 
 /// Print a message to the log.
 ///
@@ -94,43 +97,23 @@ macro_rules! msg {
 /// Print a string to the log.
 #[inline(always)]
 pub fn sol_log(message: &str) {
-    #[cfg(target_os = "solana")]
-    unsafe {
-        crate::syscalls::sol_log_(message.as_ptr(), message.len() as u64);
-    }
-
-    #[cfg(not(target_os = "solana"))]
-    core::hint::black_box(message);
+    TargetRuntime::sol_log(message);
 }
 
 /// Print 64-bit values represented as hexadecimal to the log.
 #[inline]
 pub fn sol_log_64(arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64) {
-    #[cfg(target_os = "solana")]
-    unsafe {
-        crate::syscalls::sol_log_64_(arg1, arg2, arg3, arg4, arg5);
-    }
-
-    #[cfg(not(target_os = "solana"))]
-    core::hint::black_box((arg1, arg2, arg3, arg4, arg5));
+    TargetRuntime::sol_log_64(arg1, arg2, arg3, arg4, arg5);
 }
 
 /// Print some slices as base64.
 pub fn sol_log_data(data: &[&[u8]]) {
-    #[cfg(target_os = "solana")]
-    unsafe {
-        crate::syscalls::sol_log_data(data as *const _ as *const u8, data.len() as u64)
-    };
-
-    #[cfg(not(target_os = "solana"))]
-    core::hint::black_box(data);
+    TargetRuntime::sol_log_data(data);
 }
 
 /// Print the hexadecimal representation of a slice.
 pub fn sol_log_slice(slice: &[u8]) {
-    for (i, s) in slice.iter().enumerate() {
-        sol_log_64(0, 0, 0, i as u64, *s as u64);
-    }
+    TargetRuntime::sol_log_slice(slice);
 }
 
 /// Print the hexadecimal representation of the program's input parameters.
@@ -138,30 +121,11 @@ pub fn sol_log_slice(slice: &[u8]) {
 /// - `accounts` - A slice of [`AccountInfo`].
 /// - `data` - The instruction data.
 pub fn sol_log_params(accounts: &[AccountInfo], data: &[u8]) {
-    for (i, account) in accounts.iter().enumerate() {
-        msg!("AccountInfo");
-        sol_log_64(0, 0, 0, 0, i as u64);
-        msg!("- Is signer");
-        sol_log_64(0, 0, 0, 0, account.is_signer() as u64);
-        msg!("- Key");
-        pubkey::log(account.key());
-        msg!("- Lamports");
-        sol_log_64(0, 0, 0, 0, account.lamports());
-        msg!("- Account data length");
-        sol_log_64(0, 0, 0, 0, account.data_len() as u64);
-        msg!("- Owner");
-        // SAFETY: The `owner` reference is only used for logging.
-        pubkey::log(unsafe { account.owner() });
-    }
-    msg!("Instruction data");
-    sol_log_slice(data);
+    TargetRuntime::sol_log_params(accounts, data);
 }
 
 /// Print the remaining compute units available to the program.
 #[inline]
 pub fn sol_log_compute_units() {
-    #[cfg(target_os = "solana")]
-    unsafe {
-        crate::syscalls::sol_log_compute_units_();
-    }
+    TargetRuntime::sol_log_compute_units();
 }
