@@ -1,11 +1,13 @@
+use core::cell::RefCell;
 use std::{
-    boxed::Box,
     collections::HashMap,
     format,
     string::String,
-    sync::{LazyLock, Mutex},
+    sync::{Arc, LazyLock},
     vec::Vec,
 };
+
+use parking_lot::ReentrantMutex;
 
 use crate::{
     account_info::AccountInfo,
@@ -17,8 +19,8 @@ use crate::{
 
 use super::Runtime;
 
-pub static MOCK_RUNTIME: LazyLock<Mutex<MockRuntime>> =
-    LazyLock::new(|| Mutex::new(MockRuntime::init()));
+pub static MOCK_RUNTIME: LazyLock<ReentrantMutex<RefCell<MockRuntime>>> =
+    LazyLock::new(|| ReentrantMutex::new(RefCell::new(MockRuntime::init())));
 
 pub struct MockAccount {
     pub key: Pubkey,
@@ -28,7 +30,7 @@ pub struct MockAccount {
 
 pub enum MockData {
     Bytes(Vec<u8>),
-    Program(Box<dyn Fn(&Pubkey, &[AccountInfo], &[u8]) -> ProgramResult + Send>),
+    Program(Arc<dyn Fn(&Pubkey, &[AccountInfo], &[u8]) -> ProgramResult + Send + Sync>),
 }
 
 pub struct MockRuntime {
@@ -52,13 +54,17 @@ impl MockRuntime {
         };
         self.accounts.insert(program.key, program);
     }
+}
 
-    pub fn invoke<const ACCOUNTS: usize>(
-        &self,
-        instruction: &Instruction,
-        account_infos: &[&AccountInfo; ACCOUNTS],
-    ) {
-        let program = self
+pub fn invoke<const ACCOUNTS: usize>(
+    instruction: &Instruction,
+    account_infos: &[&AccountInfo; ACCOUNTS],
+) {
+    let program = {
+        let rt_lock = MOCK_RUNTIME.lock();
+        let rt = rt_lock.borrow();
+
+        let program = rt
             .accounts
             .get(instruction.program_id)
             .expect("program not found");
@@ -67,15 +73,17 @@ impl MockRuntime {
             panic!("invalid program id")
         };
 
-        let accounts: Vec<_> = account_infos.iter().map(|acc| (*acc).clone()).collect();
+        program.clone()
+    };
 
-        program(
-            instruction.program_id,
-            accounts.as_slice(),
-            instruction.data,
-        )
-        .expect("program failed to execute");
-    }
+    let accounts: Vec<_> = account_infos.iter().map(|acc| (*acc).clone()).collect();
+
+    program(
+        instruction.program_id,
+        accounts.as_slice(),
+        instruction.data,
+    )
+    .expect("program failed to execute");
 }
 
 impl Runtime for MockRuntime {
@@ -84,11 +92,12 @@ impl Runtime for MockRuntime {
     ////////////////////////////////////////////////////////////////////////////
 
     fn sol_log(message: &str) {
-        MOCK_RUNTIME.lock().unwrap().logs.push(message.into());
+        MOCK_RUNTIME.lock().borrow_mut().logs.push(message.into());
     }
 
     fn sol_log_64(arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64) {
-        let mut rt = MOCK_RUNTIME.lock().unwrap();
+        let rt_lock = MOCK_RUNTIME.lock();
+        let mut rt = rt_lock.borrow_mut();
         rt.logs.push(format!(
             "Program log: {:x} {:x} {:x} {:x} {:x}",
             arg1, arg2, arg3, arg4, arg5
@@ -98,13 +107,14 @@ impl Runtime for MockRuntime {
     fn sol_log_data(data: &[&[u8]]) {
         MOCK_RUNTIME
             .lock()
-            .unwrap()
+            .borrow_mut()
             .logs
             .push(format!("data: {:?}", data));
     }
 
     fn sol_log_compute_units() {
-        let mut rt = MOCK_RUNTIME.lock().unwrap();
+        let rt_lock = MOCK_RUNTIME.lock();
+        let mut rt = rt_lock.borrow_mut();
         let cu = rt.compute_units;
         rt.logs.push(format!("cu: {}", cu));
     }
@@ -159,10 +169,7 @@ impl Runtime for MockRuntime {
             }
         }
 
-        MOCK_RUNTIME
-            .lock()
-            .unwrap()
-            .invoke(instruction, account_infos);
+        invoke(instruction, account_infos);
 
         Ok(())
     }
@@ -184,10 +191,7 @@ impl Runtime for MockRuntime {
             }
         }
 
-        MOCK_RUNTIME
-            .lock()
-            .unwrap()
-            .invoke(instruction, account_infos);
+        invoke(instruction, account_infos);
 
         Ok(())
     }
