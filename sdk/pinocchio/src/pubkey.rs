@@ -1,6 +1,9 @@
 //! Public key type and functions.
 
-use crate::program_error::ProgramError;
+use crate::{
+    program_error::ProgramError,
+    runtime::{Runtime, TargetRuntime},
+};
 
 /// Number of bytes in a pubkey.
 pub const PUBKEY_BYTES: usize = 32;
@@ -171,32 +174,7 @@ pub fn create_program_address(
     seeds: &[&[u8]],
     program_id: &Pubkey,
 ) -> Result<Pubkey, ProgramError> {
-    // Call via a system call to perform the calculation
-    #[cfg(target_os = "solana")]
-    {
-        let mut bytes = core::mem::MaybeUninit::<[u8; PUBKEY_BYTES]>::uninit();
-
-        let result = unsafe {
-            crate::syscalls::sol_create_program_address(
-                seeds as *const _ as *const u8,
-                seeds.len() as u64,
-                program_id as *const _ as *const u8,
-                bytes.as_mut_ptr() as *mut u8,
-            )
-        };
-
-        match result {
-            // SAFETY: The syscall has initialized the bytes.
-            crate::SUCCESS => Ok(unsafe { bytes.assume_init() }),
-            _ => Err(result.into()),
-        }
-    }
-
-    #[cfg(not(target_os = "solana"))]
-    {
-        core::hint::black_box((seeds, program_id));
-        panic!("create_program_address is only available on target `solana`")
-    }
+    TargetRuntime::sol_create_program_address(seeds, program_id)
 }
 
 /// Create a valid [program derived address][pda] without searching for a bump seed.

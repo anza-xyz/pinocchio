@@ -53,4 +53,12 @@ impl Runtime for BlackBoxRuntime {
         core::hint::black_box((instruction, account_infos, signers_seeds));
         Ok(())
     }
+
+    fn sol_create_program_address(
+        seeds: &[&[u8]],
+        program_id: &crate::pubkey::Pubkey,
+    ) -> Result<crate::pubkey::Pubkey, crate::program_error::ProgramError> {
+        core::hint::black_box((seeds, program_id));
+        panic!("create_program_address is only available on target `solana`")
+    }
 }

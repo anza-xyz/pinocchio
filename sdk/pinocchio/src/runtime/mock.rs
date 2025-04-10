@@ -199,4 +199,22 @@ impl Runtime for MockRuntime {
 
         Ok(())
     }
+
+    fn sol_create_program_address(
+        seeds: &[&[u8]],
+        program_id: &Pubkey,
+    ) -> Result<Pubkey, ProgramError> {
+        solana_pubkey::Pubkey::create_program_address(
+            seeds,
+            &solana_pubkey::Pubkey::new_from_array(*program_id),
+        )
+        .map(|key| key.to_bytes())
+        .map_err(|err| match err {
+            solana_pubkey::PubkeyError::MaxSeedLengthExceeded => {
+                ProgramError::MaxSeedLengthExceeded
+            }
+            solana_pubkey::PubkeyError::InvalidSeeds => ProgramError::InvalidSeeds,
+            solana_pubkey::PubkeyError::IllegalOwner => ProgramError::IllegalOwner,
+        })
+    }
 }

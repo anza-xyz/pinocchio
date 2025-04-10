@@ -138,4 +138,27 @@ impl Runtime for SolanaRuntime {
 
         Ok(())
     }
+
+    fn sol_create_program_address(
+        seeds: &[&[u8]],
+        program_id: &Pubkey,
+    ) -> Result<Pubkey, ProgramError> {
+        // Call via a system call to perform the calculation
+        let mut bytes = core::mem::MaybeUninit::<[u8; PUBKEY_BYTES]>::uninit();
+
+        let result = unsafe {
+            crate::syscalls::sol_create_program_address(
+                seeds as *const _ as *const u8,
+                seeds.len() as u64,
+                program_id as *const _ as *const u8,
+                bytes.as_mut_ptr() as *mut u8,
+            )
+        };
+
+        match result {
+            // SAFETY: The syscall has initialized the bytes.
+            crate::SUCCESS => Ok(unsafe { bytes.assume_init() }),
+            _ => Err(result.into()),
+        }
+    }
 }

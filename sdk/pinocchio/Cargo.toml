@@ -16,6 +16,9 @@ unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(target_feature, values("static-syscalls"))',
 ] }
 
+[dependencies]
+solana-pubkey = { version = "2.3", features = ["curve25519"], optional = true }
+
 [features]
 std = []
-test = ["std"]
+test = ["std", "solana-pubkey"]

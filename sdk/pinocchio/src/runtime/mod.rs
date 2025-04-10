@@ -10,7 +10,10 @@ use solana::SolanaRuntime;
 use crate::{
     account_info::AccountInfo,
     instruction::{Instruction, Signer},
-    msg, pubkey, ProgramResult,
+    msg,
+    program_error::ProgramError,
+    pubkey::{self, Pubkey},
+    ProgramResult,
 };
 
 #[cfg(all(not(target_os = "solana"), not(feature = "test")))]
@@ -125,4 +128,13 @@ pub trait Runtime {
         account_infos: &[&AccountInfo; ACCOUNTS],
         signers_seeds: &[Signer],
     ) -> ProgramResult;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Addressing CALLS
+    ////////////////////////////////////////////////////////////////////////////
+
+    fn sol_create_program_address(
+        seeds: &[&[u8]],
+        program_id: &Pubkey,
+    ) -> Result<Pubkey, ProgramError>;
 }
