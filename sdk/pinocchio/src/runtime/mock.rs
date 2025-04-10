@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    format,
+    eprintln, format,
     string::String,
     sync::{Arc, LazyLock, Mutex},
     vec::Vec,
@@ -80,6 +80,13 @@ pub fn invoke<const ACCOUNTS: usize>(
         accounts.as_slice(),
         instruction.data,
     )
+    .map_err(|err| {
+        eprintln!("Err: {:?}", err);
+        eprintln!("---- LOG ----");
+        for log in MOCK_RUNTIME.lock().unwrap().logs.iter() {
+            eprintln!("{}", log);
+        }
+    })
     .expect("program failed to execute");
 }
 
