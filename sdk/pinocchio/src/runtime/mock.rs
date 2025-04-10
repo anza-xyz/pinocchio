@@ -21,9 +21,9 @@ pub static MOCK_RUNTIME: LazyLock<Mutex<MockRuntime>> =
     LazyLock::new(|| Mutex::new(MockRuntime::init()));
 
 pub struct MockAccount {
-    key: Pubkey,
-    _lamports: u64,
-    data: MockData,
+    pub key: Pubkey,
+    pub lamports: u64,
+    pub data: MockData,
 }
 
 pub enum MockData {
