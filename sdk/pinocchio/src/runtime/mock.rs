@@ -1,13 +1,10 @@
-use core::cell::RefCell;
 use std::{
     collections::HashMap,
     format,
     string::String,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, Mutex},
     vec::Vec,
 };
-
-use parking_lot::ReentrantMutex;
 
 use crate::{
     account_info::AccountInfo,
@@ -19,8 +16,8 @@ use crate::{
 
 use super::Runtime;
 
-pub static MOCK_RUNTIME: LazyLock<ReentrantMutex<RefCell<MockRuntime>>> =
-    LazyLock::new(|| ReentrantMutex::new(RefCell::new(MockRuntime::init())));
+pub static MOCK_RUNTIME: LazyLock<Mutex<MockRuntime>> =
+    LazyLock::new(|| Mutex::new(MockRuntime::init()));
 
 pub struct MockAccount {
     pub key: Pubkey,
@@ -62,7 +59,7 @@ pub fn invoke<const ACCOUNTS: usize>(
 ) {
     let program = {
         let rt_lock = MOCK_RUNTIME.lock();
-        let rt = rt_lock.borrow();
+        let rt = rt_lock.unwrap();
 
         let program = rt
             .accounts
@@ -92,12 +89,12 @@ impl Runtime for MockRuntime {
     ////////////////////////////////////////////////////////////////////////////
 
     fn sol_log(message: &str) {
-        MOCK_RUNTIME.lock().borrow_mut().logs.push(message.into());
+        MOCK_RUNTIME.lock().unwrap().logs.push(message.into());
     }
 
     fn sol_log_64(arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64) {
         let rt_lock = MOCK_RUNTIME.lock();
-        let mut rt = rt_lock.borrow_mut();
+        let mut rt = rt_lock.unwrap();
         rt.logs.push(format!(
             "Program log: {:x} {:x} {:x} {:x} {:x}",
             arg1, arg2, arg3, arg4, arg5
@@ -107,14 +104,14 @@ impl Runtime for MockRuntime {
     fn sol_log_data(data: &[&[u8]]) {
         MOCK_RUNTIME
             .lock()
-            .borrow_mut()
+            .unwrap()
             .logs
             .push(format!("data: {:?}", data));
     }
 
     fn sol_log_compute_units() {
         let rt_lock = MOCK_RUNTIME.lock();
-        let mut rt = rt_lock.borrow_mut();
+        let mut rt = rt_lock.unwrap();
         let cu = rt.compute_units;
         rt.logs.push(format!("cu: {}", cu));
     }

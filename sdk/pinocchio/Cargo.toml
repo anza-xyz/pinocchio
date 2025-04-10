@@ -16,9 +16,6 @@ unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(target_feature, values("static-syscalls"))',
 ] }
 
-[dependencies]
-parking_lot = { version = "0.12", optional = true }
-
 [features]
 std = []
-test = ["std", "parking_lot"]
+test = ["std"]
