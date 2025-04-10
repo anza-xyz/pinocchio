@@ -1,17 +1,27 @@
-#[cfg(not(target_os = "solana"))]
+#[cfg(all(not(target_os = "solana"), not(feature = "test")))]
+use blackbox::BlackBoxRuntime;
+#[cfg(all(not(target_os = "solana"), feature = "test"))]
 use mock::MockRuntime;
 #[cfg(target_os = "solana")]
 use solana::SolanaRuntime;
 
-use crate::{account_info::AccountInfo, msg, pubkey};
+use crate::{
+    account_info::AccountInfo,
+    instruction::{Instruction, Signer},
+    msg, pubkey, ProgramResult,
+};
 
+mod blackbox;
 pub mod mock;
-pub mod solana;
+mod solana;
 
 #[cfg(target_os = "solana")]
 pub type TargetRuntime = SolanaRuntime;
 
-#[cfg(not(target_os = "solana"))]
+#[cfg(all(not(target_os = "solana"), not(feature = "test")))]
+pub type TargetRuntime = BlackBoxRuntime;
+
+#[cfg(all(not(target_os = "solana"), feature = "test"))]
 pub type TargetRuntime = MockRuntime;
 
 pub trait Runtime {
@@ -65,4 +75,47 @@ pub trait Runtime {
     ////////////////////////////////////////////////////////////////////////////
     // MEM SYS CALLS
     ////////////////////////////////////////////////////////////////////////////
+
+    unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize);
+
+    unsafe fn sol_memmove(dst: *mut u8, src: *mut u8, n: usize);
+
+    unsafe fn sol_memcmp(s1: &[u8], s2: &[u8], n: usize) -> i32;
+
+    unsafe fn sol_memset(s: &mut [u8], c: u8, n: usize);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // CPI CALLS
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// Invoke a cross-program instruction with signatures.
+    ///
+    /// # Important
+    ///
+    /// The accounts on the `account_infos` slice must be in the same order as the
+    /// `accounts` field of the `instruction`.
+    fn invoke_signed<const ACCOUNTS: usize>(
+        instruction: &Instruction,
+        account_infos: &[&AccountInfo; ACCOUNTS],
+        signers_seeds: &[Signer],
+    ) -> ProgramResult;
+
+    /// Invoke a cross-program instruction with signatures.
+    ///
+    /// # Important
+    ///
+    /// The accounts on the `account_infos` slice must be in the same order as the
+    /// `accounts` field of the `instruction`.
+    ///
+    /// # Safety
+    ///
+    /// If any of the writable accounts passed to the callee contain data that is
+    /// borrowed within the calling program, and that data is written to by the
+    /// callee, then Rust's aliasing rules will be violated and cause undefined
+    /// behavior.
+    unsafe fn invoke_signed_access_unchecked<const ACCOUNTS: usize>(
+        instruction: &Instruction,
+        account_infos: &[&AccountInfo; ACCOUNTS],
+        signers_seeds: &[Signer],
+    ) -> ProgramResult;
 }

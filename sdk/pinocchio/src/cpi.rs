@@ -7,6 +7,7 @@ use crate::{
     instruction::{Account, AccountMeta, Instruction, Signer},
     program_error::ProgramError,
     pubkey::Pubkey,
+    runtime::{Runtime, TargetRuntime},
     ProgramResult,
 };
 
@@ -62,7 +63,15 @@ pub fn invoke<const ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo; ACCOUNTS],
 ) -> ProgramResult {
-    invoke_signed(instruction, account_infos, &[])
+    TargetRuntime::invoke_signed(instruction, account_infos, &[])
+}
+
+pub unsafe fn invoke_signed_access_unchecked<const ACCOUNTS: usize>(
+    instruction: &Instruction,
+    account_infos: &[&AccountInfo; ACCOUNTS],
+    signers_seeds: &[Signer],
+) -> ProgramResult {
+    TargetRuntime::invoke_signed_access_unchecked(instruction, account_infos, signers_seeds)
 }
 
 /// Invoke a cross-program instruction from a slice of `AccountInfo`s.
@@ -87,41 +96,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     account_infos: &[&AccountInfo; ACCOUNTS],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    if instruction.accounts.len() < ACCOUNTS {
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-
-    const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
-    let mut accounts = [UNINIT; ACCOUNTS];
-
-    for index in 0..ACCOUNTS {
-        let account_info = account_infos[index];
-        let account_meta = &instruction.accounts[index];
-
-        if account_info.key() != account_meta.pubkey {
-            return Err(ProgramError::InvalidArgument);
-        }
-
-        if account_meta.is_writable {
-            account_info.check_borrow_mut_data()?;
-            account_info.check_borrow_mut_lamports()?;
-        } else {
-            account_info.check_borrow_data()?;
-            account_info.check_borrow_lamports()?;
-        }
-
-        accounts[index].write(Account::from(account_infos[index]));
-    }
-
-    unsafe {
-        invoke_signed_unchecked(
-            instruction,
-            core::slice::from_raw_parts(accounts.as_ptr() as _, ACCOUNTS),
-            signers_seeds,
-        );
-    }
-
-    Ok(())
+    TargetRuntime::invoke_signed(instruction, account_infos, signers_seeds)
 }
 
 /// Invoke a cross-program instruction with signatures from a slice of
