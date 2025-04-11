@@ -381,7 +381,7 @@ macro_rules! no_allocator {
                 "offset is not aligned"
             );
 
-            &mut *(start as *mut T)
+            unsafe { &mut *(start as *mut T) }
         }
     };
 }
