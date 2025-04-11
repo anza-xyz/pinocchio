@@ -73,14 +73,17 @@ impl ConfidentialTransferMint {
 
     /// Return a `ConfidentialTransferMint` from the given Mint account info.
     #[inline(always)]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Self, ProgramError> {
+    pub fn from_account_info(
+        account_info: &AccountInfo,
+    ) -> Result<&ConfidentialTransferMint, ProgramError> {
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
         let acc_data_bytes = account_info.try_borrow_data()?;
 
-        get_extension_from_bytes::<Self>(&acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
+        get_extension_from_bytes(unsafe { account_info.borrow_data_unchecked() })
+            .ok_or(ProgramError::InvalidAccountData)
     }
 }
 
@@ -137,14 +140,17 @@ impl ConfidentialTransferAccount {
 
     /// Return a `ConfidentialTransferAccount` from the given Token account info.
     #[inline(always)]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Self, ProgramError> {
+    pub fn from_account_info(
+        account_info: &AccountInfo,
+    ) -> Result<&ConfidentialTransferAccount, ProgramError> {
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
         let acc_data_bytes = account_info.try_borrow_data()?;
 
-        get_extension_from_bytes::<Self>(&acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
+        get_extension_from_bytes(unsafe { account_info.borrow_data_unchecked() })
+            .ok_or(ProgramError::InvalidAccountData)
     }
 }
 
@@ -178,15 +184,17 @@ impl ConfidentialTransferFeeConfig {
 
     /// Return a `ConfidentialTransferFeeConfig` from the given Mint account info.
     #[inline(always)]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Self, ProgramError> {
+    pub fn from_account_info(
+        account_info: &AccountInfo,
+    ) -> Result<&ConfidentialTransferFeeConfig, ProgramError> {
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
         let acc_data_bytes = account_info.try_borrow_data()?;
 
-        // Assuming get_extension_from_bytes works for this type too
-        get_extension_from_bytes::<Self>(&acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
+        get_extension_from_bytes(unsafe { account_info.borrow_data_unchecked() })
+            .ok_or(ProgramError::InvalidAccountData)
     }
 }
 
@@ -595,47 +603,47 @@ impl<'a, const ACCOUNTS_LEN: usize> EmptyAccount<'a, ACCOUNTS_LEN> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Count required accounts
         let mut required_accounts = 3; // token_account, proof_account, authority
-        
+
         // Add optional record account if needed
-        required_accounts += (self.proof_instruction_offset != 0 && self.record_account.is_some()) as usize;
-        
+        required_accounts +=
+            (self.proof_instruction_offset != 0 && self.record_account.is_some()) as usize;
+
         // Add multisig signers
         required_accounts += self.multisig_signers.len();
-        
+
         if required_accounts != ACCOUNTS_LEN {
             return Err(ProgramError::InvalidArgument);
         }
-        
+
         // Account metas
         const UNINIT_ACC_META: MaybeUninit<AccountMeta> = MaybeUninit::<AccountMeta>::uninit();
         let mut account_metas = [UNINIT_ACC_META; ACCOUNTS_LEN];
-        
+
         // Account infos
         const UNINIT_ACC_INFO: MaybeUninit<&AccountInfo> = MaybeUninit::<&AccountInfo>::uninit();
         let mut accounts = [UNINIT_ACC_INFO; ACCOUNTS_LEN];
-        
+
         // Initialize accounts
         let mut idx = 0;
-        
+
         // Token account
         account_metas[idx].write(AccountMeta::writable(self.token_account.key()));
         accounts[idx].write(self.token_account);
         idx += 1;
-        
+
         // Proof account
         account_metas[idx].write(AccountMeta::readonly(self.proof_account.key()));
         accounts[idx].write(self.proof_account);
         idx += 1;
-        
+
         // Optional record account
         if self.proof_instruction_offset != 0 && self.record_account.is_some() {
             account_metas[idx].write(AccountMeta::readonly(self.record_account.unwrap().key()));
             accounts[idx].write(self.record_account.unwrap());
             idx += 1;
         }
-        
+
         // Authority
-        let authority_idx = idx;
         if self.multisig_signers.is_empty() {
             account_metas[idx].write(AccountMeta::readonly_signer(self.authority.key()));
         } else {
@@ -643,41 +651,44 @@ impl<'a, const ACCOUNTS_LEN: usize> EmptyAccount<'a, ACCOUNTS_LEN> {
         }
         accounts[idx].write(self.authority);
         idx += 1;
-        
+
         // Multisig signers
         for (i, signer) in self.multisig_signers.iter().enumerate() {
             account_metas[idx + i].write(AccountMeta::readonly_signer(signer.key()));
             accounts[idx + i].write(signer);
         }
-        
+
         // Convert to slices safely
         let acc_metas = unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, ACCOUNTS_LEN)
         };
-        
+
         let acc_infos: [&AccountInfo; ACCOUNTS_LEN] = unsafe {
             core::slice::from_raw_parts(accounts.as_ptr() as *const &AccountInfo, ACCOUNTS_LEN)
                 .try_into()
                 .unwrap() // Safe as we verified the length
         };
-        
+
         // Instruction data construction
         const DATA_LEN: usize = 3;
         let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
-        
+
         // Set main discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data[0..1], &[27]);
         // Set EmptyAccount discriminator as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[4]);
         // Set proof_instruction_offset as u8 at offset [2]
-        write_bytes(&mut instruction_data[2..3], &[self.proof_instruction_offset as u8]);
-        
+        write_bytes(
+            &mut instruction_data[2..3],
+            &[self.proof_instruction_offset as u8],
+        );
+
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: acc_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, DATA_LEN) },
         };
-        
+
         invoke_signed(&instruction, &acc_infos, signers)
     }
 }
@@ -774,7 +785,6 @@ impl<'a, const ACCOUNTS_LEN: usize> Deposit<'a, ACCOUNTS_LEN> {
     }
 }
 
-
 pub struct Withdraw<'a, const ACCOUNTS_LEN: usize> {
     /// The source SPL Token account (must have ConfidentialTransfer extension).
     pub token_account: &'a AccountInfo,
@@ -845,7 +855,6 @@ impl<'a, const ACCOUNTS_LEN: usize> Withdraw<'a, ACCOUNTS_LEN> {
         idx += 1;
 
         // Authority
-        let authority_idx = idx;
         if self.multisig_signers.is_empty() {
             account_metas[idx].write(AccountMeta::readonly_signer(self.authority.key()));
         } else {
