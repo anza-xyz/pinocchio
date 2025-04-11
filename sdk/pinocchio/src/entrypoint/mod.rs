@@ -309,6 +309,7 @@ macro_rules! nostd_panic_handler {
 /// Default global allocator.
 ///
 /// This macro sets up a default global allocator that uses a bump allocator to allocate memory.
+#[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! default_allocator {
     () => {
@@ -321,9 +322,24 @@ macro_rules! default_allocator {
 
         // A placeholder for `cargo clippy`
         #[cfg(not(target_os = "solana"))]
-        #[cfg(not(feature = "std"))]
         #[global_allocator]
         static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
+    };
+}
+
+/// Default global allocator.
+///
+/// This macro sets up a default global allocator that uses a bump allocator to allocate memory.
+#[cfg(feature = "std")]
+#[macro_export]
+macro_rules! default_allocator {
+    () => {
+        #[cfg(target_os = "solana")]
+        #[global_allocator]
+        static A: $crate::entrypoint::BumpAllocator = $crate::entrypoint::BumpAllocator {
+            start: $crate::entrypoint::HEAP_START_ADDRESS as usize,
+            len: $crate::entrypoint::HEAP_LENGTH,
+        };
     };
 }
 
