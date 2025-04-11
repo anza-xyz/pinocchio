@@ -182,6 +182,120 @@ pub fn slice_invoke_signed(
     Ok(())
 }
 
+/// Invoke a cross-program instruction with signatures.
+///
+/// # Important
+///
+/// The accounts on the `account_infos` slice must be in the same order as the
+/// `accounts` field of the `instruction`.
+///
+/// This function does not check that [`AccountInfo`]s are properly borrowable.
+/// Those checks consume CPU cycles that this function avoids.
+///
+/// # Safety
+///
+/// If any of the writable accounts passed to the callee contain data that is
+/// borrowed within the calling program, and that data is written to by the
+/// callee, then Rust's aliasing rules will be violated and cause undefined
+/// behavior.
+pub unsafe fn invoke_signed_access_unchecked<const ACCOUNTS: usize>(
+    instruction: &Instruction,
+    account_infos: &[&AccountInfo; ACCOUNTS],
+    signers_seeds: &[Signer],
+) -> ProgramResult {
+    if instruction.accounts.len() < ACCOUNTS {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+
+    const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
+    let mut accounts = [UNINIT; ACCOUNTS];
+
+    for index in 0..ACCOUNTS {
+        let account_info = account_infos[index];
+        let account_meta = &instruction.accounts[index];
+
+        if account_info.key() != account_meta.pubkey
+            || !account_info.is_writable() & account_meta.is_writable
+        {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        accounts[index].write(Account::from(account_infos[index]));
+    }
+
+    unsafe {
+        invoke_signed_unchecked(
+            instruction,
+            core::slice::from_raw_parts(accounts.as_ptr() as _, ACCOUNTS),
+            signers_seeds,
+        );
+    }
+
+    Ok(())
+}
+
+/// Invoke a cross-program instruction with signatures.
+///
+/// # Important
+///
+/// The accounts on the `account_infos` slice must be in the same order as the
+/// `accounts` field of the `instruction`.
+///
+/// This function does not check that [`AccountInfo`]s are properly borrowable.
+/// Those checks consume CPU cycles that this function avoids.
+///
+/// # Safety
+///
+/// If any of the writable accounts passed to the callee contain data that is
+/// borrowed within the calling program, and that data is written to by the
+/// callee, then Rust's aliasing rules will be violated and cause undefined
+/// behavior.
+pub unsafe fn slice_invoke_signed_access_unchecked(
+    instruction: &Instruction,
+    account_infos: &[&AccountInfo],
+    signers_seeds: &[Signer],
+) -> ProgramResult {
+    if instruction.accounts.len() < account_infos.len() {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+
+    if account_infos.len() > MAX_CPI_ACCOUNTS {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
+    let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
+    let mut len = 0;
+
+    for (account_info, account_meta) in account_infos.iter().zip(instruction.accounts.iter()) {
+        if account_info.key() != account_meta.pubkey
+            || !account_info.is_writable() & account_meta.is_writable
+        {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        // SAFETY: The number of accounts has been validated to be less than
+        // `MAX_CPI_ACCOUNTS`.
+        unsafe {
+            accounts
+                .get_unchecked_mut(len)
+                .write(Account::from(*account_info));
+        }
+
+        len += 1;
+    }
+    // SAFETY: The accounts have been validated.
+    unsafe {
+        invoke_signed_unchecked(
+            instruction,
+            core::slice::from_raw_parts(accounts.as_ptr() as _, len),
+            signers_seeds,
+        );
+    }
+
+    Ok(())
+}
+
 /// Invoke a cross-program instruction but don't enforce Rust's aliasing rules.
 ///
 /// This function does not check that [`Account`]s are properly borrowable.
