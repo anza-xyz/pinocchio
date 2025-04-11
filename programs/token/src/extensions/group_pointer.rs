@@ -29,15 +29,15 @@ impl GroupPointer {
     /// This method performs owner and length validation on `AccountInfo`, safe borrowing
     /// the account data.
     #[inline(always)]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<GroupPointer, ProgramError> {
+    pub fn from_account_info_unchecked(
+        account_info: &AccountInfo,
+    ) -> Result<&GroupPointer, ProgramError> {
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
-        let acc_data_bytes = account_info.try_borrow_data()?;
-        let acc_data_bytes = acc_data_bytes.as_ref();
-
-        get_extension_from_bytes::<Self>(acc_data_bytes).ok_or(ProgramError::InvalidAccountData)
+        get_extension_from_bytes(unsafe { account_info.borrow_data_unchecked() })
+            .ok_or(ProgramError::InvalidAccountData)
     }
 }
 
