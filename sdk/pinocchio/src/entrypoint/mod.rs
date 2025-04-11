@@ -365,25 +365,23 @@ macro_rules! no_allocator {
         /// initialize it later.
         #[inline]
         pub const unsafe fn allocate_unchecked<T: Sized>(offset: usize) -> &'static mut T {
-            unsafe {
-                let start = $crate::entrypoint::HEAP_START_ADDRESS as usize + offset;
-                let end = start + core::mem::size_of::<T>();
+            let start = $crate::entrypoint::HEAP_START_ADDRESS as usize + offset;
+            let end = start + core::mem::size_of::<T>();
 
-                // Assert if the allocation does not exceed the heap size.
-                assert!(
-                    end <= $crate::entrypoint::HEAP_START_ADDRESS as usize
-                        + $crate::entrypoint::HEAP_LENGTH,
-                    "allocation exceeds heap size"
-                );
+            // Assert if the allocation does not exceed the heap size.
+            assert!(
+                end <= $crate::entrypoint::HEAP_START_ADDRESS as usize
+                    + $crate::entrypoint::HEAP_LENGTH,
+                "allocation exceeds heap size"
+            );
 
-                // Assert if the pointer is aligned to `T`.
-                assert!(
-                    start % core::mem::align_of::<T>() == 0,
-                    "offset is not aligned"
-                );
+            // Assert if the pointer is aligned to `T`.
+            assert!(
+                start % core::mem::align_of::<T>() == 0,
+                "offset is not aligned"
+            );
 
-                &mut *(start as *mut T)
-            }
+            &mut *(start as *mut T)
         }
     };
 }
