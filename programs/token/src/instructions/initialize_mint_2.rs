@@ -10,6 +10,8 @@ use pinocchio::{
 
 use crate::{write_bytes, UNINIT_BYTE};
 
+use super::TokenProgramVariant;
+
 /// Initialize a new mint.
 ///
 /// ### Accounts:
@@ -27,11 +29,15 @@ pub struct InitializeMint2<'a> {
 
 impl InitializeMint2<'_> {
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+    pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
+        self.invoke_signed(&[], token_program)
     }
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers: &[Signer],
+        token_program: TokenProgramVariant,
+    ) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.mint.key())];
 
@@ -58,7 +64,7 @@ impl InitializeMint2<'_> {
         }
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: &token_program.into(),
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 67) },
         };

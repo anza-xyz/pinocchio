@@ -9,6 +9,8 @@ use pinocchio::{
 
 use crate::{write_bytes, UNINIT_BYTE};
 
+use super::TokenProgramVariant;
+
 /// Transfer Tokens from one Token Account to another.
 ///
 /// ### Accounts:
@@ -28,11 +30,15 @@ pub struct Transfer<'a> {
 
 impl Transfer<'_> {
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+    pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
+        self.invoke_signed(&[], token_program)
     }
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers: &[Signer],
+        token_program: TokenProgramVariant,
+    ) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
             AccountMeta::writable(self.from.key()),
@@ -51,7 +57,7 @@ impl Transfer<'_> {
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: &token_program.into(),
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
         };

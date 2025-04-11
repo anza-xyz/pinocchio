@@ -8,6 +8,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use super::TokenProgramVariant;
+
 /// Burns tokens by removing them from an account.
 ///
 /// ### Accounts:
@@ -29,11 +31,15 @@ pub struct BurnChecked<'a> {
 
 impl BurnChecked<'_> {
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+    pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
+        self.invoke_signed(&[], token_program)
     }
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers: &[Signer],
+        token_program: TokenProgramVariant,
+    ) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 3] = [
             AccountMeta::writable(self.account.key()),
@@ -55,7 +61,7 @@ impl BurnChecked<'_> {
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: &token_program.into(),
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };

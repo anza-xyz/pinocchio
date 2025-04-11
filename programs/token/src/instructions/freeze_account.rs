@@ -5,6 +5,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use super::TokenProgramVariant;
+
 /// Freeze an Initialized account using the Mint's freeze_authority
 ///
 /// ### Accounts:
@@ -22,11 +24,15 @@ pub struct FreezeAccount<'a> {
 
 impl FreezeAccount<'_> {
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+    pub fn invoke(&self, token_program: TokenProgramVariant) -> ProgramResult {
+        self.invoke_signed(&[], token_program)
     }
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers: &[Signer],
+        token_program: TokenProgramVariant,
+    ) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
             AccountMeta::writable(self.account.key()),
@@ -35,7 +41,7 @@ impl FreezeAccount<'_> {
         ];
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: &token_program.into(),
             accounts: &account_metas,
             data: &[10],
         };
