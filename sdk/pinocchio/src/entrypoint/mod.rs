@@ -381,6 +381,7 @@ macro_rules! no_allocator {
                 "offset is not aligned"
             );
 
+            // SAFETY: The pointer is within a valid range and aligned to `T`.
             unsafe { &mut *(start as *mut T) }
         }
     };
