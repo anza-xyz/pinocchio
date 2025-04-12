@@ -41,7 +41,7 @@ impl TokenMetadata<'_> {
     /// the account data.
     #[inline(always)]
     pub fn from_account_info<'a>(
-        account_info: AccountInfo
+        account_info: AccountInfo,
     ) -> Result<TokenMetadata<'a>, ProgramError> {
         if account_info.data_len() < Self::SIZE_METADATA_LEN {
             return Err(ProgramError::InvalidAccountData);
@@ -53,10 +53,9 @@ impl TokenMetadata<'_> {
 
         let account_data = account_info.try_borrow_data()?;
 
-        let metadata_bytes = get_extension_data_bytes_for_variable_pack::<TokenMetadata>(
-            account_data.as_ref()
-        )
-            .ok_or(ProgramError::InvalidAccountData)?;
+        let metadata_bytes =
+            get_extension_data_bytes_for_variable_pack::<TokenMetadata>(account_data.as_ref())
+                .ok_or(ProgramError::InvalidAccountData)?;
 
         Self::from_bytes(metadata_bytes)
     }
@@ -73,44 +72,58 @@ impl TokenMetadata<'_> {
         offset += 32;
 
         let mint = unsafe { &*(data.as_ptr().add(offset) as *const [u8; 32]) };
-        
+
         offset += 32;
 
-        let name_len = &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
+        let name_len =
+            &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
 
         offset += 4;
 
-        let name = unsafe { core::str::from_utf8_unchecked(
-            core::slice::from_raw_parts(data.as_ptr().add(offset), *name_len as usize)
-        ) };
+        let name = unsafe {
+            core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+                data.as_ptr().add(offset),
+                *name_len as usize,
+            ))
+        };
 
         offset += *name_len as usize;
 
-        let symbol_len = &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
+        let symbol_len =
+            &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
 
         offset += 4;
 
-        let symbol = unsafe { core::str::from_utf8_unchecked(
-            core::slice::from_raw_parts(data.as_ptr().add(offset), *symbol_len as usize)
-        ) };
+        let symbol = unsafe {
+            core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+                data.as_ptr().add(offset),
+                *symbol_len as usize,
+            ))
+        };
 
         offset += *symbol_len as usize;
 
-        let uri_len = &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
+        let uri_len =
+            &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
 
         offset += 4;
 
-        let uri = unsafe { core::str::from_utf8_unchecked(
-            core::slice::from_raw_parts(data.as_ptr().add(offset), *uri_len as usize)
-        ) };
+        let uri = unsafe {
+            core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+                data.as_ptr().add(offset),
+                *uri_len as usize,
+            ))
+        };
 
         offset += *uri_len as usize;
 
-        let additional_metadata_len = &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
+        let additional_metadata_len =
+            &u32::from_le_bytes(unsafe { *(data.as_ptr().add(offset) as *const [u8; 4]) });
 
         offset += 4;
 
-        let additional_metadata = unsafe { core::slice::from_raw_parts( data.as_ptr().add(offset), data.len() - offset) };
+        let additional_metadata =
+            unsafe { core::slice::from_raw_parts(data.as_ptr().add(offset), data.len() - offset) };
 
         Ok(TokenMetadata {
             update_authority: *update_authority,
