@@ -17,7 +17,7 @@ use super::{get_extension_from_bytes, Extension};
 use super::{ElagamalPubkey, POD_AE_CIPHERTEXT_LEN, POD_ELGAMAL_CIPHERTEXT_LEN};
 
 /// Local definition mirroring spl_token_confidential_transfer::pod::PodElGamalCiphertext
-#[derive(Clone, Copy, Debug, PartialEq)] // Removed Default
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(C)]
 pub struct PodElGamalCiphertext(pub [u8; POD_ELGAMAL_CIPHERTEXT_LEN]);
 
@@ -28,7 +28,7 @@ impl Default for PodElGamalCiphertext {
 }
 
 /// Local definition mirroring spl_token_confidential_transfer::pod::PodAeCiphertext
-#[derive(Clone, Copy, Debug, PartialEq)] // Removed Default
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(C)]
 pub struct PodAeCiphertext(pub [u8; POD_AE_CIPHERTEXT_LEN]);
 
@@ -72,15 +72,16 @@ impl ConfidentialTransferMint {
     pub const LEN: usize = mem::size_of::<ConfidentialTransferMint>();
 
     /// Return a `ConfidentialTransferMint` from the given Mint account info.
+    /// 
+    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// the account data.
     #[inline(always)]
-    pub fn from_account_info(
+    pub fn from_account_info_unchecked(
         account_info: &AccountInfo,
     ) -> Result<&ConfidentialTransferMint, ProgramError> {
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-
-        let acc_data_bytes = account_info.try_borrow_data()?;
 
         get_extension_from_bytes(unsafe { account_info.borrow_data_unchecked() })
             .ok_or(ProgramError::InvalidAccountData)
@@ -139,15 +140,16 @@ impl ConfidentialTransferAccount {
     pub const LEN: usize = mem::size_of::<ConfidentialTransferAccount>();
 
     /// Return a `ConfidentialTransferAccount` from the given Token account info.
+    /// 
+    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// the account data.   
     #[inline(always)]
-    pub fn from_account_info(
+    pub fn from_account_info_unchecked(
         account_info: &AccountInfo,
     ) -> Result<&ConfidentialTransferAccount, ProgramError> {
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-
-        let acc_data_bytes = account_info.try_borrow_data()?;
 
         get_extension_from_bytes(unsafe { account_info.borrow_data_unchecked() })
             .ok_or(ProgramError::InvalidAccountData)
