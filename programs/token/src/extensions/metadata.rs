@@ -181,6 +181,15 @@ impl InitializeTokenMetadata<'_> {
     }
 
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        // Instruction data layout:
+        // -  [0..8] [u8]: instruction discriminator
+        // -  [8..12] u32: name length (x1)
+        // -  [12..12+x1] [u8]: name string
+        // -  [12+x1..16+x1] u32: symbol length (x2)
+        // -  [16+x1..16+x1+x2] [u8]: symbol string
+        // -  [16+x1+x2..20+x1+x2] u32: uri length (x3)
+        // -  [20+x1+x2..20+x1+x2+x3][u8]: uri string
+
         // Allocate a buffer with max possible data length.
         let mut buf = [UNINIT_BYTE; 995];
         let mut offset: usize = 0;
@@ -273,6 +282,19 @@ impl UpdateField<'_> {
     }
 
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        // Instruction data layout (if Field type is Key):
+        // -  [0..8] [u8]: instruction discriminator
+        // -  [8..9] u8: field enum type
+        // -  [9..13] u32: key length (x1)
+        // -  [13..13+x1] [u8]: key string
+        // -  [13+x1..17+x1] u32: value length (x2)
+        // -  [17+x1..17+x1+x2] [u8]: value string
+        // Instruction data layout (if Field type is not Key):
+        // -  [0..8] [u8]: instruction discriminator
+        // -  [8..9] u8: field enum type
+        // -  [9..13] u32: value length (x1)
+        // -  [13..13+x1] [u8]: value string
+
         // Allocate a buffer with max possible data length.
         let mut buf = [UNINIT_BYTE; 995];
         let mut offset: usize = 0;
