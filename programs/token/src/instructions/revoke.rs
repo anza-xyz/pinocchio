@@ -5,6 +5,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use crate::InstructionData;
+
 /// Revokes the delegate's authority.
 ///
 /// ### Accounts:
@@ -33,9 +35,16 @@ impl Revoke<'_> {
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &[5],
+            data: self.get_instruction_data(),
         };
 
         invoke_signed(&instruction, &[self.source, self.authority], signers)
+    }
+}
+
+impl InstructionData for Revoke<'_> {
+    #[inline]
+    fn get_instruction_data(&self) -> &[u8] {
+        &[5]
     }
 }
