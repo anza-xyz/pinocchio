@@ -156,7 +156,7 @@ impl Extension for TokenMetadata<'_> {
 }
 
 // Instructions
-pub struct InitializeTokenMetadata<'a> {
+pub struct InitializeTokenMetadata<'a, const BUF_SIZE: usize> {
     /// The mint that this metadata pointer is associated with
     pub metadata: &'a AccountInfo,
     /// The authority that can sign to update the metadata
@@ -174,7 +174,7 @@ pub struct InitializeTokenMetadata<'a> {
     pub uri: &'a str,
 }
 
-impl InitializeTokenMetadata<'_> {
+impl<const BUF_SIZE: usize> InitializeTokenMetadata<'_, BUF_SIZE> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -190,8 +190,7 @@ impl InitializeTokenMetadata<'_> {
         // -  [16+x1+x2..20+x1+x2] u32: uri length (x3)
         // -  [20+x1+x2..20+x1+x2+x3][u8]: uri string
 
-        // Allocate a buffer with max possible data length.
-        let mut buf = [UNINIT_BYTE; 995];
+        let mut buf = [UNINIT_BYTE; BUF_SIZE];
         let mut offset: usize = 0;
 
         // Set 8-byte discriminator.
@@ -264,7 +263,7 @@ impl Field<'_> {
     }
 }
 
-pub struct UpdateField<'a> {
+pub struct UpdateField<'a, const BUF_SIZE: usize> {
     /// The mint that this metadata pointer is associated with
     pub metadata: &'a AccountInfo,
     /// The authority that can sign to update the metadata
@@ -275,7 +274,7 @@ pub struct UpdateField<'a> {
     pub value: &'a str,
 }
 
-impl UpdateField<'_> {
+impl<const BUF_SIZE: usize> UpdateField<'_, BUF_SIZE> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -295,8 +294,7 @@ impl UpdateField<'_> {
         // -  [9..13] u32: value length (x1)
         // -  [13..13+x1] [u8]: value string
 
-        // Allocate a buffer with max possible data length.
-        let mut buf = [UNINIT_BYTE; 995];
+        let mut buf = [UNINIT_BYTE; BUF_SIZE];
         let mut offset: usize = 0;
         // Set 8-byte discriminator.
         let discriminator: [u8; 8] = [221, 233, 49, 45, 181, 202, 220, 200];
