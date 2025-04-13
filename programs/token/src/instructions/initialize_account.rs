@@ -55,6 +55,7 @@ impl InitializeAccount<'_> {
 }
 
 impl InstructionData for InitializeAccount<'_> {
+    #[inline]
     fn get_instruction_data(&self) -> &[u8] {
         &[1]
     }

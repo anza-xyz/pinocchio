@@ -7,6 +7,8 @@ use pinocchio::{
     program::invoke_signed,
     ProgramResult,
 };
+extern crate alloc;
+use alloc::boxed::Box;
 
 /// Burns tokens by removing them from an account.
 ///
@@ -56,15 +58,16 @@ impl BurnChecked<'_> {
 }
 
 impl InstructionData for BurnChecked<'_> {
+    #[inline]
     fn get_instruction_data(&self) -> &[u8] {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1..9]: amount (8 bytes, u64)
         // -  [9]: decimals (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 10];
+        let mut instruction_data = Box::new([UNINIT_BYTE; 10]);
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[15]);
+        write_bytes(&mut instruction_data.as_mut_slice(), &[15]);
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
         // Set decimals as u8 at offset [9]

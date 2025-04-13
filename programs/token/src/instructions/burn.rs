@@ -8,6 +8,8 @@ use pinocchio::{
 };
 
 use crate::{write_bytes, InstructionData, UNINIT_BYTE};
+extern crate alloc;
+use alloc::boxed::Box;
 
 /// Burns tokens by removing them from an account.
 ///
@@ -55,14 +57,15 @@ impl Burn<'_> {
 }
 
 impl InstructionData for Burn<'_> {
+    #[inline]
     fn get_instruction_data(&self) -> &[u8] {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1..9]: amount (8 bytes, u64)
-        let mut instruction_data = [UNINIT_BYTE; 9];
+        let mut instruction_data = Box::new([UNINIT_BYTE; 9]);
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[8]);
+        write_bytes(&mut instruction_data.as_mut_slice(), &[8]);
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..], &self.amount.to_le_bytes());
 

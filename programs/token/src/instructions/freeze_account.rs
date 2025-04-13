@@ -51,6 +51,7 @@ impl FreezeAccount<'_> {
 }
 
 impl InstructionData for FreezeAccount<'_> {
+    #[inline]
     fn get_instruction_data(&self) -> &[u8] {
         &[10]
     }

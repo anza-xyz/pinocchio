@@ -9,6 +9,8 @@ use pinocchio::{
 };
 
 use crate::{write_bytes, InstructionData, UNINIT_BYTE};
+extern crate alloc;
+use alloc::boxed::Box;
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
@@ -69,10 +71,10 @@ impl InstructionData for SetAuthority<'_> {
         // -  [1]: authority_type (1 byte, u8)
         // -  [2]: new_authority presence flag (1 byte, AuthorityType)
         // -  [3..35] new_authority (optional, 32 bytes, Pubkey)
-        let mut instruction_data = [UNINIT_BYTE; 35];
+        let mut instruction_data = Box::new([UNINIT_BYTE; 35]);
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[6]);
+        write_bytes(&mut instruction_data.as_mut_slice(), &[6]);
         // Set authority_type as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[self.authority_type as u8]);
         // Set new_authority as [u8; 32] at offset [2..35]

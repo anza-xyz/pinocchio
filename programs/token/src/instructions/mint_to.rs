@@ -8,6 +8,8 @@ use pinocchio::{
 };
 
 use crate::{write_bytes, InstructionData, UNINIT_BYTE};
+extern crate alloc;
+use alloc::boxed::Box;
 
 /// Mints new tokens to an account.
 ///
@@ -56,14 +58,15 @@ impl MintTo<'_> {
 }
 
 impl InstructionData for MintTo<'_> {
+    #[inline]
     fn get_instruction_data(&self) -> &[u8] {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1..9]: amount (8 bytes, u64)
-        let mut instruction_data = [UNINIT_BYTE; 9];
+        let mut instruction_data = Box::new([UNINIT_BYTE; 9]);
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[7]);
+        write_bytes(&mut instruction_data.as_mut_slice(), &[7]);
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 

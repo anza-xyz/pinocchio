@@ -51,6 +51,7 @@ impl CloseAccount<'_> {
 }
 
 impl InstructionData for CloseAccount<'_> {
+    #[inline]
     fn get_instruction_data(&self) -> &[u8] {
         &[9]
     }

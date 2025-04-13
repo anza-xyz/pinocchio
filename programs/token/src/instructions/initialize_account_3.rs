@@ -9,6 +9,8 @@ use pinocchio::{
 };
 
 use crate::{write_bytes, InstructionData, UNINIT_BYTE};
+extern crate alloc;
+use alloc::boxed::Box;
 
 /// Initialize a new Token Account.
 ///
@@ -48,14 +50,15 @@ impl InitializeAccount3<'_> {
 }
 
 impl InstructionData for InitializeAccount3<'_> {
+    #[inline]
     fn get_instruction_data(&self) -> &[u8] {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1..33]: owner (32 bytes, Pubkey)
-        let mut instruction_data = [UNINIT_BYTE; 33];
+        let mut instruction_data = Box::new([UNINIT_BYTE; 33]);
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[18]);
+        write_bytes(&mut instruction_data.as_mut_slice(), &[18]);
         // Set owner as [u8; 32] at offset [1..33]
         write_bytes(&mut instruction_data[1..], self.owner);
 
