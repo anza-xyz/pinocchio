@@ -8,7 +8,7 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::{write_bytes, UNINIT_BYTE};
+use crate::{write_bytes, InstructionData, UNINIT_BYTE};
 
 /// Initialize a new mint.
 ///
@@ -41,6 +41,18 @@ impl InitializeMint<'_> {
             AccountMeta::readonly(self.rent_sysvar.key()),
         ];
 
+        let instruction = Instruction {
+            program_id: &crate::ID,
+            accounts: &account_metas,
+            data: self.get_instruction_data(),
+        };
+
+        invoke_signed(&instruction, &[self.mint, self.rent_sysvar], signers)
+    }
+}
+
+impl InstructionData for InitializeMint<'_> {
+    fn get_instruction_data(&self) -> &[u8] {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: decimals (1 byte, u8)
@@ -63,12 +75,6 @@ impl InitializeMint<'_> {
             write_bytes(&mut instruction_data[34..35], &[0]);
         }
 
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 67) },
-        };
-
-        invoke_signed(&instruction, &[self.mint, self.rent_sysvar], signers)
+        unsafe { from_raw_parts(instruction_data.as_ptr() as _, 67) }
     }
 }

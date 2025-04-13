@@ -7,7 +7,7 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::{write_bytes, UNINIT_BYTE};
+use crate::{write_bytes, InstructionData, UNINIT_BYTE};
 
 /// Mints new tokens to an account.
 ///
@@ -41,6 +41,22 @@ impl MintTo<'_> {
             AccountMeta::readonly_signer(self.mint_authority.key()),
         ];
 
+        let instruction = Instruction {
+            program_id: &crate::ID,
+            accounts: &account_metas,
+            data: self.get_instruction_data(),
+        };
+
+        invoke_signed(
+            &instruction,
+            &[self.mint, self.account, self.mint_authority],
+            signers,
+        )
+    }
+}
+
+impl InstructionData for MintTo<'_> {
+    fn get_instruction_data(&self) -> &[u8] {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1..9]: amount (8 bytes, u64)
@@ -51,16 +67,6 @@ impl MintTo<'_> {
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
-        };
-
-        invoke_signed(
-            &instruction,
-            &[self.mint, self.account, self.mint_authority],
-            signers,
-        )
+        unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) }
     }
 }

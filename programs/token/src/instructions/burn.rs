@@ -7,7 +7,7 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::{write_bytes, UNINIT_BYTE};
+use crate::{write_bytes, InstructionData, UNINIT_BYTE};
 
 /// Burns tokens by removing them from an account.
 ///
@@ -40,7 +40,23 @@ impl Burn<'_> {
             AccountMeta::readonly_signer(self.authority.key()),
         ];
 
-        // Instruction data
+        let instruction = Instruction {
+            program_id: &crate::ID,
+            accounts: &account_metas,
+            data: self.get_instruction_data(),
+        };
+
+        invoke_signed(
+            &instruction,
+            &[self.account, self.mint, self.authority],
+            signers,
+        )
+    }
+}
+
+impl InstructionData for Burn<'_> {
+    fn get_instruction_data(&self) -> &[u8] {
+        // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1..9]: amount (8 bytes, u64)
         let mut instruction_data = [UNINIT_BYTE; 9];
@@ -50,16 +66,6 @@ impl Burn<'_> {
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..], &self.amount.to_le_bytes());
 
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
-        };
-
-        invoke_signed(
-            &instruction,
-            &[self.account, self.mint, self.authority],
-            signers,
-        )
+        unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) }
     }
 }
