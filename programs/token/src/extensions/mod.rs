@@ -385,7 +385,6 @@ mod tests {
         assert!(confidential_transfer_fee_config.is_some());
     }
 
-    #[cfg(feature = "std")]
     #[test]
     fn test_token_metadata() {
         use crate::extensions::get_extension_data_bytes_for_variable_pack;

@@ -156,6 +156,11 @@ impl Extension for TokenMetadata<'_> {
 }
 
 // Instructions
+/// Instruction to initialize a token metadata account,
+/// this takes a constant buffer size to avoid heap allocations
+/// `BUF_SIZE` is the size of the buffer to use for the instruction data
+/// `BUF_SIZE` = 8 + 4 + name_len + 4 + symbol_len + 4 + uri_len
+/// if `BUF_SIZE` is not equal to size of instruction data, it will return an error
 pub struct InitializeTokenMetadata<'a, const BUF_SIZE: usize> {
     /// The mint that this metadata pointer is associated with
     pub metadata: &'a AccountInfo,
@@ -182,44 +187,54 @@ impl<const BUF_SIZE: usize> InitializeTokenMetadata<'_, BUF_SIZE> {
 
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data layout:
-        // -  [0..8] [u8]: instruction discriminator
-        // -  [8..12] u32: name length (x1)
-        // -  [12..12+x1] [u8]: name string
-        // -  [12+x1..16+x1] u32: symbol length (x2)
-        // -  [16+x1..16+x1+x2] [u8]: symbol string
-        // -  [16+x1+x2..20+x1+x2] u32: uri length (x3)
-        // -  [20+x1+x2..20+x1+x2+x3][u8]: uri string
+        // -  [0..8] : instruction discriminator
+        // -  [8..12] : name length (x1)
+        // -  [12..12+x1] : name string
+        // -  [12+x1..16+x1] : symbol length (x2)
+        // -  [16+x1..16+x1+x2]: symbol string
+        // -  [16+x1+x2..20+x1+x2] : uri length (x3)
+        // -  [20+x1+x2..20+x1+x2+x3] : uri string
 
-        let mut buf = [UNINIT_BYTE; BUF_SIZE];
+        let calculated_ix_size =
+            8 + 4 + self.name.len() + 4 + self.symbol.len() + 4 + self.uri.len();
+
+        if calculated_ix_size != BUF_SIZE {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        let mut ix_data = [UNINIT_BYTE; BUF_SIZE];
         let mut offset: usize = 0;
 
         // Set 8-byte discriminator.
         let discriminator: [u8; 8] = [210, 225, 30, 162, 88, 184, 77, 141];
-        write_bytes(&mut buf[offset..offset + 8], &discriminator);
+        write_bytes(&mut ix_data[offset..offset + 8], &discriminator);
         offset += 8;
 
         // Set name length, and name data bytes,
         let name_bytes = self.name.as_bytes();
         let name_len = name_bytes.len() as u32;
-        write_bytes(&mut buf[offset..offset + 4], &name_len.to_le_bytes());
+        write_bytes(&mut ix_data[offset..offset + 4], &name_len.to_le_bytes());
         offset += 4;
-        write_bytes(&mut buf[offset..offset + name_bytes.len()], name_bytes);
+        write_bytes(&mut ix_data[offset..offset + name_bytes.len()], name_bytes);
         offset += name_bytes.len();
 
         // Set symbol length, and symbol data bytes,
         let symbol_bytes = self.symbol.as_bytes();
         let symbol_len = symbol_bytes.len() as u32;
-        write_bytes(&mut buf[offset..offset + 4], &symbol_len.to_le_bytes());
+        write_bytes(&mut ix_data[offset..offset + 4], &symbol_len.to_le_bytes());
         offset += 4;
-        write_bytes(&mut buf[offset..offset + symbol_bytes.len()], symbol_bytes);
+        write_bytes(
+            &mut ix_data[offset..offset + symbol_bytes.len()],
+            symbol_bytes,
+        );
         offset += symbol_bytes.len();
 
         // Set uri length, and uri data bytes,
         let uri_bytes = self.uri.as_bytes();
         let uri_len = uri_bytes.len() as u32;
-        write_bytes(&mut buf[offset..offset + 4], &uri_len.to_le_bytes());
+        write_bytes(&mut ix_data[offset..offset + 4], &uri_len.to_le_bytes());
         offset += 4;
-        write_bytes(&mut buf[offset..offset + uri_bytes.len()], uri_bytes);
+        write_bytes(&mut ix_data[offset..offset + uri_bytes.len()], uri_bytes);
         offset += uri_bytes.len();
 
         let account_metas: [AccountMeta; 4] = [
@@ -233,7 +248,7 @@ impl<const BUF_SIZE: usize> InitializeTokenMetadata<'_, BUF_SIZE> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(buf.as_ptr() as _, offset) },
+            data: unsafe { core::slice::from_raw_parts(ix_data.as_ptr() as _, offset) },
         };
 
         invoke_signed(&instruction, &[self.metadata, self.mint_authority], signers)
@@ -294,32 +309,35 @@ impl<const BUF_SIZE: usize> UpdateField<'_, BUF_SIZE> {
         // -  [9..13] u32: value length (x1)
         // -  [13..13+x1] [u8]: value string
 
-        let mut buf = [UNINIT_BYTE; BUF_SIZE];
+        let mut ix_data = [UNINIT_BYTE; BUF_SIZE];
         let mut offset: usize = 0;
         // Set 8-byte discriminator.
         let discriminator: [u8; 8] = [221, 233, 49, 45, 181, 202, 220, 200];
-        write_bytes(&mut buf[offset..offset + 8], &discriminator);
+        write_bytes(&mut ix_data[offset..offset + 8], &discriminator);
         offset += 8;
 
-        write_bytes(&mut buf[offset..offset + 1], &[self.field.to_u8()]);
+        write_bytes(&mut ix_data[offset..offset + 1], &[self.field.to_u8()]);
         offset += 1;
 
         // Set serialized key data in buffer if Field is Key type.
         if let Field::Key(key) = self.field {
             let key_bytes = key.as_bytes();
             let key_len = key_bytes.len() as u32;
-            write_bytes(&mut buf[offset..offset + 4], &key_len.to_le_bytes());
+            write_bytes(&mut ix_data[offset..offset + 4], &key_len.to_le_bytes());
             offset += 4;
-            write_bytes(&mut buf[offset..offset + key_bytes.len()], key_bytes);
+            write_bytes(&mut ix_data[offset..offset + key_bytes.len()], key_bytes);
             offset += key_bytes.len();
         }
 
         // Set serialized value data in buffer
         let value_bytes = self.value.as_bytes();
         let value_len = value_bytes.len() as u32;
-        write_bytes(&mut buf[offset..offset + 4], &value_len.to_le_bytes());
+        write_bytes(&mut ix_data[offset..offset + 4], &value_len.to_le_bytes());
         offset += 4;
-        write_bytes(&mut buf[offset..offset + value_bytes.len()], value_bytes);
+        write_bytes(
+            &mut ix_data[offset..offset + value_bytes.len()],
+            value_bytes,
+        );
         offset += value_bytes.len();
 
         let account_metas: [AccountMeta; 2] = [
@@ -331,7 +349,7 @@ impl<const BUF_SIZE: usize> UpdateField<'_, BUF_SIZE> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(buf.as_ptr() as _, offset) },
+            data: unsafe { core::slice::from_raw_parts(ix_data.as_ptr() as _, offset) },
         };
 
         invoke_signed(
