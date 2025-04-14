@@ -3,6 +3,7 @@ use crate::{
     state::{Mint, TokenAccount},
 };
 // pub mod confidential_transfer;
+pub mod confidential_transfer;
 pub mod cpi_guard;
 pub mod default_account_state;
 pub mod group_member_pointer;
@@ -24,6 +25,7 @@ pub const ELGAMAL_PUBKEY_LEN: usize = 32;
 pub const POD_AE_CIPHERTEXT_LEN: usize = 36;
 pub const POD_ELGAMAL_CIPHERTEXT_LEN: usize = 64;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct ElagamalPubkey(pub [u8; ELGAMAL_PUBKEY_LEN]);
 
 pub const EXTENSIONS_PADDING: usize = 83;
@@ -225,10 +227,15 @@ pub fn get_extension_data_bytes_for_variable_pack<T: Extension + Clone>(
 #[cfg(test)]
 mod tests {
     use crate::extensions::{
-        get_extension_from_bytes, group_member_pointer::GroupMemberPointer,
-        group_pointer::GroupPointer, metadata_pointer::MetadataPointer,
-        mint_close_authority::MintCloseAuthority, permanent_delegate::PermanentDelegate,
-        token_group::TokenGroup, transfer_fee::TransferFeeConfig,
+        confidential_transfer::{ConfidentialTransferFeeConfig, ConfidentialTransferMint},
+        get_extension_from_bytes,
+        group_member_pointer::GroupMemberPointer,
+        group_pointer::GroupPointer,
+        metadata_pointer::MetadataPointer,
+        mint_close_authority::MintCloseAuthority,
+        permanent_delegate::PermanentDelegate,
+        token_group::TokenGroup,
+        transfer_fee::TransferFeeConfig,
     };
 
     pub const TEST_MINT_WITH_EXTENSIONS_SLICE: &[u8] = &[
@@ -363,6 +370,22 @@ mod tests {
         assert!(gmp.member_address.eq(&[2u8; 32]));
     }
 
+    #[test]
+    fn test_confidential_transfer_mint() {
+        let confidential_transfer_mint =
+            get_extension_from_bytes::<ConfidentialTransferMint>(&TEST_MINT_WITH_EXTENSIONS_SLICE);
+        assert!(confidential_transfer_mint.is_some());
+    }
+
+    #[test]
+    fn test_confidential_transfer_fee_config() {
+        let confidential_transfer_fee_config = get_extension_from_bytes::<
+            ConfidentialTransferFeeConfig,
+        >(&TEST_MINT_WITH_EXTENSIONS_SLICE);
+        assert!(confidential_transfer_fee_config.is_some());
+    }
+
+    #[cfg(feature = "std")]
     #[test]
     fn test_token_metadata() {
         use crate::extensions::get_extension_data_bytes_for_variable_pack;
