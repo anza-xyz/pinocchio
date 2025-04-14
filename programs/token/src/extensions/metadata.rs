@@ -195,13 +195,6 @@ impl<const BUF_SIZE: usize> InitializeTokenMetadata<'_, BUF_SIZE> {
         // -  [16+x1+x2..20+x1+x2] : uri length (x3)
         // -  [20+x1+x2..20+x1+x2+x3] : uri string
 
-        let calculated_ix_size =
-            8 + 4 + self.name.len() + 4 + self.symbol.len() + 4 + self.uri.len();
-
-        if calculated_ix_size != BUF_SIZE {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-
         let mut ix_data = [UNINIT_BYTE; BUF_SIZE];
         let mut offset: usize = 0;
 
