@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::str;
 
 use super::{get_extension_data_bytes_for_variable_pack, BaseState, Extension, ExtensionType};
-use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
+use crate::TOKEN_2022_PROGRAM_ID;
 use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke_signed,
