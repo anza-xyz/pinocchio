@@ -220,7 +220,7 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
     (program_id, processed, instruction_data)
 }
 
-/// Default panic hook (std).
+/// Default panic hook.
 ///
 /// This macro sets up a default panic hook that logs the panic message and the file where the
 /// panic occurred. Syscall "abort()" will be called after it returns. It acts as a hook after
@@ -241,11 +241,11 @@ macro_rules! default_panic_handler {
     };
 }
 
-/// Default panic hook (no std).
+/// Default panic hook.
 ///
 /// This macro sets up a default panic hook that logs the file where the panic occurred.
 ///
-/// This is used when the `"std"` feature is disabled and program is `std`.
+/// This is used when the `"std"` feature is disabled.
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! default_panic_handler {
@@ -263,12 +263,10 @@ macro_rules! default_panic_handler {
     };
 }
 
-/// A rust panic handler for `no_std`.
+/// A global `#[panic_handler]` for `no_std` programs.
 ///
-/// When all crates are `no_std`, we need to define a global `#[panic_handler]`.
-/// It takes over the default rust panic handler.
-///
-/// This macro is used when the `"std"` feature is disabled.
+/// This macro can only be used when all crates are `no_std` and the `"std"` feature is
+/// disabled.
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! nostd_panic_handler {
@@ -294,13 +292,13 @@ macro_rules! nostd_panic_handler {
             }
         }
 
-        /// A placeholder for `cargo clippy`
-        ///
-        /// Add `panic = "abort"` to `[profile.dev]` in `Cargo.toml` for clippy
+        // A placeholder for `cargo clippy`.
+        //
+        // Add `panic = "abort"` to `[profile.dev]` in `Cargo.toml` for clippy.
         #[cfg(not(target_os = "solana"))]
         #[no_mangle]
         #[panic_handler]
-        fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
+        fn handler(_info: &core::panic::PanicInfo<'_>) -> ! {
             unsafe { core::hint::unreachable_unchecked() }
         }
     };
@@ -319,9 +317,8 @@ macro_rules! default_allocator {
             len: $crate::entrypoint::HEAP_LENGTH,
         };
 
-        // A placeholder for `cargo clippy`
-        #[cfg(not(target_os = "solana"))]
-        #[cfg(not(feature = "std"))]
+        // A placeholder for `cargo clippy`.
+        #[cfg(not(any(target_os = "solana", test)))]
         #[global_allocator]
         static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
     };
@@ -353,6 +350,9 @@ macro_rules! no_allocator {
 
         /// Allocates memory for the given type `T` at the specified offset in the
         /// heap reserved address space.
+        ///
+        /// This function requires the `#![feature(const_mut_refs)]` crate feature
+        /// to be set.
         ///
         /// # Safety
         ///
