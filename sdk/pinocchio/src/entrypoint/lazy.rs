@@ -85,7 +85,9 @@ macro_rules! lazy_program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            match $process_instruction($crate::entrypoint::lazy::InstructionContext::new(input)) {
+            match $process_instruction($crate::entrypoint::lazy::InstructionContext::new_unchecked(
+                input,
+            )) {
                 Ok(_) => $crate::SUCCESS,
                 Err(error) => error.into(),
             }
@@ -112,10 +114,31 @@ pub struct InstructionContext {
 
 impl InstructionContext {
     /// Creates a new [`InstructionContext`] for the input buffer.
+    ///
+    /// The caller must ensure that the input buffer is valid, i.e., it represents
+    /// the program input parameters serialzed by the SVM loader.
+    ///
+    /// This method is deprecated and will be removed in a future version. It is
+    /// missing the `unsafe` qualifier.
+    #[deprecated(since = "0.8.3", note = "Use `new_unchecked` instead")]
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     #[inline(always)]
     pub fn new(input: *mut u8) -> Self {
+        unsafe { Self::new_unchecked(input) }
+    }
+
+    /// Creates a new [`InstructionContext`] for the input buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the input buffer is valid, i.e., it represents
+    /// the program input parameters serialized by the SVM loader.
+    #[inline(always)]
+    pub unsafe fn new_unchecked(input: *mut u8) -> Self {
         Self {
             input,
+            // SAFETY: The first 8 bytes of the input buffer represent the
+            // number of accounts when serialized by the SVM loader.
             remaining: unsafe { *(input as *const u64) },
             offset: core::mem::size_of::<u64>(),
         }
