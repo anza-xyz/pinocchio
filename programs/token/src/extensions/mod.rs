@@ -17,8 +17,10 @@ pub mod mint_close_authority;
 pub mod non_transferable;
 pub mod pausable;
 pub mod permanent_delegate;
+pub mod reallocate;
 pub mod token_group;
 pub mod transfer_fee;
+pub mod transfer_hook;
 
 pub const ELGAMAL_PUBKEY_LEN: usize = 32;
 

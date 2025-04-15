@@ -18,7 +18,7 @@ pub struct PausableConfig {
     /// Authority that can pause or resume activity on the mint
     pub authority: Pubkey,
     /// Whether minting / transferring / burning tokens is paused
-    pub paused: bool,
+    pub paused: u8,
 }
 
 impl super::Extension for PausableConfig {

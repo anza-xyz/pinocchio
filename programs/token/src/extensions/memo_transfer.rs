@@ -14,7 +14,7 @@ use super::get_extension_from_bytes;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MemoTransfer {
     /// Require transfers into this account to be accompanied by a memo
-    pub require_incoming_transfer_memos: bool,
+    pub require_incoming_transfer_memos: u8,
 }
 
 impl super::Extension for MemoTransfer {
