@@ -1,10 +1,8 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey};
+
+use crate::{InvokeParts, TruncatedInstructionData};
+
+use super::AllocateWithSeed;
 
 /// Assign account to a program based on a seed.
 ///
@@ -29,40 +27,39 @@ pub struct AssignWithSeed<'a, 'b, 'c> {
     pub owner: &'c Pubkey,
 }
 
-impl AssignWithSeed<'_, '_, '_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 2;
+const DATA_LEN: usize = 104;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable_signer(self.account.key()),
-            AccountMeta::readonly_signer(self.base.key()),
-        ];
+impl<'a, 'b, 'c> From<AllocateWithSeed<'a, 'b, 'c>>
+    for InvokeParts<'a, N_ACCOUNTS, TruncatedInstructionData<DATA_LEN>>
+{
+    fn from(value: AllocateWithSeed<'a, 'b, 'c>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [value.account, value.base],
+            account_metas: [
+                AccountMeta::writable_signer(value.account.key()),
+                AccountMeta::readonly_signer(value.base.key()),
+            ],
+            instruction_data: {
+                // instruction data
+                // - [0..4  ]: instruction discriminator
+                // - [4..36 ]: base pubkey
+                // - [36..44]: seed length
+                // - [44..  ]: seed (max 32)
+                // - [.. +32]: owner pubkey
+                let mut instruction_data = [0; DATA_LEN];
+                instruction_data[0] = 10;
+                instruction_data[4..36].copy_from_slice(value.base.key());
+                instruction_data[36..44]
+                    .copy_from_slice(&u64::to_le_bytes(value.seed.len() as u64));
 
-        // instruction data
-        // - [0..4  ]: instruction discriminator
-        // - [4..36 ]: base pubkey
-        // - [36..44]: seed length
-        // - [44..  ]: seed (max 32)
-        // - [.. +32]: owner pubkey
-        let mut instruction_data = [0; 104];
-        instruction_data[0] = 10;
-        instruction_data[4..36].copy_from_slice(self.base.key());
-        instruction_data[36..44].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
+                let offset = 44 + value.seed.len();
+                instruction_data[44..offset].copy_from_slice(value.seed.as_bytes());
+                instruction_data[offset..offset + 32].copy_from_slice(value.owner.as_ref());
 
-        let offset = 44 + self.seed.len();
-        instruction_data[44..offset].copy_from_slice(self.seed.as_bytes());
-        instruction_data[offset..offset + 32].copy_from_slice(self.owner.as_ref());
-
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data[..offset + 32],
-        };
-
-        invoke_signed(&instruction, &[self.account, self.base], signers)
+                TruncatedInstructionData::new(instruction_data, offset + 32)
+            },
+        }
     }
 }

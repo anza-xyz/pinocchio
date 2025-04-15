@@ -1,9 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta};
+
+use crate::{FullInstructionData, InvokeParts};
 
 /// Consumes a stored nonce, replacing it with a successor.
 ///
@@ -22,31 +19,26 @@ pub struct AdvanceNonceAccount<'a> {
     pub authority: &'a AccountInfo,
 }
 
-impl AdvanceNonceAccount<'_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 3;
+const DATA_LEN: usize = 1;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
-        ];
-
-        // instruction
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &[4],
-        };
-
-        invoke_signed(
-            &instruction,
-            &[self.account, self.recent_blockhashes_sysvar, self.authority],
-            signers,
-        )
+impl<'a> From<AdvanceNonceAccount<'a>>
+    for InvokeParts<'a, N_ACCOUNTS, FullInstructionData<DATA_LEN>>
+{
+    fn from(value: AdvanceNonceAccount<'a>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [
+                value.account,
+                value.recent_blockhashes_sysvar,
+                value.authority,
+            ],
+            account_metas: [
+                AccountMeta::writable(value.account.key()),
+                AccountMeta::readonly(value.recent_blockhashes_sysvar.key()),
+                AccountMeta::readonly_signer(value.authority.key()),
+            ],
+            instruction_data: { FullInstructionData::new([4]) },
+        }
     }
 }
