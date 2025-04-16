@@ -186,7 +186,7 @@ impl InitializeTokenMetadata<'_> {
 
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data layout:
-        // -  [0..8] : instruction discriminator
+        // -  [0..8] : extension instruction discriminator
         // -  [8..12] : name length (x1)
         // -  [12..12+x1] : name string
         // -  [12+x1..16+x1] : symbol length (x2)
@@ -194,7 +194,14 @@ impl InitializeTokenMetadata<'_> {
         // -  [16+x1+x2..20+x1+x2] : uri length (x3)
         // -  [20+x1+x2..20+x1+x2+x3] : uri string
 
-        let mut ix_data: Vec<u8> = Vec::new();
+        let ix_len = 8 // instruction discriminator
+            + 4 // name length
+            + self.name.len()
+            + 4 // symbol length
+            + self.symbol.len()
+            + 4 // uri length
+            + self.uri.len();
+        let mut ix_data: Vec<u8> = Vec::with_capacity(ix_len);
 
         // Set 8-byte discriminator.
         let discriminator: [u8; 8] = [210, 225, 30, 162, 88, 184, 77, 141];
@@ -225,7 +232,7 @@ impl InitializeTokenMetadata<'_> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: &ix_data.to_vec(),
+            data: &ix_data,
         };
 
         invoke_signed(&instruction, &[self.metadata, self.mint_authority], signers)
@@ -286,7 +293,17 @@ impl UpdateField<'_> {
         // -  [9..13] u32: value length (x1)
         // -  [13..13+x1] [u8]: value string
 
-        let mut ix_data: Vec<u8> = Vec::new();
+        let ix_len = 8 // instruction discriminator
+            + 1 // field type
+            + if let Field::Key(key) = self.field {
+                4 + key.len()
+            } else {
+                0
+            }
+            + 4 // value length
+            + self.value.len();
+
+        let mut ix_data: Vec<u8> = Vec::with_capacity(ix_len);
 
         // Set 8-byte discriminator.
         let discriminator: [u8; 8] = [221, 233, 49, 45, 181, 202, 220, 200];
@@ -314,7 +331,7 @@ impl UpdateField<'_> {
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: &ix_data.to_vec(),
+            data: &ix_data,
         };
 
         invoke_signed(

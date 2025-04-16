@@ -18,6 +18,7 @@ pub mod non_transferable;
 pub mod pausable;
 pub mod permanent_delegate;
 pub mod reallocate;
+pub mod scaled_ui_amount;
 pub mod token_group;
 pub mod transfer_fee;
 pub mod transfer_hook;
@@ -34,7 +35,7 @@ pub const EXTENSIONS_PADDING: usize = 83;
 
 pub const EXTENSION_START_OFFSET: usize = 1;
 
-#[repr(u8)]
+#[repr(u16)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExtensionType {
     /// Used as padding if the account size would otherwise be 355, same as a
@@ -140,6 +141,10 @@ impl ExtensionType {
         };
         Some(ext)
     }
+
+    pub fn to_bytes(&self) -> [u8; 2] {
+        u16::to_le_bytes(*self as u16)
+    }
 }
 
 pub const EXTENSION_LENGTH_LEN: usize = 2;
@@ -233,6 +238,7 @@ mod tests {
         get_extension_from_bytes,
         group_member_pointer::GroupMemberPointer,
         group_pointer::GroupPointer,
+        metadata::TokenMetadata,
         metadata_pointer::MetadataPointer,
         mint_close_authority::MintCloseAuthority,
         permanent_delegate::PermanentDelegate,
@@ -390,7 +396,6 @@ mod tests {
     #[test]
     fn test_token_metadata() {
         use crate::extensions::get_extension_data_bytes_for_variable_pack;
-        use crate::extensions::metadata::TokenMetadata;
 
         let token_metadata = get_extension_data_bytes_for_variable_pack::<TokenMetadata>(
             &TEST_MINT_WITH_EXTENSIONS_SLICE,
