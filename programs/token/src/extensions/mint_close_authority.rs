@@ -65,22 +65,26 @@ impl InitializeMintCloseAuthority<'_> {
         let account_metas = [AccountMeta::writable(self.mint.key())];
         // Instruction data Layout:
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..33]: close authority (32 bytes, Pubkey)
+        // -  [1]: option type (1 byte)
+        // -  [2..34]: close authority (32 bytes, Pubkey)
 
-        let mut instruction_data = [UNINIT_BYTE; 33];
+        let mut instruction_data = [UNINIT_BYTE; 34];
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data[0..1], &[25]);
-        // Set close authority as Pubkey at offset [1..33]
+        // Set option type at offset [1]
+        // Set close authority as Pubkey at offset [2..34]
         if let Some(close_authority) = self.close_authority {
-            write_bytes(&mut instruction_data[1..33], &close_authority);
+            write_bytes(&mut instruction_data[1..2], &[1]);
+            write_bytes(&mut instruction_data[2..34], &close_authority);
         } else {
-            write_bytes(&mut instruction_data[1..33], &Pubkey::default());
+            write_bytes(&mut instruction_data[1..2], &[0]);
+            write_bytes(&mut instruction_data[2..34], &Pubkey::default());
         }
 
         let instruction = instruction::Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
             accounts: &account_metas,
-            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 33) },
+            data: unsafe { core::slice::from_raw_parts(instruction_data.as_ptr() as _, 34) },
         };
 
         invoke_signed(&instruction, &[self.mint], signers)?;
