@@ -71,10 +71,8 @@ impl Initialize<'_> {
         // -  [2..34] u8: authority
         // -  [34..66] u8: metadata_address
         let mut instruction_data = [UNINIT_BYTE; 66];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[39]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[0]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[39, 0]);
         // Set authority as u8 at offset [2..34]
         if let Some(authority) = self.authority {
             write_bytes(&mut instruction_data[2..34], &authority);
@@ -121,10 +119,8 @@ impl Update<'_> {
         // -  [1] u8: extension instruction discriminator
         // -  [2..34] u8: metadata_address
         let mut instruction_data = [UNINIT_BYTE; 34];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[39]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[1]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[39, 1]);
         // Set metadata_address as u8 at offset [2..34]
         if let Some(new_metadata_address) = self.new_metadata_address {
             write_bytes(&mut instruction_data[2..34], &new_metadata_address);

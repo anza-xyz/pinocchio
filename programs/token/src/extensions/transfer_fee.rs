@@ -106,10 +106,8 @@ impl InitializeTransferFeeConfig<'_> {
 
         let mut instruction_data = [UNINIT_BYTE; 116];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[26]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[0]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[26, 0]);
         // Set mint as Pubkey at offset [1..33]
         write_bytes(&mut instruction_data[2..34], self.mint.key().as_ref());
         // Set transfer_fee_config_authority COption at offset [33..37]
@@ -199,10 +197,8 @@ impl TransferCheckedWithFee<'_> {
         // -  [11..19]: fee (8 bytes, u64)
         let mut instruction_data = [UNINIT_BYTE; 19];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[26]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[1]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[26, 1]);
         // Set amount as u64 at offset [2..10]
         write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
         // Set decimals as u8 at offset [10]

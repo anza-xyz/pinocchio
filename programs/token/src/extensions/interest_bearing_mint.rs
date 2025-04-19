@@ -79,10 +79,8 @@ impl Initialize<'_> {
         // -  [2..4]: rate (2 bytes, u16)
         // -  [4..36]: rate authority (32 bytes, Pubkey)
         let mut instruction_data = [UNINIT_BYTE; 36];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[33]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[0]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[33, 0]);
         // Set rate as u16 at offset [1..3]
         write_bytes(&mut instruction_data[2..4], &self.rate.to_le_bytes());
         // Set rate authority as Pubkey at offset [3..35]
@@ -125,10 +123,8 @@ impl Update<'_> {
         // -  [2..4]: new rate (2 bytes, u16)
         let mut instruction_data = [UNINIT_BYTE; 4];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[33]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[1]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[33, 1]);
         // Set rate as u16 at offset [2..4]
         write_bytes(&mut instruction_data[2..4], &self.new_rate.to_le_bytes());
 

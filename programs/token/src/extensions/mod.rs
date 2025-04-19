@@ -3,7 +3,9 @@ use crate::{
     state::{Mint, TokenAccount},
 };
 // pub mod confidential_transfer;
+pub mod confidential_mint_burn;
 pub mod confidential_transfer;
+pub mod confidential_transfer_fee;
 pub mod cpi_guard;
 pub mod default_account_state;
 pub mod group_member_pointer;
@@ -29,7 +31,7 @@ pub const POD_AE_CIPHERTEXT_LEN: usize = 36;
 pub const POD_ELGAMAL_CIPHERTEXT_LEN: usize = 64;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct ElagamalPubkey(pub [u8; ELGAMAL_PUBKEY_LEN]);
+pub struct PodElGamalPubkey(pub [u8; ELGAMAL_PUBKEY_LEN]);
 
 pub const EXTENSIONS_PADDING: usize = 83;
 

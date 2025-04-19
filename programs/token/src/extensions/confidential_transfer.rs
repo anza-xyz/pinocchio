@@ -14,7 +14,7 @@ use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 
 use super::{get_extension_from_bytes, Extension};
 
-use super::{ElagamalPubkey, POD_AE_CIPHERTEXT_LEN, POD_ELGAMAL_CIPHERTEXT_LEN};
+use super::{PodElGamalPubkey, POD_AE_CIPHERTEXT_LEN, POD_ELGAMAL_CIPHERTEXT_LEN};
 
 /// Local definition mirroring spl_token_confidential_transfer::pod::PodElGamalCiphertext
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -58,7 +58,7 @@ pub struct ConfidentialTransferMint {
     pub auto_approve_new_accounts: u8, // Simplified from PodBool
 
     /// Authority to decode any transfer amount in a confidential transfer.
-    pub auditor_elgamal_pubkey: ElagamalPubkey, // Simplified from OptionalNonZeroElGamalPubkey
+    pub auditor_elgamal_pubkey: PodElGamalPubkey, // Simplified from OptionalNonZeroElGamalPubkey
 }
 
 impl Extension for ConfidentialTransferMint {
@@ -96,7 +96,7 @@ pub struct ConfidentialTransferAccount {
     pub approved: u8, // Simplified from PodBool
 
     /// The public key associated with ElGamal encryption
-    pub elgamal_pubkey: ElagamalPubkey,
+    pub elgamal_pubkey: PodElGamalPubkey,
 
     /// The low 16 bits of the pending balance (encrypted by `elgamal_pubkey`)
     pub pending_balance_lo: EncryptedBalance,
@@ -164,7 +164,7 @@ pub struct ConfidentialTransferFeeConfig {
     pub authority: Pubkey, // Simplified from OptionalNonZeroPubkey, assuming default Pubkey means None
 
     /// Withheld fees encrypted under this key
-    pub withdraw_withheld_authority_elgamal_pubkey: ElagamalPubkey,
+    pub withdraw_withheld_authority_elgamal_pubkey: PodElGamalPubkey,
 
     /// If `false`, harvest to mint is rejected.
     pub harvest_to_mint_enabled: u8, // Simplified from PodBool
@@ -210,7 +210,7 @@ pub struct InitializeMint<'a> {
     /// `authority` before they may be used by the user.
     pub auto_approve_new_accounts: bool,
     /// New authority to decode any transfer amount in a confidential transfer.
-    pub auditor_elgamal_pubkey: Option<&'a ElagamalPubkey>,
+    pub auditor_elgamal_pubkey: Option<&'a PodElGamalPubkey>,
 }
 
 impl InitializeMint<'_> {
@@ -264,7 +264,7 @@ pub struct UpdateMint<'a> {
     /// `authority` before they may be used by the user.
     pub auto_approve_new_accounts: bool,
     /// New authority to decode any transfer amount in a confidential transfer.
-    pub auditor_elgamal_pubkey: Option<&'a ElagamalPubkey>,
+    pub auditor_elgamal_pubkey: Option<&'a PodElGamalPubkey>,
 }
 
 impl UpdateMint<'_> {
@@ -311,7 +311,7 @@ pub struct ConfigureAccount<'a, const ACCOUNTS_LEN: usize> {
     /// Optional multisig signers if the authority is a multisig account.
     pub multisig_signers: &'a [&'a AccountInfo],
     /// The ElGamal public key for the account.
-    pub elgamal_pk: &'a ElagamalPubkey,
+    pub elgamal_pk: &'a PodElGamalPubkey,
     /// The decryptable balance (typically ciphertext corresponding to 0)
     /// encrypted with the `elgamal_pk`.
     pub decryptable_zero_balance: &'a DecryptableBalance,
