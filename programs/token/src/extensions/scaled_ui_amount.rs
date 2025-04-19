@@ -73,10 +73,8 @@ impl Initialize<'_> {
 
         let mut instruction_data = [UNINIT_BYTE; 42];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[43]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[0]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[43, 0]);
         // Set authority as Pubkey at offset [2..34]
         if let Some(authority) = self.authority {
             write_bytes(&mut instruction_data[2..34], authority.as_ref());
@@ -132,10 +130,8 @@ impl UpdateMultiplier<'_> {
 
         let mut instruction_data = [UNINIT_BYTE; 18];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[43]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[1]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[43, 1]);
         // Set multiplier as f64 at offset [2..10]
         write_bytes(&mut instruction_data[2..10], &self.multiplier);
         // Set effective timestamp as u64 at offset [10..18]

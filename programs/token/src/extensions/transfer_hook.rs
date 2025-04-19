@@ -108,10 +108,8 @@ impl Initialize<'_> {
         // [34..66] : program_id (32 bytes, Pubkey)
         let mut instruction_data = [UNINIT_BYTE; 66];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[36]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[0]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[36, 0]);
         // Set authority as u8 at offset [2..34]
         if let Some(authority) = self.authority {
             write_bytes(&mut instruction_data[2..34], &authority);
@@ -165,10 +163,8 @@ impl Update<'_> {
         // [34..66] : program_id (32 bytes, Pubkey)
         let mut instruction_data = [UNINIT_BYTE; 66];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[0..1], &[36]);
-        // Set extension discriminator as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[1]);
+        // Set discriminator as u8 at offset [0] & Set extension discriminator as u8 at offset [1]
+        write_bytes(&mut instruction_data[0..2], &[36, 1]);
         // Set program_id as u8 at offset [34..66]
         if let Some(program_id) = self.program_id {
             write_bytes(&mut instruction_data[34..66], &program_id);

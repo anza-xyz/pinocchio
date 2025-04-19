@@ -25,7 +25,7 @@ pub struct Reallocate<'a> {
     pub extension_types: &'a [ExtensionType],
 }
 
-impl<'a> Reallocate<'a> {
+impl Reallocate<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -61,10 +61,10 @@ impl<'a> Reallocate<'a> {
         invoke_signed(
             &instruction,
             &[
-                &self.token_account,
-                &self.payer,
-                &self.system_program,
-                &self.authority,
+                self.token_account,
+                self.payer,
+                self.system_program,
+                self.authority,
             ],
             signers,
         )?;

@@ -10,38 +10,12 @@ use pinocchio::{
     ProgramResult,
 };
 
+use crate::extensions::ELGAMAL_PUBKEY_LEN;
 use crate::{write_bytes, TOKEN_2022_PROGRAM_ID, UNINIT_BYTE};
 
-use super::{get_extension_from_bytes, Extension};
+use super::{get_extension_from_bytes, DecryptableBalance, EncryptedBalance, Extension};
 
-use super::{ElagamalPubkey, POD_AE_CIPHERTEXT_LEN, POD_ELGAMAL_CIPHERTEXT_LEN};
-
-/// Local definition mirroring spl_token_confidential_transfer::pod::PodElGamalCiphertext
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[repr(C)]
-pub struct PodElGamalCiphertext(pub [u8; POD_ELGAMAL_CIPHERTEXT_LEN]);
-
-impl Default for PodElGamalCiphertext {
-    fn default() -> Self {
-        Self([0u8; POD_ELGAMAL_CIPHERTEXT_LEN])
-    }
-}
-
-/// Local definition mirroring spl_token_confidential_transfer::pod::PodAeCiphertext
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[repr(C)]
-pub struct PodAeCiphertext(pub [u8; POD_AE_CIPHERTEXT_LEN]);
-
-impl Default for PodAeCiphertext {
-    fn default() -> Self {
-        Self([0u8; POD_AE_CIPHERTEXT_LEN])
-    }
-}
-
-/// Alias for clarity, mirroring spl_token_confidential_transfer::instruction::DecryptableBalance
-pub type DecryptableBalance = PodAeCiphertext;
-/// Alias for clarity, mirroring spl_token_confidential_transfer::state::EncryptedBalance
-pub type EncryptedBalance = PodElGamalCiphertext;
+use super::{POD_AE_CIPHERTEXT_LEN, POD_ELGAMAL_CIPHERTEXT_LEN};
 
 // State Structs and Extension Implementations
 
@@ -58,7 +32,7 @@ pub struct ConfidentialTransferMint {
     pub auto_approve_new_accounts: u8, // Simplified from PodBool
 
     /// Authority to decode any transfer amount in a confidential transfer.
-    pub auditor_elgamal_pubkey: ElagamalPubkey, // Simplified from OptionalNonZeroElGamalPubkey
+    pub auditor_elgamal_pubkey: [u8; ELGAMAL_PUBKEY_LEN], // Simplified from OptionalNonZeroElGamalPubkey
 }
 
 impl Extension for ConfidentialTransferMint {
@@ -96,7 +70,7 @@ pub struct ConfidentialTransferAccount {
     pub approved: u8, // Simplified from PodBool
 
     /// The public key associated with ElGamal encryption
-    pub elgamal_pubkey: ElagamalPubkey,
+    pub elgamal_pubkey: [u8; ELGAMAL_PUBKEY_LEN],
 
     /// The low 16 bits of the pending balance (encrypted by `elgamal_pubkey`)
     pub pending_balance_lo: EncryptedBalance,
@@ -117,16 +91,16 @@ pub struct ConfidentialTransferAccount {
     pub allow_non_confidential_credits: u8, // Simplified from PodBool
 
     /// The total number of credits (`Deposit` or `Transfer`) to `pending_balance`
-    pub pending_balance_credit_counter: u64, // Simplified from PodU64
+    pub pending_balance_credit_counter: [u8; 8], // Simplified from PodU64
 
     /// The maximum number of credits before `ApplyPendingBalance` is required
-    pub maximum_pending_balance_credit_counter: u64, // Simplified from PodU64
+    pub maximum_pending_balance_credit_counter: [u8; 8], // Simplified from PodU64
 
     /// The `expected_pending_balance_credit_counter` from the last `ApplyPendingBalance`
-    pub expected_pending_balance_credit_counter: u64, // Simplified from PodU64
+    pub expected_pending_balance_credit_counter: [u8; 8], // Simplified from PodU64
 
     /// The actual `pending_balance_credit_counter` during the last `ApplyPendingBalance`
-    pub actual_pending_balance_credit_counter: u64, // Simplified from PodU64
+    pub actual_pending_balance_credit_counter: [u8; 8], // Simplified from PodU64
 }
 
 impl Extension for ConfidentialTransferAccount {
@@ -164,13 +138,13 @@ pub struct ConfidentialTransferFeeConfig {
     pub authority: Pubkey, // Simplified from OptionalNonZeroPubkey, assuming default Pubkey means None
 
     /// Withheld fees encrypted under this key
-    pub withdraw_withheld_authority_elgamal_pubkey: ElagamalPubkey,
+    pub withdraw_withheld_authority_elgamal_pubkey: [u8; ELGAMAL_PUBKEY_LEN],
 
     /// If `false`, harvest to mint is rejected.
     pub harvest_to_mint_enabled: u8, // Simplified from PodBool
 
     /// Withheld tokens moved to the mint for withdrawal.
-    pub withheld_amount: EncryptedBalance, // Matches PodElGamalCiphertext
+    pub withheld_amount: EncryptedBalance, // Matches [u8; POD_ELGAMAL_CIPHERTEXT_LEN]
 }
 
 impl Extension for ConfidentialTransferFeeConfig {
@@ -210,7 +184,7 @@ pub struct InitializeMint<'a> {
     /// `authority` before they may be used by the user.
     pub auto_approve_new_accounts: bool,
     /// New authority to decode any transfer amount in a confidential transfer.
-    pub auditor_elgamal_pubkey: Option<&'a ElagamalPubkey>,
+    pub auditor_elgamal_pubkey: Option<&'a [u8; ELGAMAL_PUBKEY_LEN]>,
 }
 
 impl InitializeMint<'_> {
@@ -264,7 +238,7 @@ pub struct UpdateMint<'a> {
     /// `authority` before they may be used by the user.
     pub auto_approve_new_accounts: bool,
     /// New authority to decode any transfer amount in a confidential transfer.
-    pub auditor_elgamal_pubkey: Option<&'a ElagamalPubkey>,
+    pub auditor_elgamal_pubkey: Option<&'a [u8; ELGAMAL_PUBKEY_LEN]>,
 }
 
 impl UpdateMint<'_> {
@@ -311,13 +285,13 @@ pub struct ConfigureAccount<'a, const ACCOUNTS_LEN: usize> {
     /// Optional multisig signers if the authority is a multisig account.
     pub multisig_signers: &'a [&'a AccountInfo],
     /// The ElGamal public key for the account.
-    pub elgamal_pk: &'a ElagamalPubkey,
+    pub elgamal_pk: [u8; ELGAMAL_PUBKEY_LEN],
     /// The decryptable balance (typically ciphertext corresponding to 0)
     /// encrypted with the `elgamal_pk`.
     pub decryptable_zero_balance: &'a DecryptableBalance,
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> ConfigureAccount<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> ConfigureAccount<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -379,17 +353,17 @@ impl<'a, const ACCOUNTS_LEN: usize> ConfigureAccount<'a, ACCOUNTS_LEN> {
         };
 
         // Instruction data layout:
-        const DATA_LEN: usize = 1 + 1 + super::ELGAMAL_PUBKEY_LEN + POD_AE_CIPHERTEXT_LEN; // 1 + 1 + 32 + 36 = 70
+        const DATA_LEN: usize = 1 + 1 + ELGAMAL_PUBKEY_LEN + POD_AE_CIPHERTEXT_LEN; // 1 + 1 + 32 + 36 = 70
         let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
 
         write_bytes(&mut instruction_data[0..1], &[27]); // Main discriminator
         write_bytes(&mut instruction_data[1..2], &[2]); // ConfigureAccount discriminator
         write_bytes(
-            &mut instruction_data[2..(2 + super::ELGAMAL_PUBKEY_LEN)],
-            &self.elgamal_pk.0,
+            &mut instruction_data[2..(2 + ELGAMAL_PUBKEY_LEN)],
+            &self.elgamal_pk,
         ); // ElGamal PK bytes
         write_bytes(
-            &mut instruction_data[(2 + super::ELGAMAL_PUBKEY_LEN)..DATA_LEN],
+            &mut instruction_data[(2 + ELGAMAL_PUBKEY_LEN)..DATA_LEN],
             &self.decryptable_zero_balance.0,
         ); // Decryptable zero balance ciphertext bytes
 
@@ -416,7 +390,7 @@ pub struct ConfigureAccountWithRegistry<'a, const ACCOUNTS_LEN: usize> {
     pub system_program: Option<&'a AccountInfo>,
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> ConfigureAccountWithRegistry<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> ConfigureAccountWithRegistry<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -503,7 +477,7 @@ pub struct ApproveAccount<'a, const ACCOUNTS_LEN: usize> {
     pub multisig_signers: &'a [&'a AccountInfo],
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> ApproveAccount<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> ApproveAccount<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -594,7 +568,7 @@ pub struct EmptyAccount<'a, const ACCOUNTS_LEN: usize> {
     pub proof_instruction_offset: i8,
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> EmptyAccount<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> EmptyAccount<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -708,7 +682,7 @@ pub struct Deposit<'a, const ACCOUNTS_LEN: usize> {
     pub decimals: u8,
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> Deposit<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> Deposit<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -805,14 +779,14 @@ pub struct Withdraw<'a, const ACCOUNTS_LEN: usize> {
     /// Expected number of decimals for the mint.
     pub decimals: u8,
     /// The new decryptable balance ciphertext after the withdrawal succeeds.
-    pub new_decryptable_available_balance: PodAeCiphertext,
+    pub new_decryptable_available_balance: [u8; POD_AE_CIPHERTEXT_LEN],
     /// Relative offset of the equality proof instruction, or 0 if using context state account.
     pub equality_proof_instruction_offset: i8,
     /// Relative offset of the range proof instruction, or 0 if using context state account.
     pub range_proof_instruction_offset: i8,
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> Withdraw<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> Withdraw<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -916,10 +890,10 @@ impl<'a, const ACCOUNTS_LEN: usize> Withdraw<'a, ACCOUNTS_LEN> {
         write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
         // Set decimals as u8 at offset [10..11]
         write_bytes(&mut instruction_data[10..11], &[self.decimals]);
-        // Set new_decryptable_available_balance as PodAeCiphertext at offset [11..47]
+        // Set new_decryptable_available_balance as [u8; POD_AE_CIPHERTEXT_LEN] at offset [11..47]
         write_bytes(
             &mut instruction_data[11..47],
-            &self.new_decryptable_available_balance.0,
+            &self.new_decryptable_available_balance,
         );
         // Set proof instruction offsets at offset [47..49]
         write_bytes(
@@ -950,10 +924,10 @@ pub struct ApplyPendingBalance<'a, const ACCOUNTS_LEN: usize> {
     /// The expected number of pending balance credits to apply.
     pub expected_pending_balance_credit_counter: u64,
     /// The new decryptable balance ciphertext after applying the pending balance.
-    pub new_decryptable_available_balance: PodAeCiphertext,
+    pub new_decryptable_available_balance: [u8; POD_AE_CIPHERTEXT_LEN],
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> ApplyPendingBalance<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> ApplyPendingBalance<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -999,7 +973,7 @@ impl<'a, const ACCOUNTS_LEN: usize> ApplyPendingBalance<'a, ACCOUNTS_LEN> {
         // -  [0]: instruction discriminator (1 byte, u8) -> 27 (ConfidentialTransferExtension)
         // -  [1]: extension instruction discriminator (1 byte, u8) -> 8 (ApplyPendingBalance)
         // -  [2..10]: expected_pending_balance_credit_counter (8 bytes, u64)
-        // -  [10..46]: new_decryptable_available_balance (36 bytes, PodAeCiphertext)
+        // -  [10..46]: new_decryptable_available_balance (36 bytes, [u8; POD_AE_CIPHERTEXT_LEN])
         const DATA_LEN: usize = 1 + 1 + 8 + POD_AE_CIPHERTEXT_LEN;
         let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
 
@@ -1012,15 +986,15 @@ impl<'a, const ACCOUNTS_LEN: usize> ApplyPendingBalance<'a, ACCOUNTS_LEN> {
             &mut instruction_data[2..10],
             &self.expected_pending_balance_credit_counter.to_le_bytes(),
         );
-        // Set new_decryptable_available_balance as PodAeCiphertext at offset [10..DATA_LEN]
+        // Set new_decryptable_available_balance as [u8; POD_AE_CIPHERTEXT_LEN] at offset [10..DATA_LEN]
         write_bytes(
             &mut instruction_data[10..DATA_LEN],
-            &self.new_decryptable_available_balance.0,
+            &self.new_decryptable_available_balance,
         );
 
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
-            accounts: &acc_metas,
+            accounts: acc_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, DATA_LEN) },
         };
 
@@ -1037,7 +1011,7 @@ pub struct DisableConfidentialCredits<'a, const ACCOUNTS_LEN: usize> {
     pub multisig_signers: &'a [&'a AccountInfo],
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> DisableConfidentialCredits<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> DisableConfidentialCredits<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -1084,7 +1058,7 @@ impl<'a, const ACCOUNTS_LEN: usize> DisableConfidentialCredits<'a, ACCOUNTS_LEN>
         // -  [1]: extension instruction discriminator (1 byte, u8) -> 11 (DisableConfidentialCredits)
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
-            accounts: &acc_metas,
+            accounts: acc_metas,
             data: &[27, 11],
         };
 
@@ -1101,7 +1075,7 @@ pub struct DisableNonConfidentialCredits<'a, const ACCOUNTS_LEN: usize> {
     pub multisig_signers: &'a [&'a AccountInfo],
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> DisableNonConfidentialCredits<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> DisableNonConfidentialCredits<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -1167,7 +1141,7 @@ pub struct EnableConfidentialCredits<'a, const ACCOUNTS_LEN: usize> {
     pub multisig_signers: &'a [&'a AccountInfo],
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> EnableConfidentialCredits<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> EnableConfidentialCredits<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -1231,7 +1205,7 @@ pub struct EnableNonConfidentialCredits<'a, const ACCOUNTS_LEN: usize> {
     pub multisig_signers: &'a [&'a AccountInfo],
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> EnableNonConfidentialCredits<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> EnableNonConfidentialCredits<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -1277,7 +1251,7 @@ impl<'a, const ACCOUNTS_LEN: usize> EnableNonConfidentialCredits<'a, ACCOUNTS_LE
         // -  [1]: extension instruction discriminator (1 byte, u8) -> 15 (EnableNonConfidentialCredits)
         let instruction = Instruction {
             program_id: &TOKEN_2022_PROGRAM_ID,
-            accounts: &acc_metas,
+            accounts: acc_metas,
             data: &[27, 15],
         };
 
@@ -1316,7 +1290,7 @@ pub struct Transfer<'a, const ACCOUNTS_LEN: usize> {
     /// Range proof account (optional, context state or record account).
     pub range_proof_account: Option<&'a AccountInfo>,
     /// The new source decryptable balance ciphertext after the transfer succeeds.
-    pub new_source_decryptable_available_balance: PodAeCiphertext,
+    pub new_source_decryptable_available_balance: [u8; POD_AE_CIPHERTEXT_LEN],
     /// Relative offset of the equality proof instruction, or 0 if using context state account.
     pub equality_proof_instruction_offset: i8,
     /// Relative offset of the transfer amount ciphertext validity proof instruction, or 0 if using context state account.
@@ -1325,7 +1299,7 @@ pub struct Transfer<'a, const ACCOUNTS_LEN: usize> {
     pub range_proof_instruction_offset: i8,
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> Transfer<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> Transfer<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -1399,12 +1373,10 @@ impl<'a, const ACCOUNTS_LEN: usize> Transfer<'a, ACCOUNTS_LEN> {
             self.transfer_amount_ciphertext_validity_proof_account,
             self.range_proof_account,
         ];
-        for proof_acc_opt in proof_accounts_options.iter() {
-            if let Some(proof_acc) = proof_acc_opt {
-                account_metas[idx].write(AccountMeta::readonly(proof_acc.key()));
-                accounts[idx].write(proof_acc);
-                idx += 1;
-            }
+        for proof_acc in proof_accounts_options.into_iter().flatten() {
+            account_metas[idx].write(AccountMeta::readonly(proof_acc.key()));
+            accounts[idx].write(proof_acc);
+            idx += 1;
         }
 
         let is_authority_signer = self.multisig_signers.is_empty();
@@ -1449,7 +1421,7 @@ impl<'a, const ACCOUNTS_LEN: usize> Transfer<'a, ACCOUNTS_LEN> {
         // New source decryptable balance
         write_bytes(
             &mut instruction_data[balance_start..balance_end],
-            &self.new_source_decryptable_available_balance.0,
+            &self.new_source_decryptable_available_balance,
         );
         // Equality proof offset
         write_bytes(
@@ -1516,13 +1488,13 @@ pub struct TransferWithFee<'a, const ACCOUNTS_LEN: usize> {
 
     // Instruction Data fields incorporated into struct
     /// The new source decryptable balance ciphertext after the transfer succeeds.
-    pub new_source_decryptable_available_balance: PodAeCiphertext,
+    pub new_source_decryptable_available_balance: [u8; POD_AE_CIPHERTEXT_LEN],
     /// The transfer amount encrypted under the auditor ElGamal public key (low bits).
-    pub transfer_amount_auditor_ciphertext_lo: PodElGamalCiphertext,
+    pub transfer_amount_auditor_ciphertext_lo: [u8; POD_ELGAMAL_CIPHERTEXT_LEN],
     /// The transfer amount encrypted under the auditor ElGamal public key (high bits).
-    pub transfer_amount_auditor_ciphertext_hi: PodElGamalCiphertext,
+    pub transfer_amount_auditor_ciphertext_hi: [u8; POD_ELGAMAL_CIPHERTEXT_LEN],
     /// The fee commitment encrypted under the auditor ElGamal public key.
-    pub fee_commitment_auditor_ciphertext: PodElGamalCiphertext,
+    pub fee_commitment_auditor_ciphertext: [u8; POD_ELGAMAL_CIPHERTEXT_LEN],
     /// Relative offset of the equality proof instruction.
     pub equality_proof_instruction_offset: i8,
     /// Relative offset of the transfer amount ciphertext validity proof instruction.
@@ -1535,7 +1507,7 @@ pub struct TransferWithFee<'a, const ACCOUNTS_LEN: usize> {
     pub range_proof_instruction_offset: i8,
 }
 
-impl<'a, const ACCOUNTS_LEN: usize> TransferWithFee<'a, ACCOUNTS_LEN> {
+impl<const ACCOUNTS_LEN: usize> TransferWithFee<'_, ACCOUNTS_LEN> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -1627,12 +1599,10 @@ impl<'a, const ACCOUNTS_LEN: usize> TransferWithFee<'a, ACCOUNTS_LEN> {
             self.range_proof_account,
         ];
 
-        for proof_opt in proof_accounts.iter() {
-            if let Some(proof) = proof_opt {
-                account_metas[idx].write(AccountMeta::readonly(proof.key()));
-                accounts[idx].write(proof);
-                idx += 1;
-            }
+        for proof in proof_accounts.into_iter().flatten() {
+            account_metas[idx].write(AccountMeta::readonly(proof.key()));
+            accounts[idx].write(proof);
+            idx += 1;
         }
 
         // Add Authority account.
@@ -1698,19 +1668,19 @@ impl<'a, const ACCOUNTS_LEN: usize> TransferWithFee<'a, ACCOUNTS_LEN> {
         // Write ciphertexts
         write_bytes(
             &mut instruction_data[balance_start..balance_end],
-            &self.new_source_decryptable_available_balance.0,
+            &self.new_source_decryptable_available_balance,
         );
         write_bytes(
             &mut instruction_data[transfer_lo_start..transfer_lo_end],
-            &self.transfer_amount_auditor_ciphertext_lo.0,
+            &self.transfer_amount_auditor_ciphertext_lo,
         );
         write_bytes(
             &mut instruction_data[transfer_hi_start..transfer_hi_end],
-            &self.transfer_amount_auditor_ciphertext_hi.0,
+            &self.transfer_amount_auditor_ciphertext_hi,
         );
         write_bytes(
             &mut instruction_data[fee_commit_start..fee_commit_end],
-            &self.fee_commitment_auditor_ciphertext.0,
+            &self.fee_commitment_auditor_ciphertext,
         );
 
         // Write proof instruction offsets (as u8)
