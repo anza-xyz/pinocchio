@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - programs/associated-token-account
+          - programs/memo
           - programs/system
           - programs/token
           - sdk/log/crate
@@ -101,6 +102,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.ANZA_TEAM_PAT }}
+          fetch-depth: 0 # get the whole history for git-cliff
 
       - name: Setup Environment
         uses: ./.github/actions/setup
@@ -140,8 +142,22 @@ jobs:
 
           pnpm tsx ./scripts/publish.mts ${{ inputs.crate }} $LEVEL $OPTIONS
 
+      - name: Generate a changelog
+        if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: ".github/cliff.toml"
+          args: |
+            "${{ steps.publish.outputs.old_git_tag }}"..main
+            --include-path "${{ inputs.crate }}/**"
+            --github-repo "${{ github.repository }}"
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
       - name: Create GitHub release
         if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.publish.outputs.crate }}@v${{ steps.publish.outputs.version }}
+          tag: ${{ steps.publish.outputs.new_git_tag }}
+          bodyFile: CHANGELOG.md

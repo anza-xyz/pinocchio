@@ -34,7 +34,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "pinocchio"
-version = "0.8.0"
+version = "0.8.3"
 
 [[package]]
 name = "pinocchio-associated-token-account"
@@ -53,11 +53,19 @@ dependencies = [
 
 [[package]]
 name = "pinocchio-log-macro"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "quote",
  "regex",
  "syn",
+]
+
+[[package]]
+name = "pinocchio-memo"
+version = "0.1.0"
+dependencies = [
+ "pinocchio",
+ "pinocchio-pubkey",
 ]
 
 [[package]]
@@ -70,7 +78,7 @@ dependencies = [
 
 [[package]]
 name = "pinocchio-system"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "pinocchio",
  "pinocchio-pubkey",

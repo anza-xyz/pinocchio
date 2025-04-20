@@ -220,7 +220,7 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
     (program_id, processed, instruction_data)
 }
 
-/// Default panic hook (std).
+/// Default panic hook.
 ///
 /// This macro sets up a default panic hook that logs the panic message and the file where the
 /// panic occurred. Syscall "abort()" will be called after it returns. It acts as a hook after
@@ -241,11 +241,11 @@ macro_rules! default_panic_handler {
     };
 }
 
-/// Default panic hook (no std).
+/// Default panic hook.
 ///
 /// This macro sets up a default panic hook that logs the file where the panic occurred.
 ///
-/// This is used when the `"std"` feature is disabled and program is `std`.
+/// This is used when the `"std"` feature is disabled.
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! default_panic_handler {
@@ -263,12 +263,10 @@ macro_rules! default_panic_handler {
     };
 }
 
-/// A rust panic handler for `no_std`.
+/// A global `#[panic_handler]` for `no_std` programs.
 ///
-/// When all crates are `no_std`, we need to define a global `#[panic_handler]`.
-/// It takes over the default rust panic handler.
-///
-/// This macro is used when the `"std"` feature is disabled.
+/// This macro can only be used when all crates are `no_std` and the `"std"` feature is
+/// disabled.
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! nostd_panic_handler {
@@ -293,6 +291,16 @@ macro_rules! nostd_panic_handler {
                 unsafe { $crate::syscalls::abort() }
             }
         }
+
+        // A placeholder for `cargo clippy`.
+        //
+        // Add `panic = "abort"` to `[profile.dev]` in `Cargo.toml` for clippy.
+        #[cfg(not(target_os = "solana"))]
+        #[no_mangle]
+        #[panic_handler]
+        fn handler(_info: &core::panic::PanicInfo<'_>) -> ! {
+            unsafe { core::hint::unreachable_unchecked() }
+        }
     };
 }
 
@@ -308,6 +316,11 @@ macro_rules! default_allocator {
             start: $crate::entrypoint::HEAP_START_ADDRESS as usize,
             len: $crate::entrypoint::HEAP_LENGTH,
         };
+
+        // A placeholder for `cargo clippy`.
+        #[cfg(not(any(target_os = "solana", test)))]
+        #[global_allocator]
+        static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
     };
 }
 
@@ -334,6 +347,43 @@ macro_rules! no_allocator {
         #[cfg(target_os = "solana")]
         #[global_allocator]
         static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
+
+        /// Allocates memory for the given type `T` at the specified offset in the
+        /// heap reserved address space.
+        ///
+        /// This function requires the `#![feature(const_mut_refs)]` crate feature
+        /// to be set.
+        ///
+        /// # Safety
+        ///
+        /// It is the caller's responsibility to ensure that the offset does not
+        /// overlap with previous allocations and that type `T` can hold the bit-pattern
+        /// `0` as a valid value.
+        ///
+        /// For types that cannot hold the bit-pattern `0` as a valid value, use
+        /// `core::mem::MaybeUninit<T>` to allocate memory for the type and
+        /// initialize it later.
+        #[inline]
+        pub const unsafe fn allocate_unchecked<T: Sized>(offset: usize) -> &'static mut T {
+            let start = $crate::entrypoint::HEAP_START_ADDRESS as usize + offset;
+            let end = start + core::mem::size_of::<T>();
+
+            // Assert if the allocation does not exceed the heap size.
+            assert!(
+                end <= $crate::entrypoint::HEAP_START_ADDRESS as usize
+                    + $crate::entrypoint::HEAP_LENGTH,
+                "allocation exceeds heap size"
+            );
+
+            // Assert if the pointer is aligned to `T`.
+            assert!(
+                start % core::mem::align_of::<T>() == 0,
+                "offset is not aligned"
+            );
+
+            // SAFETY: The pointer is within a valid range and aligned to `T`.
+            unsafe { &mut *(start as *mut T) }
+        }
     };
 }
 
