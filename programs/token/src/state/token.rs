@@ -1,4 +1,4 @@
-use crate::{LEGACY_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID};
+use crate::{TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID};
 
 use super::AccountState;
 use pinocchio::{
@@ -59,18 +59,18 @@ impl TokenAccount {
     pub fn from_account_info(
         account_info: &AccountInfo,
     ) -> Result<Ref<TokenAccount>, ProgramError> {
-        if account_info.data_len() != Self::LEN {
+        if account_info.data_len() < Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
 
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID)
-            && account_info.is_owned_by(&LEGACY_TOKEN_PROGRAM_ID)
+            && account_info.is_owned_by(&TOKEN_PROGRAM_ID)
         {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
-            Self::from_bytes(data)
+            Self::from_bytes(&data[..TokenAccount::LEN])
         }))
     }
 
@@ -92,12 +92,14 @@ impl TokenAccount {
         }
 
         if !account_info.is_owned_by(&TOKEN_2022_PROGRAM_ID)
-            && !account_info.is_owned_by(&LEGACY_TOKEN_PROGRAM_ID)
+            && !account_info.is_owned_by(&TOKEN_PROGRAM_ID)
         {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
-        Ok(Self::from_bytes(account_info.borrow_data_unchecked()))
+        Ok(Self::from_bytes(
+            &account_info.borrow_data_unchecked()[..TokenAccount::LEN],
+        ))
     }
 
     /// Return a `TokenAccount` from the given bytes.

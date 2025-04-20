@@ -48,11 +48,11 @@ pub enum TokenProgramVariant {
 
 use pinocchio::pubkey::Pubkey;
 
-use crate::{LEGACY_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID};
+use crate::{TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID};
 impl From<TokenProgramVariant> for Pubkey {
     fn from(variant: TokenProgramVariant) -> Self {
         match variant {
-            TokenProgramVariant::Legacy => LEGACY_TOKEN_PROGRAM_ID,
+            TokenProgramVariant::Legacy => TOKEN_PROGRAM_ID,
             TokenProgramVariant::Token2022 => TOKEN_2022_PROGRAM_ID,
         }
     }
