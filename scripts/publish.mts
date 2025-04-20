@@ -18,8 +18,10 @@ if (!level) {
   throw new Error('A version level — e.g. "patch" — must be provided.');
 }
 
-// Get the crate name.
-const crate = getCargo(folder).package['name'];
+// Get the package information from the crate TOML file.
+const crate = getCargo(folder).package;
+const previous = crate['version'];
+const name = crate['name'];
 
 // Go to the crate folder to release.
 cd(path.dirname(manifestPath));
@@ -27,7 +29,7 @@ cd(path.dirname(manifestPath));
 // Publish the new version.
 const releaseArgs = dryRun
   ? []
-  : ['--tag-name', `${crate}@v{{version}}`, '--no-confirm', '--execute'];
+  : ['--tag-name', `${name}@v{{version}}`, '--no-confirm', '--execute'];
 await $`cargo release ${level} ${releaseArgs}`;
 
 // Stop here if this is a dry run.
@@ -38,8 +40,12 @@ if (dryRun) {
 // Get the updated version number.
 const version = getCargo(folder).package['version'];
 
-// Expose the new version to CI if needed.
+// Git tag for the new and old versions.
+const newGitTag = `${name}@v${version}`;
+const oldGitTag = `${name}@v${previous}`;
+
+// Expose the versions to CI if needed.
 if (process.env.CI) {
-  await $`echo "crate=${crate}" >> $GITHUB_OUTPUT`;
-  await $`echo "version=${version}" >> $GITHUB_OUTPUT`;
+  await $`echo "new_git_tag=${newGitTag}" >> $GITHUB_OUTPUT`;
+  await $`echo "old_git_tag=${oldGitTag}" >> $GITHUB_OUTPUT`;
 }

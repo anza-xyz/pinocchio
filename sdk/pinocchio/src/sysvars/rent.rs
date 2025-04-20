@@ -81,7 +81,7 @@ impl Rent {
         }))
     }
 
-    /// Return a `Mint` from the given account info.
+    /// Return a `Rent` from the given account info.
     ///
     /// This method performs a check on the account info key, but does not
     /// perform the borrow check.
