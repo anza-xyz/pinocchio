@@ -11,41 +11,41 @@ use crate::ID;
 #[repr(C)]
 pub struct TokenAccount {
     /// The mint associated with this account
-    mint: Pubkey,
+    pub mint: Pubkey,
 
     /// The owner of this account.
-    owner: Pubkey,
+    pub owner: Pubkey,
 
     /// The amount of tokens this account holds.
-    amount: [u8; 8],
+    pub amount: [u8; 8],
 
     /// Indicates whether the delegate is present or not.
-    delegate_flag: [u8; 4],
+    pub delegate_flag: [u8; 4],
 
     /// If `delegate` is `Some` then `delegated_amount` represents
     /// the amount authorized by the delegate.
-    delegate: Pubkey,
+    pub delegate: Pubkey,
 
     /// The account's state.
-    state: u8,
+    pub state: u8,
 
     /// Indicates whether this account represents a native token or not.
-    is_native: [u8; 4],
+    pub is_native: [u8; 4],
 
     /// If is_native.is_some, this is a native token, and the value logs the
     /// rent-exempt reserve. An Account is required to be rent-exempt, so
     /// the value is used by the Processor to ensure that wrapped SOL
     /// accounts do not drop below this threshold.
-    native_amount: [u8; 8],
+    pub native_amount: [u8; 8],
 
     /// The amount delegated.
-    delegated_amount: [u8; 8],
+    pub delegated_amount: [u8; 8],
 
     /// Indicates whether the close authority is present or not.
-    close_authority_flag: [u8; 4],
+    pub close_authority_flag: [u8; 4],
 
     /// Optional authority to close the account.
-    close_authority: Pubkey,
+    pub close_authority: Pubkey,
 }
 
 impl TokenAccount {
