@@ -521,3 +521,94 @@ unsafe impl core::alloc::GlobalAlloc for NoAllocator {
         // I deny all allocations, so I don't need to free.
     }
 }
+
+/// A macro to define a constant allocator.
+///
+/// This macro defines a static memory allocator for the program and sets up a bump
+/// allocator with the remaining heap space. It takes a list "pointer" name and type
+/// pairs, allocates them in the heap, and provides a function to access them.
+#[macro_export]
+macro_rules! const_allocator {
+    ( { $( $ptr_name:ident : $ptr_ty:ty ),+ $(,)? } ) => {
+        pub(crate) mod alloc {
+            //! Static memory allocations for the program.
+
+            /// The `Allocator` struct defines the static memory locations
+            /// for the program and the remaining heap size.
+            struct Allocator {
+                __start: usize,
+                __len: usize,
+                $(
+                    $ptr_name : usize
+                ),*
+            }
+
+            impl Allocator {
+                #[allow(clippy::arithmetic_side_effects)]
+                const fn new() -> Self {
+                    let mut start: usize = $crate::entrypoint::HEAP_START_ADDRESS as usize;
+
+                    $(
+                        let align = core::mem::align_of::<$ptr_ty>();
+                        // Align the start address to the next multiple of `align`.
+                        let boundary = (start + align - 1) & !(align - 1);
+                        let $ptr_name = boundary;
+
+                        start = boundary.saturating_add(core::mem::size_of::<$ptr_ty>());
+                    )*
+
+                    // Align the start address to the next multiple of `u64`.
+                    let align = core::mem::align_of::<u64>();
+                    let start = (start + align - 1) & !(align - 1);
+                    // Calculate the length of the allocated memory.
+                    let len = start - ($crate::entrypoint::HEAP_START_ADDRESS as usize);
+
+                    Self {
+                        __start: start,
+                        // A compile-time check to ensure that the lenght of the allocated memory
+                        // does not exceed the heap size.
+                        __len: if len > ($crate::entrypoint::HEAP_LENGTH as usize) {
+                            panic!("Heap allocation overflow: \
+                                The size of the struct exceeds the available heap space.");
+                            } else {
+                                $crate::entrypoint::HEAP_LENGTH - len
+                            },
+                        $(
+                            $ptr_name,
+                        )*
+                    }
+                }
+            }
+
+            // A static instance of the allocator.
+            static ALLOCATOR: Allocator = Allocator::new();
+
+            $(
+                // Make this `const` once `const_mut_refs` is stable for the platform-tools
+                // toolchain Rust version.
+                #[doc = concat!(" Returns a mutable reference to `", stringify!($ptr_name), "`.")]
+                #[inline(always)]
+                pub fn $ptr_name() -> &'static mut $ptr_ty {
+                    // SAFETY: The pointer is within a valid range and aligned to `T`.
+                    unsafe { &mut *(ALLOCATOR.$ptr_name as *mut $ptr_ty) }
+                }
+            )*
+
+            #[cfg(target_os = "solana")]
+            #[global_allocator]
+            static A: $crate::entrypoint::BumpAllocator = $crate::entrypoint::BumpAllocator {
+                start: ALLOCATOR.__start,
+                len: ALLOCATOR.__len,
+            };
+
+            /// A default allocator for when the program is compiled on a target different than
+            /// `"solana"`.
+            ///
+            /// This links the `std` library, which will set up a default global allocator.
+            #[cfg(not(target_os = "solana"))]
+            mod __private {
+                extern crate std as __std;
+            }
+        }
+    };
+}
