@@ -569,7 +569,7 @@ macro_rules! const_allocator {
                         // does not exceed the heap size.
                         __len: if len > ($crate::entrypoint::HEAP_LENGTH as usize) {
                             panic!("Heap allocation overflow: \
-                                The size of the struct exceeds the available heap space.");
+                                The size of the allocated memory exceeds the available heap space.");
                             } else {
                                 $crate::entrypoint::HEAP_LENGTH - len
                             },
