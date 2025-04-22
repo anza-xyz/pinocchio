@@ -581,7 +581,7 @@ macro_rules! const_allocator {
             }
 
             // A static instance of the allocator.
-            static ALLOCATOR: Allocator = Allocator::new();
+            const ALLOCATOR: Allocator = Allocator::new();
 
             $(
                 // Make this `const` once `const_mut_refs` is stable for the platform-tools
