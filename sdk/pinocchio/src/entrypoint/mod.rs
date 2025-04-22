@@ -314,7 +314,7 @@ macro_rules! nostd_panic_handler {
         ///
         /// This links the `std` library, which will set up a default panic handler.
         #[cfg(not(target_os = "solana"))]
-        mod __private {
+        mod __private_panic_handler {
             extern crate std as __std;
         }
     };
@@ -338,7 +338,7 @@ macro_rules! default_allocator {
         ///
         /// This links the `std` library, which will set up a default global allocator.
         #[cfg(not(target_os = "solana"))]
-        mod __private {
+        mod __private_alloc {
             extern crate std as __std;
         }
     };
@@ -433,7 +433,7 @@ macro_rules! static_allocator {
         ///
         /// This links the `std` library, which will set up a default global allocator.
         #[cfg(not(target_os = "solana"))]
-        mod __private {
+        mod __private_alloc {
             extern crate std as __std;
         }
     };
