@@ -1,7 +1,7 @@
 [package]
 name = "pinocchio-log-macro"
 description = "Macro for pinocchio log utility"
-version = "0.4.0"
+version = "0.4.1"
 edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"
