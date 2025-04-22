@@ -89,6 +89,18 @@ pub const SUCCESS: u64 = super::SUCCESS;
 ///
 /// }
 /// ```
+///
+/// # Important
+///
+/// The panic handler set up is different dependending on whether the `std` library is available to the
+/// linker or not. The `entrypoint!` macro will set up a default panic "hook", that works with the
+/// `#[panic_handler]` set by the `std`. Therefore, this macro should be used when the program or any
+/// of its dependencies are dependent on the `std` library.
+///
+/// When the program and all its dependencies are `no_std`, it is necessary to set a
+/// `#[panic_handler]` to handle panics. This is done by the `nostd_panic_handler!` macro. In this case,
+/// it is not possible to use the `entrypoint` macro. Use the `program_entrypoint!` macro instead and set
+/// up the allocator and panic handler manually.
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:ident ) => {
@@ -223,8 +235,8 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
 /// Default panic hook.
 ///
 /// This macro sets up a default panic hook that logs the panic message and the file where the
-/// panic occurred. Syscall "abort()" will be called after it returns. It acts as a hook after
-/// rust runtime panics.
+/// panic occurred. It acts as a hook after Rust runtime panics; syscall `abort()` will be called
+/// after it returns.
 ///
 /// Note that this requires the `"std"` feature to be enabled.
 #[cfg(feature = "std")]
@@ -243,9 +255,11 @@ macro_rules! default_panic_handler {
 
 /// Default panic hook.
 ///
-/// This macro sets up a default panic hook that logs the file where the panic occurred.
+/// This macro sets up a default panic hook that logs the file where the panic occurred. It acts
+/// as a hook after Rust runtime panics; syscall `abort()` will be called after it returns.
 ///
-/// This is used when the `"std"` feature is disabled.
+/// This is used when the `"std"` feature is disabled, while either the program or any of its
+/// dependencies are not `no_std`.
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! default_panic_handler {
@@ -264,6 +278,9 @@ macro_rules! default_panic_handler {
 }
 
 /// A global `#[panic_handler]` for `no_std` programs.
+///
+/// This macro sets up a default panic handler that logs the location (file, line and column)
+/// where the panic occurred and then calls the syscall `abort()`.
 ///
 /// This macro can only be used when all crates are `no_std` and the `"std"` feature is
 /// disabled.
@@ -292,14 +309,13 @@ macro_rules! nostd_panic_handler {
             }
         }
 
-        // A placeholder for `cargo clippy`.
-        //
-        // Add `panic = "abort"` to `[profile.dev]` in `Cargo.toml` for clippy.
+        /// A panic handler for when the program is compiled on a target different than
+        /// `"solana"`.
+        ///
+        /// This links the `std` library, which will set up a default panic handler.
         #[cfg(not(target_os = "solana"))]
-        #[no_mangle]
-        #[panic_handler]
-        fn handler(_info: &core::panic::PanicInfo<'_>) -> ! {
-            unsafe { core::hint::unreachable_unchecked() }
+        mod __private {
+            extern crate std as __std;
         }
     };
 }
@@ -317,10 +333,14 @@ macro_rules! default_allocator {
             len: $crate::entrypoint::HEAP_LENGTH,
         };
 
-        // A placeholder for `cargo clippy`.
-        #[cfg(not(any(target_os = "solana", test)))]
-        #[global_allocator]
-        static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
+        /// A default allocator for when the program is compiled on a target different than
+        /// `"solana"`.
+        ///
+        /// This links the `std` library, which will set up a default global allocator.
+        #[cfg(not(target_os = "solana"))]
+        mod __private {
+            extern crate std as __std;
+        }
     };
 }
 
@@ -337,12 +357,30 @@ macro_rules! no_allocator {
 
 /// A global allocator that does not allocate memory.
 ///
-/// This macro sets up a global allocator that denies all allocations. This is useful when the
-/// program does not need to allocate memory $mdash; the program will panic if it tries to
-/// allocate memory.
+/// This macro sets up a global allocator that denies all allocations. This is useful
+/// when the program does not need to allocate memory. The program will panic if it tries
+/// to allocate memory.
+#[deprecated(since = "0.8.4", note = "Use the `static_allocator` macro instead")]
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! no_allocator {
+    () => {
+        $crate::static_allocator!();
+    };
+}
+
+/// A global allocator that does not dynamically allocate memory.
+///
+/// This macro sets up a global allocator that denies all dynamic allocations, while
+/// allowing static ("manual") allocations. This is useful when the program does not need to
+/// synamically allocate memory and manages their own allocations.
+///
+/// The program will panic if it tries to allocate memory.
+///
+/// This is used when the `"std"` feature is disabled.
+#[cfg(not(feature = "std"))]
+#[macro_export]
+macro_rules! static_allocator {
     () => {
         #[cfg(target_os = "solana")]
         #[global_allocator]
@@ -350,9 +388,6 @@ macro_rules! no_allocator {
 
         /// Allocates memory for the given type `T` at the specified offset in the
         /// heap reserved address space.
-        ///
-        /// This function requires the `#![feature(const_mut_refs)]` crate feature
-        /// to be set.
         ///
         /// # Safety
         ///
@@ -363,8 +398,17 @@ macro_rules! no_allocator {
         /// For types that cannot hold the bit-pattern `0` as a valid value, use
         /// `core::mem::MaybeUninit<T>` to allocate memory for the type and
         /// initialize it later.
-        #[inline]
-        pub const unsafe fn allocate_unchecked<T: Sized>(offset: usize) -> &'static mut T {
+        //
+        // Make this `const` once `const_mut_refs` is stable for the platform-tools
+        // toolchain Rust version.
+        #[inline(always)]
+        pub unsafe fn allocate_unchecked<T: Sized>(offset: usize) -> &'static mut T {
+            // SAFETY: The pointer is within a valid range and aligned to `T`.
+            unsafe { &mut *(calculate_offset::<T>(offset) as *mut T) }
+        }
+
+        #[inline(always)]
+        const fn calculate_offset<T: Sized>(offset: usize) -> usize {
             let start = $crate::entrypoint::HEAP_START_ADDRESS as usize + offset;
             let end = start + core::mem::size_of::<T>();
 
@@ -381,8 +425,16 @@ macro_rules! no_allocator {
                 "offset is not aligned"
             );
 
-            // SAFETY: The pointer is within a valid range and aligned to `T`.
-            unsafe { &mut *(start as *mut T) }
+            start
+        }
+
+        /// A default allocator for when the program is compiled on a target different than
+        /// `"solana"`.
+        ///
+        /// This links the `std` library, which will set up a default global allocator.
+        #[cfg(not(target_os = "solana"))]
+        mod __private {
+            extern crate std as __std;
         }
     };
 }
@@ -430,7 +482,7 @@ mod alloc {
 }
 
 #[cfg(not(feature = "std"))]
-/// Zero global allocator.
+/// An allocator that does not allocate memory.
 pub struct NoAllocator;
 
 #[cfg(not(feature = "std"))]
