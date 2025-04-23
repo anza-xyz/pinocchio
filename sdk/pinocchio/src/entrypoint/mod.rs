@@ -32,15 +32,34 @@ pub const SUCCESS: u64 = super::SUCCESS;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
-/// The main difference from the standard `entrypoint!` macro is that this macro represents an
-/// entrypoint that does not perform allocations or copies when reading the input buffer.
+/// This macro is deprecated and will be removed in a future version. It is recommended to
+/// use the [`entrypoint_with_allocator_and_panic_handler`] macro instead.
+#[deprecated(
+    since = "0.8.4",
+    note = "Use the `entrypoint_with_allocator_and_panic_handler` macro instead"
+)]
+#[macro_export]
+macro_rules! entrypoint {
+    ( $process_instruction:ident ) => {
+        entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
+    };
+    ( $process_instruction:ident, $maximum:expr ) => {
+        $crate::entrypoint_with_allocator_and_panic_handler!($process_instruction, $maximum);
+    };
+}
+
+/// Declare the program entrypoint and set up global handlers.
+///
+/// The main difference from the standard (SDK) [`entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html)
+/// macro is that this macro represents an entrypoint that does not perform allocations or copies
+/// when reading the input buffer.
 ///
 /// This macro emits the common boilerplate necessary to begin program execution, calling a
 /// provided function to process the program instruction supplied by the runtime, and reporting
 /// its result to the runtime.
 ///
-/// It also sets up a [global allocator] and [panic handler], using the [`crate::default_allocator!`]
-/// and [`crate::default_panic_handler!`] macros.
+/// It also sets up a [global allocator] and [panic handler], using the [`crate::default_allocator`]
+/// and [`crate::default_panic_handler`] macros.
 ///
 /// The first argument is the name of a function with this type signature:
 ///
@@ -57,7 +76,9 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// be ignored. When the maximum is not specified, the default is `64`. This is currently the [maximum
 /// number of accounts] that a transaction may lock in a block.
 ///
+/// [global allocator]: https://doc.rust-lang.org/stable/alloc/alloc/trait.GlobalAlloc.html
 /// [maximum number of accounts]: https://github.com/anza-xyz/agave/blob/ccabfcf84921977202fd06d3197cbcea83742133/runtime/src/bank.rs#L3207-L3219
+/// [panic handler]: https://doc.rust-lang.org/stable/core/panic/trait.PanicHandler.html
 ///
 /// # Examples
 ///
@@ -70,13 +91,13 @@ pub const SUCCESS: u64 = super::SUCCESS;
 ///
 ///     use pinocchio::{
 ///         account_info::AccountInfo,
-///         entrypoint,
+///         entrypoint_with_allocator_and_panic_handler,
 ///         msg,
 ///         pubkey::Pubkey,
 ///         ProgramResult
 ///     };
 ///
-///     entrypoint!(process_instruction);
+///     entrypoint_with_allocator_and_panic_handler!(process_instruction);
 ///
 ///     pub fn process_instruction(
 ///         program_id: &Pubkey,
@@ -92,19 +113,21 @@ pub const SUCCESS: u64 = super::SUCCESS;
 ///
 /// # Important
 ///
-/// The panic handler set up is different dependending on whether the `std` library is available to the
-/// linker or not. The `entrypoint!` macro will set up a default panic "hook", that works with the
-/// `#[panic_handler]` set by the `std`. Therefore, this macro should be used when the program or any
-/// of its dependencies are dependent on the `std` library.
+/// The panic handler set up is different depending on whether the `std` library is available to the
+/// linker or not. The `entrypoint_with_allocator_and_panic_handler` macro will set up a default
+/// panic "hook", that works with the `#[panic_handler]` set by the `std`. Therefore, this macro
+/// should be used when the program or any of its dependencies are dependent on the `std` library.
 ///
 /// When the program and all its dependencies are `no_std`, it is necessary to set a
-/// `#[panic_handler]` to handle panics. This is done by the `nostd_panic_handler!` macro. In this case,
-/// it is not possible to use the `entrypoint` macro. Use the `program_entrypoint!` macro instead and set
-/// up the allocator and panic handler manually.
+/// `#[panic_handler]` to handle panics. This is done by the [`nostd_panic_handler`] macro. In this
+/// case, it is not possible to use the `entrypoint_with_allocator_and_panic_handler` macro. Use the
+/// [`program_entrypoint`] macro instead and set up the allocator and panic handler manually.
 #[macro_export]
-macro_rules! entrypoint {
+macro_rules! entrypoint_with_allocator_and_panic_handler {
     ( $process_instruction:ident ) => {
-        entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
+        entrypoint_with_allocator_and_panic_handler!($process_instruction, {
+            $crate::MAX_TX_ACCOUNTS
+        });
     };
     ( $process_instruction:ident, $maximum:expr ) => {
         $crate::program_entrypoint!($process_instruction, $maximum);
@@ -115,9 +138,9 @@ macro_rules! entrypoint {
 
 /// Declare the program entrypoint.
 ///
-/// This macro is similar to the `entrypoint!` macro, but it does not set up a global allocator
-/// nor a panic handler. This is useful when the program will set up its own allocator and panic
-/// handler.
+/// This macro is similar to the [`entrypoint_with_allocator_and_panic_handler`] macro, but it does
+/// not set up a global allocator nor a panic handler. This is useful when the program will set up
+/// its own allocator and panic handler.
 #[macro_export]
 macro_rules! program_entrypoint {
     ( $process_instruction:ident ) => {
@@ -373,9 +396,9 @@ macro_rules! no_allocator {
 ///
 /// This macro sets up a global allocator that denies all dynamic allocations, while
 /// allowing static ("manual") allocations. This is useful when the program does not need to
-/// synamically allocate memory and manages their own allocations.
+/// dynamically allocate memory and manages their own allocations.
 ///
-/// The program will panic if it tries to allocate memory.
+/// The program will panic if it tries to dynamically allocate memory.
 ///
 /// This is used when the `"std"` feature is disabled.
 #[cfg(not(feature = "std"))]
@@ -452,7 +475,7 @@ mod alloc {
     }
 
     /// Integer arithmetic in this global allocator implementation is safe when
-    /// operating on the prescribed `HEAP_START_ADDRESS` and `HEAP_LENGTH`. Any
+    /// operating on the prescribed [`HEAP_START_ADDRESS`] and [`HEAP_LENGTH`]. Any
     /// other use may overflow and is thus unsupported and at one's own risk.
     #[allow(clippy::arithmetic_side_effects)]
     unsafe impl alloc::alloc::GlobalAlloc for BumpAllocator {
