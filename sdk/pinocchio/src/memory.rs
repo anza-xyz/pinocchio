@@ -48,7 +48,7 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
 /// - `dst` - Destination reference to copy to
 /// - `src` - Source reference to copy from
 #[inline]
-pub fn copy_val<T: Sized>(dst: &mut T, src: &T) {
+pub fn copy_val<T: ?Sized>(dst: &mut T, src: &T) {
     #[cfg(target_os = "solana")]
     unsafe {
         syscalls::sol_memcpy_(
