@@ -33,7 +33,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// Declare the program entrypoint and set up global handlers.
 ///
 /// This macro is deprecated and will be removed in a future version. It is recommended to
-/// use the [`entrypoint_with_allocator_and_panic_handler`] macro instead.
+/// use the [`crate::entrypoint_with_allocator_and_panic_handler`] macro instead.
 #[deprecated(
     since = "0.8.4",
     note = "Use the `entrypoint_with_allocator_and_panic_handler` macro instead"
@@ -119,9 +119,10 @@ macro_rules! entrypoint {
 /// should be used when the program or any of its dependencies are dependent on the `std` library.
 ///
 /// When the program and all its dependencies are `no_std`, it is necessary to set a
-/// `#[panic_handler]` to handle panics. This is done by the [`nostd_panic_handler`] macro. In this
-/// case, it is not possible to use the `entrypoint_with_allocator_and_panic_handler` macro. Use the
-/// [`program_entrypoint`] macro instead and set up the allocator and panic handler manually.
+/// `#[panic_handler]` to handle panics. This is done by the [`crate::nostd_panic_handler`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
+/// macro. In this case, it is not possible to use the `entrypoint_with_allocator_and_panic_handler`
+/// macro. Use the [`crate::program_entrypoint`] macro instead and set up the allocator and panic
+/// handler manually.
 #[macro_export]
 macro_rules! entrypoint_with_allocator_and_panic_handler {
     ( $process_instruction:ident ) => {
@@ -138,7 +139,7 @@ macro_rules! entrypoint_with_allocator_and_panic_handler {
 
 /// Declare the program entrypoint.
 ///
-/// This macro is similar to the [`entrypoint_with_allocator_and_panic_handler`] macro, but it does
+/// This macro is similar to the [`crate::entrypoint_with_allocator_and_panic_handler`] macro, but it does
 /// not set up a global allocator nor a panic handler. This is useful when the program will set up
 /// its own allocator and panic handler.
 #[macro_export]
