@@ -50,6 +50,7 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
 #[inline]
 pub fn copy_val<T: ?Sized>(dst: &mut T, src: &T) {
     #[cfg(target_os = "solana")]
+    // SAFETY: dst and src are of same type therefore the size is the same
     unsafe {
         syscalls::sol_memcpy_(
             dst as *mut T as *mut u8,
