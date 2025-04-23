@@ -41,6 +41,12 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
     core::hint::black_box((dst, src, n));
 }
 
+/// Copies the contents of one value to another.
+///
+/// # Arguments
+///
+/// - `dst` - Destination reference to copy to
+/// - `src` - Source reference to copy from
 #[inline]
 pub fn copy_val<T: Sized>(dst: &mut T, src: &T) {
     #[cfg(target_os = "solana")]
