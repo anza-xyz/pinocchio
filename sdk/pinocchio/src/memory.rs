@@ -41,6 +41,21 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
     core::hint::black_box((dst, src, n));
 }
 
+#[inline]
+pub fn copy_val<T: Sized>(dst: &mut T, src: &T) {
+    #[cfg(target_os = "solana")]
+    unsafe {
+        syscalls::sol_memcpy_(
+            dst as *mut T as *mut u8,
+            src as *const T as *const u8,
+            core::mem::size_of_val(dst) as u64,
+        );
+    }
+
+    #[cfg(not(target_os = "solana"))]
+    core::hint::black_box((dst, src));
+}
+
 /// Like C `memmove`.
 ///
 /// # Arguments
