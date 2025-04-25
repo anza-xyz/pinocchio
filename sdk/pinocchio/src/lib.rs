@@ -176,7 +176,7 @@
 //! ```
 //!
 //! Instead of enabling the `std` feature to be able to format log messages with [`msg!`],
-//! it is recommented to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log)
+//! it is recommended to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log)
 //! crate. This crate provides a lightweight `log!` macro with better compute units
 //! consumption than the standard `format!` macro without requiring the `std` library.
 //!
