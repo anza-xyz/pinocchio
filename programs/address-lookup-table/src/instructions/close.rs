@@ -34,24 +34,15 @@ impl Close<'_> {
             AccountMeta::writable(self.recipient.key()),
         ];
 
-        // Instruction data:
-        // - [0]: Instruction discriminator (1 byte, u8) (4 for Close)
-
-        let instruction_data = [4u8];
-
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &instruction_data,
+            data: &[4],
         };
 
         invoke_signed(
             &instruction,
-            &[
-                self.lookup_table,
-                self.authority,
-                self.recipient,
-            ],
+            &[self.lookup_table, self.authority, self.recipient],
             signers,
         )
     }

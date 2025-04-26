@@ -1,3 +1,4 @@
+use core::slice::from_raw_parts;
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
@@ -5,6 +6,8 @@ use pinocchio::{
     sysvars::clock::Slot,
     ProgramResult,
 };
+
+use crate::{write_bytes, UNINIT_BYTE};
 
 /// Create an address lookup table
 ///
@@ -52,18 +55,21 @@ impl Create<'_> {
         ];
 
         // Instruction data:
-        // - [0..4 ]: Instruction discriminator (1 byte, u8) (0 for Create)
+        // - [0..4 ]: Instruction discriminator (4 bytes, u32) (0 for Create)
         // - [4..12]: Recent Slot
         // - [12   ]: bump seed
-        let mut instruction_data = [0; 13];
-        instruction_data[0] = 0;
-        instruction_data[4..12].copy_from_slice(&self.recent_slot.to_le_bytes());
-        instruction_data[12] = self.bump_seed;
+        let mut instruction_data = [UNINIT_BYTE; 13];
+        write_bytes(&mut instruction_data, &[0]);
+        write_bytes(
+            &mut instruction_data[4..12],
+            &self.recent_slot.to_le_bytes(),
+        );
+        write_bytes(&mut instruction_data[12..], &[self.bump_seed]);
 
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &instruction_data,
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 13) },
         };
 
         invoke_signed(

@@ -31,21 +31,12 @@ impl Deactivate<'_> {
             AccountMeta::readonly_signer(self.authority.key()),
         ];
 
-        // Instruction data:
-        // - [0]: Instruction discriminator (1 byte, u8) (3 for Deactivate)
-
-        let instruction_data = [3u8];
-
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &instruction_data,
+            data: &[3],
         };
 
-        invoke_signed(
-            &instruction,
-            &[self.lookup_table, self.authority],
-            signers,
-        )
+        invoke_signed(&instruction, &[self.lookup_table, self.authority], signers)
     }
 }

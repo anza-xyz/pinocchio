@@ -30,21 +30,12 @@ impl Freeze<'_> {
             AccountMeta::readonly_signer(self.authority.key()),
         ];
 
-        // Instruction data:
-        // - [0]: Instruction discriminator (1 byte, u8) (1 for Freeze)
-
-        let instruction_data = [1u8];
-
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &instruction_data,
+            data: &[1],
         };
 
-        invoke_signed(
-            &instruction,
-            &[self.lookup_table, self.authority],
-            signers,
-        )
+        invoke_signed(&instruction, &[self.lookup_table, self.authority], signers)
     }
 }

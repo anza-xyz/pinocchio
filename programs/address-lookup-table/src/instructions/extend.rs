@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
@@ -27,7 +28,7 @@ pub struct Extend<'a> {
     /// System program for CPI.
     pub system_program: Option<&'a AccountInfo>,
     /// Addresses to extend the table with
-    pub new_addresses: &'a [Pubkey],
+    pub new_addresses: Vec<&'a Pubkey>,
 }
 
 impl Extend<'_> {
@@ -38,7 +39,7 @@ impl Extend<'_> {
 
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data:
-        // - [0]: Instruction discriminator (1 byte, u8) (2 for Extend)
+        // - [0]: Instruction discriminator (4 bytes, u32) (2 for Extend)
 
         // LOOKUP_TABLE_MAX_ADDRESSES == u8::MAX + 1.
         let mut instruction_data = [0; 8196]; // TODO: huge for stack, maybe forget about no_std and use vector
