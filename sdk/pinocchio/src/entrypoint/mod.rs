@@ -40,8 +40,8 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// provided function to process the program instruction supplied by the runtime, and reporting
 /// its result to the runtime.
 ///
-/// It also sets up a [global allocator] and [panic handler], using the [`crate::default_allocator!`]
-/// and [`crate::default_panic_handler!`] macros.
+/// It also sets up a [global allocator] and [panic handler], using the [`crate::default_allocator`]
+/// and [`crate::default_panic_handler`] macros.
 ///
 /// The first argument is the name of a function with this type signature:
 ///
