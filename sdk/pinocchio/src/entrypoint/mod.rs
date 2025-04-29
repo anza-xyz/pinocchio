@@ -119,7 +119,7 @@ macro_rules! entrypoint {
 
 /// Declare the program entrypoint.
 ///
-/// This macro is similar to the [`crate::entrypoint`] macro, but it does
+/// This macro is similar to the [`crate::entrypoint!`] macro, but it does
 /// not set up a global allocator nor a panic handler. This is useful when the program will set up
 /// its own allocator and panic handler.
 #[macro_export]
