@@ -108,9 +108,11 @@ impl Rent {
     /// a valid representation of `Rent`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<&Self, ProgramError> {
-        if bytes.len() != Self::LEN {
+        if bytes.len() < Self::LEN {
             return Err(ProgramError::InvalidArgument);
         }
+        // SAFETY: `bytes` has been validated to be at least `Self::LEN` bytes long; the
+        // caller must ensure that `bytes` contains a valid representation of `Rent`.
         Ok(unsafe { Self::from_bytes_unchecked(bytes) })
     }
 
