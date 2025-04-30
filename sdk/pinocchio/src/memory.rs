@@ -43,6 +43,19 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
 
 /// Copies the contents of one value to another.
 ///
+/// Equivalent to `dst = src` where `dst` and `src`
+/// are of same type and `impl Copy`.
+///
+/// This helper will be useful to optimize CU if
+/// copied size is > 32 bytes.
+///
+/// For value smaller than 32 bytes, `dst = src`
+/// will be emitted to register assignment. For
+/// values larger than 32 bytes, compiler will
+/// generate excess boilerplate to `sol_memcpy_`.
+/// So if T's size is known to be > 32 bytes,
+/// this helper should be used.
+///
 /// # Arguments
 ///
 /// - `dst` - Destination reference to copy to
