@@ -40,8 +40,8 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// provided function to process the program instruction supplied by the runtime, and reporting
 /// its result to the runtime.
 ///
-/// It also sets up a [global allocator] and [panic handler], using the [`crate::default_allocator`]
-/// and [`crate::default_panic_handler`] macros.
+/// It also sets up a [global allocator] and [panic handler], using the [`crate::default_allocator!`]
+/// and [`crate::default_panic_handler!`] macros.
 ///
 /// The first argument is the name of a function with this type signature:
 ///
@@ -103,7 +103,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// When the program and all its dependencies are `no_std`, it is necessary to set a
 /// `#[panic_handler]` to handle panics. This is done by the [`crate::nostd_panic_handler`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
 /// macro. In this case, it is not possible to use the `entrypoint`
-/// macro. Use the [`crate::program_entrypoint`] macro instead and set up the allocator and panic
+/// macro. Use the [`crate::program_entrypoint!`] macro instead and set up the allocator and panic
 /// handler manually.
 #[macro_export]
 macro_rules! entrypoint {
