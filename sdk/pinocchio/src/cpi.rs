@@ -3,8 +3,8 @@
 use core::{mem::MaybeUninit, ops::Deref};
 
 use crate::{
-    account_info::AccountInfo,
-    instruction::{Account, AccountMeta, Instruction, Signer},
+    account_info::{AccountInfo, BorrowState},
+    instruction::{Account, Instruction, Signer},
     program_error::ProgramError,
     pubkey::Pubkey,
     ProgramResult,
@@ -12,44 +12,6 @@ use crate::{
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.
 pub const MAX_CPI_ACCOUNTS: usize = 64;
-
-/// An `Instruction` as expected by `sol_invoke_signed_c`.
-///
-/// DO NOT EXPOSE THIS STRUCT:
-///
-/// To ensure pointers are valid upon use, the scope of this struct should
-/// only be limited to the stack where sol_invoke_signed_c happens and then
-/// discarded immediately after.
-#[repr(C)]
-#[derive(Debug, PartialEq, Clone)]
-struct CInstruction<'a> {
-    /// Public key of the program.
-    program_id: *const Pubkey,
-
-    /// Accounts expected by the program instruction.
-    accounts: *const AccountMeta<'a>,
-
-    /// Number of accounts expected by the program instruction.
-    accounts_len: u64,
-
-    /// Data expected by the program instruction.
-    data: *const u8,
-
-    /// Length of the data expected by the program instruction.
-    data_len: u64,
-}
-
-impl<'a> From<&Instruction<'a, '_, '_, '_>> for CInstruction<'a> {
-    fn from(instruction: &Instruction<'a, '_, '_, '_>) -> Self {
-        CInstruction {
-            program_id: instruction.program_id,
-            accounts: instruction.accounts.as_ptr(),
-            accounts_len: instruction.accounts.len() as u64,
-            data: instruction.data.as_ptr(),
-            data_len: instruction.data.len() as u64,
-        }
-    }
-}
 
 /// Invoke a cross-program instruction.
 ///
@@ -82,6 +44,7 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
 /// `accounts` field of the `instruction`.
+#[inline]
 pub fn invoke_signed<const ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo; ACCOUNTS],
@@ -102,12 +65,14 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
             return Err(ProgramError::InvalidArgument);
         }
 
-        if account_meta.is_writable {
-            account_info.check_borrow_mut_data()?;
-            account_info.check_borrow_mut_lamports()?;
+        let state = if account_meta.is_writable {
+            BorrowState::Borrowed
         } else {
-            account_info.check_borrow_data()?;
-            account_info.check_borrow_lamports()?;
+            BorrowState::MutablyBorrowed
+        };
+
+        if account_info.check_borrowed_state(state) {
+            return Err(ProgramError::AccountBorrowFailed);
         }
 
         accounts[index].write(Account::from(account_infos[index]));
@@ -131,6 +96,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
 /// `accounts` field of the `instruction`.
+#[inline]
 pub fn slice_invoke_signed(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
@@ -153,13 +119,16 @@ pub fn slice_invoke_signed(
             return Err(ProgramError::InvalidArgument);
         }
 
-        if account_meta.is_writable {
-            account_info.check_borrow_mut_data()?;
-            account_info.check_borrow_mut_lamports()?;
+        let state = if account_meta.is_writable {
+            BorrowState::Borrowed
         } else {
-            account_info.check_borrow_data()?;
-            account_info.check_borrow_lamports()?;
+            BorrowState::MutablyBorrowed
+        };
+
+        if account_info.check_borrowed_state(state) {
+            return Err(ProgramError::AccountBorrowFailed);
         }
+
         // SAFETY: The number of accounts has been validated to be less than
         // `MAX_CPI_ACCOUNTS`.
         unsafe {
@@ -210,6 +179,7 @@ pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) 
 /// borrowed within the calling program, and that data is written to by the
 /// callee, then Rust's aliasing rules will be violated and cause undefined
 /// behavior.
+#[inline(always)]
 pub unsafe fn invoke_signed_unchecked(
     instruction: &Instruction,
     accounts: &[Account],
@@ -217,10 +187,44 @@ pub unsafe fn invoke_signed_unchecked(
 ) {
     #[cfg(target_os = "solana")]
     {
-        let instruction = CInstruction::from(instruction);
+        use crate::instruction::AccountMeta;
+
+        /// An `Instruction` as expected by `sol_invoke_signed_c`.
+        ///
+        /// DO NOT EXPOSE THIS STRUCT:
+        ///
+        /// To ensure pointers are valid upon use, the scope of this struct should
+        /// only be limited to the stack where sol_invoke_signed_c happens and then
+        /// discarded immediately after.
+        #[repr(C)]
+        struct CInstruction<'a> {
+            /// Public key of the program.
+            program_id: *const Pubkey,
+
+            /// Accounts expected by the program instruction.
+            accounts: *const AccountMeta<'a>,
+
+            /// Number of accounts expected by the program instruction.
+            accounts_len: u64,
+
+            /// Data expected by the program instruction.
+            data: *const u8,
+
+            /// Length of the data expected by the program instruction.
+            data_len: u64,
+        }
+
+        let cpi_instruction = CInstruction {
+            program_id: instruction.program_id,
+            accounts: instruction.accounts.as_ptr(),
+            accounts_len: instruction.accounts.len() as u64,
+            data: instruction.data.as_ptr(),
+            data_len: instruction.data.len() as u64,
+        };
+
         unsafe {
             crate::syscalls::sol_invoke_signed_c(
-                &instruction as *const _ as *const u8,
+                &cpi_instruction as *const _ as *const u8,
                 accounts as *const _ as *const u8,
                 accounts.len() as u64,
                 signers_seeds as *const _ as *const u8,
@@ -243,6 +247,7 @@ pub const MAX_RETURN_DATA: usize = 1024;
 ///
 /// The maximum size of return data is [`MAX_RETURN_DATA`]. Return data is
 /// retrieved by the caller with [`get_return_data`].
+#[inline(always)]
 pub fn set_return_data(data: &[u8]) {
     #[cfg(target_os = "solana")]
     unsafe {
@@ -282,18 +287,19 @@ pub fn set_return_data(data: &[u8]) {
 /// For more about return data see the [documentation for the return data proposal][rdp].
 ///
 /// [rdp]: https://docs.solanalabs.com/proposals/return-data
+#[inline]
 pub fn get_return_data() -> Option<ReturnData> {
     #[cfg(target_os = "solana")]
     {
         const UNINIT_BYTE: core::mem::MaybeUninit<u8> = core::mem::MaybeUninit::<u8>::uninit();
         let mut data = [UNINIT_BYTE; MAX_RETURN_DATA];
-        let mut program_id = Pubkey::default();
+        let mut program_id = MaybeUninit::<Pubkey>::uninit();
 
         let size = unsafe {
             crate::syscalls::sol_get_return_data(
                 data.as_mut_ptr() as *mut u8,
                 data.len() as u64,
-                &mut program_id,
+                program_id.as_mut_ptr() as *mut Pubkey,
             )
         };
 
@@ -301,7 +307,7 @@ pub fn get_return_data() -> Option<ReturnData> {
             None
         } else {
             Some(ReturnData {
-                program_id,
+                program_id: unsafe { program_id.assume_init() },
                 data,
                 size: core::cmp::min(size as usize, MAX_RETURN_DATA),
             })
