@@ -71,7 +71,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
             BorrowState::MutablyBorrowed
         };
 
-        if account_info.check_borrowed_state(state) {
+        if account_info.is_borrowed(state) {
             return Err(ProgramError::AccountBorrowFailed);
         }
 
@@ -125,7 +125,7 @@ pub fn slice_invoke_signed(
             BorrowState::MutablyBorrowed
         };
 
-        if account_info.check_borrowed_state(state) {
+        if account_info.is_borrowed(state) {
             return Err(ProgramError::AccountBorrowFailed);
         }
 

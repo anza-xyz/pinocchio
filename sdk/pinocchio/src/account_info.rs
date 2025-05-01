@@ -28,11 +28,6 @@ pub enum BorrowState {
     ///
     /// This will test both data and lamports mutable borrow state.
     MutablyBorrowed = 0b_1000_1000,
-
-    /// Mask to check whether an account is already immutably borrowed.
-    ///
-    /// This will test both data and lamports immutably borrow state.
-    ImmutablyBorrowed = 0b_0111_0111,
 }
 
 /// Raw account data.
@@ -196,7 +191,7 @@ impl AccountInfo {
     ///
     /// This will test both data and lamports borrow state.
     #[inline(always)]
-    pub fn check_borrowed_state(&self, state: BorrowState) -> bool {
+    pub fn is_borrowed(&self, state: BorrowState) -> bool {
         let borrow_state = unsafe { (*self.raw).borrow_state };
         borrow_state & (state as u8) != 0
     }
@@ -513,10 +508,11 @@ impl AccountInfo {
     pub fn close(&self) -> ProgramResult {
         // make sure the account is not borrowed since we are about to
         // resize the data to zero
-        if self.check_borrowed_state(BorrowState::Borrowed) {
+        if self.is_borrowed(BorrowState::Borrowed) {
             return Err(ProgramError::AccountBorrowFailed);
         }
 
+        // SAFETY: The are no active borrows on the account data or lamports.
         unsafe {
             self.close_unchecked();
         }
