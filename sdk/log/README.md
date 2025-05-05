@@ -27,7 +27,7 @@ While the cost related to (1) is *fixed*, in the sense that it does not change w
 This crate defines a lightweight `Logger` type to format log messages and a companion `log!` macro. The logger is a fixed size buffer that can be used to format log messages before sending them to the log output. Any type that implements the `Log` trait can be appended to the logger. Additionally, the logger can the dereferenced to a `&[u8]` slice, which can be used for other purposes &mdash; e.g., it can be used to create `&str` to be stored on an account or return data of programs.
 
 Below is a sample of the improvements observed when formatting log messages, measured in terms of compute units (CU):
-| Ouput message                      | `log!` | `msg!`          | Improvement (%) |
+| Output message                      | `log!` | `msg!`          | Improvement (%) |
 |------------------------------------|--------|-----------------|-----------------|
 | `"Hello world!"`                   | 104    | 104             | -               |
 | `"lamports={}"` + `u64`            | 286    | 625 (+339)      | 55%             |
@@ -117,7 +117,7 @@ let lamports = 1_000_000_000;
 log!("transfer amount (SOL: {:.9}", lamports);
 ```
 
-For `&str` types, it is possible to specify a maximim length and a truncation strategy using one of the `Argument::Truncate*` variants:
+For `&str` types, it is possible to specify a maximum length and a truncation strategy using one of the `Argument::Truncate*` variants:
 ```rust
 use pinocchio_log::logger::{Attribute, Logger};
 
