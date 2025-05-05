@@ -160,37 +160,35 @@ macro_rules! program_entrypoint {
 #[allow(clippy::cast_ptr_alignment, clippy::missing_safety_doc)]
 #[inline(always)]
 pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
-    input: *mut u8,
+    mut input: *mut u8,
     accounts: &mut [core::mem::MaybeUninit<AccountInfo>],
 ) -> (&'a Pubkey, usize, &'a [u8]) {
-    let mut offset: usize = 0;
-
     // total number of accounts present; it only process up to MAX_ACCOUNTS
-    let total_accounts = *(input.add(offset) as *const u64) as usize;
-    offset += core::mem::size_of::<u64>();
+    let mut processed = *(input as *const u64) as usize;
+    input = input.add(core::mem::size_of::<u64>());
 
-    let processed = if total_accounts > 0 {
+    if processed > 0 {
+        let total_accounts = processed;
         // number of accounts to process (limited to MAX_ACCOUNTS)
-        let processed = core::cmp::min(total_accounts, MAX_ACCOUNTS);
+        processed = core::cmp::min(total_accounts, MAX_ACCOUNTS);
 
         for i in 0..processed {
-            let account_info: *mut Account = input.add(offset) as *mut _;
+            let account_info: *mut Account = input as *mut Account;
+            // rent epoch (8 bytes)
+            input = input.add(core::mem::size_of::<u64>());
 
             if (*account_info).borrow_state == NON_DUP_MARKER {
-                // repurpose the borrow state to track borrows
+                // Unique account: repurpose the borrow state to track borrows
                 (*account_info).borrow_state = 0b_0000_0000;
 
-                offset += core::mem::size_of::<Account>();
-                offset += (*account_info).data_len as usize;
-                offset += MAX_PERMITTED_DATA_INCREASE;
-                offset += (offset as *const u8).align_offset(BPF_ALIGN_OF_U128);
-                offset += core::mem::size_of::<u64>();
+                input = input.add(core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE);
+                input = input.add((*account_info).data_len as usize);
+                input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
 
                 accounts[i].write(AccountInfo { raw: account_info });
             } else {
-                offset += core::mem::size_of::<u64>();
-                // duplicated account – clone the original pointer using `borrow_state` since it represents the
-                // index of the duplicated account passed by the runtime.
+                // Duplicated account: clone the original pointer using `borrow_state` since it represents
+                // the index of the duplicated account passed by the runtime.
                 accounts[i].write(
                     accounts
                         .get_unchecked((*account_info).borrow_state as usize)
@@ -200,38 +198,31 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
             }
         }
 
-        // process any remaining accounts to move the offset to the instruction
+        // Process any remaining accounts to move the offset to the instruction
         // data (there is a duplication of logic but we avoid testing whether we
-        // have space for the account or not)
+        // have space for the account or not).
         for _ in processed..total_accounts {
-            let account_info: *mut Account = input.add(offset) as *mut _;
+            let account_info: *mut Account = input as *mut Account;
+            // rent epoch (8 bytes)
+            input = input.add(core::mem::size_of::<u64>());
 
             if (*account_info).borrow_state == NON_DUP_MARKER {
-                offset += core::mem::size_of::<Account>();
-                offset += (*account_info).data_len as usize;
-                offset += MAX_PERMITTED_DATA_INCREASE;
-                offset += (offset as *const u8).align_offset(BPF_ALIGN_OF_U128);
-                offset += core::mem::size_of::<u64>();
-            } else {
-                offset += core::mem::size_of::<u64>();
+                input = input.add(core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE);
+                input = input.add((*account_info).data_len as usize);
+                input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
             }
         }
-
-        processed
-    } else {
-        // no accounts to process
-        0
-    };
+    }
 
     // instruction data
-    let instruction_data_len = *(input.add(offset) as *const u64) as usize;
-    offset += core::mem::size_of::<u64>();
+    let instruction_data_len = *(input as *const u64) as usize;
+    input = input.add(core::mem::size_of::<u64>());
 
-    let instruction_data = { core::slice::from_raw_parts(input.add(offset), instruction_data_len) };
-    offset += instruction_data_len;
+    let instruction_data = { core::slice::from_raw_parts(input, instruction_data_len) };
+    input = input.add(instruction_data_len);
 
     // program id
-    let program_id: &Pubkey = &*(input.add(offset) as *const Pubkey);
+    let program_id: &Pubkey = &*(input as *const Pubkey);
 
     (program_id, processed, instruction_data)
 }
