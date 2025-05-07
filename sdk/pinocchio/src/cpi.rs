@@ -475,7 +475,7 @@ pub fn invoke_instruction_signed<const ACCOUNTS: usize>(
 /// aliasing rules.
 ///
 /// This function does not check that [`Account`]s are properly borrowable.
-/// Those checks consume CPU cycles that this function avoids.
+/// Those checks consume CUs that this function avoids.
 ///
 /// # Safety
 ///
