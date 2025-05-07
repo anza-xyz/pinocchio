@@ -2,7 +2,10 @@
 
 use core::{marker::PhantomData, ops::Deref};
 
-use crate::{account_info::AccountInfo, pubkey::Pubkey};
+use crate::{
+    account_info::{AccountInfo, BorrowState},
+    pubkey::Pubkey,
+};
 
 /// Information about a CPI instruction.
 #[derive(Debug, Clone)]
@@ -76,6 +79,26 @@ pub struct Account<'a> {
 #[inline(always)]
 const fn offset<T, U>(ptr: *const T, offset: usize) -> *const U {
     unsafe { (ptr as *const u8).add(offset) as *const U }
+}
+
+impl Account<'_> {
+    /// Return true if the account borrow state is set to the given state.
+    ///
+    /// This will test both data and lamports borrow state, similarly to
+    /// [`AccountInfo::is_borrowed`].
+    #[inline(always)]
+    pub fn is_borrowed(&self, state: BorrowState) -> bool {
+        // SAFETY: The `borrow_state` of an account is stored in the first byte of the
+        // memory location of the account on the input buffer, which starts at 8 bytes
+        // before the account `key`.
+        unsafe { *(self.key as *const u8).sub(8) & (state as u8) != 0 }
+    }
+
+    #[inline(always)]
+    pub fn key(&self) -> &'_ Pubkey {
+        // SAFETY: The `key` field is a pointer to the public key of the account.
+        unsafe { &*self.key }
+    }
 }
 
 impl<'a> From<&'a AccountInfo> for Account<'a> {
