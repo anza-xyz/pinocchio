@@ -50,34 +50,44 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     account_infos: &[&AccountInfo; ACCOUNTS],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    if instruction.accounts.len() < ACCOUNTS {
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-
     const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
     let mut accounts = [UNINIT; ACCOUNTS];
 
-    for index in 0..ACCOUNTS {
-        let account_info = account_infos[index];
-        let account_meta = &instruction.accounts[index];
+    account_infos
+        .iter()
+        .enumerate()
+        .try_for_each(|(index, account_info)| {
+            // Check whether all account infos can be safely borrowed according
+            // to their mutability on the instruction or not.
+            //
+            // This is a best effort approach since it is cheaper than matching each
+            // account info with their account meta and tracking duplicates, but it
+            // is pessimistic since it might sometimes require that read-only accounts
+            // on the cross-program invocation to be mutably borrow "friendly".
+            let state = if account_info.is_writable() {
+                BorrowState::Borrowed
+            } else {
+                BorrowState::MutablyBorrowed
+            };
 
-        if account_info.key() != account_meta.pubkey {
-            return Err(ProgramError::InvalidArgument);
-        }
+            if account_info.is_borrowed(state) {
+                return Err(ProgramError::AccountBorrowFailed);
+            }
 
-        let state = if account_meta.is_writable {
-            BorrowState::Borrowed
-        } else {
-            BorrowState::MutablyBorrowed
-        };
+            // SAFETY: There are `ACCOUNTS` account infos.
+            unsafe {
+                accounts
+                    .get_unchecked_mut(index)
+                    .write(Account::from(*account_info));
+                //.write(Account::from_account_info(account_info));
+            }
 
-        if account_info.is_borrowed(state) {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
+            Ok(())
+        })?;
 
-        accounts[index].write(Account::from(account_infos[index]));
-    }
-
+    // SAFETY: At this point it is guaranteed that all account infos are
+    // borrowable according to their mutability on the instruction, which
+    // in the worst case is more than what is needed.
     unsafe {
         invoke_signed_unchecked(
             instruction,
@@ -102,48 +112,52 @@ pub fn slice_invoke_signed(
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    if instruction.accounts.len() < account_infos.len() {
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-
     if account_infos.len() > MAX_CPI_ACCOUNTS {
         return Err(ProgramError::InvalidArgument);
     }
 
     const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
     let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
-    let mut len = 0;
 
-    for (account_info, account_meta) in account_infos.iter().zip(instruction.accounts.iter()) {
-        if account_info.key() != account_meta.pubkey {
-            return Err(ProgramError::InvalidArgument);
-        }
+    account_infos
+        .iter()
+        .enumerate()
+        .try_for_each(|(index, account_info)| {
+            // Check whether all account infos can be safely borrowed according
+            // to their mutability on the instruction or not.
+            //
+            // This is a best effort approach since it is cheaper than matching each
+            // account info with their account meta and tracking duplicates, but it
+            // is pessimistic since it might sometimes require that read-only accounts
+            // on the cross-program invocation to be mutably borrow "friendly".
+            let state = if account_info.is_writable() {
+                BorrowState::Borrowed
+            } else {
+                BorrowState::MutablyBorrowed
+            };
 
-        let state = if account_meta.is_writable {
-            BorrowState::Borrowed
-        } else {
-            BorrowState::MutablyBorrowed
-        };
+            if account_info.is_borrowed(state) {
+                return Err(ProgramError::AccountBorrowFailed);
+            }
 
-        if account_info.is_borrowed(state) {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
+            // SAFETY: There are `MAX_CPI_ACCOUNTS` account infos in the
+            // worst case.
+            unsafe {
+                accounts
+                    .get_unchecked_mut(index)
+                    .write(Account::from(*account_info));
+            }
 
-        // SAFETY: The number of accounts has been validated to be less than
-        // `MAX_CPI_ACCOUNTS`.
-        unsafe {
-            accounts
-                .get_unchecked_mut(len)
-                .write(Account::from(*account_info));
-        }
+            Ok(())
+        })?;
 
-        len += 1;
-    }
-    // SAFETY: The accounts have been validated.
+    // SAFETY: At this point it is guaranteed that all account infos are
+    // borrowable according to their mutability on the instruction, which
+    // in the worst case is more than what is needed.
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            core::slice::from_raw_parts(accounts.as_ptr() as _, len),
+            core::slice::from_raw_parts(accounts.as_ptr() as _, account_infos.len()),
             signers_seeds,
         );
     }
