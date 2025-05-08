@@ -191,9 +191,11 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
                 input = input.add(STATIC_ACCOUNT_DATA);
                 input = input.add((*account_info).data_len as usize);
                 input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
+                input = input.add(core::mem::size_of::<u64>());
 
                 accounts[i].write(AccountInfo { raw: account_info });
             } else {
+                input = input.add(core::mem::size_of::<u64>());
                 // Duplicated account: clone the original pointer using `borrow_state` since it represents
                 // the index of the duplicated account passed by the runtime.
                 accounts[i].write(
