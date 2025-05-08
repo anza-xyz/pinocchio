@@ -245,21 +245,23 @@ impl InstructionContext {
     #[inline(always)]
     unsafe fn read_account(&mut self) -> MaybeAccount {
         let account: *mut Account = self.input as *mut Account;
+        // Adds an 8-bytes offset for:
+        //   - rent epoch in case of a non-duplicate account
+        //   - duplicate marker + 7 bytes of padding in case of a duplicate account
+        self.input = self.input.add(core::mem::size_of::<u64>());
 
         if (*account).borrow_state == NON_DUP_MARKER {
-            // repurpose the borrow state to track borrows
+            // Unique account: repurpose the borrow state to track borrows.
             (*account).borrow_state = 0b_0000_0000;
 
             self.input = self.input.add(core::mem::size_of::<Account>());
             self.input = self.input.add((*account).data_len as usize);
             self.input = self.input.add(MAX_PERMITTED_DATA_INCREASE);
             self.input = self.input.add(self.input.align_offset(BPF_ALIGN_OF_U128));
-            self.input = self.input.add(core::mem::size_of::<u64>());
 
             MaybeAccount::Account(AccountInfo { raw: account })
         } else {
-            self.input = self.input.add(core::mem::size_of::<u64>());
-            //the caller will handle the mapping to the original account
+            // The caller will handle the mapping to the original account.
             MaybeAccount::Duplicated((*account).borrow_state)
         }
     }
