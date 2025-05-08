@@ -174,8 +174,6 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
 
         for i in 0..processed {
             let account_info: *mut Account = input as *mut Account;
-            // rent epoch (8 bytes)
-            input = input.add(core::mem::size_of::<u64>());
 
             if (*account_info).borrow_state == NON_DUP_MARKER {
                 // Unique account: repurpose the borrow state to track borrows
@@ -184,9 +182,11 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
                 input = input.add(core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE);
                 input = input.add((*account_info).data_len as usize);
                 input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
+                input = input.add(core::mem::size_of::<u64>());
 
                 accounts[i].write(AccountInfo { raw: account_info });
             } else {
+                input = input.add(core::mem::size_of::<u64>());
                 // Duplicated account: clone the original pointer using `borrow_state` since it represents
                 // the index of the duplicated account passed by the runtime.
                 accounts[i].write(
@@ -203,7 +203,9 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
         // have space for the account or not).
         for _ in processed..total_accounts {
             let account_info: *mut Account = input as *mut Account;
-            // rent epoch (8 bytes)
+            // Adds an 8-bytes offset for:
+            // - rent epoch in case of a non-duplicate account
+            // - duplicate marker + 7 bytes of padding in case of a duplicate account
             input = input.add(core::mem::size_of::<u64>());
 
             if (*account_info).borrow_state == NON_DUP_MARKER {
