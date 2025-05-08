@@ -414,4 +414,27 @@ mod tests {
 
         str_test_case!(1, 5, 10, 50, 100, 1000, 10000);
     }
+
+    #[test]
+    fn test_logger_bool() {
+        let mut logger = Logger::<5>::default();
+        logger.append(true);
+
+        assert!(&*logger == "true".as_bytes());
+
+        let mut logger = Logger::<5>::default();
+        logger.append(false);
+
+        assert!(&*logger == "false".as_bytes());
+
+        let mut logger = Logger::<3>::default();
+        logger.append(true);
+
+        assert!(&*logger == "tr@".as_bytes());
+
+        let mut logger = Logger::<4>::default();
+        logger.append(false);
+
+        assert!(&*logger == "fal@".as_bytes());
+    }
 }

@@ -619,3 +619,18 @@ macro_rules! impl_log_for_slice {
 // Supported slice types.
 impl_log_for_slice!([T]);
 impl_log_for_slice!([T; N]);
+
+/// Implement the log trait for the bool type.
+impl Log for bool {
+    #[inline]
+    fn debug_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
+        let value = if *self { "true" } else { "false" };
+        value.debug_with_args(buffer, args)
+    }
+
+    #[inline]
+    fn write_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
+        let value = if *self { "true" } else { "false" };
+        value.write_with_args(buffer, args)
+    }
+}
