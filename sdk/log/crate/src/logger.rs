@@ -11,9 +11,6 @@ extern "C" {
 #[cfg(not(target_os = "solana"))]
 extern crate std;
 
-/// Byte representation of the digits [0, 9].
-const DIGITS: [u8; 10] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
-
 /// Bytes for a truncated `str` log message.
 const TRUNCATED_SLICE: [u8; 3] = [b'.', b'.', b'.'];
 
@@ -78,7 +75,7 @@ impl<const BUFFER: usize> Logger<BUFFER> {
         } else {
             self.len += value.write_with_args(&mut self.buffer[self.len..], args);
 
-            if self.len() > BUFFER {
+            if self.len > BUFFER {
                 // Indicates that the buffer is full.
                 self.len = BUFFER;
                 // SAFETY: the buffer length is checked to greater than `BUFFER`.
@@ -192,7 +189,7 @@ macro_rules! impl_log_for_unsigned_integer {
                     0 => {
                         // SAFETY: the buffer is checked to be non-empty.
                         unsafe {
-                            buffer.get_unchecked_mut(0).write(*DIGITS.get_unchecked(0));
+                            buffer.get_unchecked_mut(0).write(b'0');
                         }
                         1
                     }
@@ -206,12 +203,12 @@ macro_rules! impl_log_for_unsigned_integer {
                             offset -= 1;
                             // SAFETY: the offset is always within the bounds of the array since
                             // the `offset` is initialized with the maximum number of digits that
-                            // the type can have and decremented on each iteration. The `digits`
-                            // array is also initialized with the same length as the offset.
+                            // the type can have and decremented on each iteration; `remainder`
+                            // is always less than 10.
                             unsafe {
                                 digits
                                     .get_unchecked_mut(offset)
-                                    .write(*DIGITS.get_unchecked(remainder as usize));
+                                    .write(b'0' + remainder as u8);
                             }
                         }
 
@@ -233,12 +230,9 @@ macro_rules! impl_log_for_unsigned_integer {
                                 offset -= 1;
                                 // SAFETY: the offset is always within the bounds of the array since
                                 // the `offset` is initialized with the maximum number of digits that
-                                // the type can have and decremented on each iteration. The `digits`
-                                // array is also initialized with the same length as the offset.
+                                // the type can have and decremented on each iteration.
                                 unsafe {
-                                    digits
-                                        .get_unchecked_mut(offset)
-                                        .write(*DIGITS.get_unchecked(0));
+                                    digits.get_unchecked_mut(offset).write(b'0');
                                 }
                             }
                             // Space for the decimal point.
@@ -351,7 +345,7 @@ macro_rules! impl_log_for_signed {
                     0 => {
                         // SAFETY: the buffer is checked to be non-empty.
                         unsafe {
-                            buffer.get_unchecked_mut(0).write(*DIGITS.get_unchecked(0));
+                            buffer.get_unchecked_mut(0).write(b'0');
                         }
                         1
                     }
