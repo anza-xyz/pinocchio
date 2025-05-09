@@ -4,7 +4,7 @@ use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
 use crate::{
     account_info::{AccountInfo, BorrowState},
-    instruction::{Account, AccountMeta, Instruction, Signer},
+    instruction::{Account, Instruction, Signer},
     program_error::ProgramError,
     pubkey::Pubkey,
     ProgramResult,
@@ -397,100 +397,6 @@ pub unsafe fn invoke_signed_unchecked(
     accounts: &[Account],
     signers_seeds: &[Signer],
 ) {
-    invoke_instruction_signed_unchecked(
-        instruction.program_id,
-        instruction.accounts,
-        instruction.data,
-        accounts,
-        signers_seeds,
-    );
-}
-
-/// Invoke a cross-program instruction.
-#[inline(always)]
-pub fn invoke_instruction<const ACCOUNTS: usize>(
-    program_id: &Pubkey,
-    priviledges: &[Priviledge; ACCOUNTS],
-    instruction_data: &[u8],
-    accounts: &[Account; ACCOUNTS],
-) -> ProgramResult {
-    invoke_instruction_signed(program_id, priviledges, instruction_data, accounts, &[])
-}
-
-/// Invoke a cross-program instruction with signatures.
-#[inline]
-pub fn invoke_instruction_signed<const ACCOUNTS: usize>(
-    program_id: &Pubkey,
-    priviledges: &[Priviledge; ACCOUNTS],
-    instruction_data: &[u8],
-    accounts: &[Account; ACCOUNTS],
-    signers_seeds: &[Signer],
-) -> ProgramResult {
-    let mut account_metas = MaybeUninit::<[AccountMeta; ACCOUNTS]>::uninit();
-    let mut account_metas_ptr = account_metas.as_mut_ptr() as *mut AccountMeta;
-
-    accounts
-        .iter()
-        .zip(priviledges.iter())
-        .try_for_each(|(account, priviledge)| {
-            // Check whether all account infos can be safely borrowed according
-            // to their mutability on the instruction or not.
-            if account.is_borrowed(match priviledge.0 {
-                true => BorrowState::Borrowed,
-                false => BorrowState::MutablyBorrowed,
-            }) {
-                return Err(ProgramError::AccountBorrowFailed);
-            }
-
-            // SAFETY: There are `ACCOUNTS` account metas.
-            unsafe {
-                account_metas_ptr.write(AccountMeta::new(
-                    account.key(),
-                    priviledge.0,
-                    priviledge.1,
-                ));
-
-                account_metas_ptr = account_metas_ptr.add(1);
-            }
-
-            Ok(())
-        })?;
-
-    // SAFETY: At this point it is guaranteed that all account infos are
-    // borrowable according to their mutability on the instruction.
-    unsafe {
-        invoke_instruction_signed_unchecked(
-            program_id,
-            account_metas.assume_init_ref(),
-            instruction_data,
-            accounts,
-            signers_seeds,
-        );
-    }
-
-    Ok(())
-}
-
-/// Invoke a cross-program instruction with signatures but don't enforce Rust's
-/// aliasing rules.
-///
-/// This function does not check that [`Account`]s are properly borrowable.
-/// Those checks consume CUs that this function avoids.
-///
-/// # Safety
-///
-/// If any of the writable accounts passed to the callee contain data that is
-/// borrowed within the calling program, and that data is written to by the
-/// callee, then Rust's aliasing rules will be violated and cause undefined
-/// behavior.
-#[inline(always)]
-pub unsafe fn invoke_instruction_signed_unchecked(
-    program_id: &Pubkey,
-    account_metas: &[AccountMeta],
-    instruction_data: &[u8],
-    accounts: &[Account],
-    signers_seeds: &[Signer],
-) {
     #[cfg(target_os = "solana")]
     {
         /// An `Instruction` as expected by `sol_invoke_signed_c`.
@@ -506,7 +412,7 @@ pub unsafe fn invoke_instruction_signed_unchecked(
             program_id: *const Pubkey,
 
             /// Accounts expected by the program instruction.
-            accounts: *const AccountMeta<'a>,
+            accounts: *const crate::instruction::AccountMeta<'a>,
 
             /// Number of accounts expected by the program instruction.
             accounts_len: u64,
@@ -519,11 +425,11 @@ pub unsafe fn invoke_instruction_signed_unchecked(
         }
 
         let cpi_instruction = CInstruction {
-            program_id,
-            accounts: account_metas.as_ptr(),
-            accounts_len: account_metas.len() as u64,
-            data: instruction_data.as_ptr(),
-            data_len: instruction_data.len() as u64,
+            program_id: instruction.program_id,
+            accounts: instruction.accounts.as_ptr(),
+            accounts_len: instruction.accounts.len() as u64,
+            data: instruction.data.as_ptr(),
+            data_len: instruction.data.len() as u64,
         };
 
         unsafe {
@@ -539,13 +445,7 @@ pub unsafe fn invoke_instruction_signed_unchecked(
 
     #[cfg(not(target_os = "solana"))]
     {
-        core::hint::black_box((
-            program_id,
-            account_metas,
-            instruction_data,
-            accounts,
-            signers_seeds,
-        ));
+        core::hint::black_box((instruction, accounts, signers_seeds));
         unreachable!();
     }
 }
