@@ -74,8 +74,8 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     account_infos
         .iter()
         .zip(instruction.accounts.iter())
-        .enumerate()
-        .try_for_each(|(index, (account_info, account_meta))| {
+        .zip(accounts.iter_mut())
+        .try_for_each(|((account_info, account_meta), accounts)| {
             // In order to check whether the borrow state is compatible
             // with the invocation, we need to check that we have the
             // correct account info and meta pair.
@@ -99,12 +99,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
                 return Err(ProgramError::AccountBorrowFailed);
             }
 
-            // SAFETY: There are `ACCOUNTS` account infos.
-            unsafe {
-                accounts
-                    .get_unchecked_mut(index)
-                    .write(Account::from(*account_info));
-            }
+            accounts.write(Account::from(*account_info));
 
             Ok(())
         })?;
@@ -157,11 +152,11 @@ pub fn slice_invoke_signed(
     account_infos
         .iter()
         .zip(instruction.accounts.iter())
-        .enumerate()
-        .try_for_each(|(index, (account_info, account_meta))| {
+        .zip(accounts.iter_mut())
+        .try_for_each(|((account_info, account_meta), account)| {
             // In order to check whether the borrow state is compatible
             // with the invocation, we need to check that we have the
-            // correct account info and meta pair
+            // correct account info and meta pair.
             if account_info.key() != account_meta.pubkey {
                 return Err(ProgramError::InvalidArgument);
             }
@@ -182,13 +177,7 @@ pub fn slice_invoke_signed(
                 return Err(ProgramError::AccountBorrowFailed);
             }
 
-            // SAFETY: There are `MAX_CPI_ACCOUNTS` account infos in the
-            // worst case.
-            unsafe {
-                accounts
-                    .get_unchecked_mut(index)
-                    .write(Account::from(*account_info));
-            }
+            account.write(Account::from(*account_info));
 
             Ok(())
         })?;
