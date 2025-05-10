@@ -399,6 +399,8 @@ pub unsafe fn invoke_signed_unchecked(
 ) {
     #[cfg(target_os = "solana")]
     {
+        use crate::instruction::AccountMeta;
+
         /// An `Instruction` as expected by `sol_invoke_signed_c`.
         ///
         /// DO NOT EXPOSE THIS STRUCT:
@@ -412,7 +414,7 @@ pub unsafe fn invoke_signed_unchecked(
             program_id: *const Pubkey,
 
             /// Accounts expected by the program instruction.
-            accounts: *const crate::instruction::AccountMeta<'a>,
+            accounts: *const AccountMeta<'a>,
 
             /// Number of accounts expected by the program instruction.
             accounts_len: u64,
@@ -444,10 +446,7 @@ pub unsafe fn invoke_signed_unchecked(
     }
 
     #[cfg(not(target_os = "solana"))]
-    {
-        core::hint::black_box((instruction, accounts, signers_seeds));
-        unreachable!();
-    }
+    core::hint::black_box((instruction, accounts, signers_seeds));
 }
 
 /// Maximum size that can be set using [`set_return_data`].
