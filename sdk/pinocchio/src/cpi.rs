@@ -104,8 +104,8 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
             Ok(())
         })?;
 
-    // SAFETY: At this point it is guaranteed that all account infos are
-    // borrowable according to their mutability on the instruction.
+    // SAFETY: At this point it is guaranteed that account infos are borrowable
+    // according to their mutability on the instruction.
     unsafe {
         invoke_signed_unchecked(
             instruction,
@@ -185,9 +185,8 @@ pub fn slice_invoke_signed(
             Ok(())
         })?;
 
-    // SAFETY: At this point it is guaranteed that all account infos are
-    // borrowable according to their mutability on the instruction, which
-    // in the worst case is more than what is needed.
+    // SAFETY: At this point it is guaranteed that account infos are borrowable
+    // according to their mutability on the instruction.
     unsafe {
         invoke_signed_unchecked(
             instruction,
