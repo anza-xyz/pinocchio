@@ -21,7 +21,9 @@ pub const MAX_CPI_ACCOUNTS: usize = 64;
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
+/// `accounts` field of the `instruction`. When the instruction has duplicated
+/// accounts, it is necessary to pass a duplicated reference to the same account
+/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
 pub fn invoke<const ACCOUNTS: usize>(
     instruction: &Instruction,
@@ -38,7 +40,9 @@ pub fn invoke<const ACCOUNTS: usize>(
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
+/// `accounts` field of the `instruction`. When the instruction has duplicated
+/// accounts, it is necessary to pass a duplicated reference to the same account
+/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
 pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
     slice_invoke_signed(instruction, account_infos, &[])
@@ -61,7 +65,9 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
+/// `accounts` field of the `instruction`. When the instruction has duplicated
+/// accounts, it is necessary to pass a duplicated reference to the same account
+/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline]
 pub fn invoke_signed<const ACCOUNTS: usize>(
     instruction: &Instruction,
@@ -138,14 +144,17 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
-#[inline]
+/// `accounts` field of the `instruction`. When the instruction has duplicated
+/// accounts, it is necessary to pass a duplicated reference to the same account
+/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 pub fn slice_invoke_signed(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    if account_infos.len() > MAX_CPI_ACCOUNTS {
+    // Check that the number of accounts match the expected accounts by
+    // the instruction and do not exceed the maximum allowed.
+    if instruction.accounts.len() != account_infos.len() || account_infos.len() > MAX_CPI_ACCOUNTS {
         return Err(ProgramError::InvalidArgument);
     }
 
