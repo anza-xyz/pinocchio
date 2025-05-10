@@ -53,13 +53,10 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 ///      accounts in the instruction.
 ///
 /// This validation is done to ensure that the borrow checker rules are followed,
-/// consuming CUs in the process. There are two alternatives to this function that
-/// have lower CU consumption:
-///   * `invoke_instruction_signed` - does not perform `Pubkey` validation since
-///      it creates each `AccountMeta` from the `Account` directly.
-///   * `invoke_signed_unchecked` - does not perform any validation. This should
-///      only be used when the caller is sure that the borrow checker rules are
-///      followed.
+/// consuming CUs in the process. The `invoke_signed_unchecked` is an alternative
+/// to this function that has lower CU consumption since it does not perform
+/// any validation. This should only be used when the caller is sure that the borrow
+/// checker rules are followed.
 ///
 /// # Important
 ///
@@ -86,15 +83,19 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
                 return Err(ProgramError::InvalidArgument);
             }
 
-            // Check whether all account infos can be safely borrowed according
-            // to their mutability on the instruction or not.
-            let state = if account_meta.is_writable {
+            // Determines the borrow state that would be invalid according
+            // to their mutability on the instruction.
+            let invalid_state = if account_meta.is_writable {
+                // If the account is required to be writable, it cannot
+                // be currently borrowed.
                 BorrowState::Borrowed
             } else {
+                // If the account is required to be read-only, it cannot
+                // be currently mutably borrowed.
                 BorrowState::MutablyBorrowed
             };
 
-            if account_info.is_borrowed(state) {
+            if account_info.is_borrowed(invalid_state) {
                 return Err(ProgramError::AccountBorrowFailed);
             }
 
@@ -165,15 +166,19 @@ pub fn slice_invoke_signed(
                 return Err(ProgramError::InvalidArgument);
             }
 
-            // Check whether all account infos can be safely borrowed according
-            // to their mutability on the instruction or not.
-            let state = if account_meta.is_writable {
+            // Determines the borrow state that would be invalid according
+            // to their mutability on the instruction.
+            let invalid_state = if account_meta.is_writable {
+                // If the account is required to be writable, it cannot
+                //  be currently borrowed.
                 BorrowState::Borrowed
             } else {
+                // If the account is required to be read-only, it cannot
+                // be currently mutably borrowed.
                 BorrowState::MutablyBorrowed
             };
 
-            if account_info.is_borrowed(state) {
+            if account_info.is_borrowed(invalid_state) {
                 return Err(ProgramError::AccountBorrowFailed);
             }
 
@@ -238,6 +243,8 @@ pub unsafe fn invoke_signed_unchecked(
 ) {
     #[cfg(target_os = "solana")]
     {
+        use crate::instruction::AccountMeta;
+
         /// An `Instruction` as expected by `sol_invoke_signed_c`.
         ///
         /// DO NOT EXPOSE THIS STRUCT:
@@ -251,7 +258,7 @@ pub unsafe fn invoke_signed_unchecked(
             program_id: *const Pubkey,
 
             /// Accounts expected by the program instruction.
-            accounts: *const crate::instruction::AccountMeta<'a>,
+            accounts: *const AccountMeta<'a>,
 
             /// Number of accounts expected by the program instruction.
             accounts_len: u64,
@@ -283,10 +290,7 @@ pub unsafe fn invoke_signed_unchecked(
     }
 
     #[cfg(not(target_os = "solana"))]
-    {
-        core::hint::black_box((instruction, accounts, signers_seeds));
-        unreachable!();
-    }
+    core::hint::black_box((instruction, accounts, signers_seeds));
 }
 
 /// Maximum size that can be set using [`set_return_data`].
