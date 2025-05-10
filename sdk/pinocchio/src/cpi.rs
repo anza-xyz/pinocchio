@@ -1,6 +1,6 @@
 //! Cross-program invocation helpers.
 
-use core::{mem::MaybeUninit, ops::Deref};
+use core::{cmp::min, mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
 use crate::{
     account_info::{AccountInfo, BorrowState},
@@ -109,7 +109,10 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            core::slice::from_raw_parts(accounts.as_ptr() as _, ACCOUNTS),
+            from_raw_parts(
+                accounts.as_ptr() as _,
+                min(ACCOUNTS, instruction.accounts.len()),
+            ),
             signers_seeds,
         );
     }
@@ -188,7 +191,7 @@ pub fn slice_invoke_signed(
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            core::slice::from_raw_parts(accounts.as_ptr() as _, account_infos.len()),
+            from_raw_parts(accounts.as_ptr() as _, account_infos.len()),
             signers_seeds,
         );
     }
@@ -369,7 +372,7 @@ pub struct ReturnData {
     program_id: Pubkey,
 
     /// Return data set by the program.
-    data: [core::mem::MaybeUninit<u8>; MAX_RETURN_DATA],
+    data: [MaybeUninit<u8>; MAX_RETURN_DATA],
 
     /// Length of the return data.
     size: usize,
@@ -383,7 +386,7 @@ impl ReturnData {
 
     /// Return the data set by the program.
     pub fn as_slice(&self) -> &[u8] {
-        unsafe { core::slice::from_raw_parts(self.data.as_ptr() as _, self.size) }
+        unsafe { from_raw_parts(self.data.as_ptr() as _, self.size) }
     }
 }
 
