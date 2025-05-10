@@ -191,7 +191,10 @@ pub fn slice_invoke_signed(
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            from_raw_parts(accounts.as_ptr() as _, account_infos.len()),
+            from_raw_parts(
+                accounts.as_ptr() as _,
+                min(account_infos.len(), instruction.accounts.len()),
+            ),
             signers_seeds,
         );
     }
