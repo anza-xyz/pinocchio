@@ -30,6 +30,11 @@ pub type ProgramResult = super::ProgramResult;
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = super::SUCCESS;
 
+/// The "static" size of an account in the input buffer.
+///
+/// This is the size of the account header plus the maximum permitted data increase.
+const STATIC_ACCOUNT_DATA: usize = core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+
 /// Declare the program entrypoint and set up global handlers.
 ///
 /// The main difference from the standard (SDK) [`entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html)
@@ -183,7 +188,7 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
                 // Unique account: repurpose the borrow state to track borrows.
                 (*account_info).borrow_state = 0b_0000_0000;
 
-                input = input.add(core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE);
+                input = input.add(STATIC_ACCOUNT_DATA);
                 input = input.add((*account_info).data_len as usize);
                 input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
 
@@ -211,7 +216,7 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
             input = input.add(core::mem::size_of::<u64>());
 
             if (*account_info).borrow_state == NON_DUP_MARKER {
-                input = input.add(core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE);
+                input = input.add(STATIC_ACCOUNT_DATA);
                 input = input.add((*account_info).data_len as usize);
                 input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
             }

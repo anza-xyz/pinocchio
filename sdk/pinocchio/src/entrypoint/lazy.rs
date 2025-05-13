@@ -2,7 +2,8 @@
 //! input buffer.
 
 use crate::{
-    account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
+    account_info::{Account, AccountInfo},
+    entrypoint::STATIC_ACCOUNT_DATA,
     program_error::ProgramError,
     pubkey::Pubkey,
     BPF_ALIGN_OF_U128, NON_DUP_MARKER,
@@ -100,8 +101,10 @@ macro_rules! lazy_program_entrypoint {
 /// This is a wrapper around the input buffer that provides methods to read the accounts
 /// and instruction data. It is used by the lazy entrypoint to access the input data on demand.
 pub struct InstructionContext {
-    /// Pointer to the runtime input buffer for the instruction.
-    input: *mut u8,
+    /// Pointer to the runtime input buffer to read from.
+    ///
+    /// This pointer is moved forward as accounts are read from the buffer.
+    buffer: *mut u8,
 
     /// Number of remaining accounts.
     ///
@@ -134,8 +137,9 @@ impl InstructionContext {
     pub unsafe fn new_unchecked(input: *mut u8) -> Self {
         Self {
             // SAFETY: The first 8 bytes of the input buffer represent the
-            // number of accounts when serialized by the SVM loader.
-            input: unsafe { input.add(core::mem::size_of::<u64>()) },
+            // number of accounts when serialized by the SVM loader, which is read
+            // when the context is created.
+            buffer: unsafe { input.add(core::mem::size_of::<u64>()) },
             // SAFETY: Read the number of accounts from the input buffer serialized
             // by the SVM loader.
             remaining: unsafe { *(input as *const u64) },
@@ -206,10 +210,10 @@ impl InstructionContext {
     /// before reading all accounts will result in undefined behavior.
     #[inline(always)]
     pub unsafe fn instruction_data_unchecked(&self) -> &[u8] {
-        let data_len = *(self.input as *const usize);
+        let data_len = *(self.buffer as *const usize);
         // shadowing the input to avoid leaving it in an inconsistent position
-        let input = self.input.add(core::mem::size_of::<u64>());
-        core::slice::from_raw_parts(input, data_len)
+        let data = self.buffer.add(core::mem::size_of::<u64>());
+        core::slice::from_raw_parts(data, data_len)
     }
 
     /// Returns the program id for the instruction.
@@ -233,8 +237,8 @@ impl InstructionContext {
     /// before reading all accounts will result in undefined behavior.
     #[inline(always)]
     pub unsafe fn program_id_unchecked(&self) -> &Pubkey {
-        let data_len = *(self.input as *const usize);
-        &*(self.input.add(core::mem::size_of::<u64>() + data_len) as *const Pubkey)
+        let data_len = *(self.buffer as *const usize);
+        &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Pubkey)
     }
 
     /// Read an account from the input buffer.
@@ -244,20 +248,19 @@ impl InstructionContext {
     #[allow(clippy::cast_ptr_alignment, clippy::missing_safety_doc)]
     #[inline(always)]
     unsafe fn read_account(&mut self) -> MaybeAccount {
-        let account: *mut Account = self.input as *mut Account;
+        let account: *mut Account = self.buffer as *mut Account;
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicate account
         //   - duplicate marker + 7 bytes of padding in case of a duplicate account
-        self.input = self.input.add(core::mem::size_of::<u64>());
+        self.buffer = self.buffer.add(core::mem::size_of::<u64>());
 
         if (*account).borrow_state == NON_DUP_MARKER {
             // Unique account: repurpose the borrow state to track borrows.
             (*account).borrow_state = 0b_0000_0000;
 
-            self.input = self.input.add(core::mem::size_of::<Account>());
-            self.input = self.input.add((*account).data_len as usize);
-            self.input = self.input.add(MAX_PERMITTED_DATA_INCREASE);
-            self.input = self.input.add(self.input.align_offset(BPF_ALIGN_OF_U128));
+            self.buffer = self.buffer.add(STATIC_ACCOUNT_DATA);
+            self.buffer = self.buffer.add((*account).data_len as usize);
+            self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
 
             MaybeAccount::Account(AccountInfo { raw: account })
         } else {
