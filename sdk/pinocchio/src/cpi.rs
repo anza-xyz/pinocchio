@@ -1,6 +1,6 @@
 //! Cross-program invocation helpers.
 
-use core::{cmp::min, mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
+use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
 use crate::{
     account_info::{AccountInfo, BorrowState},
@@ -44,8 +44,11 @@ pub fn invoke<const ACCOUNTS: usize>(
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
-pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
-    slice_invoke_signed(instruction, account_infos, &[])
+pub fn slice_invoke<const MAX_ACCOUNTS: usize>(
+    instruction: &Instruction,
+    account_infos: &[&AccountInfo],
+) -> ProgramResult {
+    slice_invoke_signed::<MAX_ACCOUNTS>(instruction, account_infos, &[])
 }
 
 /// Invoke a cross-program instruction with signatures.
@@ -68,12 +71,16 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 /// `accounts` field of the `instruction`. When the instruction has duplicated
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
-#[inline]
+#[inline(always)]
 pub fn invoke_signed<const ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo; ACCOUNTS],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
+    if ACCOUNTS < instruction.accounts.len() {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+
     const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
     let mut accounts = [UNINIT; ACCOUNTS];
 
@@ -115,10 +122,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            from_raw_parts(
-                accounts.as_ptr() as _,
-                min(ACCOUNTS, instruction.accounts.len()),
-            ),
+            from_raw_parts(accounts.as_ptr() as _, instruction.accounts.len()),
             signers_seeds,
         );
     }
@@ -147,19 +151,26 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 /// `accounts` field of the `instruction`. When the instruction has duplicated
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
-pub fn slice_invoke_signed(
+#[inline(always)]
+pub fn slice_invoke_signed<const MAX_ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    // Check that the number of accounts match the expected accounts by
-    // the instruction and do not exceed the maximum allowed.
-    if instruction.accounts.len() != account_infos.len() || account_infos.len() > MAX_CPI_ACCOUNTS {
+    // Check that the number of accounts provided is not greater than
+    // the maximum number of accounts allowed.
+    if MAX_ACCOUNTS > MAX_CPI_ACCOUNTS {
         return Err(ProgramError::InvalidArgument);
     }
 
+    // Check that the number of accounts provided is not less than
+    // the number of accounts expected by the instruction.
+    if instruction.accounts.len() < account_infos.len() {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+
     const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
-    let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
+    let mut accounts = [UNINIT; MAX_ACCOUNTS];
 
     account_infos
         .iter()
@@ -199,10 +210,7 @@ pub fn slice_invoke_signed(
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            from_raw_parts(
-                accounts.as_ptr() as _,
-                min(account_infos.len(), instruction.accounts.len()),
-            ),
+            from_raw_parts(accounts.as_ptr() as _, instruction.accounts.len()),
             signers_seeds,
         );
     }
