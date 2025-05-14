@@ -105,8 +105,11 @@ pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
-pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
-    slice_invoke_signed(instruction, account_infos, &[])
+pub fn slice_invoke<const MAX_ACCOUNTS: usize>(
+    instruction: &Instruction,
+    account_infos: &[&AccountInfo],
+) -> ProgramResult {
+    slice_invoke_signed::<MAX_ACCOUNTS>(instruction, account_infos, &[])
 }
 
 /// Invoke a cross-program instruction with signatures from an array of
@@ -241,7 +244,8 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 /// `accounts` field of the `instruction`. When the instruction has duplicated
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
-pub fn slice_invoke_signed(
+#[inline(always)]
+pub fn slice_invoke_signed<const MAX_ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
