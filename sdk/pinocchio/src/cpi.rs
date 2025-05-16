@@ -1,6 +1,6 @@
 //! Cross-program invocation helpers.
 
-use core::{mem::MaybeUninit, ops::Deref};
+use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
 use crate::{
     account_info::{AccountInfo, BorrowState},
@@ -15,10 +15,15 @@ pub const MAX_CPI_ACCOUNTS: usize = 64;
 
 /// Invoke a cross-program instruction.
 ///
+/// This function is a convenience wrapper around [`invoke_signed`] that
+/// passes an empty signer seeds slice.
+///
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
+/// `accounts` field of the `instruction`. When the instruction has duplicated
+/// accounts, it is necessary to pass a duplicated reference to the same account
+/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
 pub fn invoke<const ACCOUNTS: usize>(
     instruction: &Instruction,
@@ -29,59 +34,95 @@ pub fn invoke<const ACCOUNTS: usize>(
 
 /// Invoke a cross-program instruction from a slice of `AccountInfo`s.
 ///
+/// This function is a convenience wrapper around [`slice_invoke_signed`]
+/// that passes an empty signer seeds slice.
+///
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
+/// `accounts` field of the `instruction`. When the instruction has duplicated
+/// accounts, it is necessary to pass a duplicated reference to the same account
+/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
-pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
-    slice_invoke_signed(instruction, account_infos, &[])
+pub fn slice_invoke<const MAX_ACCOUNTS: usize>(
+    instruction: &Instruction,
+    account_infos: &[&AccountInfo],
+) -> ProgramResult {
+    slice_invoke_signed::<MAX_ACCOUNTS>(instruction, account_infos, &[])
 }
 
 /// Invoke a cross-program instruction with signatures.
 ///
+/// This function performs validation of the `account_infos` slice to ensure that:
+///   1. The accounts match the expected accounts in the instruction, i.e., their
+///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
+///   2. The borrow state of the accounts is compatible with the mutability of the
+///      accounts in the instruction.
+///
+/// This validation is done to ensure that the borrow checker rules are followed,
+/// consuming CUs in the process. The `invoke_signed_unchecked` is an alternative
+/// to this function that has lower CU consumption since it does not perform
+/// any validation. This should only be used when the caller is sure that the borrow
+/// checker rules are followed.
+///
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
-#[inline]
+/// `accounts` field of the `instruction`. When the instruction has duplicated
+/// accounts, it is necessary to pass a duplicated reference to the same account
+/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
+#[inline(always)]
 pub fn invoke_signed<const ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo; ACCOUNTS],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    if instruction.accounts.len() < ACCOUNTS {
+    if ACCOUNTS < instruction.accounts.len() {
         return Err(ProgramError::NotEnoughAccountKeys);
     }
 
     const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
     let mut accounts = [UNINIT; ACCOUNTS];
 
-    for index in 0..ACCOUNTS {
-        let account_info = account_infos[index];
-        let account_meta = &instruction.accounts[index];
+    account_infos
+        .iter()
+        .zip(instruction.accounts.iter())
+        .zip(accounts.iter_mut())
+        .try_for_each(|((account_info, account_meta), accounts)| {
+            // In order to check whether the borrow state is compatible
+            // with the invocation, we need to check that we have the
+            // correct account info and meta pair.
+            if account_info.key() != account_meta.pubkey {
+                return Err(ProgramError::InvalidArgument);
+            }
 
-        if account_info.key() != account_meta.pubkey {
-            return Err(ProgramError::InvalidArgument);
-        }
+            // Determines the borrow state that would be invalid according
+            // to their mutability on the instruction.
+            let invalid_state = if account_meta.is_writable {
+                // If the account is required to be writable, it cannot
+                // be currently borrowed.
+                BorrowState::Borrowed
+            } else {
+                // If the account is required to be read-only, it cannot
+                // be currently mutably borrowed.
+                BorrowState::MutablyBorrowed
+            };
 
-        let state = if account_meta.is_writable {
-            BorrowState::Borrowed
-        } else {
-            BorrowState::MutablyBorrowed
-        };
+            if account_info.is_borrowed(invalid_state) {
+                return Err(ProgramError::AccountBorrowFailed);
+            }
 
-        if account_info.is_borrowed(state) {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
+            accounts.write(Account::from(*account_info));
 
-        accounts[index].write(Account::from(account_infos[index]));
-    }
+            Ok(())
+        })?;
 
+    // SAFETY: At this point it is guaranteed that account infos are borrowable
+    // according to their mutability on the instruction.
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            core::slice::from_raw_parts(accounts.as_ptr() as _, ACCOUNTS),
+            from_raw_parts(accounts.as_ptr() as _, instruction.accounts.len()),
             signers_seeds,
         );
     }
@@ -92,58 +133,84 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 /// Invoke a cross-program instruction with signatures from a slice of
 /// `AccountInfo`s.
 ///
+/// This function performs validation of the `account_infos` slice to ensure that:
+///   1. The accounts match the expected accounts in the instruction, i.e., their
+///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
+///   2. The borrow state of the accounts is compatible with the mutability of the
+///      accounts in the instruction.
+///
+/// This validation is done to ensure that the borrow checker rules are followed,
+/// consuming CUs in the process. The `invoke_signed_unchecked` is an alternative
+/// to this function that have lower CU consumption since it does not perform
+/// any validation. This should only be used when the caller is sure that the borrow
+/// checker rules are followed.
+///
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`.
-#[inline]
-pub fn slice_invoke_signed(
+/// `accounts` field of the `instruction`. When the instruction has duplicated
+/// accounts, it is necessary to pass a duplicated reference to the same account
+/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
+#[inline(always)]
+pub fn slice_invoke_signed<const MAX_ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
+    // Check that the number of accounts provided is not greater than
+    // the maximum number of accounts allowed.
+    if MAX_ACCOUNTS > MAX_CPI_ACCOUNTS {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    // Check that the number of accounts provided is not less than
+    // the number of accounts expected by the instruction.
     if instruction.accounts.len() < account_infos.len() {
         return Err(ProgramError::NotEnoughAccountKeys);
     }
 
-    if account_infos.len() > MAX_CPI_ACCOUNTS {
-        return Err(ProgramError::InvalidArgument);
-    }
-
     const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
-    let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
-    let mut len = 0;
+    let mut accounts = [UNINIT; MAX_ACCOUNTS];
 
-    for (account_info, account_meta) in account_infos.iter().zip(instruction.accounts.iter()) {
-        if account_info.key() != account_meta.pubkey {
-            return Err(ProgramError::InvalidArgument);
-        }
+    account_infos
+        .iter()
+        .zip(instruction.accounts.iter())
+        .zip(accounts.iter_mut())
+        .try_for_each(|((account_info, account_meta), account)| {
+            // In order to check whether the borrow state is compatible
+            // with the invocation, we need to check that we have the
+            // correct account info and meta pair.
+            if account_info.key() != account_meta.pubkey {
+                return Err(ProgramError::InvalidArgument);
+            }
 
-        let state = if account_meta.is_writable {
-            BorrowState::Borrowed
-        } else {
-            BorrowState::MutablyBorrowed
-        };
+            // Determines the borrow state that would be invalid according
+            // to their mutability on the instruction.
+            let invalid_state = if account_meta.is_writable {
+                // If the account is required to be writable, it cannot
+                //  be currently borrowed.
+                BorrowState::Borrowed
+            } else {
+                // If the account is required to be read-only, it cannot
+                // be currently mutably borrowed.
+                BorrowState::MutablyBorrowed
+            };
 
-        if account_info.is_borrowed(state) {
-            return Err(ProgramError::AccountBorrowFailed);
-        }
+            if account_info.is_borrowed(invalid_state) {
+                return Err(ProgramError::AccountBorrowFailed);
+            }
 
-        // SAFETY: The number of accounts has been validated to be less than
-        // `MAX_CPI_ACCOUNTS`.
-        unsafe {
-            accounts
-                .get_unchecked_mut(len)
-                .write(Account::from(*account_info));
-        }
+            account.write(Account::from(*account_info));
 
-        len += 1;
-    }
-    // SAFETY: The accounts have been validated.
+            Ok(())
+        })?;
+
+    // SAFETY: At this point it is guaranteed that account infos are borrowable
+    // according to their mutability on the instruction.
     unsafe {
         invoke_signed_unchecked(
             instruction,
-            core::slice::from_raw_parts(accounts.as_ptr() as _, len),
+            from_raw_parts(accounts.as_ptr() as _, instruction.accounts.len()),
             signers_seeds,
         );
     }
@@ -154,7 +221,7 @@ pub fn slice_invoke_signed(
 /// Invoke a cross-program instruction but don't enforce Rust's aliasing rules.
 ///
 /// This function does not check that [`Account`]s are properly borrowable.
-/// Those checks consume CPU cycles that this function avoids.
+/// Those checks consume CUs that this function avoids.
 ///
 /// # Safety
 ///
@@ -171,7 +238,7 @@ pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) 
 /// aliasing rules.
 ///
 /// This function does not check that [`Account`]s are properly borrowable.
-/// Those checks consume CPU cycles that this function avoids.
+/// Those checks consume CUs that this function avoids.
 ///
 /// # Safety
 ///
@@ -324,7 +391,7 @@ pub struct ReturnData {
     program_id: Pubkey,
 
     /// Return data set by the program.
-    data: [core::mem::MaybeUninit<u8>; MAX_RETURN_DATA],
+    data: [MaybeUninit<u8>; MAX_RETURN_DATA],
 
     /// Length of the return data.
     size: usize,
@@ -338,7 +405,7 @@ impl ReturnData {
 
     /// Return the data set by the program.
     pub fn as_slice(&self) -> &[u8] {
-        unsafe { core::slice::from_raw_parts(self.data.as_ptr() as _, self.size) }
+        unsafe { from_raw_parts(self.data.as_ptr() as _, self.size) }
     }
 }
 
