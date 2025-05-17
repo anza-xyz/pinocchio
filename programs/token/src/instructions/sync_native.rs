@@ -5,6 +5,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use crate::InstructionData;
+
 /// Given a native token account updates its amount field based
 /// on the account's underlying `lamports`.
 ///
@@ -29,9 +31,16 @@ impl SyncNative<'_> {
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &[17],
+            data: self.get_instruction_data(),
         };
 
         invoke_signed(&instruction, &[self.native_token], signers)
+    }
+}
+
+impl InstructionData for SyncNative<'_> {
+    #[inline]
+    fn get_instruction_data(&self) -> &[u8] {
+        &[17]
     }
 }
