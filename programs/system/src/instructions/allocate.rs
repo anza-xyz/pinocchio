@@ -1,9 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta};
+
+use crate::{FullInstructionData, InvokeParts};
 
 /// Allocate space in a (possibly new) account without funding.
 ///
@@ -17,29 +14,24 @@ pub struct Allocate<'a> {
     pub space: u64,
 }
 
-impl Allocate<'_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 1;
+const DATA_LEN: usize = 12;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable_signer(self.account.key())];
-
-        // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..12]: space
-        let mut instruction_data = [0; 12];
-        instruction_data[0] = 8;
-        instruction_data[4..12].copy_from_slice(&self.space.to_le_bytes());
-
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data,
-        };
-
-        invoke_signed(&instruction, &[self.account], signers)
+impl<'a> From<Allocate<'a>> for InvokeParts<'a, N_ACCOUNTS, FullInstructionData<DATA_LEN>> {
+    fn from(value: Allocate<'a>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [value.account],
+            account_metas: [AccountMeta::writable_signer(value.account.key())],
+            instruction_data: {
+                // instruction data
+                // -  [0..4 ]: instruction discriminator
+                // -  [4..12]: space
+                let mut instruction_data = [0; DATA_LEN];
+                instruction_data[0] = 8;
+                instruction_data[4..12].copy_from_slice(&value.space.to_le_bytes());
+                FullInstructionData::new(instruction_data)
+            },
+        }
     }
 }

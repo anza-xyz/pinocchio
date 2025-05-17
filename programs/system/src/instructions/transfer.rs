@@ -1,9 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta};
+
+use crate::{FullInstructionData, InvokeParts};
 
 /// Transfer lamports.
 ///
@@ -21,32 +18,27 @@ pub struct Transfer<'a> {
     pub lamports: u64,
 }
 
-impl Transfer<'_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 2;
+const DATA_LEN: usize = 12;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable_signer(self.from.key()),
-            AccountMeta::writable(self.to.key()),
-        ];
-
-        // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..12]: lamports amount
-        let mut instruction_data = [0; 12];
-        instruction_data[0] = 2;
-        instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
-
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data,
-        };
-
-        invoke_signed(&instruction, &[self.from, self.to], signers)
+impl<'a> From<Transfer<'a>> for InvokeParts<'a, N_ACCOUNTS, FullInstructionData<DATA_LEN>> {
+    fn from(value: Transfer<'a>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [value.from, value.to],
+            account_metas: [
+                AccountMeta::writable_signer(value.from.key()),
+                AccountMeta::writable(value.to.key()),
+            ],
+            instruction_data: {
+                // instruction data
+                // -  [0..4 ]: instruction discriminator
+                // -  [4..12]: lamports amount
+                let mut instruction_data = [0; DATA_LEN];
+                instruction_data[0] = 2;
+                instruction_data[4..12].copy_from_slice(&value.lamports.to_le_bytes());
+                FullInstructionData::new(instruction_data)
+            },
+        }
     }
 }

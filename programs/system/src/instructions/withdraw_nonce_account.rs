@@ -1,9 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta};
+
+use crate::{FullInstructionData, InvokeParts};
 
 /// Withdraw funds from a nonce account.
 ///
@@ -39,45 +36,39 @@ pub struct WithdrawNonceAccount<'a> {
     pub lamports: u64,
 }
 
-impl WithdrawNonceAccount<'_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 5;
+const DATA_LEN: usize = 12;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 5] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.recipient.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
-        ];
-
-        // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..12]: lamports
-        let mut instruction_data = [0; 12];
-        instruction_data[0] = 5;
-        instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
-
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data,
-        };
-
-        invoke_signed(
-            &instruction,
-            &[
-                self.account,
-                self.recipient,
-                self.recent_blockhashes_sysvar,
-                self.rent_sysvar,
-                self.authority,
+impl<'a> From<WithdrawNonceAccount<'a>>
+    for InvokeParts<'a, N_ACCOUNTS, FullInstructionData<DATA_LEN>>
+{
+    fn from(value: WithdrawNonceAccount<'a>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [
+                value.account,
+                value.recipient,
+                value.recent_blockhashes_sysvar,
+                value.rent_sysvar,
+                value.authority,
             ],
-            signers,
-        )
+            account_metas: [
+                AccountMeta::writable(value.account.key()),
+                AccountMeta::writable(value.recipient.key()),
+                AccountMeta::readonly(value.recent_blockhashes_sysvar.key()),
+                AccountMeta::readonly(value.rent_sysvar.key()),
+                AccountMeta::readonly_signer(value.authority.key()),
+            ],
+            instruction_data: {
+                // instruction data
+                // -  [0..4 ]: instruction discriminator
+                // -  [4..12]: lamports
+                let mut instruction_data = [0; DATA_LEN];
+                instruction_data[0] = 5;
+                instruction_data[4..12].copy_from_slice(&value.lamports.to_le_bytes());
+
+                FullInstructionData::new(instruction_data)
+            },
+        }
     }
 }
