@@ -15,7 +15,10 @@ crate-type = ["rlib"]
 pinocchio-log-macro = { workspace = true, optional = true }
 
 [lints.rust]
-unexpected_cfgs = {level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(target_os, values("solana"))',
+    'cfg(target_feature, values("static-syscalls"))',
+] }
 
 [features]
 default = ["macro"]

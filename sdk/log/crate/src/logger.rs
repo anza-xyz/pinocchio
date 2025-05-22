@@ -1,11 +1,28 @@
 use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
-#[cfg(target_os = "solana")]
-// Syscalls provided by the SVM runtime.
-extern "C" {
-    pub fn sol_log_(message: *const u8, len: u64);
+#[cfg(all(target_os = "solana", not(target_feature = "static-syscalls")))]
+mod syscalls {
+    // Syscalls provided by the SVM runtime (SBPFv0, SBPFv1 and SBPFv2).
+    extern "C" {
+        pub fn sol_log_(message: *const u8, len: u64);
 
-    pub fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64);
+        pub fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64);
+    }
+}
+
+#[cfg(all(target_os = "solana", target_feature = "static-syscalls"))]
+mod syscalls {
+    // Syscalls provided by the SVM runtime (SBPFv3 and newer).
+    unsafe extern "C" fn sol_log_(message: *const u8, length: u64) {
+        let syscall: extern "C" fn(*const u8, u64) = core::mem::transmute(544561597u64); // murmur32 hash of "sol_log_"
+        syscall(message, length)
+    }
+
+    pub(crate) fn sol_memcpy_(dest: *mut u8, src: *const u8, n: u64) {
+        let syscall: extern "C" fn(*mut u8, *const u8, u64) =
+            unsafe { core::mem::transmute(1904002211u64) }; // murmur32 hash of "sol_memcpy_"
+        syscall(dest, src, n)
+    }
 }
 
 #[cfg(not(target_os = "solana"))]
@@ -121,7 +138,7 @@ pub fn log_message(message: &[u8]) {
     // SAFETY: the message is always a valid pointer to a slice of bytes
     // and `sol_log_` is a syscall.
     unsafe {
-        sol_log_(message.as_ptr(), message.len() as u64);
+        syscalls::sol_log_(message.as_ptr(), message.len() as u64);
     }
     #[cfg(not(target_os = "solana"))]
     {
@@ -258,11 +275,15 @@ macro_rules! impl_log_for_unsigned_integer {
                             #[cfg(target_os = "solana")]
                             {
                                 if precision == 0 {
-                                    sol_memcpy_(ptr as *mut _, source as *const _, written as u64);
+                                    syscalls::sol_memcpy_(
+                                        ptr as *mut _,
+                                        source as *const _,
+                                        written as u64,
+                                    );
                                 } else {
                                     // Integer part of the number.
                                     let integer_part = written - (fraction + 1);
-                                    sol_memcpy_(
+                                    syscalls::sol_memcpy_(
                                         ptr as *mut _,
                                         source as *const _,
                                         integer_part as u64,
@@ -272,7 +293,7 @@ macro_rules! impl_log_for_unsigned_integer {
                                     (ptr.add(integer_part) as *mut u8).write(b'.');
 
                                     // Fractional part of the number.
-                                    sol_memcpy_(
+                                    syscalls::sol_memcpy_(
                                         ptr.add(integer_part + 1) as *mut _,
                                         source.add(integer_part) as *const _,
                                         fraction as u64,
