@@ -16,9 +16,7 @@ This crate contains [`pinocchio`](https://crates.io/crates/pinocchio) helpers to
 Each instruction defines a `struct` with the accounts and parameters required. Once all values are set, you can call directly `invoke` or `invoke_signed` to perform the CPI.
 
 This is a `no_std` crate.
-
 > **Note:** The API defined in this crate is subject to change.
-
 ## Examples
 
 Initializing a mint account:
@@ -45,7 +43,5 @@ Transfer {
     amount: 10,
 }.invoke()?;
 ```
-
 ## License
-
 The code is licensed under the [Apache License Version 2.0](../LICENSE)
