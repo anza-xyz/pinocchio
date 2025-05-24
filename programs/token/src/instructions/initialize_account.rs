@@ -5,6 +5,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use crate::InstructionData;
+
 /// Initialize a new Token Account.
 ///
 /// ### Accounts:
@@ -41,7 +43,7 @@ impl InitializeAccount<'_> {
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &[1],
+            data: self.get_instruction_data(),
         };
 
         invoke_signed(
@@ -49,5 +51,12 @@ impl InitializeAccount<'_> {
             &[self.account, self.mint, self.owner, self.rent_sysvar],
             signers,
         )
+    }
+}
+
+impl InstructionData for InitializeAccount<'_> {
+    #[inline]
+    fn get_instruction_data(&self) -> &[u8] {
+        &[1]
     }
 }

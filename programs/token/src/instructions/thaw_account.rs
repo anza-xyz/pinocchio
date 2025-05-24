@@ -5,6 +5,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use crate::InstructionData;
+
 /// Thaw a Frozen account using the Mint's freeze_authority
 ///
 /// ### Accounts:
@@ -37,7 +39,7 @@ impl ThawAccount<'_> {
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &[11],
+            data: self.get_instruction_data(),
         };
 
         invoke_signed(
@@ -45,5 +47,12 @@ impl ThawAccount<'_> {
             &[self.account, self.mint, self.freeze_authority],
             signers,
         )
+    }
+}
+
+impl InstructionData for ThawAccount<'_> {
+    #[inline]
+    fn get_instruction_data(&self) -> &[u8] {
+        &[11]
     }
 }
