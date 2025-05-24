@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
+    cpi::array_invoke_signed,
     instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
     ProgramResult,
 };
 
@@ -36,6 +36,6 @@ impl Revoke<'_> {
             data: &[5],
         };
 
-        invoke_signed(&instruction, &[self.source, self.authority], signers)
+        array_invoke_signed(&instruction, &[self.source, self.authority], signers)
     }
 }

@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
+    cpi::array_invoke_signed,
     instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
     ProgramResult,
 };
 
@@ -43,7 +43,7 @@ impl AdvanceNonceAccount<'_> {
             data: &[4],
         };
 
-        invoke_signed(
+        array_invoke_signed(
             &instruction,
             &[self.account, self.recent_blockhashes_sysvar, self.authority],
             signers,

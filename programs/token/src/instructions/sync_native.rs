@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
+    cpi::array_invoke_signed,
     instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
     ProgramResult,
 };
 
@@ -32,6 +32,6 @@ impl SyncNative<'_> {
             data: &[17],
         };
 
-        invoke_signed(&instruction, &[self.native_token], signers)
+        array_invoke_signed(&instruction, &[self.native_token], signers)
     }
 }

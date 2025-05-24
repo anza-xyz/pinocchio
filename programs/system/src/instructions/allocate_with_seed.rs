@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
+    cpi::array_invoke_signed,
     instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
     pubkey::Pubkey,
     ProgramResult,
 };
@@ -69,6 +69,6 @@ impl AllocateWithSeed<'_, '_, '_> {
             data: &instruction_data[..offset + 40],
         };
 
-        invoke_signed(&instruction, &[self.account, self.base], signers)
+        array_invoke_signed(&instruction, &[self.account, self.base], signers)
     }
 }
