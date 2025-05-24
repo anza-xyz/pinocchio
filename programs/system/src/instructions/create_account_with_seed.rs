@@ -1,10 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey};
+
+use crate::{InvokeParts, TruncatedInstructionData};
 
 /// Create a new account at an address derived from a base pubkey and a seed.
 ///
@@ -40,49 +36,45 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     pub owner: &'c Pubkey,
 }
 
-impl CreateAccountWithSeed<'_, '_, '_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 3;
+const DATA_LEN: usize = 120;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable_signer(self.from.key()),
-            AccountMeta::writable(self.to.key()),
-            AccountMeta::readonly_signer(self.base.unwrap_or(self.from).key()),
-        ];
+impl<'a, 'b, 'c> From<CreateAccountWithSeed<'a, 'b, 'c>>
+    for InvokeParts<'a, N_ACCOUNTS, TruncatedInstructionData<DATA_LEN>>
+{
+    fn from(value: CreateAccountWithSeed<'a, 'b, 'c>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [value.from, value.to, value.base.unwrap_or(value.from)],
+            account_metas: [
+                AccountMeta::writable_signer(value.from.key()),
+                AccountMeta::writable(value.to.key()),
+                AccountMeta::readonly_signer(value.base.unwrap_or(value.from).key()),
+            ],
+            instruction_data: {
+                // instruction data
+                // - [0..4  ]: instruction discriminator
+                // - [4..36 ]: base pubkey
+                // - [36..44]: seed length
+                // - [44..  ]: seed (max 32)
+                // - [..  +8]: lamports
+                // - [..  +8]: account space
+                // - [.. +32]: owner pubkey
+                let mut instruction_data = [0; DATA_LEN];
+                instruction_data[0] = 3;
+                instruction_data[4..36].copy_from_slice(value.base.unwrap_or(value.from).key());
+                instruction_data[36..44]
+                    .copy_from_slice(&u64::to_le_bytes(value.seed.len() as u64));
 
-        // instruction data
-        // - [0..4  ]: instruction discriminator
-        // - [4..36 ]: base pubkey
-        // - [36..44]: seed length
-        // - [44..  ]: seed (max 32)
-        // - [..  +8]: lamports
-        // - [..  +8]: account space
-        // - [.. +32]: owner pubkey
-        let mut instruction_data = [0; 120];
-        instruction_data[0] = 3;
-        instruction_data[4..36].copy_from_slice(self.base.unwrap_or(self.from).key());
-        instruction_data[36..44].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
+                let offset = 44 + value.seed.len();
+                instruction_data[44..offset].copy_from_slice(value.seed.as_bytes());
+                instruction_data[offset..offset + 8].copy_from_slice(&value.lamports.to_le_bytes());
+                instruction_data[offset + 8..offset + 16]
+                    .copy_from_slice(&value.space.to_le_bytes());
+                instruction_data[offset + 16..offset + 48].copy_from_slice(value.owner.as_ref());
 
-        let offset = 44 + self.seed.len();
-        instruction_data[44..offset].copy_from_slice(self.seed.as_bytes());
-        instruction_data[offset..offset + 8].copy_from_slice(&self.lamports.to_le_bytes());
-        instruction_data[offset + 8..offset + 16].copy_from_slice(&self.space.to_le_bytes());
-        instruction_data[offset + 16..offset + 48].copy_from_slice(self.owner.as_ref());
-
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data[..offset + 48],
-        };
-
-        invoke_signed(
-            &instruction,
-            &[self.from, self.to, self.base.unwrap_or(self.from)],
-            signers,
-        )
+                TruncatedInstructionData::new(instruction_data, offset + 48)
+            },
+        }
     }
 }

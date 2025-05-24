@@ -1,10 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey};
+
+use crate::{FullInstructionData, InvokeParts};
 
 /// Assign account to a program
 ///
@@ -18,29 +14,25 @@ pub struct Assign<'a, 'b> {
     pub owner: &'b Pubkey,
 }
 
-impl Assign<'_, '_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 1;
+const DATA_LEN: usize = 36;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable_signer(self.account.key())];
+impl<'a, 'b> From<Assign<'a, 'b>> for InvokeParts<'a, N_ACCOUNTS, FullInstructionData<DATA_LEN>> {
+    fn from(value: Assign<'a, 'b>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [value.account],
+            account_metas: [AccountMeta::writable_signer(value.account.key())],
+            instruction_data: {
+                // instruction data
+                // -  [0..4 ]: instruction discriminator
+                // -  [4..36]: owner pubkey
+                let mut instruction_data = [0; DATA_LEN];
+                instruction_data[0] = 1;
+                instruction_data[4..36].copy_from_slice(value.owner.as_ref());
 
-        // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..36]: owner pubkey
-        let mut instruction_data = [0; 36];
-        instruction_data[0] = 1;
-        instruction_data[4..36].copy_from_slice(self.owner.as_ref());
-
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data,
-        };
-
-        invoke_signed(&instruction, &[self.account], signers)
+                FullInstructionData::new(instruction_data)
+            },
+        }
     }
 }

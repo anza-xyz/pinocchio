@@ -1,9 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta};
+
+use crate::{FullInstructionData, InvokeParts};
 
 /// One-time idempotent upgrade of legacy nonce versions in order to bump
 /// them out of chain blockhash domain.
@@ -15,23 +12,18 @@ pub struct UpdateNonceAccount<'a> {
     pub account: &'a AccountInfo,
 }
 
-impl UpdateNonceAccount<'_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 1;
+const DATA_LEN: usize = 1;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.account.key())];
-
-        // instruction
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &[12],
-        };
-
-        invoke_signed(&instruction, &[self.account], signers)
+impl<'a> From<UpdateNonceAccount<'a>>
+    for InvokeParts<'a, N_ACCOUNTS, FullInstructionData<DATA_LEN>>
+{
+    fn from(value: UpdateNonceAccount<'a>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [value.account],
+            account_metas: [AccountMeta::writable(value.account.key())],
+            instruction_data: FullInstructionData::new([12]),
+        }
     }
 }
