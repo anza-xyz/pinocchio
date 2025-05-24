@@ -689,6 +689,53 @@ impl<'a, T: ?Sized> RefMut<'a, T> {
             None => Err(ManuallyDrop::into_inner(orig)),
         }
     }
+
+    /// Splits a `RefMut` into two `RefMut`s for different, non-overlapping components.
+    ///
+    /// # Safety
+    ///
+    /// The closure **must** return two non-overlapping mutable references derived from the original.
+    /// If the returned references overlap, this will cause undefined behavior.
+    ///
+    /// Emulates the behavior of [`std::cell::RefMut::map_split`].
+    ///
+    /// # Example
+    /// ```ignore
+    /// let (left, right) = RefMut::map_split(ref_mut, |slice| slice.split_at_mut(2));
+    /// // left and right are now independent mutable borrows of disjoint parts of the slice
+    /// ```
+    #[inline]
+    pub fn map_split<U: ?Sized, V: ?Sized, F>(
+        orig: RefMut<'a, T>,
+        f: F,
+    ) -> (RefMut<'a, U>, RefMut<'a, V>)
+    where
+        F: FnOnce(&mut T) -> (&mut U, &mut V),
+    {
+        use core::mem::ManuallyDrop;
+        use core::ptr::NonNull;
+        use core::marker::PhantomData;
+
+        let mut orig = ManuallyDrop::new(orig);
+        let state = orig.state;
+        let borrow_mask = orig.borrow_mask;
+        let (u, v) = f(&mut *orig);
+
+        (
+            RefMut {
+                value: NonNull::from(u),
+                state,
+                borrow_mask,
+                marker: PhantomData,
+            },
+            RefMut {
+                value: NonNull::from(v),
+                state,
+                borrow_mask,
+                marker: PhantomData,
+            },
+        )
+    }
 }
 
 impl<T: ?Sized> core::ops::Deref for RefMut<'_, T> {
@@ -833,5 +880,45 @@ mod tests {
 
         assert_eq!(lamports, 200);
         assert_eq!(state, 0);
+    }
+
+    #[test]
+    fn test_map_split() {
+        // Create a mutable array and a dummy borrow state
+        let mut data: [u8; 4] = [1, 2, 3, 4];
+        let mut state: u8 = 0b_0000_1000; // Simulate a mutable borrow
+        use core::ptr::NonNull;
+        use core::marker::PhantomData;
+
+        // Create a RefMut<[u8]>
+        let ref_mut = RefMut {
+            value: NonNull::from(&mut data[..]),
+            state: NonNull::from(&mut state),
+            borrow_mask: DATA_MASK,
+            marker: PhantomData,
+        };
+
+        // Split the RefMut into two non-overlapping slices
+        let (mut left, mut right) = RefMut::map_split(ref_mut, |slice| slice.split_at_mut(2));
+
+        // Mutate both halves independently
+        left.copy_from_slice(&[10, 20]);
+        right.copy_from_slice(&[30, 40]);
+
+        // assert the changes
+        assert_eq!(&data, &[10, 20, 30, 40]);
+
+        // drop one half and ensure the other still works
+        drop(left);
+        // right is still valid
+        right[0] = 99;
+        assert_eq!(&data, &[10, 20, 99, 40]);
+        drop(right);
+
+        // borrow state should be reset after dropping
+        assert_eq!(state & 0b_0000_1000, 0);
+
+        // overlapping splits are undefined behavior and must be avoided:
+        // let (a, b) = RefMut::map_split(ref_mut, |slice| (&mut slice[0..3], &mut slice[2..4]));
     }
 }
