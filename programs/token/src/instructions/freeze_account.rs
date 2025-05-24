@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
+    cpi::array_invoke_signed,
     instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
     ProgramResult,
 };
 
@@ -40,7 +40,7 @@ impl FreezeAccount<'_> {
             data: &[10],
         };
 
-        invoke_signed(
+        array_invoke_signed(
             &instruction,
             &[self.account, self.mint, self.freeze_authority],
             signers,

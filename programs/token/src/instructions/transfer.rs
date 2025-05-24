@@ -2,8 +2,8 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
+    cpi::array_invoke_signed,
     instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
     ProgramResult,
 };
 
@@ -56,6 +56,6 @@ impl Transfer<'_> {
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
         };
 
-        invoke_signed(&instruction, &[self.from, self.to, self.authority], signers)
+        array_invoke_signed(&instruction, &[self.from, self.to, self.authority], signers)
     }
 }

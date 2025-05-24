@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
+    cpi::array_invoke_signed,
     instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
     pubkey::Pubkey,
     ProgramResult,
 };
@@ -71,6 +71,6 @@ impl TransferWithSeed<'_, '_, '_> {
             data: &instruction_data[..offset + 32],
         };
 
-        invoke_signed(&instruction, &[self.from, self.base, self.to], signers)
+        array_invoke_signed(&instruction, &[self.from, self.base, self.to], signers)
     }
 }

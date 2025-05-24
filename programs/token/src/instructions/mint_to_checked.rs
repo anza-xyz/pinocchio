@@ -2,8 +2,8 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
+    cpi::array_invoke_signed,
     instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
     ProgramResult,
 };
 
@@ -62,7 +62,7 @@ impl MintToChecked<'_> {
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };
 
-        invoke_signed(
+        array_invoke_signed(
             &instruction,
             &[self.mint, self.account, self.mint_authority],
             signers,
