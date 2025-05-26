@@ -10,7 +10,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, parse_str,
     punctuated::Punctuated,
-    Error, Expr, LitInt, LitStr, Token,
+    Error, Expr, ItemFn, LitInt, LitStr, Token,
 };
 
 /// The default buffer size for the logger.
@@ -234,4 +234,76 @@ pub fn log(input: TokenStream) -> TokenStream {
     } else {
         TokenStream::from(quote! {pinocchio_log::logger::log_message(#format_string.as_bytes());})
     }
+}
+
+/// Attribute macro for instrumenting functions with compute unit logging.
+///
+/// This macro wraps the decorated function with additional logging statements
+/// that print the function name and the number of compute units used before and after
+/// the function execution.
+///
+/// # Usage
+///
+/// ```rust,ignore
+/// #[compute_fn]
+/// fn my_function() {
+///     // Function body
+/// }
+/// ```
+///
+/// # Effects
+///
+/// - Adds a log message with the function name at the start of execution.
+/// - Logs the number of compute units before and after the function execution.
+/// - Adds a closing log message with the function name at the end of execution.
+///
+/// # Note on Compute Units Used by `compute_fn!`
+///
+/// ## Testing Results (as of 2024-09-01)
+///
+///  TOTAL COST OF LOGGING: 445 - 36 = 409
+///  EXTRA COST INSIDE THE FUNCTION: 101
+///
+///  EMPTY_WITH_LOG where nothing happens inside the log.
+///  TOTAL COMPUTE UNITS USED: 445
+///  INNER LOG COST: 101
+///
+///  "Program EMPTY_WITH_LOG invoke [1]",
+///  "Program log: Program log: process_instruction {{",
+///  "Program consumption: 199762 units remaining",
+///  "Program consumption: 199661 units remaining", // 199762 - 199661 = 101
+///  "Program log: Program log: }} // process_instruction",
+///  "Program EMPTY_WITH_LOG consumed 445 of 200000 compute units",
+///  "Program EMPTY_WITH_LOG success"
+///
+///  EMPTY where nothing happens at all.
+///  TOTAL COMPUTE UNITS USED: 36
+///  
+///  "Program EMPTY invoke [1]",
+///  "Program EMPTY consumed 36 of 200000 compute units",
+///  "Program EMPTY success"
+///  
+///  Total extra compute units used per `compute_fn!` call: 409 CU
+///  For more details, see:
+///  - https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/programs/bpf_loader/src/syscalls/logging.rs#L70
+///  - https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/program-runtime/src/compute_budget.rs#L150
+#[proc_macro_attribute]
+pub fn compute_fn(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let block = &input.block;
+
+    input.block = syn::parse_quote!({
+        ::pinocchio::msg!(concat!(stringify!(#fn_name), " {{"));
+        ::pinocchio::log::sol_log_compute_units();
+
+        let __result = (|| #block)();
+
+        ::pinocchio::log::sol_log_compute_units();
+        ::pinocchio::msg!(concat!("}} // ", stringify!(#fn_name)));
+
+        __result
+    });
+
+    quote!(#input).into()
 }
