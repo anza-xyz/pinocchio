@@ -46,9 +46,9 @@ pub type Priviledge = (bool, bool);
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
-pub fn invoke<const MAX_ACCOUNTS: usize>(
+pub fn invoke<const ACCOUNTS: usize>(
     instruction: &Instruction,
-    account_infos: &[&AccountInfo],
+    account_infos: &[&AccountInfo; ACCOUNTS],
 ) -> ProgramResult {
     invoke_signed::<ACCOUNTS>(instruction, account_infos, &[])
 }
@@ -105,9 +105,9 @@ pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
-pub fn array_invoke<const ACCOUNTS: usize>(
+pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
     instruction: &Instruction,
-    account_infos: &[&AccountInfo; ACCOUNTS],
+    account_infos: &[&AccountInfo],
 ) -> ProgramResult {
     slice_invoke_signed::<MAX_ACCOUNTS>(instruction, account_infos, &[])
 }
@@ -372,40 +372,6 @@ unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 /// any validation. This should only be used when the caller is sure that the borrow
 /// checker rules are followed.
 ///
-/// Note that this function is inlined to avoid the overhead of a function call,
-/// but uses stack memory allocation. When a higher number of accounts is needed,
-/// it is recommended to use the [`slice_invoke_signed`] function instead.
-///
-/// # Important
-///
-/// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`. When the instruction has duplicated
-/// accounts, it is necessary to pass a duplicated reference to the same account
-/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
-#[inline(always)]
-pub fn array_invoke_signed<const ACCOUNTS: usize>(
-    instruction: &Instruction,
-    account_infos: &[&AccountInfo; ACCOUNTS],
-    signers_seeds: &[Signer],
-) -> ProgramResult {
-    invoke_signed::<ACCOUNTS>(instruction, account_infos, signers_seeds)
-}
-
-/// Invoke a cross-program instruction with signatures from an array of
-/// `AccountInfo`s.
-///
-/// This function performs validation of the `account_infos` slice to ensure that:
-///   1. The accounts match the expected accounts in the instruction, i.e., their
-///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
-///   2. The borrow state of the accounts is compatible with the mutability of the
-///      accounts in the instruction.
-///
-/// This validation is done to ensure that the borrow checker rules are followed,
-/// consuming CUs in the process. The `invoke_signed_unchecked` is an alternative
-/// to this function that have lower CU consumption since it does not perform
-/// any validation. This should only be used when the caller is sure that the borrow
-/// checker rules are followed.
-///
 /// # Important
 ///
 /// The accounts on the `account_infos` slice must be in the same order as the
@@ -417,7 +383,7 @@ pub fn slice_invoke_signed(
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    invoke_signed::<MAX_CPI_ACCOUNTS>(instruction, account_infos, signers_seeds)
+    invoke_signed_with_bounds::<MAX_CPI_ACCOUNTS>(instruction, account_infos, signers_seeds)
 }
 
 /// Invoke a cross-program instruction but don't enforce Rust's aliasing rules.
