@@ -297,7 +297,7 @@ pub fn compute_fn(_attr: TokenStream, item: TokenStream) -> TokenStream {
         ::pinocchio::msg!(concat!(stringify!(#fn_name), " {{"));
         ::pinocchio::log::sol_log_compute_units();
 
-        let __result = (|| #block)();
+        let __result = #block;
 
         ::pinocchio::log::sol_log_compute_units();
         ::pinocchio::msg!(concat!("}} // ", stringify!(#fn_name)));
