@@ -50,22 +50,21 @@ macro_rules! impl_sysvar_get {
 ///
 /// # Safety
 ///
-/// `dst` must be large enough to hold `length` bytes.
+/// `dst` must point to a buffer that can hold at least `length` bytes.
 #[inline]
 pub unsafe fn get_sysvar_unchecked(
-    dst: &mut [u8],
+    dst: *mut u8,
     sysvar_id: &Pubkey,
     offset: u64,
     length: u64,
 ) -> Result<(), ProgramError> {
     let sysvar_id = sysvar_id as *const _ as *const u8;
-    let var_addr = dst as *mut _ as *mut u8;
 
     #[cfg(target_os = "solana")]
-    let result = unsafe { crate::syscalls::sol_get_sysvar(sysvar_id, var_addr, offset, length) };
+    let result = unsafe { crate::syscalls::sol_get_sysvar(sysvar_id, dst, offset, length) };
 
     #[cfg(not(target_os = "solana"))]
-    let result = core::hint::black_box(sysvar_id as u64 + var_addr as u64 + offset + length);
+    let result = core::hint::black_box(sysvar_id as u64 + dst as u64 + offset + length);
 
     match result {
         crate::SUCCESS => Ok(()),
@@ -88,5 +87,5 @@ pub fn get_sysvar(
         return Err(ProgramError::InvalidArgument);
     }
 
-    unsafe { get_sysvar_unchecked(dst, sysvar_id, offset, length) }
+    unsafe { get_sysvar_unchecked(dst as *mut _ as *mut u8, sysvar_id, offset, length) }
 }
