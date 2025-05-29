@@ -1,10 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
-};
+use pinocchio::{account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey};
+
+use crate::{FullInstructionData, InvokeParts};
 
 /// Drive state of Uninitialized nonce account to Initialized, setting the nonce value.
 ///
@@ -35,41 +31,34 @@ pub struct InitializeNonceAccount<'a, 'b> {
     pub authority: &'b Pubkey,
 }
 
-impl InitializeNonceAccount<'_, '_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const N_ACCOUNTS: usize = 3;
+const DATA_LEN: usize = 36;
 
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
-        ];
-
-        // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..36]: authority pubkey
-        let mut instruction_data = [0; 36];
-        instruction_data[0] = 6;
-        instruction_data[4..36].copy_from_slice(self.authority);
-
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data,
-        };
-
-        invoke_signed(
-            &instruction,
-            &[
-                self.account,
-                self.recent_blockhashes_sysvar,
-                self.rent_sysvar,
+impl<'a, 'b> From<InitializeNonceAccount<'a, 'b>>
+    for InvokeParts<'a, N_ACCOUNTS, FullInstructionData<DATA_LEN>>
+{
+    fn from(value: InitializeNonceAccount<'a, 'b>) -> Self {
+        InvokeParts {
+            program_id: crate::ID,
+            accounts: [
+                value.account,
+                value.recent_blockhashes_sysvar,
+                value.rent_sysvar,
             ],
-            signers,
-        )
+            account_metas: [
+                AccountMeta::writable(value.account.key()),
+                AccountMeta::readonly(value.recent_blockhashes_sysvar.key()),
+                AccountMeta::readonly(value.rent_sysvar.key()),
+            ],
+            instruction_data: {
+                // instruction data
+                // -  [0..4 ]: instruction discriminator
+                // -  [4..36]: authority pubkey
+                let mut instruction_data = [0; DATA_LEN];
+                instruction_data[0] = 6;
+                instruction_data[4..36].copy_from_slice(value.authority);
+                FullInstructionData::new(instruction_data)
+            },
+        }
     }
 }
