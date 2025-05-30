@@ -357,7 +357,7 @@ unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
     Ok(())
 }
 
-/// Invoke a cross-program instruction with signatures from an array of
+/// Invoke a cross-program instruction with signatures from a slice of
 /// `AccountInfo`s.
 ///
 /// This function performs validation of the `account_infos` slice to ensure that:
@@ -371,6 +371,11 @@ unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 /// to this function that have lower CU consumption since it does not perform
 /// any validation. This should only be used when the caller is sure that the borrow
 /// checker rules are followed.
+///
+/// Note that the maximum number of accounts that can be passed to a cross-program
+/// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
+/// of `AccountInfo`s has more accounts, only the number of accounts required by
+/// the `instruction` will be used.
 ///
 /// # Important
 ///
