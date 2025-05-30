@@ -98,6 +98,12 @@ runs:
         toolchain: ${{ env.TOOLCHAIN_LINT }}
         components: miri
 
+    - name: Install 'cargo-spellcheck'
+      if: ${{ contains(inputs.components, 'spellcheck') }}
+      uses: taiki-e/cache-cargo-install-action@v2
+      with:
+        tool: cargo-spellcheck
+
     - name: Cache Cargo Dependencies
       if: ${{ inputs.cargo-cache-key }}
       uses: actions/cache@v4
