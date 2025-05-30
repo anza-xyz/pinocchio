@@ -100,7 +100,7 @@ runs:
 
     - name: Install 'cargo-spellcheck'
       if: ${{ contains(inputs.components, 'spellcheck') }}
-      uses: taiki-e/cache-cargo-install-action@v2
+      uses: taiki-e/install-action@v2
       with:
         tool: cargo-spellcheck
 
