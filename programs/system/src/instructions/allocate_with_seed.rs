@@ -39,6 +39,7 @@ impl AllocateWithSeed<'_, '_, '_> {
         self.invoke_signed(&[])
     }
 
+    #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
