@@ -13,11 +13,12 @@ use crate::{
 /// Maximum number of accounts that can be passed to a cross-program invocation.
 pub const MAX_CPI_ACCOUNTS: usize = 64;
 
-/// Invoke a cross-program instruction.
+/// Invoke a cross-program instruction from an array of `AccountInfo`s.
 ///
 /// Note that this function is inlined to avoid the overhead of a function call,
-/// but uses stack memory allocation. When a higher number of accounts is needed,
-/// it is recommended to use the [`slice_invoke`] function instead.
+/// but uses stack memory allocation. When a large number of accounts is needed,
+/// it is recommended to use the [`slice_invoke`] function instead to reduce
+/// stack memory utilization.
 ///
 /// # Important
 ///
@@ -35,9 +36,17 @@ pub fn invoke<const ACCOUNTS: usize>(
 
 /// Invoke a cross-program instruction from a slice of `AccountInfo`s.
 ///
+/// The `MAX_ACCOUNTS` constant defines the maximum number of accounts expected
+/// to be passed to the cross-program invocation. This provides an upper bound to
+/// the number of accounts that need to be statically allocated for cases where the
+/// number of instruction accounts is not known at compile time. The final number of
+/// accounts passed to the cross-program invocation will be the number of accounts
+/// required by the `instruction`, even if `MAX_ACCOUNTS` is greater than that.
+///
 /// Note that this function is inlined to avoid the overhead of a function call,
-/// but uses stack memory allocation. When a higher number of accounts is needed,
-/// it is recommended to use the [`slice_invoke`] function instead.
+/// but uses stack memory allocation. When a large number of accounts is needed,
+/// it is recommended to use the [`slice_invoke`] function instead to reduce
+/// stack memory utilization.
 ///
 /// # Important
 ///
@@ -53,7 +62,12 @@ pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
     invoke_signed_with_bounds::<MAX_ACCOUNTS>(instruction, account_infos, &[])
 }
 
-/// Invoke a cross-program instruction.
+/// Invoke a cross-program instruction from a slice of `AccountInfo`s.
+///
+/// Note that the maximum number of accounts that can be passed to a cross-program
+/// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
+/// of `AccountInfo`s has more accounts, only the number of accounts required by
+/// the `instruction` will be used.
 ///
 /// # Important
 ///
@@ -81,8 +95,9 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 /// checker rules are followed.
 ///
 /// Note that this function is inlined to avoid the overhead of a function call,
-/// but uses stack memory allocation. When a higher number of accounts is needed,
-/// it is recommended to use the [`slice_invoke_signed`] function instead.
+/// but uses stack memory allocation. When a large number of accounts is needed,
+/// it is recommended to use the [`slice_invoke_signed`] function instead to reduce
+/// stack memory utilization.
 ///
 /// # Important
 ///
@@ -99,7 +114,8 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     invoke_signed_with_bounds::<ACCOUNTS>(instruction, account_infos, signers_seeds)
 }
 
-/// Invoke a cross-program instruction with signatures.
+/// Invoke a cross-program instruction with signatures from a slice of
+/// `AccountInfo`s.
 ///
 /// This function performs validation of the `account_infos` slice to ensure that:
 ///   1. The accounts match the expected accounts in the instruction, i.e., their
@@ -113,9 +129,17 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 /// any validation. This should only be used when the caller is sure that the borrow
 /// checker rules are followed.
 ///
+/// The `MAX_ACCOUNTS` constant defines the maximum number of accounts expected
+/// to be passed to the cross-program invocation. This provides an upper bound to
+/// the number of accounts that need to be statically allocated for cases where the
+/// number of instruction accounts is not known at compile time. The final number of
+/// accounts passed to the cross-program invocation will be the number of accounts
+/// required by the `instruction`, even if `MAX_ACCOUNTS` is greater than that.
+///
 /// Note that this function is inlined to avoid the overhead of a function call,
-/// but uses stack memory allocation. When a higher number of accounts is needed,
-/// it is recommended to use the [`slice_invoke_signed`] function instead.
+/// but uses stack memory allocation. When a large number of accounts is needed,
+/// it is recommended to use the [`slice_invoke_signed`] function instead to reduce
+/// stack memory utilization.
 ///
 /// # Important
 ///
@@ -129,12 +153,12 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    // Check that the number of accounts provided is not greater than
+    // Check that the number of `MAX_ACCOUNTS` provided is not greater than
     // the maximum number of accounts allowed.
     const {
         assert!(
             MAX_ACCOUNTS <= MAX_CPI_ACCOUNTS,
-            "Maximum number of accounts is greater than allowed (MAX_CPI_ACCOUNTS)"
+            "MAX_ACCOUNTS is greater than allowed MAX_CPI_ACCOUNTS"
         );
     }
 
@@ -193,7 +217,7 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
     Ok(())
 }
 
-/// Invoke a cross-program instruction with signatures from an array of
+/// Invoke a cross-program instruction with signatures from a slice of
 /// `AccountInfo`s.
 ///
 /// This function performs validation of the `account_infos` slice to ensure that:
@@ -207,6 +231,11 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 /// to this function that have lower CU consumption since it does not perform
 /// any validation. This should only be used when the caller is sure that the borrow
 /// checker rules are followed.
+///
+/// Note that the maximum number of accounts that can be passed to a cross-program
+/// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
+/// of `AccountInfo`s has more accounts, only the number of accounts required by
+/// the `instruction` will be used.
 ///
 /// # Important
 ///
@@ -227,6 +256,11 @@ pub fn slice_invoke_signed(
 /// This function does not check that [`Account`]s are properly borrowable.
 /// Those checks consume CUs that this function avoids.
 ///
+/// Note that the maximum number of accounts that can be passed to a cross-program
+/// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
+/// of `AccountInfo`s has more accounts, only the number of accounts required by
+/// the `instruction` will be used.
+///
 /// # Safety
 ///
 /// If any of the writable accounts passed to the callee contain data that is
@@ -243,6 +277,11 @@ pub unsafe fn invoke_unchecked(instruction: &Instruction, accounts: &[Account]) 
 ///
 /// This function does not check that [`Account`]s are properly borrowable.
 /// Those checks consume CUs that this function avoids.
+///
+/// Note that the maximum number of accounts that can be passed to a cross-program
+/// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
+/// of `AccountInfo`s has more accounts, only the number of accounts required by
+/// the `instruction` will be used.
 ///
 /// # Safety
 ///
