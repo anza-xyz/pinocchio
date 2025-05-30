@@ -164,7 +164,7 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 
     // Check that the number of accounts provided is not less than
     // the number of accounts expected by the instruction.
-    if instruction.accounts.len() < account_infos.len() {
+    if account_infos.len() < instruction.accounts.len() {
         return Err(ProgramError::NotEnoughAccountKeys);
     }
 
