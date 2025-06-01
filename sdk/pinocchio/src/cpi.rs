@@ -357,40 +357,6 @@ unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
     Ok(())
 }
 
-/// Invoke a cross-program instruction with signatures from a slice of
-/// `AccountInfo`s.
-///
-/// This function performs validation of the `account_infos` slice to ensure that:
-///   1. The accounts match the expected accounts in the instruction, i.e., their
-///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
-///   2. The borrow state of the accounts is compatible with the mutability of the
-///      accounts in the instruction.
-///
-/// This validation is done to ensure that the borrow checker rules are followed,
-/// consuming CUs in the process. The `invoke_signed_unchecked` is an alternative
-/// to this function that have lower CU consumption since it does not perform
-/// any validation. This should only be used when the caller is sure that the borrow
-/// checker rules are followed.
-///
-/// Note that the maximum number of accounts that can be passed to a cross-program
-/// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
-/// of `AccountInfo`s has more accounts, only the number of accounts required by
-/// the `instruction` will be used.
-///
-/// # Important
-///
-/// The accounts on the `account_infos` slice must be in the same order as the
-/// `accounts` field of the `instruction`. When the instruction has duplicated
-/// accounts, it is necessary to pass a duplicated reference to the same account
-/// to maintain the 1:1 relationship between `account_infos` and `accounts`.
-pub fn slice_invoke_signed(
-    instruction: &Instruction,
-    account_infos: &[&AccountInfo],
-    signers_seeds: &[Signer],
-) -> ProgramResult {
-    invoke_signed_with_bounds::<MAX_CPI_ACCOUNTS>(instruction, account_infos, signers_seeds)
-}
-
 /// Invoke a cross-program instruction but don't enforce Rust's aliasing rules.
 ///
 /// This function does not check that [`Account`]s are properly borrowable.
