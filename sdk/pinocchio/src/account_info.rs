@@ -732,7 +732,7 @@ impl<T: ?Sized> Drop for RefMut<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use core::mem::MaybeUninit;
+    use core::mem::{size_of, MaybeUninit};
 
     use crate::NON_DUP_MARKER;
 
