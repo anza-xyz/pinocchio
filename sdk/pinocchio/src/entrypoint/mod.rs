@@ -48,7 +48,7 @@ const STATIC_ACCOUNT_DATA: usize = core::mem::size_of::<Account>() + MAX_PERMITT
 /// It also sets up a [global allocator] and [panic handler], using the [`crate::default_allocator!`]
 /// and [`crate::default_panic_handler!`] macros.
 ///
-/// The first argument is the name of a function with this type signature:
+/// The only argument is the name of a function with this type signature:
 ///
 /// ```ignore
 /// fn process_instruction(
@@ -124,6 +124,11 @@ macro_rules! entrypoint {
         $crate::default_allocator!();
         $crate::default_panic_handler!();
     };
+    ( $process_instruction:expr, $maximum:expr ) => {
+        // The `maximum` argument is not used in this macro, but it is kept for
+        // backwards compatibility.
+        entrypoint!($process_instruction);
+    };
 }
 
 /// Declare the program entrypoint.
@@ -181,10 +186,10 @@ macro_rules! program_entrypoint {
             const UNINIT: core::mem::MaybeUninit<$crate::account_info::AccountInfo> =
                 core::mem::MaybeUninit::<$crate::account_info::AccountInfo>::uninit();
             // Create an array of uninitialized account infos.
-            let mut accounts = [UNINIT; $maximum];
+            let mut accounts = [UNINIT; { $crate::MAX_TX_ACCOUNTS }];
 
             let (program_id, count, instruction_data) =
-                $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
+                $crate::entrypoint::deserialize(input, &mut accounts);
 
             // Call the program's entrypoint passing `count` account infos; we know that
             // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
@@ -197,6 +202,11 @@ macro_rules! program_entrypoint {
                 Err(error) => error.into(),
             }
         }
+    };
+    ( $process_instruction:expr, $maximum:expr ) => {
+        // The `maximum` argument is not used in this macro, but it is kept for
+        // backwards compatibility.
+        program_entrypoint!($process_instruction);
     };
 }
 
@@ -214,7 +224,7 @@ macro_rules! program_entrypoint {
 /// program input parameters serialized by the SVM loader.
 #[allow(clippy::cast_ptr_alignment)]
 #[inline(always)]
-pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
+pub unsafe fn deserialize<'a, const ACCOUNTS: usize>(
     mut input: *mut u8,
     accounts: &mut [core::mem::MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
 ) -> (&'a Pubkey, usize, &'a [u8]) {
