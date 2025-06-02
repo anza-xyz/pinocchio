@@ -18,7 +18,7 @@ use crate::{
 )]
 #[macro_export]
 macro_rules! lazy_entrypoint {
-    ( $process_instruction:ident ) => {
+    ( $process_instruction:expr ) => {
         $crate::lazy_program_entrypoint!($process_instruction);
     };
 }
@@ -82,7 +82,7 @@ macro_rules! lazy_entrypoint {
 /// ```
 #[macro_export]
 macro_rules! lazy_program_entrypoint {
-    ( $process_instruction:ident ) => {
+    ( $process_instruction:expr ) => {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
@@ -255,9 +255,6 @@ impl InstructionContext {
         self.buffer = self.buffer.add(core::mem::size_of::<u64>());
 
         if (*account).borrow_state == NON_DUP_MARKER {
-            // Unique account: repurpose the borrow state to track borrows.
-            (*account).borrow_state = 0b_0000_0000;
-
             self.buffer = self.buffer.add(STATIC_ACCOUNT_DATA);
             self.buffer = self.buffer.add((*account).data_len as usize);
             self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
@@ -271,6 +268,7 @@ impl InstructionContext {
 }
 
 /// Wrapper type around an [`AccountInfo`] that may be a duplicate.
+#[repr(C)]
 pub enum MaybeAccount {
     /// An [`AccountInfo`] that is not a duplicate.
     Account(AccountInfo),
