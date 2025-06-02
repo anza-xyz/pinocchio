@@ -268,6 +268,7 @@ impl InstructionContext {
 }
 
 /// Wrapper type around an [`AccountInfo`] that may be a duplicate.
+#[repr(C)]
 pub enum MaybeAccount {
     /// An [`AccountInfo`] that is not a duplicate.
     Account(AccountInfo),
