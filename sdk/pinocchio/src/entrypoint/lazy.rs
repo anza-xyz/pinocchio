@@ -18,7 +18,7 @@ use crate::{
 )]
 #[macro_export]
 macro_rules! lazy_entrypoint {
-    ( $process_instruction:ident ) => {
+    ( $process_instruction:expr ) => {
         $crate::lazy_program_entrypoint!($process_instruction);
     };
 }
@@ -82,7 +82,7 @@ macro_rules! lazy_entrypoint {
 /// ```
 #[macro_export]
 macro_rules! lazy_program_entrypoint {
-    ( $process_instruction:ident ) => {
+    ( $process_instruction:expr ) => {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
