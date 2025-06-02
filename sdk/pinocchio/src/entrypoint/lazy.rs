@@ -255,9 +255,6 @@ impl InstructionContext {
         self.buffer = self.buffer.add(core::mem::size_of::<u64>());
 
         if (*account).borrow_state == NON_DUP_MARKER {
-            // Unique account: repurpose the borrow state to track borrows.
-            (*account).borrow_state = 0b_0000_0000;
-
             self.buffer = self.buffer.add(STATIC_ACCOUNT_DATA);
             self.buffer = self.buffer.add((*account).data_len as usize);
             self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
@@ -271,6 +268,7 @@ impl InstructionContext {
 }
 
 /// Wrapper type around an [`AccountInfo`] that may be a duplicate.
+#[repr(C)]
 pub enum MaybeAccount {
     /// An [`AccountInfo`] that is not a duplicate.
     Account(AccountInfo),
