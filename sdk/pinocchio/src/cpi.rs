@@ -15,6 +15,9 @@ pub const MAX_CPI_ACCOUNTS: usize = 64;
 
 /// Invoke a cross-program instruction from an array of `AccountInfo`s.
 ///
+/// This function is a convenience wrapper around the [`invoke_signed`] function
+/// with the signers' seeds set to an empty slice.
+///
 /// Note that this function is inlined to avoid the overhead of a function call,
 /// but uses stack memory allocation. When a large number of accounts is needed,
 /// it is recommended to use the [`slice_invoke`] function instead to reduce
@@ -35,6 +38,9 @@ pub fn invoke<const ACCOUNTS: usize>(
 }
 
 /// Invoke a cross-program instruction from a slice of `AccountInfo`s.
+///
+/// This function is a convenience wrapper around the [`invoke_signed_with_bounds`]
+/// function with the signers' seeds set to an empty slice.
 ///
 /// The `MAX_ACCOUNTS` constant defines the maximum number of accounts expected
 /// to be passed to the cross-program invocation. This provides an upper bound to
@@ -64,6 +70,9 @@ pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
 
 /// Invoke a cross-program instruction from a slice of `AccountInfo`s.
 ///
+/// This function is a convenience wrapper around the [`slice_invoke_signed`]
+/// function with the signers' seeds set to an empty slice.
+///
 /// Note that the maximum number of accounts that can be passed to a cross-program
 /// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
 /// of `AccountInfo`s has more accounts, only the number of accounts required by
@@ -84,9 +93,11 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 /// `AccountInfo`s.
 ///
 /// This function performs validation of the `account_infos` slice to ensure that:
-///   1. The accounts match the expected accounts in the instruction, i.e., their
+///   1. It has at least as many accounts as the number of accounts expected by
+///      the instruction.
+///   2. The accounts match the expected accounts in the instruction, i.e., their
 ///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
-///   2. The borrow state of the accounts is compatible with the mutability of the
+///   3. The borrow state of the accounts is compatible with the mutability of the
 ///      accounts in the instruction.
 ///
 /// This validation is done to ensure that the borrow checker rules are followed,
@@ -112,16 +123,24 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     account_infos: &[&AccountInfo; ACCOUNTS],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    _invoke_signed_with_bounds::<ACCOUNTS>(instruction, account_infos, signers_seeds)
+    // SAFETY: The array of `AccountInfo`s will be checked to ensure that it has
+    // the same number of accounts as the instruction – this indirectly validates
+    // that the stack allocated account storage `ACCOUNTS` is sufficient for the
+    // number of accounts expected by the instruction.
+    unsafe {
+        inner_invoke_signed_with_bounds::<ACCOUNTS>(instruction, account_infos, signers_seeds)
+    }
 }
 
 /// Invoke a cross-program instruction with signatures from a slice of
 /// `AccountInfo`s.
 ///
 /// This function performs validation of the `account_infos` slice to ensure that:
-///   1. The accounts match the expected accounts in the instruction, i.e., their
+///   1. It has at least as many accounts as the number of accounts expected by
+///      the instruction.
+///   2. The accounts match the expected accounts in the instruction, i.e., their
 ///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
-///   2. The borrow state of the accounts is compatible with the mutability of the
+///   3. The borrow state of the accounts is compatible with the mutability of the
 ///      accounts in the instruction.
 ///
 /// This validation is done to ensure that the borrow checker rules are followed,
@@ -154,8 +173,8 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    // Check that the potential number of accounts provided is not less than
-    // the number of accounts expected by the instruction;
+    // Check that the stack allocated account storage `MAX_ACCOUNTS` is sufficient
+    // for the number of accounts expected by the instruction.
     //
     // The check for the slice of `AccountInfo`s not being less than the
     // number of accounts expected by the instruction is done in
@@ -164,16 +183,21 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
         return Err(ProgramError::NotEnoughAccountKeys);
     }
 
-    _invoke_signed_with_bounds::<MAX_ACCOUNTS>(instruction, account_infos, signers_seeds)
+    // SAFETY: The stack allocated account storage `MAX_ACCOUNTS` was validated.
+    unsafe {
+        inner_invoke_signed_with_bounds::<MAX_ACCOUNTS>(instruction, account_infos, signers_seeds)
+    }
 }
 
 /// Invoke a cross-program instruction with signatures from a slice of
 /// `AccountInfo`s.
 ///
 /// This function performs validation of the `account_infos` slice to ensure that:
-///   1. The accounts match the expected accounts in the instruction, i.e., their
+///   1. It has at least as many accounts as the number of accounts expected by
+///      the instruction.
+///   2. The accounts match the expected accounts in the instruction, i.e., their
 ///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
-///   2. The borrow state of the accounts is compatible with the mutability of the
+///   3. The borrow state of the accounts is compatible with the mutability of the
 ///      accounts in the instruction.
 ///
 /// This validation is done to ensure that the borrow checker rules are followed,
@@ -198,8 +222,8 @@ pub fn slice_invoke_signed(
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    // Check that the potential number of accounts provided is not less than
-    // the number of accounts expected by the instruction;
+    // Check that the stack allocated account storage `MAX_ACCOUNTS` is sufficient
+    // for the number of accounts expected by the instruction.
     //
     // The check for the slice of `AccountInfo`s not being less than the
     // number of accounts expected by the instruction is done in
@@ -208,13 +232,35 @@ pub fn slice_invoke_signed(
         return Err(ProgramError::NotEnoughAccountKeys);
     }
 
-    _invoke_signed_with_bounds::<MAX_CPI_ACCOUNTS>(instruction, account_infos, signers_seeds)
+    // SAFETY: The stack allocated account storage `MAX_CPI_ACCOUNTS` was validated.
+    unsafe {
+        inner_invoke_signed_with_bounds::<MAX_CPI_ACCOUNTS>(
+            instruction,
+            account_infos,
+            signers_seeds,
+        )
+    }
 }
 
 /// Internal function to invoke a cross-program instruction with signatures
 /// from a slice of `AccountInfo`s performing borrow checking.
+///
+/// This function performs validation of the `account_infos` slice to ensure that:
+///   1. It has at least as many accounts as the number of accounts expected by
+///      the instruction.
+///   2. The accounts match the expected accounts in the instruction, i.e., their
+///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
+///   3. The borrow state of the accounts is compatible with the mutability of the
+///      accounts in the instruction.
+///
+/// # Safety
+///
+/// This function is unsafe because it does not check that the stack allocated account
+/// storage `MAX_ACCOUNTS` is sufficient for the number of accounts expected by the
+/// instruction. Using a value of `MAX_ACCOUNTS` that is less than the number of accounts
+/// expected by the instruction will result in undefined behavior.
 #[inline(always)]
-fn _invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
+unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
