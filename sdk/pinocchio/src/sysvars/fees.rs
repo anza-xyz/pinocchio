@@ -13,7 +13,7 @@ pub struct FeeCalculator {
 }
 
 impl FeeCalculator {
-    /// Create a new instance of the FeeCalculator
+    /// Create a new instance of the `FeeCalculator`.
     pub fn new(lamports_per_signature: u64) -> Self {
         Self {
             lamports_per_signature,
@@ -61,7 +61,7 @@ impl Default for FeeRateGovernor {
 }
 
 impl FeeRateGovernor {
-    /// Create a new FeeCalculator based on current cluster signature throughput
+    /// Create a new `FeeCalculator` based on current cluster signature throughput
     pub fn create_fee_calculator(&self) -> FeeCalculator {
         FeeCalculator::new(self.lamports_per_signature)
     }
