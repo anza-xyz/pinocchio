@@ -424,7 +424,7 @@ impl_log_for_signed!(i64);
 impl_log_for_signed!(i128);
 impl_log_for_signed!(isize);
 
-/// Implement the log trait for the &str type.
+/// Implement the log trait for the `&str` type.
 unsafe impl Log for &str {
     #[inline]
     fn debug_with_args(&self, buffer: &mut [MaybeUninit<u8>], _args: &[Argument]) -> usize {
@@ -666,7 +666,7 @@ macro_rules! impl_log_for_slice {
 impl_log_for_slice!([T]);
 impl_log_for_slice!([T; N]);
 
-/// Implement the log trait for the bool type.
+/// Implement the log trait for the `bool` type.
 unsafe impl Log for bool {
     #[inline]
     fn debug_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
