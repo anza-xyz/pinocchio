@@ -10,7 +10,7 @@
     "lint": "tsx ./scripts/lint.mts",
     "miri": "tsx ./scripts/miri.mts",
     "semver": "tsx ./scripts/semver.mts",
-    "spellcheck": "cargo spellcheck --code 1",
+    "spellcheck": "cargo spellcheck -j1 --code 1",
     "test": "tsx ./scripts/test.mts"
   },
   "devDependencies": {
