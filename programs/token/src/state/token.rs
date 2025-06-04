@@ -32,9 +32,9 @@ pub struct TokenAccount {
     /// Indicates whether this account represents a native token or not.
     is_native: [u8; 4],
 
-    /// If is_native.is_some, this is a native token, and the value logs the
-    /// rent-exempt reserve. An Account is required to be rent-exempt, so
-    /// the value is used by the Processor to ensure that wrapped SOL
+    /// When `is_native.is_some()` is `true`, this is a native token, and the
+    /// value logs the rent-exempt reserve. An Account is required to be rent-exempt,
+    /// so the value is used by the Processor to ensure that wrapped SOL
     /// accounts do not drop below this threshold.
     native_amount: [u8; 8],
 
@@ -77,8 +77,8 @@ impl TokenAccount {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that it is safe to borrow the account data – e.g., there are
-    /// no mutable borrows of the account data.
+    /// The caller must ensure that it is safe to borrow the account data (e.g., there are
+    /// no mutable borrows of the account data).
     #[inline]
     pub unsafe fn from_account_info_unchecked(
         account_info: &AccountInfo,
