@@ -55,6 +55,7 @@ blockhash/S
 VM
 SVM
 BPF
+SBF
 inlined
 CU/S
 borrowable
