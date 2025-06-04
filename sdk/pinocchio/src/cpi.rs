@@ -47,7 +47,9 @@ pub fn invoke<const ACCOUNTS: usize>(
 /// the number of accounts that need to be statically allocated for cases where the
 /// number of instruction accounts is not known at compile time. The final number of
 /// accounts passed to the cross-program invocation will be the number of accounts
-/// required by the `instruction`, even if `MAX_ACCOUNTS` is greater than that.
+/// required by the `instruction`, even if `MAX_ACCOUNTS` is greater than that. When
+/// `MAX_ACCOUNTS` is lower than the number of accounts expected by the instruction,
+/// this function will return a [`ProgramError::InvalidArgument`] error.
 ///
 /// Note that this function is inlined to avoid the overhead of a function call,
 /// but uses stack memory allocation. When a large number of accounts is needed,
@@ -74,9 +76,11 @@ pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
 /// function with the signers' seeds set to an empty slice.
 ///
 /// Note that the maximum number of accounts that can be passed to a cross-program
-/// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
+/// invocation is defined by the [`MAX_CPI_ACCOUNTS`] constant. Even if the slice
 /// of `AccountInfo`s has more accounts, only the number of accounts required by
-/// the `instruction` will be used.
+/// the `instruction` will be used. If the number of accounts required by the
+/// instruction is greater than [`MAX_CPI_ACCOUNTS`], this function will return a
+/// [`ProgramError::InvalidArgument`] error.
 ///
 /// # Important
 ///
@@ -144,7 +148,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 ///      accounts in the instruction.
 ///
 /// This validation is done to ensure that the borrow checker rules are followed,
-/// consuming CUs in the process. The `invoke_signed_unchecked` is an alternative
+/// consuming CUs in the process. The [`invoke_signed_unchecked`] is an alternative
 /// to this function that has lower CU consumption since it does not perform
 /// any validation. This should only be used when the caller is sure that the borrow
 /// checker rules are followed.
@@ -154,7 +158,9 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 /// the number of accounts that need to be statically allocated for cases where the
 /// number of instruction accounts is not known at compile time. The final number of
 /// accounts passed to the cross-program invocation will be the number of accounts
-/// required by the `instruction`, even if `MAX_ACCOUNTS` is greater than that.
+/// required by the `instruction`, even if `MAX_ACCOUNTS` is greater than that. When
+/// `MAX_ACCOUNTS` is lower than the number of accounts expected by the instruction,
+/// this function will return a [`ProgramError::InvalidArgument`] error.
 ///
 /// Note that this function is inlined to avoid the overhead of a function call,
 /// but uses stack memory allocation. When a large number of accounts is needed,
@@ -180,7 +186,7 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
     // number of accounts expected by the instruction is done in
     // `invoke_signed_with_bounds`.
     if MAX_ACCOUNTS < instruction.accounts.len() {
-        return Err(ProgramError::NotEnoughAccountKeys);
+        return Err(ProgramError::InvalidArgument);
     }
 
     // SAFETY: The stack allocated account storage `MAX_ACCOUNTS` was validated.
@@ -201,7 +207,7 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 ///      accounts in the instruction.
 ///
 /// This validation is done to ensure that the borrow checker rules are followed,
-/// consuming CUs in the process. The `invoke_signed_unchecked` is an alternative
+/// consuming CUs in the process. The [`invoke_signed_unchecked`] is an alternative
 /// to this function that have lower CU consumption since it does not perform
 /// any validation. This should only be used when the caller is sure that the borrow
 /// checker rules are followed.
@@ -209,7 +215,9 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 /// Note that the maximum number of accounts that can be passed to a cross-program
 /// invocation is defined by the `MAX_CPI_ACCOUNTS` constant. Even if the slice
 /// of `AccountInfo`s has more accounts, only the number of accounts required by
-/// the `instruction` will be used.
+/// the `instruction` will be used. If the number of accounts required by the
+/// instruction is greater than [`MAX_CPI_ACCOUNTS`], this function will return a
+/// [`ProgramError::InvalidArgument`] error.
 ///
 /// # Important
 ///
@@ -222,14 +230,14 @@ pub fn slice_invoke_signed(
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    // Check that the stack allocated account storage `MAX_ACCOUNTS` is sufficient
-    // for the number of accounts expected by the instruction.
+    // Check that the stack allocated account storage `MAX_CPI_ACCOUNTS` is
+    // sufficient for the number of accounts expected by the instruction.
     //
     // The check for the slice of `AccountInfo`s not being less than the
     // number of accounts expected by the instruction is done in
     // `invoke_signed_with_bounds`.
     if MAX_CPI_ACCOUNTS < instruction.accounts.len() {
-        return Err(ProgramError::NotEnoughAccountKeys);
+        return Err(ProgramError::InvalidArgument);
     }
 
     // SAFETY: The stack allocated account storage `MAX_CPI_ACCOUNTS` was validated.
