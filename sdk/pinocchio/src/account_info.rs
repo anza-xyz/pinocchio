@@ -1,5 +1,6 @@
 //! Data structures to represent account information.
 use core::{
+    convert::Infallible,
     marker::PhantomData,
     mem::ManuallyDrop,
     ptr::NonNull,
@@ -424,6 +425,47 @@ impl AccountInfo {
         Ok(())
     }
 
+    /// Returns the original data length of the account, lazily initializing it if it is not set.
+    pub fn original_data_len(&self) -> usize {
+        let length = unsafe { (*self.raw).original_data_len };
+
+        if length & SET_LEN_MASK == SET_LEN_MASK {
+            (length & GET_LEN_MASK) as usize
+        } else {
+            let current_len = self.data_len();
+            // lazily initialize the original data length and sets the flag
+            unsafe {
+                (*self.raw).original_data_len = (current_len as u32) | SET_LEN_MASK;
+            }
+            current_len as usize
+        }
+    }
+
+    /// Sets the data_len field on the underlying account, checking that the new length is less than the maximum permitted data increase.
+    ///
+    /// This will not modify the length of any existing borrowed data from [`Ref`] or [`RefMut`], and will only take effect on the next borrows. If you
+    /// want to realloc the account data, you should use [`AccountInfo::realloc`] instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the new length is greater than the maximum permitted data increase.
+    /// TODO: I think this is sound, but might make sense to mark as unsafe and add some invariants just in case (i.e. that there are either no borrows or we currently control the only mutable borrow and are updating its length too)
+    #[inline]
+    pub fn set_data_len_checked(&self, new_len: usize) -> Result<(), ProgramError> {
+        // return early if the length increase from the original serialized data
+        // length is too large and would result in an out of bounds allocation
+        if new_len.saturating_sub(self.original_data_len()) > MAX_PERMITTED_DATA_INCREASE {
+            return Err(ProgramError::InvalidRealloc);
+        }
+
+        // SAFETY: We have full access to the mutable account data and don't give out any references to the data
+        unsafe {
+            *(&raw mut (*self.raw).data_len) = new_len as u64;
+        }
+
+        Ok(())
+    }
+
     /// Realloc the account's data and optionally zero-initialize the new
     /// memory.
     ///
@@ -451,25 +493,8 @@ impl AccountInfo {
             return Ok(());
         }
 
-        let original_len = {
-            let length = unsafe { (*self.raw).original_data_len };
-
-            if length & SET_LEN_MASK == SET_LEN_MASK {
-                (length & GET_LEN_MASK) as usize
-            } else {
-                // lazily initialize the original data length and sets the flag
-                unsafe {
-                    (*self.raw).original_data_len = (current_len as u32) | SET_LEN_MASK;
-                }
-                current_len
-            }
-        };
-
-        // return early if the length increase from the original serialized data
-        // length is too large and would result in an out of bounds allocation
-        if new_len.saturating_sub(original_len) > MAX_PERMITTED_DATA_INCREASE {
-            return Err(ProgramError::InvalidRealloc);
-        }
+        // Update the data length and ensure that the new length is less than the maximum permitted data increase.
+        self.set_data_len_checked(new_len)?;
 
         // realloc
         unsafe {
