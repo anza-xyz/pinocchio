@@ -100,6 +100,7 @@ macro_rules! lazy_program_entrypoint {
 ///
 /// This is a wrapper around the input buffer that provides methods to read the accounts
 /// and instruction data. It is used by the lazy entrypoint to access the input data on demand.
+#[derive(Debug)]
 pub struct InstructionContext {
     /// Pointer to the runtime input buffer to read from.
     ///
@@ -276,6 +277,7 @@ impl InstructionContext {
 }
 
 /// Wrapper type around an [`AccountInfo`] that may be a duplicate.
+#[derive(Debug)]
 pub enum MaybeAccount {
     /// An [`AccountInfo`] that is not a duplicate.
     Account(AccountInfo),

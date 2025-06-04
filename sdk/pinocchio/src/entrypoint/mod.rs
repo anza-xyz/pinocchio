@@ -668,6 +668,7 @@ mod alloc {
 
 #[cfg(not(feature = "std"))]
 /// An allocator that does not allocate memory.
+#[derive(Debug, Copy, Clone)]
 pub struct NoAllocator;
 
 #[cfg(not(feature = "std"))]

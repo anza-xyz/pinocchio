@@ -22,7 +22,7 @@ impl FeeCalculator {
 }
 
 /// Governs the fee rate for the cluster
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct FeeRateGovernor {
     /// The current cost of a signature
     pub lamports_per_signature: u64,
@@ -74,7 +74,7 @@ impl FeeRateGovernor {
 }
 
 /// Fees sysvar
-#[derive(Debug)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct Fees {
     /// Fee calculator for processing transactions
     pub fee_calculator: FeeCalculator,

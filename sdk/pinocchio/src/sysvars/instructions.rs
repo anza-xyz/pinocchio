@@ -13,6 +13,7 @@ pub const INSTRUCTIONS_ID: Pubkey = [
     0xc1, 0x24, 0xc6, 0x8f, 0x21, 0x56, 0x75, 0xa5, 0xdb, 0xba, 0xcb, 0x5f, 0x08, 0x00, 0x00, 0x00,
 ];
 
+#[derive(Debug, Copy, Clone)]
 pub struct Instructions<T>
 where
     T: Deref<Target = [u8]>,
@@ -125,7 +126,7 @@ impl<'a> TryFrom<&'a AccountInfo> for Instructions<Ref<'a, [u8]>> {
 }
 
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct IntrospectedInstruction<'a> {
     pub raw: *const u8,
     pub marker: PhantomData<&'a [u8]>,
@@ -212,7 +213,7 @@ const IS_SIGNER: u8 = 0b00000001;
 const IS_WRITABLE: u8 = 0b00000010;
 
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug, Copy)]
 pub struct IntrospectedAccountMeta {
     /// Account flags:
     ///   * bit `0`: signer
