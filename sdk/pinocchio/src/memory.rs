@@ -38,7 +38,7 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
     syscalls::sol_memcpy_(dst.as_mut_ptr(), src.as_ptr(), n as u64);
 
     #[cfg(not(target_os = "solana"))]
-    core::hint::black_box((dst, src, n));
+    dst[..n].copy_from_slice(&src[..n]);
 }
 
 /// Copies the contents of one value to another.
@@ -61,7 +61,7 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
 /// - `dst` - Destination reference to copy to
 /// - `src` - Source reference to copy from
 #[inline]
-pub fn copy_val<T: ?Sized>(dst: &mut T, src: &T) {
+pub fn copy_val<T: ?Sized + Copy>(dst: &mut T, src: &T) {
     #[cfg(target_os = "solana")]
     // SAFETY: dst and src are of same type therefore the size is the same
     unsafe {
@@ -73,7 +73,9 @@ pub fn copy_val<T: ?Sized>(dst: &mut T, src: &T) {
     }
 
     #[cfg(not(target_os = "solana"))]
-    core::hint::black_box((dst, src));
+    {
+        *dst = *src;
+    }
 }
 
 /// Like C `memmove`.
@@ -101,7 +103,9 @@ pub unsafe fn sol_memmove(dst: *mut u8, src: *const u8, n: usize) {
     syscalls::sol_memmove_(dst, src, n as u64);
 
     #[cfg(not(target_os = "solana"))]
-    core::hint::black_box((dst, src, n));
+    {
+        core::ptr::copy(src, dst, n);
+    }
 }
 
 /// Like C `memcmp`.
@@ -135,7 +139,16 @@ pub unsafe fn sol_memcmp(s1: &[u8], s2: &[u8], n: usize) -> i32 {
     syscalls::sol_memcmp_(s1.as_ptr(), s2.as_ptr(), n as u64, &mut result as *mut i32);
 
     #[cfg(not(target_os = "solana"))]
-    core::hint::black_box((s1, s2, n, result));
+    {
+        debug_assert!(s1.len() >= n);
+        debug_assert!(s2.len() >= n);
+        for i in 0..n {
+            if s1[i] != s2[i] {
+                result = s1[i] as i32 - s2[i] as i32;
+                break;
+            }
+        }
+    }
 
     result
 }
@@ -168,5 +181,8 @@ pub unsafe fn sol_memset(s: &mut [u8], c: u8, n: usize) {
     syscalls::sol_memset_(s.as_mut_ptr(), c, n as u64);
 
     #[cfg(not(target_os = "solana"))]
-    core::hint::black_box((s, c, n));
+    {
+        debug_assert!(s.len() >= n);
+        s[..n].fill(c);
+    }
 }
