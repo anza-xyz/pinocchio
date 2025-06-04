@@ -113,7 +113,7 @@ const STATIC_ACCOUNT_DATA: usize = core::mem::size_of::<Account>() + MAX_PERMITT
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:ident ) => {
-        entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
+        $crate::entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
     };
     ( $process_instruction:ident, $maximum:expr ) => {
         $crate::program_entrypoint!($process_instruction, $maximum);
