@@ -9,7 +9,7 @@ use pinocchio::{
 
 use crate::{write_bytes, UNINIT_BYTE};
 
-/// Transfer Tokens from one Token Account to another.
+/// Transfer tokens from one Token account to another.
 ///
 /// ### Accounts:
 ///   0. `[WRITE]` Sender account
@@ -22,7 +22,7 @@ pub struct Transfer<'a> {
     pub to: &'a AccountInfo,
     /// Authority account.
     pub authority: &'a AccountInfo,
-    /// Amount of microtokens to transfer.
+    /// Amount of micro-tokens to transfer.
     pub amount: u64,
 }
 
