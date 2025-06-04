@@ -17,7 +17,7 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
 /// Represents masks for borrow state of an account.
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum BorrowState {
     /// Mask to check whether an account is already borrowed.
     ///
@@ -104,7 +104,7 @@ const GET_LEN_MASK: u32 = !SET_LEN_MASK;
 /// used to track borrows of the account data and lamports, given that an
 /// account can be "shared" across multiple `AccountInfo` instances.
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AccountInfo {
     /// Raw (pointer to) account data.
     ///
@@ -567,6 +567,7 @@ const LAMPORTS_SHIFT: u8 = 4;
 const DATA_SHIFT: u8 = 0;
 
 /// Reference to account data or lamports with checked borrow rules.
+#[derive(Debug)]
 pub struct Ref<'a, T: ?Sized> {
     value: NonNull<T>,
     state: NonNull<u8>,
@@ -638,6 +639,7 @@ const LAMPORTS_MASK: u8 = 0b_0111_1111;
 const DATA_MASK: u8 = 0b_1111_0111;
 
 /// Mutable reference to account data or lamports with checked borrow rules.
+#[derive(Debug)]
 pub struct RefMut<'a, T: ?Sized> {
     value: NonNull<T>,
     state: NonNull<u8>,
