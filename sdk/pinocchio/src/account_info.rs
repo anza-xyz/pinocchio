@@ -112,7 +112,7 @@ pub(crate) struct Account {
 /// used to track borrows of the account data and lamports, given that an
 /// account can be "shared" across multiple `AccountInfo` instances.
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct AccountInfo {
     /// Raw (pointer to) account data.
     ///
@@ -131,6 +131,13 @@ impl AccountInfo {
     #[inline(always)]
     pub fn owner(&self) -> &Pubkey {
         unsafe { &(*self.raw).owner }
+    }
+
+    #[inline(always)]
+    pub fn owner_key(&self) -> Pubkey {
+        // SAFETY:
+        // We immediately copy out the pubkey, so the reference can never be invalidated
+        unsafe { *self.owner() }
     }
 
     /// Indicates whether the transaction was signed by this account.
