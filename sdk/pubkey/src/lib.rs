@@ -18,7 +18,7 @@ macro_rules! pubkey {
 #[macro_export]
 macro_rules! declare_id {
     ( $id:expr ) => {
-        #[doc = "The const program ID."]
+        #[doc = "The constant program ID."]
         pub const ID: $crate::pinocchio::pubkey::Pubkey = $crate::from_str($id);
 
         #[doc = "Returns `true` if given pubkey is the program ID."]
