@@ -19,10 +19,10 @@ pub const RENT_ID: Pubkey = [
 /// Default rental rate in lamports/byte-year.
 ///
 /// This calculation is based on:
-/// - 10^9 lamports per SOL
-/// - $1 per SOL
-/// - $0.01 per megabyte day
-/// - $3.65 per megabyte year
+/// - `10^9` lamports per SOL
+/// - `$1` per SOL
+/// - `$0.01` per megabyte day
+/// - `$3.65` per megabyte year
 pub const DEFAULT_LAMPORTS_PER_BYTE_YEAR: u64 = 1_000_000_000 / 100 * 365 / (1024 * 1024);
 
 /// Default amount of time (in years) the balance has to include rent for the
@@ -88,7 +88,7 @@ impl Rent {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that it is safe to borrow the account data – e.g., there are
+    /// The caller must ensure that it is safe to borrow the account data - e.g., there are
     /// no mutable borrows of the account data.
     #[inline]
     pub unsafe fn from_account_info_unchecked(

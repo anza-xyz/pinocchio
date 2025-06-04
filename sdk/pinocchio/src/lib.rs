@@ -3,7 +3,7 @@
 //! Pinocchio is a zero-dependency library to create Solana programs in Rust.
 //! It takes advantage of the way SVM loaders serialize the program input parameters
 //! into a byte array that is then passed to the program's entrypoint to define
-//! zero-copy types to read the input – these types are defined in an efficient way
+//! zero-copy types to read the input - these types are defined in an efficient way
 //! taking into consideration that they will be used in on-chain programs.
 //!
 //! It is intended to be used by on-chain programs only; for off-chain programs,
@@ -76,7 +76,7 @@
 //! `instruction_data` separately. This consumes compute units before the program
 //! begins its execution. In some cases, it is beneficial for a program to have
 //! more control when the input parsing is happening, even whether the parsing
-//! is needed or not &mdash; this is the purpose of the [`lazy_program_entrypoint!`]
+//! is needed or not - this is the purpose of the [`lazy_program_entrypoint!`]
 //! macro. This macro only wraps the program input and provides methods to parse
 //! the input on-demand.
 //!
@@ -182,8 +182,8 @@
 //!
 //! ## Advanced entrypoint configuration
 //!
-//! The symbols emitted by the entrypoint macros &mdash; program entrypoint, global
-//! allocator and default panic handler &mdash; can only be defined once globally. If
+//! The symbols emitted by the entrypoint macros - program entrypoint, global
+//! allocator and default panic handler - can only be defined once globally. If
 //! the program crate is also intended to be used as a library, it is common practice
 //! to define a Cargo [feature](https://doc.rust-lang.org/cargo/reference/features.html)
 //! in your program crate to conditionally enable the module that includes the [`entrypoint!`]
