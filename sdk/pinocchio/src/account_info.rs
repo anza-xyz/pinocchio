@@ -556,7 +556,7 @@ impl AccountInfo {
 
     /// Returns the memory address of the account data.
     fn data_ptr(&self) -> *mut u8 {
-        unsafe { (self.raw as *const _ as *mut u8).add(core::mem::size_of::<Account>()) }
+        unsafe { (self.raw as *mut u8).add(core::mem::size_of::<Account>()) }
     }
 }
 
