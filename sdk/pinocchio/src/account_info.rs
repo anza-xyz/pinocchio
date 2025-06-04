@@ -593,15 +593,24 @@ impl<'a, T: ?Sized> Ref<'a, T> {
     where
         F: FnOnce(&T) -> &U,
     {
+        Self::try_map::<_, _, Infallible>(orig, |x| Ok(f(x))).unwrap()
+    }
+
+    /// Maps a reference to a new type in a fallible map, returning an error if the map fails.
+    #[inline]
+    pub fn try_map<U: ?Sized, F, E>(orig: Ref<'a, T>, f: F) -> Result<Ref<'a, U>, E>
+    where
+        F: FnOnce(&T) -> Result<&U, E>,
+    {
         // Avoid decrementing the borrow flag on Drop.
         let orig = ManuallyDrop::new(orig);
 
-        Ref {
-            value: NonNull::from(f(&*orig)),
+        Ok(Ref {
+            value: NonNull::from(f(&*orig)?),
             state: orig.state,
             borrow_shift: orig.borrow_shift,
             marker: PhantomData,
-        }
+        })
     }
 
     /// Filters and maps a reference to a new type.
@@ -665,15 +674,25 @@ impl<'a, T: ?Sized> RefMut<'a, T> {
     where
         F: FnOnce(&mut T) -> &mut U,
     {
+        Self::try_map::<_, _, Infallible>(orig, |x| Ok(f(x))).unwrap()
+    }
+
+    /// Maps a mutable reference to a new type in a fallible map, returning an error if the map fails.
+    #[inline]
+    pub fn try_map<U: ?Sized, F, E>(orig: RefMut<'a, T>, f: F) -> Result<RefMut<'a, U>, E>
+    where
+        F: FnOnce(&mut T) -> Result<&mut U, E>,
+    {
         // Avoid decrementing the borrow flag on Drop.
         let mut orig = ManuallyDrop::new(orig);
+        let value = f(&mut *orig)?;
 
-        RefMut {
-            value: NonNull::from(f(&mut *orig)),
+        Ok(RefMut {
+            value: NonNull::from(value),
             state: orig.state,
             borrow_mask: orig.borrow_mask,
             marker: PhantomData,
-        }
+        })
     }
 
     /// Filters and maps a mutable reference to a new type.
