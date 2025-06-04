@@ -28,7 +28,7 @@ pub struct ProcessedSiblingInstruction {
     /// Length of the instruction data
     pub data_len: u64,
 
-    /// Number of AccountMeta structures
+    /// Number of `AccountMeta` structures
     pub accounts_len: u64,
 }
 
@@ -133,7 +133,7 @@ impl<'a> AccountMeta<'a> {
         }
     }
 
-    /// Creates a new readonly `AccountMeta`.
+    /// Creates a new read-only `AccountMeta`.
     #[inline(always)]
     pub const fn readonly(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, false, false)
@@ -145,7 +145,7 @@ impl<'a> AccountMeta<'a> {
         Self::new(pubkey, true, false)
     }
 
-    /// Creates a new readonly and signer `AccountMeta`.
+    /// Creates a new read-only and signer `AccountMeta`.
     #[inline(always)]
     pub const fn readonly_signer(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, false, true)

@@ -410,7 +410,7 @@ pub unsafe fn invoke_signed_unchecked(
         /// DO NOT EXPOSE THIS STRUCT:
         ///
         /// To ensure pointers are valid upon use, the scope of this struct should
-        /// only be limited to the stack where sol_invoke_signed_c happens and then
+        /// only be limited to the stack where `sol_invoke_signed_c` happens and then
         /// discarded immediately after.
         #[repr(C)]
         struct CInstruction<'a> {
@@ -486,12 +486,12 @@ pub fn set_return_data(data: &[u8]) {
 ///
 /// Return data is set by the callee with [`set_return_data`].
 ///
-/// Return data is cleared before every CPI invocation &mdash; a program that
+/// Return data is cleared before every CPI invocation - a program that
 /// has invoked no other programs can expect the return data to be `None`; if no
 /// return data was set by the previous CPI invocation, then this function
 /// returns `None`.
 ///
-/// Return data is not cleared after returning from CPI invocations &mdash; a
+/// Return data is not cleared after returning from CPI invocations - a
 /// program that has called another program may retrieve return data that was
 /// not set by the called program, but instead set by a program further down the
 /// call stack; or, if a program calls itself recursively, it is possible that

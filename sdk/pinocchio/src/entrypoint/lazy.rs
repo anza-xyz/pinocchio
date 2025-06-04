@@ -116,7 +116,7 @@ impl InstructionContext {
     /// Creates a new [`InstructionContext`] for the input buffer.
     ///
     /// The caller must ensure that the input buffer is valid, i.e., it represents
-    /// the program input parameters serialzed by the SVM loader.
+    /// the program input parameters serialized by the SVM loader.
     ///
     /// This method is deprecated and will be removed in a future version. It is
     /// missing the `unsafe` qualifier.

@@ -27,7 +27,7 @@ use crate::syscalls;
 /// # Safety
 ///
 /// This function does not verify that `n` is less than or equal to the
-/// lengths of the `dst` and `src` slices passed to it &mdash; it will copy
+/// lengths of the `dst` and `src` slices passed to it - it will copy
 /// bytes to and from beyond the slices.
 ///
 /// Specifying an `n` greater than either the length of `dst` or `src` will
@@ -124,7 +124,7 @@ pub unsafe fn sol_memmove(dst: *mut u8, src: *const u8, n: usize) {
 /// # Safety
 ///
 /// It does not verify that `n` is less than or equal to the lengths of the
-/// `dst` and `src` slices passed to it &mdash; it will read bytes beyond the
+/// `dst` and `src` slices passed to it - it will read bytes beyond the
 /// slices.
 ///
 /// Specifying an `n` greater than either the length of `dst` or `src` will
@@ -160,7 +160,7 @@ pub unsafe fn sol_memcmp(s1: &[u8], s2: &[u8], n: usize) -> i32 {
 /// # Safety
 ///
 /// This function does not verify that `n` is less than or equal to the length
-/// of the `s` slice passed to it &mdash; it will write bytes beyond the
+/// of the `s` slice passed to it - it will write bytes beyond the
 /// slice.
 ///
 /// Specifying an `n` greater than the length of `s` will likely introduce
