@@ -1,6 +1,7 @@
 //! Data structures to represent account information.
 
 use core::{
+    convert::Infallible,
     marker::PhantomData,
     mem::ManuallyDrop,
     ptr::{write, NonNull},
