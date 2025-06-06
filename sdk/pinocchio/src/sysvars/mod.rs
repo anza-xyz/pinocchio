@@ -1,6 +1,10 @@
 //! Provides access to cluster system accounts.
 
+#[cfg(target_os = "solana")]
+use crate::syscalls::sol_get_sysvar;
 use crate::{program_error::ProgramError, pubkey::Pubkey};
+#[cfg(not(target_os = "solana"))]
+use core::hint::black_box;
 
 pub mod clock;
 pub mod fees;
@@ -50,42 +54,43 @@ macro_rules! impl_sysvar_get {
 ///
 /// # Safety
 ///
-/// `dst` must point to a buffer that can hold at least `length` bytes.
+/// The caller must ensure that the `dst` pointer is valid and has enough space
+/// to hold the requested `len` bytes of data.
 #[inline]
 pub unsafe fn get_sysvar_unchecked(
     dst: *mut u8,
     sysvar_id: &Pubkey,
-    offset: u64,
-    length: u64,
+    offset: usize,
+    len: usize,
 ) -> Result<(), ProgramError> {
-    let sysvar_id = sysvar_id as *const _ as *const u8;
-
     #[cfg(target_os = "solana")]
-    let result = unsafe { crate::syscalls::sol_get_sysvar(sysvar_id, dst, offset, length) };
+    {
+        let result = unsafe {
+            sol_get_sysvar(
+                sysvar_id as *const _ as *const u8,
+                dst,
+                offset as u64,
+                len as u64,
+            )
+        };
+
+        match result {
+            crate::SUCCESS => Ok(()),
+            e => Err(e.into()),
+        }
+    }
 
     #[cfg(not(target_os = "solana"))]
-    let result = core::hint::black_box(sysvar_id as u64 + dst as u64 + offset + length);
-
-    match result {
-        crate::SUCCESS => Ok(()),
-        e => Err(e.into()),
+    {
+        black_box((dst, sysvar_id, offset, len));
+        Ok(())
     }
 }
 
 /// Handler for retrieving a slice of sysvar data from the `sol_get_sysvar`
 /// syscall.
-#[inline]
-pub fn get_sysvar(
-    dst: &mut [u8],
-    sysvar_id: &Pubkey,
-    offset: u64,
-    length: u64,
-) -> Result<(), ProgramError> {
-    // Check that the provided destination buffer is large enough to hold the
-    // requested data.
-    if dst.len() < length as usize {
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    unsafe { get_sysvar_unchecked(dst as *mut _ as *mut u8, sysvar_id, offset, length) }
+#[inline(always)]
+pub fn get_sysvar(dst: &mut [u8], sysvar_id: &Pubkey, offset: usize) -> Result<(), ProgramError> {
+    // SAFETY: Use the length of the slice as the length parameter.
+    unsafe { get_sysvar_unchecked(dst.as_mut_ptr(), sysvar_id, offset, dst.len()) }
 }
