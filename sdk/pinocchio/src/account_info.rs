@@ -39,11 +39,11 @@ pub enum BorrowState {
 pub(crate) struct Account {
     /// Borrow state of the account data.
     ///
-    /// 0) We reuse the duplicate flag for this. We set it to 0b0000_0000.
+    /// 0) We reuse the duplicate flag for this (`0b1111_1111`).
     /// 1) We use the first four bits to track state of lamport borrow
     /// 2) We use the second four bits to track state of data borrow
     ///
-    /// 4 bit state: [1 bit mutable borrow flag | u3 immmutable borrow flag]
+    /// 4 bit state: [1 bit mutable borrow flag | `u3` immutable borrow flag]
     /// This gives us up to 7 immutable borrows. Note that does not mean 7
     /// duplicate account infos, but rather 7 calls to borrow lamports or
     /// borrow data across all duplicate account infos.
@@ -87,7 +87,7 @@ pub(crate) struct Account {
 /// Mask to indicate the original data length has been set.
 ///
 /// This takes advantage of the fact that the original data length will not
-/// be greater than 10_000_000 bytes, so we can use the most significant bit
+/// be greater than `10_000_000` bytes, so we can use the most significant bit
 /// as a flag to indicate that the original data length has been set and lazily
 /// initialize its value.
 const SET_LEN_MASK: u32 = 1 << 31;
@@ -495,8 +495,8 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// This doesn't protect against future reinitialization of the account
-    /// since the account data will need to be zeroed out as well; otherwise the lenght,
+    /// This doesn't protect against future re-initialization of the account
+    /// since the account data will need to be zeroed out as well; otherwise the length,
     /// lamports and owner can be set again before the data is wiped out from
     /// the ledger using the keypair of the account being closed.
     ///
@@ -523,8 +523,8 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// This doesn't protect against future reinitialization of the account
-    /// since the account data will need to be zeroed out as well; otherwise the lenght,
+    /// This doesn't protect against future re-initialization of the account
+    /// since the account data will need to be zeroed out as well; otherwise the length,
     /// lamports and owner can be set again before the data is wiped out from
     /// the ledger using the keypair of the account being closed.
     ///

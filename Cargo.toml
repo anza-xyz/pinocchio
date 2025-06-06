@@ -39,3 +39,6 @@ test = "1.84.1"
 pre-release-commit-message = "Publish {{crate_name}} v{{version}}"
 tag-message = "Publish {{crate_name}} v{{version}}"
 consolidate-commits = false
+
+[workspace.metadata.spellcheck]
+config = "scripts/setup/spellcheck.toml"

@@ -9,6 +9,7 @@
     "hack": "tsx ./scripts/hack.mts",
     "lint": "tsx ./scripts/lint.mts",
     "semver": "tsx ./scripts/semver.mts",
+    "spellcheck": "cargo spellcheck -j1 --code 1",
     "test": "tsx ./scripts/test.mts"
   },
   "devDependencies": {
