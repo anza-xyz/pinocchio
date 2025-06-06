@@ -3,6 +3,7 @@
 use crate::program_error::ProgramError;
 
 pub mod clock;
+pub mod epoch_rewards;
 pub mod fees;
 pub mod instructions;
 pub mod rent;
