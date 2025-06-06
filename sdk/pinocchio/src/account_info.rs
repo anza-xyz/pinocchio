@@ -492,6 +492,22 @@ impl AccountInfo {
         Ok(())
     }
 
+    /// Resize (either truncating or zero extending) the account's data.
+    ///
+    /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
+    /// within an instruction.
+    ///
+    /// # Important
+    ///
+    /// This method makes assumptions about the layout and location of memory
+    /// referenced by `AccountInfo` fields. It should only be called for
+    /// instances of `AccountInfo` that were created by the runtime and received
+    /// in the `process_instruction` entrypoint of a program.
+    #[inline]
+    pub fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
+        self.realloc(new_len, true)
+    }
+
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
