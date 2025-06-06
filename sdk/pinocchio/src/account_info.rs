@@ -522,7 +522,7 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// Note: This does not zeroes the account data. The account data will be zeroed by
+    /// Note: This does not zero the account data. The account data will be zeroed by
     /// the runtime at the end of the instruction where the account was closed or at the
     /// next CPI call.
     ///
