@@ -435,6 +435,7 @@ impl AccountInfo {
     /// referenced by `AccountInfo` fields. It should only be called for
     /// instances of `AccountInfo` that were created by the runtime and received
     /// in the `process_instruction` entrypoint of a program.
+    #[deprecated(since = "0.9.0", note = "Use AccountInfo::resize() instead")]
     pub fn realloc(&self, new_len: usize, zero_init: bool) -> Result<(), ProgramError> {
         let mut data = self.try_borrow_mut_data()?;
         let current_len = data.len();
@@ -505,6 +506,7 @@ impl AccountInfo {
     /// in the `process_instruction` entrypoint of a program.
     #[inline]
     pub fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
+        #[allow(deprecated)]
         self.realloc(new_len, true)
     }
 
