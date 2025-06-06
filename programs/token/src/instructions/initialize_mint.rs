@@ -8,7 +8,9 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::{write_bytes, UNINIT_BYTE};
+use crate::{write_bytes, InstructionData, UNINIT_BYTE};
+extern crate alloc;
+use alloc::boxed::Box;
 
 /// Initialize a new mint.
 ///
@@ -41,16 +43,29 @@ impl InitializeMint<'_> {
             AccountMeta::readonly(self.rent_sysvar.key()),
         ];
 
+        let instruction = Instruction {
+            program_id: &crate::ID,
+            accounts: &account_metas,
+            data: self.get_instruction_data(),
+        };
+
+        invoke_signed(&instruction, &[self.mint, self.rent_sysvar], signers)
+    }
+}
+
+impl InstructionData for InitializeMint<'_> {
+    #[inline]
+    fn get_instruction_data(&self) -> &[u8] {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: decimals (1 byte, u8)
         // -  [2..34]: mint_authority (32 bytes, Pubkey)
         // -  [34]: freeze_authority presence flag (1 byte, u8)
         // -  [35..67]: freeze_authority (optional, 32 bytes, Pubkey)
-        let mut instruction_data = [UNINIT_BYTE; 67];
+        let mut instruction_data = Box::new([UNINIT_BYTE; 67]);
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[0]);
+        write_bytes(&mut instruction_data.as_mut_slice(), &[0]);
         // Set decimals as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[self.decimals]);
         // Set mint_authority as Pubkey at offset [2..34]
@@ -63,12 +78,6 @@ impl InitializeMint<'_> {
             write_bytes(&mut instruction_data[34..35], &[0]);
         }
 
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 67) },
-        };
-
-        invoke_signed(&instruction, &[self.mint, self.rent_sysvar], signers)
+        unsafe { from_raw_parts(instruction_data.as_ptr() as _, 67) }
     }
 }
