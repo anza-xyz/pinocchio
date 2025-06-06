@@ -495,10 +495,9 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// This doesn't protect against future reinitialization of the account
-    /// since the account data will need to be zeroed out as well; otherwise the lenght,
-    /// lamports and owner can be set again before the data is wiped out from
-    /// the ledger using the keypair of the account being closed.
+    /// Note: This does not zeroes the account data. The account data will be zeroed by
+    /// the runtime at the end of the instruction where the account was closed or at the
+    /// next CPI call.
     ///
     /// # Important
     ///
@@ -523,10 +522,9 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// This doesn't protect against future reinitialization of the account
-    /// since the account data will need to be zeroed out as well; otherwise the lenght,
-    /// lamports and owner can be set again before the data is wiped out from
-    /// the ledger using the keypair of the account being closed.
+    /// Note: This does not zeroes the account data. The account data will be zeroed by
+    /// the runtime at the end of the instruction where the account was closed or at the
+    /// next CPI call.
     ///
     /// # Important
     ///
