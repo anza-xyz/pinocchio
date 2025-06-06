@@ -13,8 +13,8 @@ mod syscalls {
 #[cfg(all(target_os = "solana", target_feature = "static-syscalls"))]
 mod syscalls {
     // Syscalls provided by the SVM runtime (SBPFv3 and newer).
-    unsafe extern "C" fn sol_log_(message: *const u8, length: u64) {
-        let syscall: extern "C" fn(*const u8, u64) = core::mem::transmute(544561597u64); // murmur32 hash of "sol_log_"
+    pub(crate) fn sol_log_(message: *const u8, length: u64) {
+        let syscall: extern "C" fn(*const u8, u64) = unsafe{ core::mem::transmute(544561597u64) }; // murmur32 hash of "sol_log_"
         syscall(message, length)
     }
 
