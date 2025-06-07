@@ -1,4 +1,5 @@
 //! Data structures to represent account information.
+
 use core::{
     marker::PhantomData,
     mem::ManuallyDrop,
@@ -80,18 +81,13 @@ pub(crate) struct Account {
     /// Indicates whether this account represents a program.
     executable: u8,
 
-    /// Account's original data length when it was serialized for the
-    /// current program invocation.
+    /// Difference between the original data length and the current
+    /// data length.
     ///
-    /// The value of this field is lazily initialized to the current data length
-    /// and the [`SET_LEN_MASK`] flag on first access. When reading this field,
-    /// the flag is cleared to retrieve the original data length by using the
-    /// [`GET_LEN_MASK`] mask.
-    ///
-    /// Currently, this value is only used for `realloc` to determine if the
-    /// account data length has changed from the original serialized length beyond
-    /// the maximum permitted data increase.
-    original_data_len: u32,
+    /// This is used to track the original data length of the account
+    /// when the account is resized. The runtime guarantees that this
+    /// value is zero at the start of the instruction.
+    resize_delta: i32,
 
     /// Public key of the account.
     key: Pubkey,
@@ -105,20 +101,6 @@ pub(crate) struct Account {
     /// Length of the data. Modifiable by programs.
     pub(crate) data_len: u64,
 }
-
-/// Mask to indicate the original data length has been set.
-///
-/// This takes advantage of the fact that the original data length will not
-/// be greater than 10_000_000 bytes, so we can use the most significant bit
-/// as a flag to indicate that the original data length has been set and lazily
-/// initialize its value.
-const SET_LEN_MASK: u32 = 1 << 31;
-
-/// Mask to retrieve the original data length.
-///
-/// This mask is used to retrieve the original data length from the `original_data_len`
-/// by clearing the flag that indicates the original data length has been set.
-const GET_LEN_MASK: u32 = !SET_LEN_MASK;
 
 /// Wrapper struct for an `Account`.
 ///
@@ -176,6 +158,16 @@ impl AccountInfo {
     #[inline(always)]
     pub fn data_len(&self) -> usize {
         unsafe { (*self.raw).data_len as usize }
+    }
+
+    /// Returns the delta between the original data length and the current
+    /// data length.
+    ///
+    /// This value will be different than zero if the account has been resized
+    /// during the current instruction.
+    #[inline(always)]
+    pub fn resize_delta(&self) -> i32 {
+        unsafe { (*self.raw).resize_delta }
     }
 
     /// Returns the lamports in the account.
@@ -461,8 +453,8 @@ impl AccountInfo {
     /// Realloc the account's data and optionally zero-initialize the new
     /// memory.
     ///
-    /// Note:  Account data can be increased within a single call by up to
-    /// [`MAX_PERMITTED_DATA_INCREASE`] bytes.
+    /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
+    /// within an instruction.
     ///
     /// Note: Memory used to grow is already zero-initialized upon program
     /// entrypoint and re-zeroing it wastes compute units.  If within the same
@@ -478,56 +470,47 @@ impl AccountInfo {
     /// in the `process_instruction` entrypoint of a program.
     #[deprecated(since = "0.9.0", note = "Use AccountInfo::resize() instead")]
     pub fn realloc(&self, new_len: usize, zero_init: bool) -> Result<(), ProgramError> {
-        let mut data = self.try_borrow_mut_data()?;
-        let current_len = data.len();
+        // Check wheather the account data is already borrowed.
+        self.can_borrow_mut_data()?;
 
-        // return early if length hasn't changed
+        // Account length is always `< i32::MAX`...
+        let current_len = self.data_len() as i32;
+        // ...so the new length must fit in an `i32`.
+        let new_len = i32::try_from(new_len).map_err(|_| ProgramError::InvalidRealloc)?;
+
+        // Return early if length hasn't changed.
         if new_len == current_len {
             return Ok(());
         }
 
-        let original_len = {
-            let length = unsafe { (*self.raw).original_data_len };
+        let difference = new_len - current_len;
+        let accumulated_resize_delta = self.resize_delta() + difference;
 
-            if length & SET_LEN_MASK == SET_LEN_MASK {
-                (length & GET_LEN_MASK) as usize
-            } else {
-                // lazily initialize the original data length and sets the flag
-                unsafe {
-                    (*self.raw).original_data_len = (current_len as u32) | SET_LEN_MASK;
-                }
-                current_len
-            }
-        };
-
-        // return early if the length increase from the original serialized data
+        // Return an error when the length increase from the original serialized data
         // length is too large and would result in an out of bounds allocation
-        if new_len.saturating_sub(original_len) > MAX_PERMITTED_DATA_INCREASE {
+        if accumulated_resize_delta > MAX_PERMITTED_DATA_INCREASE as i32 {
             return Err(ProgramError::InvalidRealloc);
         }
 
-        // realloc
         unsafe {
-            let data_ptr = data.as_mut_ptr();
-            // set new length in the serialized data
             (*self.raw).data_len = new_len as u64;
-            // recreate the local slice with the new length
-            data.value = NonNull::from(from_raw_parts_mut(data_ptr, new_len));
+            (*self.raw).resize_delta = accumulated_resize_delta;
         }
 
-        if zero_init {
-            let len_increase = new_len.saturating_sub(current_len);
-            if len_increase > 0 {
-                unsafe {
-                    #[cfg(target_os = "solana")]
-                    sol_memset_(
-                        &mut data[current_len..] as *mut _ as *mut u8,
-                        0,
-                        len_increase as u64,
-                    );
-                    #[cfg(not(target_os = "solana"))]
-                    core::ptr::write_bytes(data.as_mut_ptr().add(current_len), 0, len_increase);
-                }
+        if zero_init && difference > 0 {
+            unsafe {
+                #[cfg(target_os = "solana")]
+                sol_memset_(
+                    self.data_ptr().add(current_len as usize),
+                    0,
+                    difference as u64,
+                );
+                #[cfg(not(target_os = "solana"))]
+                core::ptr::write_bytes(
+                    self.data_ptr().add(current_len as usize),
+                    0,
+                    difference as usize,
+                );
             }
         }
 
@@ -1028,5 +1011,64 @@ mod tests {
 
         let borrow_state = unsafe { (*account_info.raw).borrow_state };
         assert!(borrow_state == NOT_BORROWED);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_realloc() {
+        let mut account_data = [0u8; 1000];
+        let alignment_offset = account_data.as_ptr() as usize % 8;
+        let account_slice = &mut account_data[alignment_offset..];
+        // Ensure the account data is aligned to 8 bytes as expected by the
+        // Account struct.
+        assert_eq!(account_slice.as_ptr() as usize % 8, 0);
+
+        // Set the initial data length to 100.
+        account_slice[80..88].copy_from_slice(&100u64.to_le_bytes());
+
+        let account = AccountInfo {
+            raw: account_slice as *const _ as *mut Account,
+        };
+
+        assert_eq!(account.data_len(), 100);
+        assert_eq!(account.resize_delta(), 0);
+
+        // increase the size.
+
+        account.realloc(200, false).unwrap();
+
+        assert_eq!(account.data_len(), 200);
+        assert_eq!(account.resize_delta(), 100);
+
+        // decrease the size.
+
+        account.realloc(0, false).unwrap();
+
+        assert_eq!(account.data_len(), 0);
+        assert_eq!(account.resize_delta(), -100);
+
+        // Invalid reallocation.
+
+        let invalid_realloc = account.realloc(10_000_000_001, false);
+        assert!(invalid_realloc.is_err());
+
+        // Reset to its original size.
+
+        account.realloc(100, false).unwrap();
+
+        assert_eq!(account.data_len(), 100);
+        assert_eq!(account.resize_delta(), 0);
+
+        // Consecutive reallocations.
+
+        account.realloc(200, false).unwrap();
+        account.realloc(50, false).unwrap();
+        account.realloc(500, false).unwrap();
+
+        assert_eq!(account.data_len(), 500);
+        assert_eq!(account.resize_delta(), 400);
+
+        let data = account.try_borrow_data().unwrap();
+        assert_eq!(data.len(), 500);
     }
 }
