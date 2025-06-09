@@ -294,13 +294,15 @@ pub fn compute_fn(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let block = &input.block;
 
     input.block = syn::parse_quote!({
-        ::pinocchio::msg!(concat!(stringify!(#fn_name), " {{"));
-        ::pinocchio::log::sol_log_compute_units();
+        let cu_before =  ::pinocchio::log::sol_remaining_compute_units();
 
         let __result = (|| #block)();
 
-        ::pinocchio::log::sol_log_compute_units();
-        ::pinocchio::msg!(concat!("}} // ", stringify!(#fn_name)));
+        let cu_after =  ::pinocchio::log::sol_remaining_compute_units();
+        let empty_log_cost = 102;
+        let diff = cu_before - cu_after - empty_log_cost;
+
+        ::pinocchio_log::log!( "Function {} consumed {} compute units", stringify!(#fn_name), diff);
 
         __result
     });
