@@ -242,51 +242,32 @@ pub fn log(input: TokenStream) -> TokenStream {
 /// that print the function name and the number of compute units used before and after
 /// the function execution.
 ///
-/// # Usage
+/// # Effects
+///
+/// - Adds a log message with the function name at the end of execution with amount of CU consumed.
+///
+/// # Note
+///
+/// This macro consumes an additional compute units per call due to the logging operations.
+///
+///  # Example
 ///
 /// ```rust,ignore
-/// #[compute_fn]
+/// #[pinocchio_log::compute_fn]
 /// fn my_function() {
 ///     // Function body
 /// }
 /// ```
+/// 
+/// logging output will look like:
+/// 
+/// "Program log: Function my_function consumed 36 compute units"
+/// 
+/// # References
 ///
-/// # Effects
+/// * [Logging syscall](https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/programs/bpf_loader/src/syscalls/logging.rs#L70)
+/// * [Compute budget](https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/program-runtime/src/compute_budget.rs#L150)
 ///
-/// - Adds a log message with the function name at the start of execution.
-/// - Logs the number of compute units before and after the function execution.
-/// - Adds a closing log message with the function name at the end of execution.
-///
-/// # Note on Compute Units Used by `compute_fn!`
-///
-/// ## Testing Results (as of 2024-09-01)
-///
-///  TOTAL COST OF LOGGING: 445 - 36 = 409
-///  EXTRA COST INSIDE THE FUNCTION: 101
-///
-///  EMPTY_WITH_LOG where nothing happens inside the log.
-///  TOTAL COMPUTE UNITS USED: 445
-///  INNER LOG COST: 101
-///
-///  "Program EMPTY_WITH_LOG invoke [1]",
-///  "Program log: Program log: process_instruction {{",
-///  "Program consumption: 199762 units remaining",
-///  "Program consumption: 199661 units remaining", // 199762 - 199661 = 101
-///  "Program log: Program log: }} // process_instruction",
-///  "Program EMPTY_WITH_LOG consumed 445 of 200000 compute units",
-///  "Program EMPTY_WITH_LOG success"
-///
-///  EMPTY where nothing happens at all.
-///  TOTAL COMPUTE UNITS USED: 36
-///  
-///  "Program EMPTY invoke [1]",
-///  "Program EMPTY consumed 36 of 200000 compute units",
-///  "Program EMPTY success"
-///  
-///  Total extra compute units used per `compute_fn!` call: 409 CU
-///  For more details, see:
-///  - https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/programs/bpf_loader/src/syscalls/logging.rs#L70
-///  - https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/program-runtime/src/compute_budget.rs#L150
 #[proc_macro_attribute]
 pub fn compute_fn(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as ItemFn);
@@ -299,10 +280,11 @@ pub fn compute_fn(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let __result = (|| #block)();
 
         let cu_after =  ::pinocchio::log::sol_remaining_compute_units();
-        let empty_log_cost = 102;
-        let diff = cu_before - cu_after - empty_log_cost;
+        let introspection_cost = 102; // 100 - compute budget syscall_base_cost,  2 - extra calculations
 
-        ::pinocchio_log::log!( "Function {} consumed {} compute units", stringify!(#fn_name), diff);
+        let consumed = cu_before - cu_after - introspection_cost;
+
+        ::pinocchio_log::log!("Function {} consumed {} compute units", stringify!(#fn_name), consumed);
 
         __result
     });
