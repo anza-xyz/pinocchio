@@ -258,11 +258,11 @@ pub fn log(input: TokenStream) -> TokenStream {
 ///     // Function body
 /// }
 /// ```
-/// 
+///
 /// logging output will look like:
-/// 
+///
 /// "Program log: Function my_function consumed 36 compute units"
-/// 
+///
 /// # References
 ///
 /// * [Logging syscall](https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/programs/bpf_loader/src/syscalls/logging.rs#L70)
