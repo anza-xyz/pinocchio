@@ -165,13 +165,3 @@ pub fn sol_log_compute_units() {
         crate::syscalls::sol_log_compute_units_();
     }
 }
-#[inline]
-pub fn sol_remaining_compute_units() -> u64 {
-    #[cfg(target_os = "solana")]
-    unsafe {
-        crate::syscalls::sol_remaining_compute_units()
-    }
-
-    #[cfg(not(target_os = "solana"))]
-    core::hint::black_box(0u64)
-}

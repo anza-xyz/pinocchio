@@ -253,7 +253,7 @@ pub fn log(input: TokenStream) -> TokenStream {
 ///  # Example
 ///
 /// ```rust,ignore
-/// #[pinocchio_log::compute_fn]
+/// #[pinocchio_log::log_cu_usage]
 /// fn my_function() {
 ///     // Function body
 /// }
@@ -269,17 +269,17 @@ pub fn log(input: TokenStream) -> TokenStream {
 /// * [Compute budget](https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/program-runtime/src/compute_budget.rs#L150)
 ///
 #[proc_macro_attribute]
-pub fn compute_fn(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn log_cu_usage(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as ItemFn);
     let fn_name = &input.sig.ident;
     let block = &input.block;
 
     input.block = syn::parse_quote!({
-        let cu_before =  ::pinocchio::log::sol_remaining_compute_units();
+        let cu_before = unsafe { ::pinocchio_log::logger::remaining_compute_units() };
 
         let __result = (|| #block)();
 
-        let cu_after =  ::pinocchio::log::sol_remaining_compute_units();
+        let cu_after = unsafe { ::pinocchio_log::logger::remaining_compute_units() };
         let introspection_cost = 102; // 100 - compute budget syscall_base_cost,  2 - extra calculations
 
         let consumed = cu_before - cu_after - introspection_cost;

@@ -7,6 +7,8 @@ mod syscalls {
         pub fn sol_log_(message: *const u8, len: u64);
 
         pub fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64);
+
+        pub fn sol_remaining_compute_units() -> u64;
     }
 }
 
@@ -22,6 +24,11 @@ mod syscalls {
         let syscall: extern "C" fn(*mut u8, *const u8, u64) =
             unsafe { core::mem::transmute(1904002211u64) }; // murmur32 hash of "sol_memcpy_"
         syscall(dest, src, n)
+    }
+
+    pub(crate) fn sol_remaining_compute_units() -> u64 {
+        let syscall: extern "C" fn() -> u64 = unsafe { core::mem::transmute(3991886574u64) }; // murmur32 hash of "sol_remaining_compute_units"
+        syscall()
     }
 }
 
@@ -145,6 +152,19 @@ pub fn log_message(message: &[u8]) {
         let message = core::str::from_utf8(message).unwrap();
         std::println!("{}", message);
     }
+}
+
+/// Remaining CUs.
+#[inline(always)]
+pub fn remaining_compute_units() -> u64 {
+    #[cfg(target_os = "solana")]
+    // SAFETY: the message is always a valid pointer to a slice of bytes
+    // and `sol_remaining_compute_units` is a syscall.
+    unsafe {
+        syscalls::sol_remaining_compute_units()
+    }
+    #[cfg(not(target_os = "solana"))]
+    core::hint::black_box(0u64)
 }
 
 /// Formatting arguments.
