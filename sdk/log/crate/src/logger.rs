@@ -158,8 +158,7 @@ pub fn log_message(message: &[u8]) {
 #[inline(always)]
 pub fn remaining_compute_units() -> u64 {
     #[cfg(target_os = "solana")]
-    // SAFETY: the message is always a valid pointer to a slice of bytes
-    // and `sol_remaining_compute_units` is a syscall.
+    // SAFETY: `sol_remaining_compute_units` is a syscall that returns the remaining compute units.
     unsafe {
         syscalls::sol_remaining_compute_units()
     }
