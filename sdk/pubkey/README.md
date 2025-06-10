@@ -48,8 +48,7 @@ pinocchio_pubkey::declare_id!("Ping111111111111111111111111111111111111111");
 
 3) Creating a `Pubkey` from a `&str`:
 ```rust
-let address = String::from("7qtAvP4CJuSKauWHtHZJt9wmQRgvcFeUcU3xKrFzxKf1");
-let owner = pinocchio_pubkey::from_str(&address);
+const OWNER: pinocchio::pubkey::Pubkey = pinocchio_pubkey::from_str("7qtAvP4CJuSKauWHtHZJt9wmQRgvcFeUcU3xKrFzxKf1");
 ```
 
 ## License
