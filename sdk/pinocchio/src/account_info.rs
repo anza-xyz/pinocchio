@@ -15,6 +15,21 @@ use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
 /// single top-level instruction.
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
+/// Represents masks for borrow state of an account.
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum BorrowState {
+    /// Mask to check whether an account is already borrowed.
+    ///
+    /// This will test both data and lamports borrow state.
+    Borrowed = 0b_1111_1111,
+
+    /// Mask to check whether an account is already mutably borrowed.
+    ///
+    /// This will test both data and lamports mutable borrow state.
+    MutablyBorrowed = 0b_1000_1000,
+}
+
 /// Raw account data.
 ///
 /// This data is wrapped in an `AccountInfo` struct, which provides safe access
@@ -172,6 +187,15 @@ impl AccountInfo {
         core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Pubkey, *new_owner);
     }
 
+    /// Return true if the account borrow state is set to the given state.
+    ///
+    /// This will test both data and lamports borrow state.
+    #[inline(always)]
+    pub fn is_borrowed(&self, state: BorrowState) -> bool {
+        let borrow_state = unsafe { (*self.raw).borrow_state };
+        borrow_state & (state as u8) != 0
+    }
+
     /// Returns a read-only reference to the lamports in the account.
     ///
     /// # Safety
@@ -222,7 +246,7 @@ impl AccountInfo {
     /// field is already mutable borrowed or if 7 borrows already exist.
     pub fn try_borrow_lamports(&self) -> Result<Ref<u64>, ProgramError> {
         // check if the account lamports are already borrowed
-        self.check_borrow_lamports()?;
+        self.can_borrow_lamports()?;
 
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
         // increment the immutable borrow count
@@ -241,7 +265,7 @@ impl AccountInfo {
     /// is already borrowed in any form.
     pub fn try_borrow_mut_lamports(&self) -> Result<RefMut<u64>, ProgramError> {
         // check if the account lamports are already borrowed
-        self.check_borrow_mut_lamports()?;
+        self.can_borrow_mut_lamports()?;
 
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
         // set the mutable lamport borrow flag
@@ -258,8 +282,16 @@ impl AccountInfo {
 
     /// Checks if it is possible to get a read-only reference to the lamport field,
     /// failing if the field is already mutable borrowed or if 7 borrows already exist.
+    #[deprecated(since = "0.8.4", note = "Use `can_borrow_lamports` instead")]
     #[inline(always)]
     pub fn check_borrow_lamports(&self) -> Result<(), ProgramError> {
+        self.can_borrow_lamports()
+    }
+
+    /// Checks if it is possible to get a read-only reference to the lamport field,
+    /// failing if the field is already mutable borrowed or if 7 borrows already exist.
+    #[inline(always)]
+    pub fn can_borrow_lamports(&self) -> Result<(), ProgramError> {
         let borrow_state = unsafe { (*self.raw).borrow_state };
 
         // check if mutable borrow is already taken
@@ -277,8 +309,16 @@ impl AccountInfo {
 
     /// Checks if it is possible to get a mutable reference to the lamport field,
     /// failing if the field is already borrowed in any form.
+    #[deprecated(since = "0.8.4", note = "Use `can_borrow_mut_lamports` instead")]
     #[inline(always)]
     pub fn check_borrow_mut_lamports(&self) -> Result<(), ProgramError> {
+        self.can_borrow_mut_lamports()
+    }
+
+    /// Checks if it is possible to get a mutable reference to the lamport field,
+    /// failing if the field is already borrowed in any form.
+    #[inline(always)]
+    pub fn can_borrow_mut_lamports(&self) -> Result<(), ProgramError> {
         let borrow_state = unsafe { (*self.raw).borrow_state };
 
         // check if any borrow (mutable or immutable) is already taken for lamports
@@ -293,7 +333,7 @@ impl AccountInfo {
     /// is already mutable borrowed or if 7 borrows already exist.
     pub fn try_borrow_data(&self) -> Result<Ref<[u8]>, ProgramError> {
         // check if the account data is already borrowed
-        self.check_borrow_data()?;
+        self.can_borrow_data()?;
 
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
         // increment the immutable data borrow count
@@ -312,7 +352,7 @@ impl AccountInfo {
     /// is already borrowed in any form.
     pub fn try_borrow_mut_data(&self) -> Result<RefMut<[u8]>, ProgramError> {
         // check if the account data is already borrowed
-        self.check_borrow_mut_data()?;
+        self.can_borrow_mut_data()?;
 
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
         // set the mutable data borrow flag
@@ -329,8 +369,16 @@ impl AccountInfo {
 
     /// Checks if it is possible to get a read-only reference to the data field, failing
     /// if the field is already mutable borrowed or if 7 borrows already exist.
+    #[deprecated(since = "0.8.4", note = "Use `can_borrow_data` instead")]
     #[inline(always)]
     pub fn check_borrow_data(&self) -> Result<(), ProgramError> {
+        self.can_borrow_data()
+    }
+
+    /// Checks if it is possible to get a read-only reference to the data field, failing
+    /// if the field is already mutable borrowed or if 7 borrows already exist.
+    #[inline(always)]
+    pub fn can_borrow_data(&self) -> Result<(), ProgramError> {
         let borrow_state = unsafe { (*self.raw).borrow_state };
 
         // check if mutable data borrow is already taken (most significant bit
@@ -349,8 +397,16 @@ impl AccountInfo {
 
     /// Checks if it is possible to get a mutable reference to the data field, failing
     /// if the field is already borrowed in any form.
+    #[deprecated(since = "0.8.4", note = "Use `can_borrow_mut_data` instead")]
     #[inline(always)]
     pub fn check_borrow_mut_data(&self) -> Result<(), ProgramError> {
+        self.can_borrow_mut_data()
+    }
+
+    /// Checks if it is possible to get a mutable reference to the data field, failing
+    /// if the field is already borrowed in any form.
+    #[inline(always)]
+    pub fn can_borrow_mut_data(&self) -> Result<(), ProgramError> {
         let borrow_state = unsafe { (*self.raw).borrow_state };
 
         // check if any borrow (mutable or immutable) is already taken for data
@@ -439,10 +495,9 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// This doesn't protect against future reinitialization of the account
-    /// since the account data will need to be zeroed out as well; otherwise the lenght,
-    /// lamports and owner can be set again before the data is wiped out from
-    /// the ledger using the keypair of the account being closed.
+    /// Note: This does not zero the account data. The account data will be zeroed by
+    /// the runtime at the end of the instruction where the account was closed or at the
+    /// next CPI call.
     ///
     /// # Important
     ///
@@ -452,8 +507,11 @@ impl AccountInfo {
     pub fn close(&self) -> ProgramResult {
         // make sure the account is not borrowed since we are about to
         // resize the data to zero
-        self.check_borrow_mut_data()?;
+        if self.is_borrowed(BorrowState::Borrowed) {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
 
+        // SAFETY: The are no active borrows on the account data or lamports.
         unsafe {
             self.close_unchecked();
         }
@@ -464,10 +522,9 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// This doesn't protect against future reinitialization of the account
-    /// since the account data will need to be zeroed out as well; otherwise the lenght,
-    /// lamports and owner can be set again before the data is wiped out from
-    /// the ledger using the keypair of the account being closed.
+    /// Note: This does not zero the account data. The account data will be zeroed by
+    /// the runtime at the end of the instruction where the account was closed or at the
+    /// next CPI call.
     ///
     /// # Important
     ///
@@ -497,7 +554,7 @@ impl AccountInfo {
 
     /// Returns the memory address of the account data.
     fn data_ptr(&self) -> *mut u8 {
-        unsafe { (self.raw as *const _ as *mut u8).add(core::mem::size_of::<Account>()) }
+        unsafe { (self.raw as *mut u8).add(core::mem::size_of::<Account>()) }
     }
 }
 

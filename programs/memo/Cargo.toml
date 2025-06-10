@@ -6,10 +6,11 @@ edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"
 repository = { workspace = true }
+rust-version = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-pinocchio = { version = "0.8.3", path = "../../sdk/pinocchio" }
+pinocchio = { version = "0.8.4", path = "../../sdk/pinocchio" }
 pinocchio-pubkey = { workspace = true }

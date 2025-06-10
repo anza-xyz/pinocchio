@@ -113,8 +113,8 @@
 //! The [`InstructionContext`](entrypoint::InstructionContext) provides on-demand
 //! access to the information of the input:
 //!
-//! * [`available()`](entrypoint::InstructionContext::available): number of available
-//!   accounts.
+//! * [`remaining()`](entrypoint::InstructionContext::remaining): number of available
+//!   accounts to parse; this number is decremented as the program parses accounts.
 //! * [`next_account()`](entrypoint::InstructionContext::next_account): parses the
 //!   next available account (can be used as many times as accounts available).
 //! * [`instruction_data()`](entrypoint::InstructionContext::instruction_data): parses
@@ -176,7 +176,7 @@
 //! ```
 //!
 //! Instead of enabling the `std` feature to be able to format log messages with [`msg!`],
-//! it is recommented to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log)
+//! it is recommended to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log)
 //! crate. This crate provides a lightweight `log!` macro with better compute units
 //! consumption than the standard `format!` macro without requiring the `std` library.
 //!

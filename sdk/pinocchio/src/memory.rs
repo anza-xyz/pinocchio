@@ -41,6 +41,41 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
     core::hint::black_box((dst, src, n));
 }
 
+/// Copies the contents of one value to another.
+///
+/// Equivalent to `dst = src` where `dst` and `src`
+/// are of same type and `impl Copy`.
+///
+/// This helper will be useful to optimize CU if
+/// copied size is > 32 bytes.
+///
+/// For value smaller than 32 bytes, `dst = src`
+/// will be emitted to register assignment. For
+/// values larger than 32 bytes, compiler will
+/// generate excess boilerplate to `sol_memcpy_`.
+/// So if T's size is known to be > 32 bytes,
+/// this helper should be used.
+///
+/// # Arguments
+///
+/// - `dst` - Destination reference to copy to
+/// - `src` - Source reference to copy from
+#[inline]
+pub fn copy_val<T: ?Sized>(dst: &mut T, src: &T) {
+    #[cfg(target_os = "solana")]
+    // SAFETY: dst and src are of same type therefore the size is the same
+    unsafe {
+        syscalls::sol_memcpy_(
+            dst as *mut T as *mut u8,
+            src as *const T as *const u8,
+            core::mem::size_of_val(dst) as u64,
+        );
+    }
+
+    #[cfg(not(target_os = "solana"))]
+    core::hint::black_box((dst, src));
+}
+
 /// Like C `memmove`.
 ///
 /// # Arguments
@@ -61,7 +96,7 @@ pub unsafe fn sol_memcpy(dst: &mut [u8], src: &[u8], n: usize) {
 ///
 /// [`ptr::copy`]: https://doc.rust-lang.org/std/ptr/fn.copy.html
 #[inline]
-pub unsafe fn sol_memmove(dst: *mut u8, src: *mut u8, n: usize) {
+pub unsafe fn sol_memmove(dst: *mut u8, src: *const u8, n: usize) {
     #[cfg(target_os = "solana")]
     syscalls::sol_memmove_(dst, src, n as u64);
 

@@ -132,8 +132,8 @@ pub fn process_instruction(
 
 The `InstructionContext` provides on-demand access to the information of the input:
 
-* `available()`: number of available accounts
-* `next_account()`: parsers the next available account (can be used as many times as accounts available)
+* `remaining()`: number of remaining accounts to be parsed
+* `next_account()`: parsers the next available account (can be used as many times as accounts remaining)
 * `instruction_data()`: parsers the instruction data
 * `program_id()`: parsers the program id
 

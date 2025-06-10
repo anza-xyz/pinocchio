@@ -1,18 +1,32 @@
 use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
-#[cfg(target_os = "solana")]
-// Syscalls provided by the SVM runtime.
-extern "C" {
-    pub fn sol_log_(message: *const u8, len: u64);
+#[cfg(all(target_os = "solana", not(target_feature = "static-syscalls")))]
+mod syscalls {
+    // Syscalls provided by the SVM runtime (SBPFv0, SBPFv1 and SBPFv2).
+    extern "C" {
+        pub fn sol_log_(message: *const u8, len: u64);
 
-    pub fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64);
+        pub fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64);
+    }
+}
+
+#[cfg(all(target_os = "solana", target_feature = "static-syscalls"))]
+mod syscalls {
+    // Syscalls provided by the SVM runtime (SBPFv3 and newer).
+    unsafe extern "C" fn sol_log_(message: *const u8, length: u64) {
+        let syscall: extern "C" fn(*const u8, u64) = core::mem::transmute(544561597u64); // murmur32 hash of "sol_log_"
+        syscall(message, length)
+    }
+
+    pub(crate) fn sol_memcpy_(dest: *mut u8, src: *const u8, n: u64) {
+        let syscall: extern "C" fn(*mut u8, *const u8, u64) =
+            unsafe { core::mem::transmute(1904002211u64) }; // murmur32 hash of "sol_memcpy_"
+        syscall(dest, src, n)
+    }
 }
 
 #[cfg(not(target_os = "solana"))]
 extern crate std;
-
-/// Byte representation of the digits [0, 9].
-const DIGITS: [u8; 10] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
 
 /// Bytes for a truncated `str` log message.
 const TRUNCATED_SLICE: [u8; 3] = [b'.', b'.', b'.'];
@@ -78,7 +92,7 @@ impl<const BUFFER: usize> Logger<BUFFER> {
         } else {
             self.len += value.write_with_args(&mut self.buffer[self.len..], args);
 
-            if self.len() > BUFFER {
+            if self.len > BUFFER {
                 // Indicates that the buffer is full.
                 self.len = BUFFER;
                 // SAFETY: the buffer length is checked to greater than `BUFFER`.
@@ -124,7 +138,7 @@ pub fn log_message(message: &[u8]) {
     // SAFETY: the message is always a valid pointer to a slice of bytes
     // and `sol_log_` is a syscall.
     unsafe {
-        sol_log_(message.as_ptr(), message.len() as u64);
+        syscalls::sol_log_(message.as_ptr(), message.len() as u64);
     }
     #[cfg(not(target_os = "solana"))]
     {
@@ -192,7 +206,7 @@ macro_rules! impl_log_for_unsigned_integer {
                     0 => {
                         // SAFETY: the buffer is checked to be non-empty.
                         unsafe {
-                            buffer.get_unchecked_mut(0).write(*DIGITS.get_unchecked(0));
+                            buffer.get_unchecked_mut(0).write(b'0');
                         }
                         1
                     }
@@ -206,12 +220,12 @@ macro_rules! impl_log_for_unsigned_integer {
                             offset -= 1;
                             // SAFETY: the offset is always within the bounds of the array since
                             // the `offset` is initialized with the maximum number of digits that
-                            // the type can have and decremented on each iteration. The `digits`
-                            // array is also initialized with the same length as the offset.
+                            // the type can have and decremented on each iteration; `remainder`
+                            // is always less than 10.
                             unsafe {
                                 digits
                                     .get_unchecked_mut(offset)
-                                    .write(*DIGITS.get_unchecked(remainder as usize));
+                                    .write(b'0' + remainder as u8);
                             }
                         }
 
@@ -233,12 +247,9 @@ macro_rules! impl_log_for_unsigned_integer {
                                 offset -= 1;
                                 // SAFETY: the offset is always within the bounds of the array since
                                 // the `offset` is initialized with the maximum number of digits that
-                                // the type can have and decremented on each iteration. The `digits`
-                                // array is also initialized with the same length as the offset.
+                                // the type can have and decremented on each iteration.
                                 unsafe {
-                                    digits
-                                        .get_unchecked_mut(offset)
-                                        .write(*DIGITS.get_unchecked(0));
+                                    digits.get_unchecked_mut(offset).write(b'0');
                                 }
                             }
                             // Space for the decimal point.
@@ -264,11 +275,15 @@ macro_rules! impl_log_for_unsigned_integer {
                             #[cfg(target_os = "solana")]
                             {
                                 if precision == 0 {
-                                    sol_memcpy_(ptr as *mut _, source as *const _, written as u64);
+                                    syscalls::sol_memcpy_(
+                                        ptr as *mut _,
+                                        source as *const _,
+                                        written as u64,
+                                    );
                                 } else {
                                     // Integer part of the number.
                                     let integer_part = written - (fraction + 1);
-                                    sol_memcpy_(
+                                    syscalls::sol_memcpy_(
                                         ptr as *mut _,
                                         source as *const _,
                                         integer_part as u64,
@@ -278,7 +293,7 @@ macro_rules! impl_log_for_unsigned_integer {
                                     (ptr.add(integer_part) as *mut u8).write(b'.');
 
                                     // Fractional part of the number.
-                                    sol_memcpy_(
+                                    syscalls::sol_memcpy_(
                                         ptr.add(integer_part + 1) as *mut _,
                                         source.add(integer_part) as *const _,
                                         fraction as u64,
@@ -351,7 +366,7 @@ macro_rules! impl_log_for_signed {
                     0 => {
                         // SAFETY: the buffer is checked to be non-empty.
                         unsafe {
-                            buffer.get_unchecked_mut(0).write(*DIGITS.get_unchecked(0));
+                            buffer.get_unchecked_mut(0).write(b'0');
                         }
                         1
                     }
@@ -625,3 +640,18 @@ macro_rules! impl_log_for_slice {
 // Supported slice types.
 impl_log_for_slice!([T]);
 impl_log_for_slice!([T; N]);
+
+/// Implement the log trait for the bool type.
+impl Log for bool {
+    #[inline]
+    fn debug_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
+        let value = if *self { "true" } else { "false" };
+        value.debug_with_args(buffer, args)
+    }
+
+    #[inline]
+    fn write_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
+        let value = if *self { "true" } else { "false" };
+        value.write_with_args(buffer, args)
+    }
+}

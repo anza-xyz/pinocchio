@@ -30,10 +30,16 @@ pub type ProgramResult = super::ProgramResult;
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = super::SUCCESS;
 
+/// The "static" size of an account in the input buffer.
+///
+/// This is the size of the account header plus the maximum permitted data increase.
+const STATIC_ACCOUNT_DATA: usize = core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+
 /// Declare the program entrypoint and set up global handlers.
 ///
-/// The main difference from the standard `entrypoint!` macro is that this macro represents an
-/// entrypoint that does not perform allocations or copies when reading the input buffer.
+/// The main difference from the standard (SDK) [`entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html)
+/// macro is that this macro represents an entrypoint that does not perform allocations or copies
+/// when reading the input buffer.
 ///
 /// This macro emits the common boilerplate necessary to begin program execution, calling a
 /// provided function to process the program instruction supplied by the runtime, and reporting
@@ -57,7 +63,9 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// be ignored. When the maximum is not specified, the default is `64`. This is currently the [maximum
 /// number of accounts] that a transaction may lock in a block.
 ///
+/// [global allocator]: https://doc.rust-lang.org/stable/alloc/alloc/trait.GlobalAlloc.html
 /// [maximum number of accounts]: https://github.com/anza-xyz/agave/blob/ccabfcf84921977202fd06d3197cbcea83742133/runtime/src/bank.rs#L3207-L3219
+/// [panic handler]: https://doc.rust-lang.org/stable/core/panic/trait.PanicHandler.html
 ///
 /// # Examples
 ///
@@ -89,6 +97,19 @@ pub const SUCCESS: u64 = super::SUCCESS;
 ///
 /// }
 /// ```
+///
+/// # Important
+///
+/// The panic handler set up is different depending on whether the `std` library is available to the
+/// linker or not. The `entrypoint` macro will set up a default
+/// panic "hook", that works with the `#[panic_handler]` set by the `std`. Therefore, this macro
+/// should be used when the program or any of its dependencies are dependent on the `std` library.
+///
+/// When the program and all its dependencies are `no_std`, it is necessary to set a
+/// `#[panic_handler]` to handle panics. This is done by the [`crate::nostd_panic_handler`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
+/// macro. In this case, it is not possible to use the `entrypoint`
+/// macro. Use the [`crate::program_entrypoint!`] macro instead and set up the allocator and panic
+/// handler manually.
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:ident ) => {
@@ -103,9 +124,9 @@ macro_rules! entrypoint {
 
 /// Declare the program entrypoint.
 ///
-/// This macro is similar to the `entrypoint!` macro, but it does not set up a global allocator
-/// nor a panic handler. This is useful when the program will set up its own allocator and panic
-/// handler.
+/// This macro is similar to the [`crate::entrypoint!`] macro, but it does
+/// not set up a global allocator nor a panic handler. This is useful when the program will set up
+/// its own allocator and panic handler.
 #[macro_export]
 macro_rules! program_entrypoint {
     ( $process_instruction:ident ) => {
@@ -144,37 +165,37 @@ macro_rules! program_entrypoint {
 #[allow(clippy::cast_ptr_alignment, clippy::missing_safety_doc)]
 #[inline(always)]
 pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
-    input: *mut u8,
+    mut input: *mut u8,
     accounts: &mut [core::mem::MaybeUninit<AccountInfo>],
 ) -> (&'a Pubkey, usize, &'a [u8]) {
-    let mut offset: usize = 0;
-
     // total number of accounts present; it only process up to MAX_ACCOUNTS
-    let total_accounts = *(input.add(offset) as *const u64) as usize;
-    offset += core::mem::size_of::<u64>();
+    let mut processed = *(input as *const u64) as usize;
+    input = input.add(core::mem::size_of::<u64>());
 
-    let processed = if total_accounts > 0 {
+    if processed > 0 {
+        let total_accounts = processed;
         // number of accounts to process (limited to MAX_ACCOUNTS)
-        let processed = core::cmp::min(total_accounts, MAX_ACCOUNTS);
+        processed = core::cmp::min(total_accounts, MAX_ACCOUNTS);
 
         for i in 0..processed {
-            let account_info: *mut Account = input.add(offset) as *mut _;
+            let account_info: *mut Account = input as *mut Account;
+            // Adds an 8-bytes offset for:
+            //   - rent epoch in case of a non-duplicated account
+            //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+            input = input.add(core::mem::size_of::<u64>());
 
             if (*account_info).borrow_state == NON_DUP_MARKER {
-                // repurpose the borrow state to track borrows
+                // Unique account: repurpose the borrow state to track borrows.
                 (*account_info).borrow_state = 0b_0000_0000;
 
-                offset += core::mem::size_of::<Account>();
-                offset += (*account_info).data_len as usize;
-                offset += MAX_PERMITTED_DATA_INCREASE;
-                offset += (offset as *const u8).align_offset(BPF_ALIGN_OF_U128);
-                offset += core::mem::size_of::<u64>();
+                input = input.add(STATIC_ACCOUNT_DATA);
+                input = input.add((*account_info).data_len as usize);
+                input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
 
                 accounts[i].write(AccountInfo { raw: account_info });
             } else {
-                offset += core::mem::size_of::<u64>();
-                // duplicated account – clone the original pointer using `borrow_state` since it represents the
-                // index of the duplicated account passed by the runtime.
+                // Duplicated account: clone the original pointer using `borrow_state` since it represents
+                // the index of the duplicated account passed by the runtime.
                 accounts[i].write(
                     accounts
                         .get_unchecked((*account_info).borrow_state as usize)
@@ -184,38 +205,33 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
             }
         }
 
-        // process any remaining accounts to move the offset to the instruction
+        // Process any remaining accounts to move the offset to the instruction
         // data (there is a duplication of logic but we avoid testing whether we
-        // have space for the account or not)
+        // have space for the account or not).
         for _ in processed..total_accounts {
-            let account_info: *mut Account = input.add(offset) as *mut _;
+            let account_info: *mut Account = input as *mut Account;
+            // Adds an 8-bytes offset for:
+            //   - rent epoch in case of a non-duplicate account
+            //   - duplicate marker + 7 bytes of padding in case of a duplicate account
+            input = input.add(core::mem::size_of::<u64>());
 
             if (*account_info).borrow_state == NON_DUP_MARKER {
-                offset += core::mem::size_of::<Account>();
-                offset += (*account_info).data_len as usize;
-                offset += MAX_PERMITTED_DATA_INCREASE;
-                offset += (offset as *const u8).align_offset(BPF_ALIGN_OF_U128);
-                offset += core::mem::size_of::<u64>();
-            } else {
-                offset += core::mem::size_of::<u64>();
+                input = input.add(STATIC_ACCOUNT_DATA);
+                input = input.add((*account_info).data_len as usize);
+                input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
             }
         }
-
-        processed
-    } else {
-        // no accounts to process
-        0
-    };
+    }
 
     // instruction data
-    let instruction_data_len = *(input.add(offset) as *const u64) as usize;
-    offset += core::mem::size_of::<u64>();
+    let instruction_data_len = *(input as *const u64) as usize;
+    input = input.add(core::mem::size_of::<u64>());
 
-    let instruction_data = { core::slice::from_raw_parts(input.add(offset), instruction_data_len) };
-    offset += instruction_data_len;
+    let instruction_data = { core::slice::from_raw_parts(input, instruction_data_len) };
+    input = input.add(instruction_data_len);
 
     // program id
-    let program_id: &Pubkey = &*(input.add(offset) as *const Pubkey);
+    let program_id: &Pubkey = &*(input as *const Pubkey);
 
     (program_id, processed, instruction_data)
 }
@@ -223,8 +239,8 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
 /// Default panic hook.
 ///
 /// This macro sets up a default panic hook that logs the panic message and the file where the
-/// panic occurred. Syscall "abort()" will be called after it returns. It acts as a hook after
-/// rust runtime panics.
+/// panic occurred. It acts as a hook after Rust runtime panics; syscall `abort()` will be called
+/// after it returns.
 ///
 /// Note that this requires the `"std"` feature to be enabled.
 #[cfg(feature = "std")]
@@ -243,9 +259,11 @@ macro_rules! default_panic_handler {
 
 /// Default panic hook.
 ///
-/// This macro sets up a default panic hook that logs the file where the panic occurred.
+/// This macro sets up a default panic hook that logs the file where the panic occurred. It acts
+/// as a hook after Rust runtime panics; syscall `abort()` will be called after it returns.
 ///
-/// This is used when the `"std"` feature is disabled.
+/// This is used when the `"std"` feature is disabled, while either the program or any of its
+/// dependencies are not `no_std`.
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! default_panic_handler {
@@ -264,6 +282,9 @@ macro_rules! default_panic_handler {
 }
 
 /// A global `#[panic_handler]` for `no_std` programs.
+///
+/// This macro sets up a default panic handler that logs the location (file, line and column)
+/// where the panic occurred and then calls the syscall `abort()`.
 ///
 /// This macro can only be used when all crates are `no_std` and the `"std"` feature is
 /// disabled.
@@ -292,14 +313,13 @@ macro_rules! nostd_panic_handler {
             }
         }
 
-        // A placeholder for `cargo clippy`.
-        //
-        // Add `panic = "abort"` to `[profile.dev]` in `Cargo.toml` for clippy.
+        /// A panic handler for when the program is compiled on a target different than
+        /// `"solana"`.
+        ///
+        /// This links the `std` library, which will set up a default panic handler.
         #[cfg(not(target_os = "solana"))]
-        #[no_mangle]
-        #[panic_handler]
-        fn handler(_info: &core::panic::PanicInfo<'_>) -> ! {
-            unsafe { core::hint::unreachable_unchecked() }
+        mod __private_panic_handler {
+            extern crate std as __std;
         }
     };
 }
@@ -317,10 +337,14 @@ macro_rules! default_allocator {
             len: $crate::entrypoint::HEAP_LENGTH,
         };
 
-        // A placeholder for `cargo clippy`.
-        #[cfg(not(any(target_os = "solana", test)))]
-        #[global_allocator]
-        static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
+        /// A default allocator for when the program is compiled on a target different than
+        /// `"solana"`.
+        ///
+        /// This links the `std` library, which will set up a default global allocator.
+        #[cfg(not(target_os = "solana"))]
+        mod __private_alloc {
+            extern crate std as __std;
+        }
     };
 }
 
@@ -335,11 +359,15 @@ macro_rules! no_allocator {
     };
 }
 
-/// A global allocator that does not allocate memory.
+/// A global allocator that does not dynamically allocate memory.
 ///
-/// This macro sets up a global allocator that denies all allocations. This is useful when the
-/// program does not need to allocate memory $mdash; the program will panic if it tries to
-/// allocate memory.
+/// This macro sets up a global allocator that denies all dynamic allocations, while
+/// allowing static ("manual") allocations. This is useful when the program does not need to
+/// dynamically allocate memory and manages their own allocations.
+///
+/// The program will panic if it tries to dynamically allocate memory.
+///
+/// This is used when the `"std"` feature is disabled.
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! no_allocator {
@@ -351,9 +379,6 @@ macro_rules! no_allocator {
         /// Allocates memory for the given type `T` at the specified offset in the
         /// heap reserved address space.
         ///
-        /// This function requires the `#![feature(const_mut_refs)]` crate feature
-        /// to be set.
-        ///
         /// # Safety
         ///
         /// It is the caller's responsibility to ensure that the offset does not
@@ -363,8 +388,17 @@ macro_rules! no_allocator {
         /// For types that cannot hold the bit-pattern `0` as a valid value, use
         /// `core::mem::MaybeUninit<T>` to allocate memory for the type and
         /// initialize it later.
-        #[inline]
-        pub const unsafe fn allocate_unchecked<T: Sized>(offset: usize) -> &'static mut T {
+        //
+        // Make this `const` once `const_mut_refs` is stable for the platform-tools
+        // toolchain Rust version.
+        #[inline(always)]
+        pub unsafe fn allocate_unchecked<T: Sized>(offset: usize) -> &'static mut T {
+            // SAFETY: The pointer is within a valid range and aligned to `T`.
+            unsafe { &mut *(calculate_offset::<T>(offset) as *mut T) }
+        }
+
+        #[inline(always)]
+        const fn calculate_offset<T: Sized>(offset: usize) -> usize {
             let start = $crate::entrypoint::HEAP_START_ADDRESS as usize + offset;
             let end = start + core::mem::size_of::<T>();
 
@@ -381,8 +415,16 @@ macro_rules! no_allocator {
                 "offset is not aligned"
             );
 
-            // SAFETY: The pointer is within a valid range and aligned to `T`.
-            unsafe { &mut *(start as *mut T) }
+            start
+        }
+
+        /// A default allocator for when the program is compiled on a target different than
+        /// `"solana"`.
+        ///
+        /// This links the `std` library, which will set up a default global allocator.
+        #[cfg(not(target_os = "solana"))]
+        mod __private_alloc {
+            extern crate std as __std;
         }
     };
 }
@@ -400,7 +442,7 @@ mod alloc {
     }
 
     /// Integer arithmetic in this global allocator implementation is safe when
-    /// operating on the prescribed `HEAP_START_ADDRESS` and `HEAP_LENGTH`. Any
+    /// operating on the prescribed [`HEAP_START_ADDRESS`] and [`HEAP_LENGTH`]. Any
     /// other use may overflow and is thus unsupported and at one's own risk.
     #[allow(clippy::arithmetic_side_effects)]
     unsafe impl alloc::alloc::GlobalAlloc for BumpAllocator {
@@ -430,7 +472,7 @@ mod alloc {
 }
 
 #[cfg(not(feature = "std"))]
-/// Zero global allocator.
+/// An allocator that does not allocate memory.
 pub struct NoAllocator;
 
 #[cfg(not(feature = "std"))]
