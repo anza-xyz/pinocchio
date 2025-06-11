@@ -37,16 +37,21 @@ pub enum BorrowState {
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Account {
-    /// Borrow state of the account data.
+    /// Borrow state for lamports and account data.
     ///
-    /// 0) We reuse the duplicate flag for this. We set it to 0b0000_0000.
-    /// 1) We use the first four bits to track state of lamport borrow
-    /// 2) We use the second four bits to track state of data borrow
+    /// This reuses the memory reserved for the duplicate flag in the
+    /// account to track lamports and data borrows. It represents the
+    /// numbers of borrows available:
     ///
-    /// 4 bit state: [1 bit mutable borrow flag | u3 immmutable borrow flag]
-    /// This gives us up to 7 immutable borrows. Note that does not mean 7
-    /// duplicate account infos, but rather 7 calls to borrow lamports or
-    /// borrow data across all duplicate account infos.
+    ///   * `1 1 1 1` (first 4 bits): borrows available for lamports,
+    ///     `1` mutable borrow or `111` (7) immutable borrows.
+    ///
+    ///   * `1 1 1 1` (last 4 bits): borrows available for data,
+    ///     `1` mutable borrow or `111` (7) immutable borrows.
+    ///
+    /// Note that this values are shared across `AccountInfo`s over the
+    /// same account, e.g., in case of duplicated accounts, they share
+    /// the same borrow state.
     pub(crate) borrow_state: u8,
 
     /// Indicates whether the transaction was signed by this account.
@@ -252,7 +257,8 @@ impl AccountInfo {
         self.can_borrow_lamports()?;
 
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-        // increment the immutable borrow count
+        // "consumes" one immutable borrow for lamports; we are guaranteed
+        // that there is at least one immutable borrow available
         *borrow_state -= 1 << LAMPORTS_SHIFT;
 
         // return the reference to lamports
@@ -271,7 +277,8 @@ impl AccountInfo {
         self.can_borrow_mut_lamports()?;
 
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-        // set the mutable lamport borrow flag
+        // "consumes" the mutable borrow for lamports; we are guaranteed
+        // that lamports are not already borrowed in any form
         *borrow_state &= 0b_0111_1111;
 
         // return the mutable reference to lamports
@@ -292,7 +299,7 @@ impl AccountInfo {
     }
 
     /// Checks if it is possible to get a read-only reference to the lamport field,
-    /// failing if the field is already mutable borrowed or if 7 borrows already exist.
+    /// failing if the field is already mutable borrowed or if `7` borrows already exist.
     #[inline(always)]
     pub fn can_borrow_lamports(&self) -> Result<(), ProgramError> {
         let borrow_state = unsafe { (*self.raw).borrow_state };
@@ -333,14 +340,14 @@ impl AccountInfo {
     }
 
     /// Tries to get a read-only reference to the data field, failing if the field
-    /// is already mutable borrowed or if 7 borrows already exist.
+    /// is already mutable borrowed or if `7` borrows already exist.
     pub fn try_borrow_data(&self) -> Result<Ref<[u8]>, ProgramError> {
         // check if the account data is already borrowed
         self.can_borrow_data()?;
 
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-        // increment the immutable data borrow count (it is guaranteed that
-        // we have at least one immutable borrow available)
+        // "consumes" one immutable borrow for data; we are guaranteed
+        // that there is at least one immutable borrow available
         *borrow_state -= 1;
 
         // return the reference to data
@@ -359,7 +366,8 @@ impl AccountInfo {
         self.can_borrow_mut_data()?;
 
         let borrow_state = unsafe { &mut (*self.raw).borrow_state };
-        // set the mutable data borrow flag
+        // "consumes" the mutable borrow for account data; we are guaranteed
+        // that account data are not already borrowed in any form
         *borrow_state &= 0b_1111_0111;
 
         // return the mutable reference to data
@@ -386,7 +394,7 @@ impl AccountInfo {
         let borrow_state = unsafe { (*self.raw).borrow_state };
 
         // check if mutable data borrow is already taken (most significant bit
-        // of the data_borrow_state)
+        // of the data borrow state)
         if borrow_state & 0b_0000_1000 == 0 {
             return Err(ProgramError::AccountBorrowFailed);
         }
@@ -734,14 +742,14 @@ impl<T: ?Sized> Drop for RefMut<'_, T> {
 mod tests {
     use core::mem::{size_of, MaybeUninit};
 
-    use crate::NON_DUP_MARKER;
+    use crate::NON_DUP_MARKER as NOT_BORROWED;
 
     use super::*;
 
     #[test]
     fn test_data_ref() {
         let data: [u8; 4] = [0, 1, 2, 3];
-        let mut state = NON_DUP_MARKER - (1 << DATA_SHIFT);
+        let mut state = NOT_BORROWED - (1 << DATA_SHIFT);
 
         let ref_data = Ref {
             value: NonNull::from(&data),
@@ -753,30 +761,30 @@ mod tests {
 
         let new_ref = Ref::map(ref_data, |data| &data[1]);
 
-        assert_eq!(state, NON_DUP_MARKER - (1 << DATA_SHIFT));
+        assert_eq!(state, NOT_BORROWED - (1 << DATA_SHIFT));
         assert_eq!(*new_ref, 1);
 
         let Ok(new_ref) = Ref::filter_map(new_ref, |_| Some(&3)) else {
             unreachable!()
         };
 
-        assert_eq!(state, NON_DUP_MARKER - (1 << DATA_SHIFT));
+        assert_eq!(state, NOT_BORROWED - (1 << DATA_SHIFT));
         assert_eq!(*new_ref, 3);
 
         let new_ref = Ref::filter_map(new_ref, |_| Option::<&u8>::None);
 
-        assert_eq!(state, NON_DUP_MARKER - (1 << DATA_SHIFT));
+        assert_eq!(state, NOT_BORROWED - (1 << DATA_SHIFT));
         assert!(new_ref.is_err());
 
         drop(new_ref);
 
-        assert_eq!(state, NON_DUP_MARKER);
+        assert_eq!(state, NOT_BORROWED);
     }
 
     #[test]
     fn test_lamports_ref() {
         let lamports: u64 = 10000;
-        let mut state = NON_DUP_MARKER - (1 << LAMPORTS_SHIFT);
+        let mut state = NOT_BORROWED - (1 << LAMPORTS_SHIFT);
 
         let ref_lamports = Ref {
             value: NonNull::from(&lamports),
@@ -788,24 +796,24 @@ mod tests {
 
         let new_ref = Ref::map(ref_lamports, |_| &1000);
 
-        assert_eq!(state, NON_DUP_MARKER - (1 << LAMPORTS_SHIFT));
+        assert_eq!(state, NOT_BORROWED - (1 << LAMPORTS_SHIFT));
         assert_eq!(*new_ref, 1000);
 
         let Ok(new_ref) = Ref::filter_map(new_ref, |_| Some(&2000)) else {
             unreachable!()
         };
 
-        assert_eq!(state, NON_DUP_MARKER - (1 << LAMPORTS_SHIFT));
+        assert_eq!(state, NOT_BORROWED - (1 << LAMPORTS_SHIFT));
         assert_eq!(*new_ref, 2000);
 
         let new_ref = Ref::filter_map(new_ref, |_| Option::<&i32>::None);
 
-        assert_eq!(state, NON_DUP_MARKER - (1 << LAMPORTS_SHIFT));
+        assert_eq!(state, NOT_BORROWED - (1 << LAMPORTS_SHIFT));
         assert!(new_ref.is_err());
 
         drop(new_ref);
 
-        assert_eq!(state, NON_DUP_MARKER);
+        assert_eq!(state, NOT_BORROWED);
     }
 
     #[test]
@@ -833,7 +841,7 @@ mod tests {
         drop(new_ref);
 
         assert_eq!(data, [4, 1, 2, 3]);
-        assert_eq!(state, NON_DUP_MARKER);
+        assert_eq!(state, NOT_BORROWED);
     }
 
     #[test]
@@ -860,14 +868,14 @@ mod tests {
         drop(new_ref);
 
         assert_eq!(lamports, 200);
-        assert_eq!(state, NON_DUP_MARKER);
+        assert_eq!(state, NOT_BORROWED);
     }
 
     #[test]
     fn test_borrow_data() {
         let mut data = [0u8; size_of::<Account>()];
         // Set the borrow state.
-        data[0] = NON_DUP_MARKER;
+        data[0] = NOT_BORROWED;
         let account_info = AccountInfo {
             raw: data.as_mut_ptr() as *mut Account,
         };
@@ -923,14 +931,14 @@ mod tests {
         assert!(account_info.can_borrow_data().is_ok());
         assert!(account_info.can_borrow_mut_data().is_ok());
 
-        assert!(data[0] == NON_DUP_MARKER);
+        assert!(data[0] == NOT_BORROWED);
     }
 
     #[test]
     fn test_borrow_lamports() {
         let mut data = [0u8; size_of::<Account>()];
         // Set the borrow state.
-        data[0] = NON_DUP_MARKER;
+        data[0] = NOT_BORROWED;
         let account_info = AccountInfo {
             raw: data.as_mut_ptr() as *mut Account,
         };
@@ -986,6 +994,6 @@ mod tests {
         assert!(account_info.can_borrow_lamports().is_ok());
         assert!(account_info.can_borrow_mut_lamports().is_ok());
 
-        assert!(data[0] == NON_DUP_MARKER);
+        assert!(data[0] == NOT_BORROWED);
     }
 }
