@@ -22,10 +22,13 @@ jobs:
         uses: ./.github/actions/setup
         with:
           cargo-cache-key: cargo-audit
-          components: audit
+          components: audit, miri
 
       - name: cargo-audit
         run: pnpm cargo-audit
+
+      - name: cargo-miri
+        run: pnpm miri
 
       - name: Filter members
         id: filter

@@ -8,6 +8,7 @@
     "format": "tsx ./scripts/format.mts",
     "hack": "tsx ./scripts/hack.mts",
     "lint": "tsx ./scripts/lint.mts",
+    "miri": "tsx ./scripts/miri.mts",
     "semver": "tsx ./scripts/semver.mts",
     "test": "tsx ./scripts/test.mts"
   },
