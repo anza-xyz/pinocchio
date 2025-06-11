@@ -246,7 +246,7 @@ pub use entrypoint::lazy as lazy_entrypoint;
 /// This value is set to `u8::MAX`, which is the theoretical maximum number
 /// of accounts that a transaction can process given that indices of accounts
 /// are represented by an `u8` value. Note that the last value (`255`) is
-///  reserved to indicate non-duplicated accounts ([`NON_DUP_MARKER`]).
+///  reserved to indicate non-duplicated accounts.
 ///
 /// The `MAX_TX_ACCOUNTS` is used to statically initialize the array of
 /// `AccountInfo`s when parsing accounts in an instruction.
