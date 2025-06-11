@@ -527,10 +527,9 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// This doesn't protect against future reinitialization of the account
-    /// since the account data will need to be zeroed out as well; otherwise the lenght,
-    /// lamports and owner can be set again before the data is wiped out from
-    /// the ledger using the keypair of the account being closed.
+    /// Note: This does not zero the account data. The account data will be zeroed by
+    /// the runtime at the end of the instruction where the account was closed or at the
+    /// next CPI call.
     ///
     /// # Important
     ///
@@ -555,10 +554,9 @@ impl AccountInfo {
     /// Zero out the the account's data length, lamports and owner fields, effectively
     /// closing the account.
     ///
-    /// This doesn't protect against future reinitialization of the account
-    /// since the account data will need to be zeroed out as well; otherwise the lenght,
-    /// lamports and owner can be set again before the data is wiped out from
-    /// the ledger using the keypair of the account being closed.
+    /// Note: This does not zero the account data. The account data will be zeroed by
+    /// the runtime at the end of the instruction where the account was closed or at the
+    /// next CPI call.
     ///
     /// # Important
     ///
@@ -588,7 +586,7 @@ impl AccountInfo {
 
     /// Returns the memory address of the account data.
     fn data_ptr(&self) -> *mut u8 {
-        unsafe { (self.raw as *const _ as *mut u8).add(core::mem::size_of::<Account>()) }
+        unsafe { (self.raw as *mut u8).add(core::mem::size_of::<Account>()) }
     }
 }
 

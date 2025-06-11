@@ -10,7 +10,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, parse_str,
     punctuated::Punctuated,
-    Error, Expr, LitInt, LitStr, Token,
+    Error, Expr, ItemFn, LitInt, LitStr, Token,
 };
 
 /// The default buffer size for the logger.
@@ -234,4 +234,60 @@ pub fn log(input: TokenStream) -> TokenStream {
     } else {
         TokenStream::from(quote! {pinocchio_log::logger::log_message(#format_string.as_bytes());})
     }
+}
+
+/// Attribute macro for instrumenting functions with compute unit logging.
+///
+/// This macro wraps the decorated function with additional logging statements
+/// that print the function name and the number of compute units used before and after
+/// the function execution.
+///
+/// # Effects
+///
+/// - Adds a log message with the function name at the end of execution with amount of CU consumed.
+///
+/// # Note
+///
+/// This macro consumes an additional compute units per call due to the logging operations.
+///
+///  # Example
+///
+/// ```rust,ignore
+/// #[pinocchio_log::log_cu_usage]
+/// fn my_function() {
+///     // Function body
+/// }
+/// ```
+///
+/// logging output will look like:
+///
+/// "Program log: Function my_function consumed 36 compute units"
+///
+/// # References
+///
+/// * [Logging syscall](https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/programs/bpf_loader/src/syscalls/logging.rs#L70)
+/// * [Compute budget](https://github.com/anza-xyz/agave/blob/d88050cda335f87e872eddbdf8506bc063f039d3/program-runtime/src/compute_budget.rs#L150)
+///
+#[proc_macro_attribute]
+pub fn log_cu_usage(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let block = &input.block;
+
+    input.block = syn::parse_quote!({
+        let cu_before = unsafe { ::pinocchio_log::logger::remaining_compute_units() };
+
+        let __result = (|| #block)();
+
+        let cu_after = unsafe { ::pinocchio_log::logger::remaining_compute_units() };
+        let introspection_cost = 102; // 100 - compute budget syscall_base_cost,  2 - extra calculations
+
+        let consumed = cu_before - cu_after - introspection_cost;
+
+        ::pinocchio_log::log!("Function {} consumed {} compute units", stringify!(#fn_name), consumed);
+
+        __result
+    });
+
+    quote!(#input).into()
 }
