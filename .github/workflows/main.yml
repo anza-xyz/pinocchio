@@ -22,6 +22,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           cargo-cache-key: cargo-audit
+          toolchain: lint
           components: audit, miri
 
       - name: cargo-audit

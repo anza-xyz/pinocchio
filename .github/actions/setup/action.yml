@@ -91,6 +91,13 @@ runs:
       with:
         tool: cargo-semver-checks@0.39.0
 
+    - name: Install 'cargo-miri'
+      if: ${{ contains(inputs.toolchain, 'lint') }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ env.TOOLCHAIN_LINT }}
+        components: miri
+
     - name: Cache Cargo Dependencies
       if: ${{ inputs.cargo-cache-key }}
       uses: actions/cache@v4
