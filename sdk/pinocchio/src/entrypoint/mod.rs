@@ -363,8 +363,6 @@ pub unsafe fn parse<const ACCOUNTS: usize>(
             input = input.add(STATIC_ACCOUNT_DATA);
             input = input.add((*account).data_len as usize);
             input = align_pointer!(input);
-
-            to_process -= 1;
         }
     }
 
