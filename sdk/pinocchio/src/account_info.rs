@@ -1,5 +1,6 @@
 //! Data structures to represent account information.
 use core::{
+    convert::Infallible,
     marker::PhantomData,
     mem::ManuallyDrop,
     ptr::NonNull,
@@ -17,7 +18,7 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
 /// Represents masks for borrow state of an account.
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum BorrowState {
     /// Mask to check whether an account is already borrowed.
     ///
@@ -104,7 +105,7 @@ const GET_LEN_MASK: u32 = !SET_LEN_MASK;
 /// used to track borrows of the account data and lamports, given that an
 /// account can be "shared" across multiple `AccountInfo` instances.
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct AccountInfo {
     /// Raw (pointer to) account data.
     ///
@@ -128,6 +129,13 @@ impl AccountInfo {
     #[inline(always)]
     pub unsafe fn owner(&self) -> &Pubkey {
         &(*self.raw).owner
+    }
+
+    #[inline(always)]
+    pub fn owner_key(&self) -> Pubkey {
+        // SAFETY:
+        // We immediately copy out the pubkey, so the reference can never be invalidated
+        unsafe { *self.owner() }
     }
 
     /// Indicates whether the transaction was signed by this account.
@@ -417,6 +425,47 @@ impl AccountInfo {
         Ok(())
     }
 
+    /// Returns the original data length of the account, lazily initializing it if it is not set.
+    pub fn original_data_len(&self) -> usize {
+        let length = unsafe { (*self.raw).original_data_len };
+
+        if length & SET_LEN_MASK == SET_LEN_MASK {
+            (length & GET_LEN_MASK) as usize
+        } else {
+            let current_len = self.data_len();
+            // lazily initialize the original data length and sets the flag
+            unsafe {
+                (*self.raw).original_data_len = (current_len as u32) | SET_LEN_MASK;
+            }
+            current_len as usize
+        }
+    }
+
+    /// Sets the data_len field on the underlying account, checking that the new length is less than the maximum permitted data increase.
+    ///
+    /// This will not modify the length of any existing borrowed data from [`Ref`] or [`RefMut`], and will only take effect on the next borrows. If you
+    /// want to realloc the account data, you should use [`AccountInfo::realloc`] instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the new length is greater than the maximum permitted data increase.
+    /// TODO: I think this is sound, but might make sense to mark as unsafe and add some invariants just in case (i.e. that there are either no borrows or we currently control the only mutable borrow and are updating its length too)
+    #[inline]
+    pub fn set_data_len_checked(&self, new_len: usize) -> Result<(), ProgramError> {
+        // return early if the length increase from the original serialized data
+        // length is too large and would result in an out of bounds allocation
+        if new_len.saturating_sub(self.original_data_len()) > MAX_PERMITTED_DATA_INCREASE {
+            return Err(ProgramError::InvalidRealloc);
+        }
+
+        // SAFETY: We have full access to the mutable account data and don't give out any references to the data
+        unsafe {
+            *(&raw mut (*self.raw).data_len) = new_len as u64;
+        }
+
+        Ok(())
+    }
+
     /// Realloc the account's data and optionally zero-initialize the new
     /// memory.
     ///
@@ -444,25 +493,8 @@ impl AccountInfo {
             return Ok(());
         }
 
-        let original_len = {
-            let length = unsafe { (*self.raw).original_data_len };
-
-            if length & SET_LEN_MASK == SET_LEN_MASK {
-                (length & GET_LEN_MASK) as usize
-            } else {
-                // lazily initialize the original data length and sets the flag
-                unsafe {
-                    (*self.raw).original_data_len = (current_len as u32) | SET_LEN_MASK;
-                }
-                current_len
-            }
-        };
-
-        // return early if the length increase from the original serialized data
-        // length is too large and would result in an out of bounds allocation
-        if new_len.saturating_sub(original_len) > MAX_PERMITTED_DATA_INCREASE {
-            return Err(ProgramError::InvalidRealloc);
-        }
+        // Update the data length and ensure that the new length is less than the maximum permitted data increase.
+        self.set_data_len_checked(new_len)?;
 
         // realloc
         unsafe {
@@ -565,6 +597,7 @@ const LAMPORTS_SHIFT: u8 = 4;
 const DATA_SHIFT: u8 = 0;
 
 /// Reference to account data or lamports with checked borrow rules.
+#[derive(Debug)]
 pub struct Ref<'a, T: ?Sized> {
     value: NonNull<T>,
     state: NonNull<u8>,
@@ -583,15 +616,24 @@ impl<'a, T: ?Sized> Ref<'a, T> {
     where
         F: FnOnce(&T) -> &U,
     {
+        Self::try_map::<_, _, Infallible>(orig, |x| Ok(f(x))).unwrap()
+    }
+
+    /// Maps a reference to a new type in a fallible map, returning an error if the map fails.
+    #[inline]
+    pub fn try_map<U: ?Sized, F, E>(orig: Ref<'a, T>, f: F) -> Result<Ref<'a, U>, E>
+    where
+        F: FnOnce(&T) -> Result<&U, E>,
+    {
         // Avoid decrementing the borrow flag on Drop.
         let orig = ManuallyDrop::new(orig);
 
-        Ref {
-            value: NonNull::from(f(&*orig)),
+        Ok(Ref {
+            value: NonNull::from(f(&*orig)?),
             state: orig.state,
             borrow_shift: orig.borrow_shift,
             marker: PhantomData,
-        }
+        })
     }
 
     /// Filters and maps a reference to a new type.
@@ -636,6 +678,7 @@ const LAMPORTS_MASK: u8 = 0b_0111_1111;
 const DATA_MASK: u8 = 0b_1111_0111;
 
 /// Mutable reference to account data or lamports with checked borrow rules.
+#[derive(Debug)]
 pub struct RefMut<'a, T: ?Sized> {
     value: NonNull<T>,
     state: NonNull<u8>,
@@ -654,15 +697,25 @@ impl<'a, T: ?Sized> RefMut<'a, T> {
     where
         F: FnOnce(&mut T) -> &mut U,
     {
+        Self::try_map::<_, _, Infallible>(orig, |x| Ok(f(x))).unwrap()
+    }
+
+    /// Maps a mutable reference to a new type in a fallible map, returning an error if the map fails.
+    #[inline]
+    pub fn try_map<U: ?Sized, F, E>(orig: RefMut<'a, T>, f: F) -> Result<RefMut<'a, U>, E>
+    where
+        F: FnOnce(&mut T) -> Result<&mut U, E>,
+    {
         // Avoid decrementing the borrow flag on Drop.
         let mut orig = ManuallyDrop::new(orig);
+        let value = f(&mut *orig)?;
 
-        RefMut {
-            value: NonNull::from(f(&mut *orig)),
+        Ok(RefMut {
+            value: NonNull::from(value),
             state: orig.state,
             borrow_mask: orig.borrow_mask,
             marker: PhantomData,
-        }
+        })
     }
 
     /// Filters and maps a mutable reference to a new type.

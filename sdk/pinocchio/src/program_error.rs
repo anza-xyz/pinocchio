@@ -5,8 +5,20 @@
 //!
 //! <https://github.com/anza-xyz/solana-sdk/blob/master/program-error/src/lib.rs>
 
+use core::{
+    error::Error,
+    fmt::{self, Display},
+};
+impl Error for ProgramError {}
+// TODO: This is a temporary impl to make it usable with other error types, but will be removed once Pinocchio pulls in the solana-sdk crate
+impl Display for ProgramError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ProgramError: {:?}", self)
+    }
+}
+
 /// Reasons the program may fail.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProgramError {
     /// Allows on-chain programs to implement program-specific error types and see them returned
     /// by the Solana runtime. A program-specific error may be any type that is represented as
