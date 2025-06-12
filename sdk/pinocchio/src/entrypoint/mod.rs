@@ -202,11 +202,13 @@ pub unsafe fn deserialize(
         input = input.add((*account).data_len as usize);
         input = align_pointer!(input);
 
-        to_process -= 1;
-
-        'remaining: while to_process > 0 {
-            // Increment the accounts pointer to the next account.
+        // We already processed the first account, so we continue processing
+        // only if the number of accounts to process is greater than 1.
+        'remaining: while to_process > 1 {
+            // Increment the `accounts` pointer to the next account.
             accounts = accounts.add(1);
+            // Marks the account as processed.
+            to_process -= 1;
 
             // Read the next account.
             let account: *mut Account = input as *mut Account;
@@ -219,8 +221,9 @@ pub unsafe fn deserialize(
                 accounts.write(AccountInfo {
                     raw: accounts_slice.add((*account).borrow_state as usize) as *mut Account,
                 });
-                to_process -= 1;
-                // Return to the loop to process the next account (if there is one).
+                // Return to the loop to process the next account (if there is one). This
+                // is using a `continue` statement to avoid an extra 'jump' instruction on
+                // the generated assembly.
                 continue 'remaining;
             }
 
@@ -229,8 +232,6 @@ pub unsafe fn deserialize(
             input = input.add(STATIC_ACCOUNT_DATA);
             input = input.add((*account).data_len as usize);
             input = align_pointer!(input);
-
-            to_process -= 1;
         }
     }
 
