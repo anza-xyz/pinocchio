@@ -256,10 +256,13 @@ impl AccountInfo {
         // check if the account lamports are already borrowed
         self.can_borrow_lamports()?;
 
-        let borrow_state = unsafe { &mut (*self.raw).borrow_state };
+        let borrow_state = self.raw as *mut u8;
+        // SAFETY: The `borrow_state` is a mutable pointer to the borrow state
+        // of the account, which is guaranteed to be valid.
+        //
         // "consumes" one immutable borrow for lamports; we are guaranteed
-        // that there is at least one immutable borrow available
-        *borrow_state -= 1 << LAMPORTS_SHIFT;
+        // that there is at least one immutable borrow available.
+        unsafe { *borrow_state -= 1 << LAMPORTS_SHIFT };
 
         // return the reference to lamports
         Ok(Ref {
@@ -276,10 +279,13 @@ impl AccountInfo {
         // check if the account lamports are already borrowed
         self.can_borrow_mut_lamports()?;
 
-        let borrow_state = unsafe { &mut (*self.raw).borrow_state };
+        let borrow_state = self.raw as *mut u8;
+        // SAFETY: The `borrow_state` is a mutable pointer to the borrow state
+        // of the account, which is guaranteed to be valid.
+        //
         // "consumes" the mutable borrow for lamports; we are guaranteed
         // that lamports are not already borrowed in any form
-        *borrow_state &= 0b_0111_1111;
+        unsafe { *borrow_state &= 0b_0111_1111 };
 
         // return the mutable reference to lamports
         Ok(RefMut {
@@ -345,10 +351,13 @@ impl AccountInfo {
         // check if the account data is already borrowed
         self.can_borrow_data()?;
 
-        let borrow_state = unsafe { &mut (*self.raw).borrow_state };
+        let borrow_state = self.raw as *mut u8;
+        // SAFETY: The `borrow_state` is a mutable pointer to the borrow state
+        // of the account, which is guaranteed to be valid.
+        //
         // "consumes" one immutable borrow for data; we are guaranteed
         // that there is at least one immutable borrow available
-        *borrow_state -= 1;
+        unsafe { *borrow_state -= 1 };
 
         // return the reference to data
         Ok(Ref {
@@ -365,10 +374,13 @@ impl AccountInfo {
         // check if the account data is already borrowed
         self.can_borrow_mut_data()?;
 
-        let borrow_state = unsafe { &mut (*self.raw).borrow_state };
+        let borrow_state = self.raw as *mut u8;
+        // SAFETY: The `borrow_state` is a mutable pointer to the borrow state
+        // of the account, which is guaranteed to be valid.
+        //
         // "consumes" the mutable borrow for account data; we are guaranteed
         // that account data are not already borrowed in any form
-        *borrow_state &= 0b_1111_0111;
+        unsafe { *borrow_state &= 0b_1111_0111 };
 
         // return the mutable reference to data
         Ok(RefMut {
@@ -873,9 +885,10 @@ mod tests {
 
     #[test]
     fn test_borrow_data() {
-        let mut data = [0u8; size_of::<Account>()];
+        // 8-bytes aligned account data.
+        let mut data = [0u64; size_of::<Account>() / size_of::<u64>()];
         // Set the borrow state.
-        data[0] = NOT_BORROWED;
+        data[0] = NOT_BORROWED as u64;
         let account_info = AccountInfo {
             raw: data.as_mut_ptr() as *mut Account,
         };
@@ -931,14 +944,16 @@ mod tests {
         assert!(account_info.can_borrow_data().is_ok());
         assert!(account_info.can_borrow_mut_data().is_ok());
 
-        assert!(data[0] == NOT_BORROWED);
+        let borrow_state = unsafe { (*account_info.raw).borrow_state };
+        assert!(borrow_state == NOT_BORROWED);
     }
 
     #[test]
     fn test_borrow_lamports() {
-        let mut data = [0u8; size_of::<Account>()];
+        // 8-bytes aligned account data.
+        let mut data = [0u64; size_of::<Account>() / size_of::<u64>()];
         // Set the borrow state.
-        data[0] = NOT_BORROWED;
+        data[0] = NOT_BORROWED as u64;
         let account_info = AccountInfo {
             raw: data.as_mut_ptr() as *mut Account,
         };
@@ -994,6 +1009,7 @@ mod tests {
         assert!(account_info.can_borrow_lamports().is_ok());
         assert!(account_info.can_borrow_mut_lamports().is_ok());
 
-        assert!(data[0] == NOT_BORROWED);
+        let borrow_state = unsafe { (*account_info.raw).borrow_state };
+        assert!(borrow_state == NOT_BORROWED);
     }
 }
