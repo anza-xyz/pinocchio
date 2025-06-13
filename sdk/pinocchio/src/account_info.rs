@@ -41,13 +41,30 @@ pub(crate) struct Account {
     ///
     /// This reuses the memory reserved for the duplicate flag in the
     /// account to track lamports and data borrows. It represents the
-    /// numbers of borrows available:
+    /// numbers of borrows available.
     ///
-    ///   * `1 1 1 1` (first 4 bits): borrows available for lamports,
-    ///     `1` mutable borrow or `111` (7) immutable borrows.
+    /// Bits in the borrow byte are used as follows:
     ///
-    ///   * `1 1 1 1` (last 4 bits): borrows available for data,
-    ///     `1` mutable borrow or `111` (7) immutable borrows.
+    ///   * lamport mutable borrow flag
+    ///     - `7 6 5 4 3 2 1 0`
+    ///     - `x . . . . . . .`: `1` -> the lamport field can be mutably borrowed;
+    ///       `0` -> there is an outstanding mutable borrow for the lamports.
+    ///
+    ///   * lamport immutable borrow count
+    ///     - `7 6 5 4 3 2 1 0`
+    ///     - `. x x x . . . .`: number of immutable borrows that can still be
+    ///       allocated, for the lamports field. Ranges from 7 (`111`) to
+    ///        0 (`000`).
+    ///
+    ///   * data mutable borrow flag
+    ///     - `7 6 5 4 3 2 1 0`
+    ///     - `. . . . x . . .`:  `1` -> the account data can be mutably borrowed;
+    ///       `0` -> there is an outstanding mutable borrow for the account data.
+    ///
+    ///   * data immutable borrow count
+    ///     - `7 6 5 4 3 2 1 0`
+    ///     - `. . . . . x x x`: Number of immutable borrows that can still be
+    ///       allocated, for the account data. Ranges from 7 (`111`) to 0 (`000`).
     ///
     /// Note that this values are shared across `AccountInfo`s over the
     /// same account, e.g., in case of duplicated accounts, they share
