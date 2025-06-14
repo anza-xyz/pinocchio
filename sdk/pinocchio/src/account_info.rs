@@ -456,11 +456,17 @@ impl AccountInfo {
     /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
     /// within an instruction.
     ///
-    /// Note: Memory used to grow is already zero-initialized upon program
-    /// entrypoint and re-zeroing it wastes compute units.  If within the same
+    /// # Important
+    ///
+    /// Memory used to grow is already zero-initialized upon program
+    /// entrypoint and re-zeroing it wastes compute units. If within the same
     /// call a program reallocs from larger to smaller and back to larger again
-    /// the new space could contain stale data.  Pass `true` for `zero_init` in
+    /// the new space could contain stale data. Pass `true` for `zero_init` in
     /// this case, otherwise compute units will be wasted re-zero-initializing.
+    ///
+    /// Note that `zero_init` being `false` will not be supported by the
+    /// program runtime in the future. Programs should not rely on being able to
+    /// access stale data and use [`Self::resize`] instead.
     ///
     /// # Safety
     ///
@@ -555,6 +561,10 @@ impl AccountInfo {
 
         // SAFETY: The are no active borrows on the account data or lamports.
         unsafe {
+            // Update the resize delta since closing an account will set its data length
+            // to zero (account length is always `< i32::MAX`).
+            (*self.raw).resize_delta = self.resize_delta() - self.data_len() as i32;
+
             self.close_unchecked();
         }
 
@@ -572,6 +582,11 @@ impl AccountInfo {
     ///
     /// The lamports must be moved from the account prior to closing it to prevent
     /// an unbalanced instruction error.
+    ///
+    /// If [`Self::realloc`] or [`Self::resize`] are called after closing the account,
+    /// they might incorrectly return an error for going over the limit if the account
+    /// previously had space allocated since this method does not update the
+    /// [`Self::resize_delta`] value.
     ///
     /// # Safety
     ///
@@ -1016,18 +1031,17 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn test_realloc() {
-        let mut account_data = [0u8; 1000];
-        let alignment_offset = account_data.as_ptr() as usize % 8;
-        let account_slice = &mut account_data[alignment_offset..];
-        // Ensure the account data is aligned to 8 bytes as expected by the
-        // Account struct.
-        assert_eq!(account_slice.as_ptr() as usize % 8, 0);
+        // 8-bytes aligned account data.
+        let mut data = [0u64; 100 * size_of::<u64>()];
 
+        // Set the borrow state.
+        data[0] = NOT_BORROWED as u64;
         // Set the initial data length to 100.
-        account_slice[80..88].copy_from_slice(&100u64.to_le_bytes());
+        //   - index `10` is equal to offset `10 * size_of::<u64>() = 80` bytes.
+        data[10] = 100;
 
         let account = AccountInfo {
-            raw: account_slice as *const _ as *mut Account,
+            raw: data.as_mut_ptr() as *const _ as *mut Account,
         };
 
         assert_eq!(account.data_len(), 100);
