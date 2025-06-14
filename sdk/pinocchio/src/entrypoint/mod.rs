@@ -2,13 +2,10 @@
 //! global handlers.
 
 pub mod lazy;
-
 pub use lazy::{InstructionContext, MaybeAccount};
 
 #[cfg(target_os = "solana")]
 pub use alloc::BumpAllocator;
-
-use core::{mem::size_of, slice::from_raw_parts};
 
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
@@ -36,7 +33,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data increase.
-const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+const STATIC_ACCOUNT_DATA: usize = core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -51,7 +48,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 /// It also sets up a [global allocator] and [panic handler], using the [`crate::default_allocator!`]
 /// and [`crate::default_panic_handler!`] macros.
 ///
-/// The only argument is the name of a function with this type signature:
+/// The first argument is the name of a function with this type signature:
 ///
 /// ```ignore
 /// fn process_instruction(
@@ -127,11 +124,6 @@ macro_rules! entrypoint {
         $crate::default_allocator!();
         $crate::default_panic_handler!();
     };
-    ( $process_instruction:expr, $maximum:expr ) => {
-        // The `maximum` argument is not used in this macro, but it is kept for
-        // backwards compatibility.
-        entrypoint!($process_instruction);
-    };
 }
 
 /// Declare the program entrypoint.
@@ -189,10 +181,10 @@ macro_rules! program_entrypoint {
             const UNINIT: core::mem::MaybeUninit<$crate::account_info::AccountInfo> =
                 core::mem::MaybeUninit::<$crate::account_info::AccountInfo>::uninit();
             // Create an array of uninitialized account infos.
-            let mut accounts = [UNINIT; { $crate::MAX_TX_ACCOUNTS }];
+            let mut accounts = [UNINIT; $maximum];
 
             let (program_id, count, instruction_data) =
-                $crate::entrypoint::deserialize(input, &mut accounts);
+                $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
 
             // Call the program's entrypoint passing `count` account infos; we know that
             // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
@@ -205,38 +197,6 @@ macro_rules! program_entrypoint {
                 Err(error) => error.into(),
             }
         }
-    };
-    ( $process_instruction:expr, $maximum:expr ) => {
-        /// Program entrypoint.
-        #[no_mangle]
-        pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account_info::AccountInfo> =
-                core::mem::MaybeUninit::<$crate::account_info::AccountInfo>::uninit();
-            // Create an array of uninitialized account infos.
-            let mut accounts = [UNINIT; { $crate::MAX_TX_ACCOUNTS }];
-
-            let (program_id, instruction_data) =
-                $crate::entrypoint::deserialize(input, accounts.as_mut_ptr() as *mut _);
-
-            // Call the program's entrypoint passing the slice of initialized accounts.
-            match $process_instruction(
-                &program_id,
-                core::slice::from_raw_parts(
-                    accounts.as_ptr() as _,
-                    // Number of accounts on the input.
-                    *(input as *const u64) as usize,
-                ),
-                &instruction_data,
-            ) {
-                Ok(()) => $crate::SUCCESS,
-                Err(error) => error.into(),
-            }
-        }
-    };
-    ( $process_instruction:expr, $maximum:expr ) => {
-        // The `maximum` argument is not used in this macro, but it is kept for
-        // backwards compatibility.
-        program_entrypoint!($process_instruction);
     };
 }
 
@@ -252,8 +212,9 @@ macro_rules! program_entrypoint {
 ///
 /// The caller must ensure that the input buffer is valid, i.e., it represents the
 /// program input parameters serialized by the SVM loader.
+#[allow(clippy::cast_ptr_alignment)]
 #[inline(always)]
-pub unsafe fn deserialize<'a, const ACCOUNTS: usize>(
+pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
     accounts: &mut [core::mem::MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
 ) -> (&'a Pubkey, usize, &'a [u8]) {
@@ -361,21 +322,33 @@ pub unsafe fn parse<const ACCOUNTS: usize>(
         let account = if (*account_info).borrow_state == NON_DUP_MARKER {
             // Unique account: create a new `AccountInfo` to represent the account.
             input = input.add(STATIC_ACCOUNT_DATA);
-            input = input.add((*account).data_len as usize);
-            input = align_pointer!(input);
-        }
+            input = input.add((*account_info).data_len as usize);
+            input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
+
+            AccountInfo { raw: account_info }
+        } else {
+            // Duplicated account: clone the original pointer using `borrow_state` since
+            // it represents the index of the duplicated account passed by the runtime.
+            accounts
+                .get_unchecked((*account_info).borrow_state as usize)
+                .assume_init_ref()
+                .clone()
+        };
+
+        accounts.get_unchecked_mut(i).write(account);
     }
 
     // instruction data
     let instruction_data_len = *(input as *const u64) as usize;
-    input = input.add(size_of::<u64>());
+    input = input.add(core::mem::size_of::<u64>());
 
-    let instruction_data = { from_raw_parts(input, instruction_data_len) };
+    let instruction_data = { core::slice::from_raw_parts(input, instruction_data_len) };
+    input = input.add(instruction_data_len);
 
     // program id
-    let program_id: &Pubkey = &*(input.add(instruction_data_len) as *const Pubkey);
+    let program_id: &Pubkey = &*(input as *const Pubkey);
 
-    (program_id, instruction_data)
+    (program_id, processed, instruction_data)
 }
 
 /// Default panic hook.
