@@ -2,12 +2,12 @@
 //! global handlers.
 
 pub mod lazy;
-use core::{cmp::min, slice::from_raw_parts};
 
 pub use lazy::{InstructionContext, MaybeAccount};
 
 #[cfg(target_os = "solana")]
 pub use alloc::BumpAllocator;
+use core::{cmp::min, mem::size_of, slice::from_raw_parts};
 
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
