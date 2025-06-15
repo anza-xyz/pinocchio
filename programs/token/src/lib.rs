@@ -15,3 +15,7 @@ fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
         d.write(*s);
     }
 }
+
+pub trait InstructionData {
+    fn get_instruction_data(&self) -> &[u8];
+}
