@@ -2,6 +2,8 @@
 //! global handlers.
 
 pub mod lazy;
+use core::{cmp::min, slice::from_raw_parts};
+
 pub use lazy::{InstructionContext, MaybeAccount};
 
 #[cfg(target_os = "solana")]
@@ -159,14 +161,18 @@ macro_rules! program_entrypoint {
             // Create an array of uninitialized account infos.
             let mut accounts = [UNINIT; { $crate::MAX_TX_ACCOUNTS }];
 
-            let (program_id, count, instruction_data) =
-                $crate::entrypoint::parse(input, &mut accounts);
+            let (program_id, instruction_data) =
+                $crate::entrypoint::parse(input, accounts.as_mut_ptr() as *mut _);
 
             // Call the program's entrypoint passing `count` account infos; we know that
             // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
             match $process_instruction(
                 &program_id,
-                core::slice::from_raw_parts(accounts.as_ptr() as _, count),
+                core::slice::from_raw_parts(
+                    accounts.as_ptr() as _,
+                    // Number of accounts on the input.
+                    *(input as *const u64) as usize,
+                ),
                 &instruction_data,
             ) {
                 Ok(()) => $crate::SUCCESS,
@@ -200,6 +206,13 @@ macro_rules! program_entrypoint {
     };
 }
 
+/// Align a pointer to the BPF alignment of `u128`.
+macro_rules! align_pointer {
+    ($ptr:ident) => {
+        (($ptr as usize + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1)) as *mut u8
+    };
+}
+
 /// Parse the input arguments from the runtime input buffer.
 ///
 /// Note that this function will only parse up to `MAX_ACCOUNTS` accounts; any
@@ -214,72 +227,97 @@ macro_rules! program_entrypoint {
 /// program input parameters serialized by the SVM loader.
 #[allow(clippy::cast_ptr_alignment)]
 #[inline(always)]
-pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
+pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
     accounts: &mut [core::mem::MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
-) -> (&'a Pubkey, usize, &'a [u8]) {
-    // Total number of accounts present in the input buffer.
+) -> (&'static Pubkey, usize, &'static [u8]) {
+    // Number of accounts to process.
     let mut processed = *(input as *const u64) as usize;
-    input = input.add(core::mem::size_of::<u64>());
+    // Skip the number of accounts (8 bytes).
+    input = input.add(size_of::<u64>());
 
     if processed > 0 {
-        let total_accounts = processed;
-        // Number of accounts to process (limited to MAX_ACCOUNTS).
-        processed = core::cmp::min(total_accounts, MAX_ACCOUNTS);
+        let mut accounts = accounts.as_mut_ptr() as *mut AccountInfo;
+        // Represents the beginning of the accounts slice.
+        let accounts_slice = accounts;
 
-        for i in 0..processed {
-            let account_info: *mut Account = input as *mut Account;
+        // The first account is always non-duplicated, so process
+        // it directly as such.
+        let account: *mut Account = input as *mut Account;
+        accounts.write(AccountInfo { raw: account });
+
+        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
+        input = input.add((*account).data_len as usize);
+        input = align_pointer!(input);
+
+        // Number of accounts to process (limited to MAX_ACCOUNTS).
+        let mut to_process = min(processed, MAX_ACCOUNTS);
+        let mut to_skip = processed - to_process;
+        // Updates the number of processed accounts.
+        processed = to_process;
+
+        // We already processed the first account, so we continue processing
+        // only if the number of accounts to process is greater than 1.
+        'remaining: while to_process > 1 {
+            // Increment the `accounts` pointer to the next account.
+            accounts = accounts.add(1);
+            // Marks the account as processed.
+            to_process -= 1;
+
+            // Read the next account.
+            let account: *mut Account = input as *mut Account;
             // Adds an 8-bytes offset for:
             //   - rent epoch in case of a non-duplicated account
             //   - duplicated marker + 7 bytes of padding in case of a duplicated account
-            input = input.add(core::mem::size_of::<u64>());
+            input = input.add(size_of::<u64>());
 
-            let account = if (*account_info).borrow_state == NON_DUP_MARKER {
-                // Unique account: create a new `AccountInfo` to represent the account.
-                input = input.add(STATIC_ACCOUNT_DATA);
-                input = input.add((*account_info).data_len as usize);
-                input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
+            if (*account).borrow_state != NON_DUP_MARKER {
+                accounts.write(AccountInfo {
+                    raw: accounts_slice.add((*account).borrow_state as usize) as *mut Account,
+                });
+                // Return to the loop to process the next account (if there is one). This
+                // is using a `continue` statement to avoid an extra 'jump' instruction on
+                // the generated assembly.
+                continue 'remaining;
+            }
 
-                AccountInfo { raw: account_info }
-            } else {
-                // Duplicated account: clone the original pointer using `borrow_state` since
-                // it represents the index of the duplicated account passed by the runtime.
-                accounts
-                    .get_unchecked((*account_info).borrow_state as usize)
-                    .assume_init_ref()
-                    .clone()
-            };
+            accounts.write(AccountInfo { raw: account });
 
-            accounts.get_unchecked_mut(i).write(account);
+            input = input.add(STATIC_ACCOUNT_DATA);
+            input = input.add((*account).data_len as usize);
+            input = align_pointer!(input);
         }
 
         // Process any remaining accounts to move the offset to the instruction
         // data (there is a duplication of logic but we avoid testing whether we
         // have space for the account or not).
-        for _ in processed..total_accounts {
-            let account_info: *mut Account = input as *mut Account;
-            // Adds an 8-bytes offset for:
-            //   - rent epoch in case of a non-duplicate account
-            //   - duplicate marker + 7 bytes of padding in case of a duplicate account
-            input = input.add(core::mem::size_of::<u64>());
+        while to_skip > 0 {
+            // Marks the account as skipped.
+            to_skip -= 1;
 
-            if (*account_info).borrow_state == NON_DUP_MARKER {
+            // Read the next account.
+            let account: *mut Account = input as *mut Account;
+            // Adds an 8-bytes offset for:
+            //   - rent epoch in case of a non-duplicated account
+            //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+            input = input.add(size_of::<u64>());
+
+            if (*account).borrow_state == NON_DUP_MARKER {
                 input = input.add(STATIC_ACCOUNT_DATA);
-                input = input.add((*account_info).data_len as usize);
-                input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
+                input = input.add((*account).data_len as usize);
+                input = align_pointer!(input);
             }
         }
     }
 
     // instruction data
     let instruction_data_len = *(input as *const u64) as usize;
-    input = input.add(core::mem::size_of::<u64>());
+    input = input.add(size_of::<u64>());
 
-    let instruction_data = { core::slice::from_raw_parts(input, instruction_data_len) };
-    input = input.add(instruction_data_len);
+    let instruction_data = { from_raw_parts(input, instruction_data_len) };
 
     // program id
-    let program_id: &Pubkey = &*(input as *const Pubkey);
+    let program_id: &Pubkey = &*(input.add(instruction_data_len) as *const Pubkey);
 
     (program_id, processed, instruction_data)
 }
@@ -295,60 +333,75 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
 /// program input parameters serialized by the SVM loader. Additionally, the `input`
 /// should last for the lifetime of the program execution since the returnerd values
 /// reference the `input`.
+///
+/// The `accounts` pointer must point to a valid slice of `AccountInfo`
+/// with enough space to hold the accounts parsed from the input buffer.
 #[inline(always)]
-pub unsafe fn parse<const ACCOUNTS: usize>(
+pub unsafe fn parse(
     mut input: *mut u8,
-    accounts: &mut [core::mem::MaybeUninit<AccountInfo>; ACCOUNTS],
-) -> (&'static Pubkey, usize, &'static [u8]) {
-    // Ensure that the number of accounts is equal to `MAX_TX_ACCOUNTS`.
-    const {
-        assert!(
-            ACCOUNTS == crate::MAX_TX_ACCOUNTS,
-            "The number of accounts must be equal to MAX_TX_ACCOUNTS"
-        );
-    }
-    // The runtime guarantees that the number of accounts does not exceed
-    // `MAX_TX_ACCOUNTS`.
-    let processed = *(input as *const u64) as usize;
-    input = input.add(core::mem::size_of::<u64>());
+    mut accounts: *mut AccountInfo,
+) -> (&'static Pubkey, &'static [u8]) {
+    // Number of accounts to process.
+    let mut to_process = *(input as *const u64) as usize;
+    // Skip the number of accounts (8 bytes).
+    input = input.add(size_of::<u64>());
 
-    for i in 0..processed {
-        let account_info: *mut Account = input as *mut Account;
-        // Adds an 8-bytes offset for:
-        //   - rent epoch in case of a non-duplicated account
-        //   - duplicated marker + 7 bytes of padding in case of a duplicated account
-        input = input.add(core::mem::size_of::<u64>());
+    if to_process > 0 {
+        // Represents the beginning of the accounts slice.
+        let accounts_slice = accounts;
 
-        let account = if (*account_info).borrow_state == NON_DUP_MARKER {
-            // Unique account: create a new `AccountInfo` to represent the account.
+        // The first account is always non-duplicated, so process
+        // it directly as such.
+        let account: *mut Account = input as *mut Account;
+        accounts.write(AccountInfo { raw: account });
+
+        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
+        input = input.add((*account).data_len as usize);
+        input = align_pointer!(input);
+
+        // We already processed the first account, so we continue processing
+        // only if the number of accounts to process is greater than 1.
+        'remaining: while to_process > 1 {
+            // Increment the `accounts` pointer to the next account.
+            accounts = accounts.add(1);
+            // Marks the account as processed.
+            to_process -= 1;
+
+            // Read the next account.
+            let account: *mut Account = input as *mut Account;
+            // Adds an 8-bytes offset for:
+            //   - rent epoch in case of a non-duplicated account
+            //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+            input = input.add(size_of::<u64>());
+
+            if (*account).borrow_state != NON_DUP_MARKER {
+                accounts.write(AccountInfo {
+                    raw: accounts_slice.add((*account).borrow_state as usize) as *mut Account,
+                });
+                // Return to the loop to process the next account (if there is one). This
+                // is using a `continue` statement to avoid an extra 'jump' instruction on
+                // the generated assembly.
+                continue 'remaining;
+            }
+
+            accounts.write(AccountInfo { raw: account });
+
             input = input.add(STATIC_ACCOUNT_DATA);
-            input = input.add((*account_info).data_len as usize);
-            input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
-
-            AccountInfo { raw: account_info }
-        } else {
-            // Duplicated account: clone the original pointer using `borrow_state` since
-            // it represents the index of the duplicated account passed by the runtime.
-            accounts
-                .get_unchecked((*account_info).borrow_state as usize)
-                .assume_init_ref()
-                .clone()
-        };
-
-        accounts.get_unchecked_mut(i).write(account);
+            input = input.add((*account).data_len as usize);
+            input = align_pointer!(input);
+        }
     }
 
     // instruction data
     let instruction_data_len = *(input as *const u64) as usize;
-    input = input.add(core::mem::size_of::<u64>());
+    input = input.add(size_of::<u64>());
 
-    let instruction_data = { core::slice::from_raw_parts(input, instruction_data_len) };
-    input = input.add(instruction_data_len);
+    let instruction_data = { from_raw_parts(input, instruction_data_len) };
 
     // program id
-    let program_id: &Pubkey = &*(input as *const Pubkey);
+    let program_id: &Pubkey = &*(input.add(instruction_data_len) as *const Pubkey);
 
-    (program_id, processed, instruction_data)
+    (program_id, instruction_data)
 }
 
 /// Default panic hook.
