@@ -7,7 +7,11 @@ pub use lazy::{InstructionContext, MaybeAccount};
 
 #[cfg(target_os = "solana")]
 pub use alloc::BumpAllocator;
-use core::{cmp::min, mem::size_of, slice::from_raw_parts};
+use core::{
+    cmp::min,
+    mem::{size_of, MaybeUninit},
+    slice::from_raw_parts,
+};
 
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
@@ -35,7 +39,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data increase.
-const STATIC_ACCOUNT_DATA: usize = core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -229,7 +233,7 @@ macro_rules! align_pointer {
 #[inline(always)]
 pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
-    accounts: &mut [core::mem::MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
+    accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
 ) -> (&'static Pubkey, usize, &'static [u8]) {
     // Number of accounts to process.
     let mut processed = *(input as *const u64) as usize;
@@ -250,10 +254,14 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         input = input.add((*account).data_len as usize);
         input = align_pointer!(input);
 
-        // Number of accounts to process (limited to MAX_ACCOUNTS).
+        // The number of accounts to process (`to_process`) is limited to
+        // `MAX_ACCOUNTS`, which is the capacity of the accounts array. When there
+        // are more accounts to process than the maximum, we still need to skip the
+        // remaining accounts (`to_skip`) to move the input pointer to the instruction
+        // data. At the end, we return the number of accounts processed (`processed`),
+        // which represents the accounts initialized in the `accounts` slice.
         let mut to_process = min(processed, MAX_ACCOUNTS);
         let mut to_skip = processed - to_process;
-        // Updates the number of processed accounts.
         processed = to_process;
 
         // We already processed the first account, so we continue processing
