@@ -39,7 +39,7 @@ impl AssignWithSeed<'_, '_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable_signer(self.account.key()),
+            AccountMeta::writable(self.account.key()),
             AccountMeta::readonly_signer(self.base.key()),
         ];
 
