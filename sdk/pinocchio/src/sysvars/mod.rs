@@ -11,6 +11,19 @@ pub mod fees;
 pub mod instructions;
 pub mod rent;
 
+/// Return value indicating that the  `offset + length` is greater than the length of
+/// the sysvar data.
+//
+// Defined in the bpf loader as [`OFFSET_LENGTH_EXCEEDS_SYSVAR`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L172).
+#[cfg(target_os = "solana")]
+const OFFSET_LENGTH_EXCEEDS_SYSVAR: u64 = 1;
+
+/// Return value indicating that the sysvar was not found.
+//
+// Defined in the bpf loader as [`SYSVAR_NOT_FOUND`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L171).
+#[cfg(target_os = "solana")]
+const SYSVAR_NOT_FOUND: u64 = 2;
+
 /// A type that holds sysvar data.
 pub trait Sysvar: Default + Sized {
     /// Load the sysvar directly from the runtime.
@@ -41,9 +54,12 @@ macro_rules! impl_sysvar_get {
             let result = core::hint::black_box(var_addr as *const _ as u64);
 
             match result {
-                // SAFETY: The syscall initialized the memory.
-                $crate::SUCCESS => Ok(unsafe { var.assume_init() }),
-                e => Err(e.into()),
+                $crate::SUCCESS => {
+                    // SAFETY: The syscall initialized the memory.
+                    Ok(unsafe { var.assume_init() })
+                }
+                // Unexpected errors are folded into `UnsupportedSysvar`.
+                _ => Err($crate::program_error::ProgramError::UnsupportedSysvar),
             }
         }
     };
@@ -76,7 +92,10 @@ pub unsafe fn get_sysvar_unchecked(
 
         match result {
             crate::SUCCESS => Ok(()),
-            e => Err(e.into()),
+            OFFSET_LENGTH_EXCEEDS_SYSVAR => Err(ProgramError::InvalidArgument),
+            // An invalid sysvar id and unexpected errors are folded
+            // into `UnsupportedSysvar`.
+            SYSVAR_NOT_FOUND | _ => Err(ProgramError::UnsupportedSysvar),
         }
     }
 
