@@ -5,6 +5,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use crate::InstructionData;
+
 /// Close an account by transferring all its SOL to the destination account.
 ///
 /// ### Accounts:
@@ -37,7 +39,7 @@ impl CloseAccount<'_> {
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &[9],
+            data: self.get_instruction_data(),
         };
 
         invoke_signed(
@@ -45,5 +47,12 @@ impl CloseAccount<'_> {
             &[self.account, self.destination, self.authority],
             signers,
         )
+    }
+}
+
+impl InstructionData for CloseAccount<'_> {
+    #[inline]
+    fn get_instruction_data(&self) -> &[u8] {
+        &[9]
     }
 }

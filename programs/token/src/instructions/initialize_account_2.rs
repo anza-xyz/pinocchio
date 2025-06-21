@@ -8,7 +8,9 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::{write_bytes, UNINIT_BYTE};
+use crate::{write_bytes, InstructionData, UNINIT_BYTE};
+extern crate alloc;
+use alloc::boxed::Box;
 
 /// Initialize a new Token Account.
 ///
@@ -41,20 +43,10 @@ impl InitializeAccount2<'_> {
             AccountMeta::readonly(self.rent_sysvar.key()),
         ];
 
-        // instruction data
-        // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..33]: owner (32 bytes, Pubkey)
-        let mut instruction_data = [UNINIT_BYTE; 33];
-
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[16]);
-        // Set owner as [u8; 32] at offset [1..33]
-        write_bytes(&mut instruction_data[1..], self.owner);
-
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },
+            data: self.get_instruction_data(),
         };
 
         invoke_signed(
@@ -62,5 +54,22 @@ impl InitializeAccount2<'_> {
             &[self.account, self.mint, self.rent_sysvar],
             signers,
         )
+    }
+}
+
+impl InstructionData for InitializeAccount2<'_> {
+    #[inline]
+    fn get_instruction_data(&self) -> &[u8] {
+        // Instruction data layout:
+        // -  [0]: instruction discriminator (1 byte, u8)
+        // -  [1..33]: owner (32 bytes, Pubkey)
+        let mut instruction_data = Box::new([UNINIT_BYTE; 33]);
+
+        // Set discriminator as u8 at offset [0]
+        write_bytes(&mut instruction_data.as_mut_slice(), &[16]);
+        // Set owner as [u8; 32] at offset [1..33]
+        write_bytes(&mut instruction_data[1..], self.owner);
+
+        unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) }
     }
 }
