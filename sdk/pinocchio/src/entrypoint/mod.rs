@@ -194,7 +194,7 @@ macro_rules! program_entrypoint {
             let mut accounts = [UNINIT; $maximum];
 
             let (program_id, count, instruction_data) =
-                $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
+                $crate::entrypoint::process::<$maximum>(input, &mut accounts);
 
             // Call the program's entrypoint passing `count` account infos; we know that
             // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
@@ -662,4 +662,168 @@ unsafe impl core::alloc::GlobalAlloc for NoAllocator {
     unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
         // I deny all allocations, so I don't need to free.
     }
+}
+
+/// A macro to repeat a pattern to process an account `n` times,
+/// where `n` is the number of `_` tokens in the input.
+macro_rules! process_n_accounts {
+    // Base case: no tokens left
+    ( () => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {};
+
+    // Recursive case: one `_` token per repetition
+    ( ( _ $($rest:tt)* ) => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!(@process_account => ($input, $accounts, $accounts_slice));
+        process_n_accounts!(($($rest)*) => ($input, $accounts, $accounts_slice));
+    };
+
+    // Process one account.
+    ( @process_account => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        // Increment the `accounts` pointer to the next account.
+        $accounts = $accounts.add(1);
+
+        // Read the next account.
+        let account: *mut Account = $input as *mut Account;
+        // Adds an 8-bytes offset for:
+        //   - rent epoch in case of a non-duplicated account
+        //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+        $input = $input.add(size_of::<u64>());
+
+        if (*account).borrow_state != NON_DUP_MARKER {
+            $accounts.write(AccountInfo {
+                raw: $accounts_slice.add((*account).borrow_state as usize) as *mut Account,
+            });
+        } else {
+            $accounts.write(AccountInfo { raw: account });
+
+            $input = $input.add(STATIC_ACCOUNT_DATA);
+            $input = $input.add((*account).data_len as usize);
+            $input = align_pointer!($input);
+        }
+    };
+}
+
+/// Convenience macro to transform the number of accounts to process
+/// into a pattern of `_` tokens.
+macro_rules! process_accounts {
+    ( 1 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 2 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 3 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 4 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 5 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 6 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 7 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 8 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _ _ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+}
+
+/// [WIP]
+///
+/// # Safety
+///
+///  The caller must ensure that the `input` buffer is valid, i.e., it represents the
+///  program input parameters serialized by the SVM loader. Additionally, the `input`
+///  should last for the lifetime of the program execution since the returned values
+///  reference the `input`.
+pub unsafe fn process<const MAX_ACCOUNTS: usize>(
+    mut input: *mut u8,
+    accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
+) -> (&'static Pubkey, usize, &'static [u8]) {
+    // Number of accounts to process.
+    let mut processed = *(input as *const u64) as usize;
+    // Skip the number of accounts (8 bytes).
+    input = input.add(size_of::<u64>());
+
+    if processed > 0 {
+        let mut accounts = accounts.as_mut_ptr() as *mut AccountInfo;
+        // Represents the beginning of the accounts slice.
+        let accounts_slice = accounts;
+
+        // The first account is always non-duplicated, so process
+        // it directly as such.
+        let account: *mut Account = input as *mut Account;
+        accounts.write(AccountInfo { raw: account });
+
+        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
+        input = input.add((*account).data_len as usize);
+        input = align_pointer!(input);
+
+        // The number of accounts to process (`to_process`) is limited to
+        // `MAX_ACCOUNTS`, which is the capacity of the accounts array. When there
+        // are more accounts to process than the maximum, we still need to skip the
+        // remaining accounts (`to_skip`) to move the input pointer to the instruction
+        // data. At the end, we return the number of accounts processed (`processed`),
+        // which represents the accounts initialized in the `accounts` slice.
+        let mut to_process = min(processed, MAX_ACCOUNTS);
+        let mut to_skip = processed - to_process;
+        processed = to_process;
+
+        while to_process > 5 {
+            // Process 5 accounts at a time.
+            process_accounts!(5 => (input, accounts, accounts_slice));
+            to_process -= 5;
+        }
+
+        if to_process > 3 {
+            // 4..3 accounts left to process.
+            if to_process > 4 {
+                process_accounts!(4 => (input, accounts, accounts_slice));
+            } else {
+                process_accounts!(3 => (input, accounts, accounts_slice));
+            }
+        } else {
+            // 2..1 accounts left to process.
+            if to_process > 2 {
+                process_accounts!(2 => (input, accounts, accounts_slice));
+            } else if to_process > 1 {
+                process_accounts!(1 => (input, accounts, accounts_slice));
+            }
+        }
+
+        // Process any remaining accounts to move the offset to the instruction
+        // data (there is a duplication of logic but we avoid testing whether we
+        // have space for the account or not).
+        while to_skip > 0 {
+            // Marks the account as skipped.
+            to_skip -= 1;
+
+            // Read the next account.
+            let account: *mut Account = input as *mut Account;
+            // Adds an 8-bytes offset for:
+            //   - rent epoch in case of a non-duplicated account
+            //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+            input = input.add(size_of::<u64>());
+
+            if (*account).borrow_state == NON_DUP_MARKER {
+                input = input.add(STATIC_ACCOUNT_DATA);
+                input = input.add((*account).data_len as usize);
+                input = align_pointer!(input);
+            }
+        }
+    }
+
+    // instruction data
+    let instruction_data_len = *(input as *const u64) as usize;
+    input = input.add(size_of::<u64>());
+
+    let instruction_data = { from_raw_parts(input, instruction_data_len) };
+
+    // program id
+    let program_id: &Pubkey = &*(input.add(instruction_data_len) as *const Pubkey);
+
+    (program_id, processed, instruction_data)
 }
