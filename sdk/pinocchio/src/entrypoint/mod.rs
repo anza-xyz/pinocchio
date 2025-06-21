@@ -731,7 +731,7 @@ macro_rules! process_accounts {
     };
 }
 
-/// [WIP]
+/// Work in progress.
 ///
 /// # Safety
 ///
