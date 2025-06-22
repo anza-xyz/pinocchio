@@ -762,56 +762,62 @@ pub unsafe fn process<const MAX_ACCOUNTS: usize>(
         input = input.add((*account).data_len as usize);
         input = align_pointer!(input);
 
-        // The number of accounts to process (`to_process`) is limited to
-        // `MAX_ACCOUNTS`, which is the capacity of the accounts array. When there
-        // are more accounts to process than the maximum, we still need to skip the
-        // remaining accounts (`to_skip`) to move the input pointer to the instruction
-        // data. At the end, we return the number of accounts processed (`processed`),
-        // which represents the accounts initialized in the `accounts` slice.
-        let mut to_process = min(processed, MAX_ACCOUNTS);
-        let mut to_skip = processed - to_process;
-        processed = to_process;
+        if processed > 1 {
+            // The number of accounts to process (`to_process`) is limited to
+            // `MAX_ACCOUNTS`, which is the capacity of the accounts array. When there
+            // are more accounts to process than the maximum, we still need to skip the
+            // remaining accounts (`to_skip`) to move the input pointer to the instruction
+            // data. At the end, we return the number of accounts processed (`processed`),
+            // which represents the accounts initialized in the `accounts` slice.
+            let mut to_process = min(processed, MAX_ACCOUNTS);
+            let mut to_skip = processed - to_process;
+            processed = to_process;
 
-        while to_process > 5 {
-            // Process 5 accounts at a time.
-            process_accounts!(5 => (input, accounts, accounts_slice));
-            to_process -= 5;
-        }
-
-        if to_process > 3 {
-            // 4..3 accounts left to process.
-            if to_process > 4 {
-                process_accounts!(4 => (input, accounts, accounts_slice));
-            } else {
-                process_accounts!(3 => (input, accounts, accounts_slice));
-            }
-        } else {
-            // 2..1 accounts left to process.
-            if to_process > 2 {
-                process_accounts!(2 => (input, accounts, accounts_slice));
-            } else if to_process > 1 {
+            if to_process == 2 {
                 process_accounts!(1 => (input, accounts, accounts_slice));
+            } else {
+                while to_process > 5 {
+                    // Process 5 accounts at a time.
+                    process_accounts!(5 => (input, accounts, accounts_slice));
+                    to_process -= 5;
+                }
+
+                if to_process > 3 {
+                    // 4..3 accounts left to process.
+                    if to_process > 4 {
+                        process_accounts!(4 => (input, accounts, accounts_slice));
+                    } else {
+                        process_accounts!(3 => (input, accounts, accounts_slice));
+                    }
+                } else {
+                    // 2..1 accounts left to process.
+                    if to_process > 2 {
+                        process_accounts!(2 => (input, accounts, accounts_slice));
+                    } else if to_process > 1 {
+                        process_accounts!(1 => (input, accounts, accounts_slice));
+                    }
+                }
             }
-        }
 
-        // Process any remaining accounts to move the offset to the instruction
-        // data (there is a duplication of logic but we avoid testing whether we
-        // have space for the account or not).
-        while to_skip > 0 {
-            // Marks the account as skipped.
-            to_skip -= 1;
+            // Process any remaining accounts to move the offset to the instruction
+            // data (there is a duplication of logic but we avoid testing whether we
+            // have space for the account or not).
+            while to_skip > 0 {
+                // Marks the account as skipped.
+                to_skip -= 1;
 
-            // Read the next account.
-            let account: *mut Account = input as *mut Account;
-            // Adds an 8-bytes offset for:
-            //   - rent epoch in case of a non-duplicated account
-            //   - duplicated marker + 7 bytes of padding in case of a duplicated account
-            input = input.add(size_of::<u64>());
+                // Read the next account.
+                let account: *mut Account = input as *mut Account;
+                // Adds an 8-bytes offset for:
+                //   - rent epoch in case of a non-duplicated account
+                //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+                input = input.add(size_of::<u64>());
 
-            if (*account).borrow_state == NON_DUP_MARKER {
-                input = input.add(STATIC_ACCOUNT_DATA);
-                input = input.add((*account).data_len as usize);
-                input = align_pointer!(input);
+                if (*account).borrow_state == NON_DUP_MARKER {
+                    input = input.add(STATIC_ACCOUNT_DATA);
+                    input = input.add((*account).data_len as usize);
+                    input = align_pointer!(input);
+                }
             }
         }
     }
