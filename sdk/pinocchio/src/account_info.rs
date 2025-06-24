@@ -120,14 +120,9 @@ impl AccountInfo {
     }
 
     /// Program that owns this account.
-    ///
-    /// # Safety
-    ///
-    /// It is undefined behaviour to use [`Self::assign`] while there is an active reference
-    /// to the `owner` returned by this method.
     #[inline(always)]
-    pub unsafe fn owner(&self) -> &Pubkey {
-        &(*self.raw).owner
+    pub fn owner(&self) -> &Pubkey {
+        unsafe { &(*self.raw).owner }
     }
 
     /// Indicates whether the transaction was signed by this account.
@@ -173,7 +168,7 @@ impl AccountInfo {
     /// Checks if the account is owned by the given program.
     #[inline(always)]
     pub fn is_owned_by(&self, program: &Pubkey) -> bool {
-        unsafe { self.owner() == program }
+        self.owner() == program
     }
 
     /// Changes the owner of the account.
