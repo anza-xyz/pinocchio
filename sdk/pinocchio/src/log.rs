@@ -150,8 +150,7 @@ pub fn sol_log_params(accounts: &[AccountInfo], data: &[u8]) {
         msg!("- Account data length");
         sol_log_64(0, 0, 0, 0, account.data_len() as u64);
         msg!("- Owner");
-        // SAFETY: The `owner` reference is only used for logging.
-        pubkey::log(unsafe { account.owner() });
+        pubkey::log(account.owner());
     }
     msg!("Instruction data");
     sol_log_slice(data);
