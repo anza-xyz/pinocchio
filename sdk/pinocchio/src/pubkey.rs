@@ -232,3 +232,54 @@ pub fn checked_create_program_address(
 
     create_program_address(seeds, program_id)
 }
+
+/// Derive a Pubkey from another Pubkey, seed, and a program id.
+/// This function does *not* validate whether the given `seed` is within
+/// the valid length or not.
+#[inline]
+pub fn create_with_seed_unchecked(
+    base: &Pubkey,
+    seed: &[u8],
+    owner: &Pubkey,
+) -> Result<Pubkey, ProgramError> {
+    #[cfg(target_os = "solana")]
+    {
+        let mut bytes = core::mem::MaybeUninit::<[u8; PUBKEY_BYTES]>::uninit();
+
+        let vals = &[base, seed, owner];
+
+        let result = unsafe {
+            crate::syscalls::sol_sha256(
+                vals as *const _ as *const u8,
+                vals.len() as u64,
+                bytes.as_mut_ptr() as *mut _,
+            )
+        };
+
+        match result {
+            // SAFETY: The syscall has initialized the bytes.
+            crate::SUCCESS => Ok(unsafe { bytes.assume_init() }),
+            _ => Err(result.into()),
+        }
+    }
+
+    #[cfg(not(target_os = "solana"))]
+    {
+        core::hint::black_box((base, seed, owner));
+        panic!("create_with_seed is only available on target `solana`")
+    }
+}
+
+/// Derive a Pubkey from another Pubkey, seed, and a program id.
+#[inline]
+pub fn create_with_seed(
+    base: &Pubkey,
+    seed: &[u8],
+    owner: &Pubkey,
+) -> Result<Pubkey, ProgramError> {
+    if seed.len() > MAX_SEED_LEN {
+        return Err(ProgramError::MaxSeedLengthExceeded);
+    }
+
+    create_with_seed_unchecked(base, seed, owner)
+}
