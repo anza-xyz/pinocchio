@@ -282,16 +282,14 @@ macro_rules! process_accounts {
 /// Parse the arguments from the runtime input buffer.
 ///
 /// This function parses the `accounts`, `instruction_data` and `program_id` from
-/// the input buffer. The `MAX_ACCOUNTS` constant defines the maximum number of accounts
-/// that can be parsed from the input buffer. If the number of accounts in the input buffer
-/// exceeds `MAX_ACCOUNTS`, the excess accounts will be ignored.
+/// the input buffer.
 ///
 /// # Safety
 ///
-///  The caller must ensure that the `input` buffer is valid, i.e., it represents the
-///  program input parameters serialized by the SVM loader. Additionally, the `input`
-///  should last for the lifetime of the program execution since the returned values
-///  reference the `input`.
+/// The caller must ensure that the `input` buffer is valid, i.e., it represents the
+/// program input parameters serialized by the SVM loader. Additionally, the `input`
+/// should last for the lifetime of the program execution since the returned values
+/// reference the `input`.
 #[inline(always)]
 pub unsafe fn parse(
     mut input: *mut u8,
@@ -317,12 +315,7 @@ pub unsafe fn parse(
         input = align_pointer!(input);
 
         if processed > 1 {
-            // The number of accounts to process (`to_process`) is limited to
-            // `MAX_ACCOUNTS`, which is the capacity of the accounts array. When there
-            // are more accounts to process than the maximum, we still need to skip the
-            // remaining accounts (`to_skip`) to move the input pointer to the instruction
-            // data. At the end, we return the number of accounts processed (`processed`),
-            // which represents the accounts initialized in the `accounts` slice.
+            // Counter for the number of accounts remaining.
             let mut to_process = processed;
 
             // This is an optimization to reduce the number of jumps required
@@ -378,10 +371,10 @@ pub unsafe fn parse(
 ///
 /// # Safety
 ///
-///  The caller must ensure that the `input` buffer is valid, i.e., it represents the
-///  program input parameters serialized by the SVM loader. Additionally, the `input`
-///  should last for the lifetime of the program execution since the returned values
-///  reference the `input`.
+/// The caller must ensure that the `input` buffer is valid, i.e., it represents the
+/// program input parameters serialized by the SVM loader. Additionally, the `input`
+/// should last for the lifetime of the program execution since the returned values
+/// reference the `input`.
 #[inline(always)]
 pub unsafe fn parse_into<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
