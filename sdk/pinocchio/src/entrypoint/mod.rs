@@ -293,7 +293,7 @@ pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
 ///
 /// The caller must ensure that the `input` buffer is valid, i.e., it represents the
 /// program input parameters serialized by the SVM loader. Additionally, the `input`
-/// should last for the lifetime of the program execution since the returnerd values
+/// should last for the lifetime of the program execution since the returned values
 /// reference the `input`.
 #[inline(always)]
 pub unsafe fn parse<const ACCOUNTS: usize>(
