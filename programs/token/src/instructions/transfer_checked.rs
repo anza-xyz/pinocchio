@@ -25,7 +25,7 @@ pub struct TransferChecked<'a> {
     pub to: &'a AccountInfo,
     /// Authority account.
     pub authority: &'a AccountInfo,
-    /// Amount of microtokens to transfer.
+    /// Amount of micro-tokens to transfer.
     pub amount: u64,
     /// Decimal for the Token
     pub decimals: u8,

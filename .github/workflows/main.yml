@@ -35,6 +35,22 @@ jobs:
         id: filter
         run: pnpm tsx ./scripts/setup/members.mts
 
+  spellcheck:
+    name: Spellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache-key: cargo-spellcheck
+          components: spellcheck
+
+      - name: cargo-spellcheck
+        run: pnpm spellcheck
+
   process:
     name: Check
     needs: sanity
