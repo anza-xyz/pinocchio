@@ -48,8 +48,8 @@ pub(crate) struct Account {
     ///
     ///   * lamport mutable borrow flag
     ///     - `7 6 5 4 3 2 1 0`
-    ///     - `x . . . . . . .`: `1` -> the lamport field can be mutably borrowed;
-    ///       `0` -> there is an outstanding mutable borrow for the lamports.
+    ///     - `x . . . . . . .`: `1` - the lamport field can be mutably borrowed;
+    ///       `0` - there is an outstanding mutable borrow for the lamports.
     ///
     ///   * lamport immutable borrow count
     ///     - `7 6 5 4 3 2 1 0`
@@ -59,8 +59,8 @@ pub(crate) struct Account {
     ///
     ///   * data mutable borrow flag
     ///     - `7 6 5 4 3 2 1 0`
-    ///     - `. . . . x . . .`:  `1` -> the account data can be mutably borrowed;
-    ///       `0` -> there is an outstanding mutable borrow for the account data.
+    ///     - `. . . . x . . .`:  `1` - the account data can be mutably borrowed;
+    ///       `0` - there is an outstanding mutable borrow for the account data.
     ///
     ///   * data immutable borrow count
     ///     - `7 6 5 4 3 2 1 0`
