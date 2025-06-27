@@ -13,22 +13,6 @@ use crate::{
 /// Maximum number of accounts that can be passed to a cross-program invocation.
 pub const MAX_CPI_ACCOUNTS: usize = 64;
 
-/// A constant to indicate that an account is read-only when passed as
-/// an account priviledge.
-pub const READONLY: bool = false;
-
-/// A constant to indicate that an account is writable when passed as
-/// an account priviledge.
-pub const WRITABLE: bool = true;
-
-/// A type representing the privileges of an account for
-/// `invoke_instruction` and `invoke_instruction_signed`.
-///
-/// The first element of the tuple indicates whether the account is
-/// writable or not, and the second element indicates whether the
-/// account is a signer or not.
-pub type Priviledge = (bool, bool);
-
 /// Invoke a cross-program instruction from an array of `AccountInfo`s.
 ///
 /// This function is a convenience wrapper around the [`invoke_signed`] function
@@ -105,11 +89,8 @@ pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
 #[inline(always)]
-pub fn invoke_with_bounds<const MAX_ACCOUNTS: usize>(
-    instruction: &Instruction,
-    account_infos: &[&AccountInfo],
-) -> ProgramResult {
-    slice_invoke_signed::<MAX_ACCOUNTS>(instruction, account_infos, &[])
+pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -> ProgramResult {
+    slice_invoke_signed(instruction, account_infos, &[])
 }
 
 /// Invoke a cross-program instruction with signatures from an array of
@@ -244,8 +225,7 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 /// `accounts` field of the `instruction`. When the instruction has duplicated
 /// accounts, it is necessary to pass a duplicated reference to the same account
 /// to maintain the 1:1 relationship between `account_infos` and `accounts`.
-#[inline(always)]
-pub fn invoke_signed<const MAX_ACCOUNTS: usize>(
+pub fn slice_invoke_signed(
     instruction: &Instruction,
     account_infos: &[&AccountInfo],
     signers_seeds: &[Signer],
@@ -410,7 +390,7 @@ pub unsafe fn invoke_signed_unchecked(
         /// DO NOT EXPOSE THIS STRUCT:
         ///
         /// To ensure pointers are valid upon use, the scope of this struct should
-        /// only be limited to the stack where `sol_invoke_signed_c` happens and then
+        /// only be limited to the stack where sol_invoke_signed_c happens and then
         /// discarded immediately after.
         #[repr(C)]
         struct CInstruction<'a> {
@@ -486,12 +466,12 @@ pub fn set_return_data(data: &[u8]) {
 ///
 /// Return data is set by the callee with [`set_return_data`].
 ///
-/// Return data is cleared before every CPI invocation - a program that
+/// Return data is cleared before every CPI invocation &mdash; a program that
 /// has invoked no other programs can expect the return data to be `None`; if no
 /// return data was set by the previous CPI invocation, then this function
 /// returns `None`.
 ///
-/// Return data is not cleared after returning from CPI invocations - a
+/// Return data is not cleared after returning from CPI invocations &mdash; a
 /// program that has called another program may retrieve return data that was
 /// not set by the called program, but instead set by a program further down the
 /// call stack; or, if a program calls itself recursively, it is possible that
