@@ -298,12 +298,31 @@ impl SlotHashes<Box<[u8]>> {
         // Prefer the zero-init-skip API when available (Rust ≥1.82) but
         // transparently fall back to a `Vec` for older compilers.
 
-        let mut data = Box::new_uninit_slice(MAX_SIZE);
-        // SAFETY: The buffer length matches the requested syscall length and we
-        // fully initialise it before use.
-        unsafe {
-            Self::fetch_into_buffer(data.as_mut_ptr() as *mut u8)?;
-            Ok(data.assume_init())
+        #[cfg(has_box_new_uninit_slice)]
+        #[allow(clippy::incompatible_msrv)]
+        {
+            // SAFETY: The buffer length matches the requested syscall length and we
+            // fully initialise it before use.
+            let mut data = Box::new_uninit_slice(MAX_SIZE);
+            unsafe {
+                Self::fetch_into_buffer(data.as_mut_ptr() as *mut u8)?;
+                Ok(data.assume_init())
+            }
+        }
+
+        #[cfg(not(has_box_new_uninit_slice))]
+        {
+            let mut vec_buf: std::vec::Vec<u8> = std::vec::Vec::with_capacity(MAX_SIZE);
+            unsafe {
+                // SAFETY: `vec_buf` was allocated with capacity `MAX_SIZE` so its
+                // pointer is valid for exactly that many bytes. `fetch_into_buffer`
+                // writes `MAX_SIZE` bytes, and we immediately set the length to
+                // `MAX_SIZE`, marking the entire buffer as initialised before it is
+                // turned into a boxed slice.
+                Self::fetch_into_buffer(vec_buf.as_mut_ptr())?;
+                vec_buf.set_len(MAX_SIZE);
+            }
+            Ok(vec_buf.into_boxed_slice())
         }
     }
 

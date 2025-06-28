@@ -7,6 +7,7 @@ license = { workspace = true }
 readme = "./README.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
+build = "build.rs" # keep 1.82.0 features out until program-tools allows us to move up from 1.79.0
 
 [lib]
 crate-type = ["rlib"]
