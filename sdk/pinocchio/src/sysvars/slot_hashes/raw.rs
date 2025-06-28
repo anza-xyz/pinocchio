@@ -8,11 +8,6 @@
 
 use super::*;
 
-pub const ERR_RAW_BAD_SHAPE: u32 = 0x10; // buffer not 8 + n*40
-pub const ERR_RAW_ENTRY_OVERFLOW: u32 = 0x11; // >512 entries possible / declared
-pub const ERR_RAW_BAD_OFFSET: u32 = 0x12; // offset not aligned or past end
-pub const ERR_RAW_LEN_TOO_SMALL: u32 = 0x13; // buffer shorter than declared length
-
 /// Validates that a buffer is properly sized for SlotHashes data.
 ///
 /// Checks that the buffer length is 8 + (N × 40) for some N ≤ 512.
@@ -28,12 +23,12 @@ pub(crate) fn validate_buffer_size(buffer_len: usize) -> Result<(), ProgramError
     // Calculate how many entries can fit
     let data_len = buffer_len - NUM_ENTRIES_SIZE;
     if data_len % ENTRY_SIZE != 0 {
-        return Err(ProgramError::Custom(ERR_RAW_BAD_SHAPE));
+        return Err(ProgramError::InvalidArgument);
     }
 
     let max_entries = data_len / ENTRY_SIZE;
     if max_entries > MAX_ENTRIES {
-        return Err(ProgramError::Custom(ERR_RAW_ENTRY_OVERFLOW));
+        return Err(ProgramError::InvalidArgument);
     }
 
     Ok(())
@@ -46,13 +41,13 @@ pub(crate) fn validate_buffer_size(buffer_len: usize) -> Result<(), ProgramError
 #[inline(always)]
 pub fn validate_fetch_offset(offset: usize, buffer_len: usize) -> Result<(), ProgramError> {
     if offset >= MAX_SIZE {
-        return Err(ProgramError::Custom(ERR_RAW_BAD_OFFSET));
+        return Err(ProgramError::InvalidArgument);
     }
     if offset != 0 && (offset < NUM_ENTRIES_SIZE || (offset - NUM_ENTRIES_SIZE) % ENTRY_SIZE != 0) {
-        return Err(ProgramError::Custom(ERR_RAW_BAD_OFFSET));
+        return Err(ProgramError::InvalidArgument);
     }
     if offset.saturating_add(buffer_len) > MAX_SIZE {
-        return Err(ProgramError::Custom(ERR_RAW_BAD_OFFSET));
+        return Err(ProgramError::InvalidArgument);
     }
 
     Ok(())
@@ -75,12 +70,12 @@ pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramErro
 
     // Reject oversized entry counts to prevent surprises.
     if num_entries > MAX_ENTRIES {
-        return Err(ProgramError::Custom(ERR_RAW_ENTRY_OVERFLOW));
+        return Err(ProgramError::InvalidArgument);
     }
 
     let required_len = NUM_ENTRIES_SIZE + num_entries * ENTRY_SIZE;
     if buffer.len() < required_len {
-        return Err(ProgramError::Custom(ERR_RAW_LEN_TOO_SMALL));
+        return Err(ProgramError::InvalidArgument);
     }
 
     Ok(num_entries)

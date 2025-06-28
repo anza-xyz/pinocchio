@@ -42,13 +42,6 @@ pub const MAX_ENTRIES: usize = 512;
 /// Max size of the sysvar data in bytes. 20488. Golden on mainnet (never smaller)
 pub const MAX_SIZE: usize = NUM_ENTRIES_SIZE + MAX_ENTRIES * ENTRY_SIZE;
 
-/// `data.len() != MAX_SIZE`
-pub const ERR_DATA_LEN_MISMATCH: u32 = 0x01;
-/// Declared entry-count > 512
-pub const ERR_ENTRYCOUNT_OVERFLOW: u32 = 0x02;
-/// Account supplied to `from_account_info` is not the SlotHashes sysvar.
-pub const ERR_WRONG_ACCOUNT_KEY: u32 = 0x03;
-
 /// A single entry in the `SlotHashes` sysvar.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(C)]
@@ -103,7 +96,7 @@ pub(crate) unsafe fn read_entry_count_from_bytes_unchecked(data: &[u8]) -> usize
 fn parse_and_validate_data(data: &[u8]) -> Result<(), ProgramError> {
     // Must be exactly the golden mainnet size
     if data.len() != MAX_SIZE {
-        return Err(ProgramError::Custom(ERR_DATA_LEN_MISMATCH));
+        return Err(ProgramError::InvalidAccountData);
     }
 
     // Read and validate the entry count from the header
@@ -111,7 +104,7 @@ fn parse_and_validate_data(data: &[u8]) -> Result<(), ProgramError> {
 
     // num_entries < 512 is allowed, for contexts which padded data up to size
     if num_entries > MAX_ENTRIES {
-        return Err(ProgramError::Custom(ERR_ENTRYCOUNT_OVERFLOW));
+        return Err(ProgramError::InvalidAccountData);
     }
     Ok(())
 }
@@ -271,7 +264,7 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
     #[inline(always)]
     pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
         if account_info.key() != &SLOTHASHES_ID {
-            return Err(ProgramError::Custom(ERR_WRONG_ACCOUNT_KEY));
+            return Err(ProgramError::InvalidArgument);
         }
 
         let data_ref = account_info.try_borrow_data()?;
