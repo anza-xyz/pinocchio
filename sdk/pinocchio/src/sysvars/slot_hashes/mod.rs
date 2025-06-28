@@ -59,6 +59,7 @@ pub struct SlotHashEntry {
     pub hash: [u8; HASH_BYTES],
 }
 
+// Fail compilation if `SlotHashEntry` is not byte-aligned.
 const _: [(); 1] = [(); mem::align_of::<SlotHashEntry>()];
 
 /// SlotHashes provides read-only, zero-copy access to SlotHashes sysvar bytes.
