@@ -10,6 +10,7 @@ pub mod clock;
 pub mod fees;
 pub mod instructions;
 pub mod rent;
+pub mod slot_hashes;
 
 /// Return value indicating that the `offset + length` is greater than the length of
 /// the sysvar data.
