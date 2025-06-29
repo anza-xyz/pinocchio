@@ -1,0 +1,15 @@
+[package]
+name = "pinocchio-token-2022"
+description = "Pinocchio helpers to invoke Token program 2022 instructions"
+version = "0.1.0"
+edition = { workspace = true }
+license = { workspace = true }
+readme = "./README.md"
+repository = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+pinocchio = { workspace = true }
+pinocchio-pubkey = { workspace = true }
