@@ -33,6 +33,8 @@ pub struct SetAuthority<'a> {
     pub authority_type: AuthorityType,
     /// The new authority
     pub new_authority: Option<&'a Pubkey>,
+    /// Token Program
+    pub token_program: &'a Pubkey,
 }
 
 impl SetAuthority<'_> {
@@ -72,7 +74,7 @@ impl SetAuthority<'_> {
         }
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: self.token_program,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
         };
