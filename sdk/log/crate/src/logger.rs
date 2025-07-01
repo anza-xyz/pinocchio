@@ -191,7 +191,14 @@ pub enum Argument {
 }
 
 /// Trait to specify the log behavior for a type.
-pub trait Log {
+///
+/// # Safety
+///
+/// The implementation must ensure that the value returned by any of the methods correctly
+/// reflects the actual number of bytes written to the buffer. Returning a value greater
+/// than the number of bytes written to the buffer will result in undefined behavior, since
+/// it will lead to reading uninitialized memory from the buffer.
+pub unsafe trait Log {
     #[inline(always)]
     fn debug(&self, buffer: &mut [MaybeUninit<u8>]) -> usize {
         self.debug_with_args(buffer, &[])
@@ -213,7 +220,7 @@ pub trait Log {
 /// Implement the log trait for unsigned integer types.
 macro_rules! impl_log_for_unsigned_integer {
     ( $type:tt, $max_digits:literal ) => {
-        impl Log for $type {
+        unsafe impl Log for $type {
             #[inline]
             fn write_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
                 if buffer.is_empty() {
@@ -373,7 +380,7 @@ impl_log_for_unsigned_integer!(usize, 20);
 /// Implement the log trait for the signed integer types.
 macro_rules! impl_log_for_signed {
     ( $type:tt ) => {
-        impl Log for $type {
+        unsafe impl Log for $type {
             #[inline]
             fn write_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
                 if buffer.is_empty() {
@@ -419,7 +426,7 @@ impl_log_for_signed!(i128);
 impl_log_for_signed!(isize);
 
 /// Implement the log trait for the &str type.
-impl Log for &str {
+unsafe impl Log for &str {
     #[inline]
     fn debug_with_args(&self, buffer: &mut [MaybeUninit<u8>], _args: &[Argument]) -> usize {
         if buffer.is_empty() {
@@ -577,7 +584,7 @@ impl Log for &str {
 /// Implement the log trait for the slice type.
 macro_rules! impl_log_for_slice {
     ( [$type:ident] ) => {
-        impl<$type> Log for &[$type]
+        unsafe impl<$type> Log for &[$type]
         where
             $type: Log
         {
@@ -585,7 +592,7 @@ macro_rules! impl_log_for_slice {
         }
     };
     ( [$type:ident; $size:ident] ) => {
-        impl<$type, const $size: usize> Log for &[$type; $size]
+        unsafe impl<$type, const $size: usize> Log for &[$type; $size]
         where
             $type: Log
         {
@@ -661,7 +668,7 @@ impl_log_for_slice!([T]);
 impl_log_for_slice!([T; N]);
 
 /// Implement the log trait for the bool type.
-impl Log for bool {
+unsafe impl Log for bool {
     #[inline]
     fn debug_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
         let value = if *self { "true" } else { "false" };
