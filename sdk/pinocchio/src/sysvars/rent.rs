@@ -52,7 +52,7 @@ pub const ACCOUNT_STORAGE_OVERHEAD: u64 = 128;
 
 /// Rent sysvar data
 #[repr(C)]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Rent {
     /// Rental rate in lamports per byte-year
     pub lamports_per_byte_year: u64,
@@ -202,6 +202,17 @@ impl Rent {
     #[inline]
     fn is_default_rent_threshold(&self) -> bool {
         u64::from_le_bytes(self.exemption_threshold.to_le_bytes()) == F64_EXEMPTION_THRESHOLD_AS_U64
+    }
+}
+
+impl Default for Rent {
+    /// Creates a new `Rent` with default values.
+    fn default() -> Self {
+        Self {
+            lamports_per_byte_year: DEFAULT_LAMPORTS_PER_BYTE_YEAR,
+            exemption_threshold: DEFAULT_EXEMPTION_THRESHOLD,
+            burn_percent: DEFAULT_BURN_PERCENT,
+        }
     }
 }
 
