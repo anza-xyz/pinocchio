@@ -224,7 +224,7 @@ macro_rules! impl_log_for_unsigned_integer {
             #[inline]
             fn write_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
                 // The maximum number of digits that the type can have.
-                const MAX_DIGITS: usize = const { $type::MAX.ilog10() as usize + 1 };
+                const MAX_DIGITS: usize = $type::MAX.ilog10() as usize + 1;
 
                 if buffer.is_empty() {
                     return 0;
