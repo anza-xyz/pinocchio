@@ -330,20 +330,25 @@ pub unsafe fn parse(
                     to_process -= 5;
                 }
 
-                // There might be remininag accounts to process.
-                if to_process > 3 {
-                    // 4..3 accounts left to process.
-                    if to_process > 4 {
+                // There might be remaining accounts to process.
+                match to_process {
+                    5 => {
                         process_accounts!(4 => (input, accounts, accounts_slice));
-                    } else {
+                    }
+                    4 => {
                         process_accounts!(3 => (input, accounts, accounts_slice));
                     }
-                } else {
-                    // 2..1 accounts left to process.
-                    if to_process > 2 {
+                    3 => {
                         process_accounts!(2 => (input, accounts, accounts_slice));
-                    } else if to_process > 1 {
+                    }
+                    2 => {
                         process_accounts!(1 => (input, accounts, accounts_slice));
+                    }
+                    1 => (),
+                    _ => {
+                        // SAFETY: `while` loop above makes sure that `to_process` has 1 to 5
+                        // entries left.
+                        unsafe { core::hint::unreachable_unchecked() }
                     }
                 }
             }
@@ -422,20 +427,25 @@ pub unsafe fn parse_into<const MAX_ACCOUNTS: usize>(
                     to_process -= 5;
                 }
 
-                // There might be remininag accounts to process.
-                if to_process > 3 {
-                    // 4..3 accounts left to process.
-                    if to_process > 4 {
+                // There might be remaining accounts to process.
+                match to_process {
+                    5 => {
                         process_accounts!(4 => (input, accounts, accounts_slice));
-                    } else {
+                    }
+                    4 => {
                         process_accounts!(3 => (input, accounts, accounts_slice));
                     }
-                } else {
-                    // 2..1 accounts left to process.
-                    if to_process > 2 {
+                    3 => {
                         process_accounts!(2 => (input, accounts, accounts_slice));
-                    } else if to_process > 1 {
+                    }
+                    2 => {
                         process_accounts!(1 => (input, accounts, accounts_slice));
+                    }
+                    1 => (),
+                    _ => {
+                        // SAFETY: `while` loop above makes sure that `to_process` has 1 to 5
+                        // entries left.
+                        unsafe { core::hint::unreachable_unchecked() }
                     }
                 }
             }
