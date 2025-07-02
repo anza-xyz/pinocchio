@@ -16,8 +16,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITE]` The mint.
 ///   1. `[WRITE]` The account to mint tokens to.
 ///   2. `[SIGNER]` The mint's minting authority.
-///
-pub struct MintTo<'a> {
+pub struct MintTo<'a, 'b> {
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Token Account.
@@ -27,10 +26,10 @@ pub struct MintTo<'a> {
     /// Amount
     pub amount: u64,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl MintTo<'_> {
+impl MintTo<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

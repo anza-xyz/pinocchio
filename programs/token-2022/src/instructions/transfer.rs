@@ -16,7 +16,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITE]` Sender account
 ///   1. `[WRITE]` Recipient account
 ///   2. `[SIGNER]` Authority account
-pub struct Transfer<'a> {
+pub struct Transfer<'a, 'b> {
     /// Sender account.
     pub from: &'a AccountInfo,
     /// Recipient account.
@@ -26,10 +26,10 @@ pub struct Transfer<'a> {
     /// Amount of microtokens to transfer.
     pub amount: u64,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl Transfer<'_> {
+impl Transfer<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

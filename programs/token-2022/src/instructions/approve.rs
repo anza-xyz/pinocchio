@@ -16,7 +16,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITE]` The token account.
 ///   1. `[]` The delegate.
 ///   2. `[SIGNER]` The source account owner.
-pub struct Approve<'a> {
+pub struct Approve<'a, 'b> {
     /// Source Account.
     pub source: &'a AccountInfo,
     /// Delegate Account
@@ -26,10 +26,10 @@ pub struct Approve<'a> {
     /// Amount
     pub amount: u64,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl Approve<'_> {
+impl Approve<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

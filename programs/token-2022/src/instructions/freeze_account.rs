@@ -12,7 +12,7 @@ use pinocchio::{
 ///   0. `[WRITE]` The account to freeze.
 ///   1. `[]` The token mint.
 ///   2. `[SIGNER]` The mint freeze authority.
-pub struct FreezeAccount<'a> {
+pub struct FreezeAccount<'a, 'b> {
     /// Token Account to freeze.
     pub account: &'a AccountInfo,
     /// Mint Account.
@@ -20,10 +20,10 @@ pub struct FreezeAccount<'a> {
     /// Mint Freeze Authority Account
     pub freeze_authority: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl FreezeAccount<'_> {
+impl FreezeAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

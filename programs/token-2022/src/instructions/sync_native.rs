@@ -12,14 +12,14 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE]`  The native token account to sync with its underlying
 ///      lamports.
-pub struct SyncNative<'a> {
+pub struct SyncNative<'a, 'b> {
     /// Native Token Account
     pub native_token: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl SyncNative<'_> {
+impl SyncNative<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

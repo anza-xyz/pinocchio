@@ -17,7 +17,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   1. `[]` The token mint.
 ///   2. `[]` The delegate.
 ///   3. `[SIGNER]` The source account owner.
-pub struct ApproveChecked<'a> {
+pub struct ApproveChecked<'a, 'b> {
     /// Source Account.
     pub source: &'a AccountInfo,
     /// Mint Account.
@@ -31,10 +31,10 @@ pub struct ApproveChecked<'a> {
     /// Decimals.
     pub decimals: u8,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl ApproveChecked<'_> {
+impl ApproveChecked<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

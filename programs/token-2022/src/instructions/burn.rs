@@ -16,7 +16,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITE]` The account to burn from.
 ///   1. `[WRITE]` The token mint.
 ///   2. `[SIGNER]` The account's owner/delegate.
-pub struct Burn<'a> {
+pub struct Burn<'a, 'b> {
     /// Source of the Burn Account
     pub account: &'a AccountInfo,
     /// Mint Account
@@ -26,10 +26,10 @@ pub struct Burn<'a> {
     /// Amount
     pub amount: u64,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl Burn<'_> {
+impl Burn<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
