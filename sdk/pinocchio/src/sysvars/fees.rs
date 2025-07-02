@@ -4,7 +4,7 @@ use super::{clock::DEFAULT_MS_PER_SLOT, Sysvar};
 use crate::impl_sysvar_get;
 
 /// Fee calculator for processing transactions
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct FeeCalculator {
     /// The current cost of a signature in lamports.
     /// This amount may increase/decrease over time based on cluster processing
@@ -74,7 +74,7 @@ impl FeeRateGovernor {
 }
 
 /// Fees sysvar
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Fees {
     /// Fee calculator for processing transactions
     pub fee_calculator: FeeCalculator,
