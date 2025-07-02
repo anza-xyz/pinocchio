@@ -11,16 +11,16 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE]` The source account.
 ///   1. `[SIGNER]` The source account owner.
-pub struct Revoke<'a> {
+pub struct Revoke<'a, 'b> {
     /// Source Account.
     pub source: &'a AccountInfo,
     ///  Source Owner Account.
     pub authority: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl Revoke<'_> {
+impl Revoke<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
