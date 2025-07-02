@@ -205,17 +205,6 @@ impl Rent {
     }
 }
 
-impl Default for Rent {
-    /// Creates a new `Rent` with default values.
-    fn default() -> Self {
-        Self {
-            lamports_per_byte_year: DEFAULT_LAMPORTS_PER_BYTE_YEAR,
-            exemption_threshold: DEFAULT_EXEMPTION_THRESHOLD,
-            burn_percent: DEFAULT_BURN_PERCENT,
-        }
-    }
-}
-
 impl Sysvar for Rent {
     impl_sysvar_get!(sol_get_rent_sysvar);
 }
