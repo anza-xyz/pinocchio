@@ -17,7 +17,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   1. `[]` The token mint.
 ///   2. `[WRITE]` The destination account.
 ///   3. `[SIGNER]` The source account's owner/delegate.
-pub struct TransferChecked<'a> {
+pub struct TransferChecked<'a, 'b> {
     /// Sender account.
     pub from: &'a AccountInfo,
     /// Mint Account
@@ -31,10 +31,10 @@ pub struct TransferChecked<'a> {
     /// Decimal for the Token
     pub decimals: u8,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl TransferChecked<'_> {
+impl TransferChecked<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

@@ -51,7 +51,7 @@ impl Mint {
             return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
-            Self::from_bytes(data)
+            Self::from_bytes_unchecked(data)
         }))
     }
 
@@ -74,16 +74,21 @@ impl Mint {
         if account_info.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Self::from_bytes(account_info.borrow_data_unchecked()))
+        Ok(Self::from_bytes_unchecked(
+            account_info.borrow_data_unchecked(),
+        ))
     }
 
     /// Return a `Mint` from the given bytes.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `bytes` contains a valid representation of `Mint`.
+    /// The caller must ensure that `bytes` contains a valid representation of `Mint`, and
+    /// it is properly aligned to be interpreted as an instance of `Mint`.
+    /// At the moment `Mint` has an alignment of 1 byte.
+    /// This method does not perform a length validation.
     #[inline(always)]
-    pub unsafe fn from_bytes(bytes: &[u8]) -> &Self {
+    pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes[..Self::BASE_LEN].as_ptr() as *const Mint)
     }
 
@@ -110,7 +115,7 @@ impl Mint {
     }
 
     pub fn supply(&self) -> u64 {
-        unsafe { core::ptr::read_unaligned(self.supply.as_ptr() as *const u64) }
+        u64::from_le_bytes(self.supply)
     }
 
     pub fn decimals(&self) -> u8 {

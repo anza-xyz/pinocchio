@@ -12,7 +12,7 @@ use pinocchio::{
 ///   0. `[WRITE]` The account to close.
 ///   1. `[WRITE]` The destination account.
 ///   2. `[SIGNER]` The account's owner.
-pub struct CloseAccount<'a> {
+pub struct CloseAccount<'a, 'b> {
     /// Token Account.
     pub account: &'a AccountInfo,
     /// Destination Account
@@ -20,10 +20,10 @@ pub struct CloseAccount<'a> {
     /// Owner Account
     pub authority: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl CloseAccount<'_> {
+impl CloseAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

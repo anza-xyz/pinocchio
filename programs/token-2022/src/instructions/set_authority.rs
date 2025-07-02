@@ -24,7 +24,7 @@ pub enum AuthorityType {
 /// ### Accounts:
 ///   0. `[WRITE]` The mint or account to change the authority of.
 ///   1. `[SIGNER]` The current authority of the mint or account.
-pub struct SetAuthority<'a> {
+pub struct SetAuthority<'a, 'b> {
     /// Account (Mint or Token)
     pub account: &'a AccountInfo,
     /// Authority of the Account.
@@ -34,10 +34,10 @@ pub struct SetAuthority<'a> {
     /// The new authority
     pub new_authority: Option<&'a Pubkey>,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl SetAuthority<'_> {
+impl SetAuthority<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

@@ -15,7 +15,7 @@ use pinocchio::{
 ///   0. `[WRITE]` The account to burn from.
 ///   1. `[WRITE]` The token mint.
 ///   2. `[SIGNER]` The account's owner/delegate.
-pub struct BurnChecked<'a> {
+pub struct BurnChecked<'a, 'b> {
     /// Source of the Burn Account
     pub account: &'a AccountInfo,
     /// Mint Account
@@ -27,10 +27,10 @@ pub struct BurnChecked<'a> {
     /// Decimals
     pub decimals: u8,
     /// Token Program
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl BurnChecked<'_> {
+impl BurnChecked<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
