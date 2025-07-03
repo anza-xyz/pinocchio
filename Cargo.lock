@@ -144,8 +144,8 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "solana-program-error"
-version = "2.2.1"
-source = "git+https://github.com/kevinheavey/solana-sdk.git?branch=program-error-pinocchio-compat#19430020ac0b45344a22dff070240dec4de818bf"
+version = "2.2.2"
+source = "git+https://github.com/kevinheavey/solana-sdk.git?branch=program-error-pinocchio-compat#52139f4775c7a65b1f5da42c8f9d0b47af9a6612"
 
 [[package]]
 name = "syn"

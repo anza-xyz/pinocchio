@@ -21,4 +21,4 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 std = ["solana-program-error/std"]
 
 [dependencies]
-solana-program-error = { version = "2.2.1", git = "https://github.com/kevinheavey/solana-sdk.git", branch = "program-error-pinocchio-compat" }
+solana-program-error = { version = "2.2.2", git = "https://github.com/kevinheavey/solana-sdk.git", branch = "program-error-pinocchio-compat" }
