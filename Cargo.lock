@@ -35,6 +35,9 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "pinocchio"
 version = "0.8.4"
+dependencies = [
+ "solana-program-error",
+]
 
 [[package]]
 name = "pinocchio-associated-token-account"
@@ -138,6 +141,11 @@ name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
+
+[[package]]
+name = "solana-program-error"
+version = "2.2.2"
+source = "git+https://github.com/kevinheavey/solana-sdk.git?branch=program-error-pinocchio-compat#52139f4775c7a65b1f5da42c8f9d0b47af9a6612"
 
 [[package]]
 name = "syn"
