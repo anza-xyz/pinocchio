@@ -4,6 +4,7 @@ use crate::impl_sysvar_get;
 pub const HASH_BYTES: usize = 32;
 
 #[derive(Default, Debug, Clone)]
+#[repr(transparent)]
 pub struct Hash([u8; HASH_BYTES]);
 
 impl Hash {
