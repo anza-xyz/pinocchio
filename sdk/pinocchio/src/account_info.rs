@@ -16,21 +16,6 @@ use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
 /// single top-level instruction.
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
-/// Represents masks for borrow state of an account.
-#[repr(u8)]
-#[derive(Clone, Copy)]
-pub enum BorrowState {
-    /// Mask to check whether an account is already borrowed.
-    ///
-    /// This will test both data and lamports borrow state.
-    Borrowed = 0b_1111_1111,
-
-    /// Mask to check whether an account is already mutably borrowed.
-    ///
-    /// This will test both data and lamports mutable borrow state.
-    MutablyBorrowed = 0b_1000_1000,
-}
-
 /// Raw account data.
 ///
 /// This data is wrapped in an `AccountInfo` struct, which provides safe access
@@ -289,13 +274,13 @@ impl AccountInfo {
         //
         // "consumes" the mutable borrow for lamports; we are guaranteed
         // that lamports are not already borrowed in any form
-        unsafe { *borrow_state &= 0b_0111_1111 };
+        unsafe { *borrow_state &= UNSET_MUTABLE_LAMPORTS_BIT };
 
         // return the mutable reference to lamports
         Ok(RefMut {
             value: unsafe { NonNull::from(&mut (*self.raw).lamports) },
             state: unsafe { NonNull::new_unchecked(borrow_state) },
-            borrow_mask: LAMPORTS_MASK,
+            borrow_mask: MUTABLE_LAMPORTS_BORROW_BIT,
             marker: PhantomData,
         })
     }
@@ -315,12 +300,12 @@ impl AccountInfo {
         let borrow_state = unsafe { (*self.raw).borrow_state };
 
         // check if mutable borrow is already taken
-        if borrow_state & 0b_1000_0000 != 0b_1000_0000 {
+        if borrow_state & MUTABLE_LAMPORTS_BORROW_BIT != MUTABLE_LAMPORTS_BORROW_BIT {
             return Err(ProgramError::AccountBorrowFailed);
         }
 
         // check if we have reached the max immutable borrow count
-        if borrow_state & 0b_0111_0000 == 0 {
+        if borrow_state & IMMUTABLE_LAMPORTS_BITS == 0 {
             return Err(ProgramError::AccountBorrowFailed);
         }
 
@@ -342,7 +327,7 @@ impl AccountInfo {
         let borrow_state = unsafe { (*self.raw).borrow_state };
 
         // check if any borrow (mutable or immutable) is already taken for lamports
-        if borrow_state & 0b_1111_0000 != 0b_1111_0000 {
+        if borrow_state & LAMPORTS_BITS != LAMPORTS_BITS {
             return Err(ProgramError::AccountBorrowFailed);
         }
 
@@ -384,13 +369,13 @@ impl AccountInfo {
         //
         // "consumes" the mutable borrow for account data; we are guaranteed
         // that account data are not already borrowed in any form
-        unsafe { *borrow_state &= 0b_1111_0111 };
+        unsafe { *borrow_state &= UNSET_MUTABLE_DATA_BIT };
 
         // return the mutable reference to data
         Ok(RefMut {
             value: unsafe { NonNull::from(from_raw_parts_mut(self.data_ptr(), self.data_len())) },
             state: unsafe { NonNull::new_unchecked(borrow_state) },
-            borrow_mask: DATA_MASK,
+            borrow_mask: MUTABLE_DATA_BORRROW_BIT,
             marker: PhantomData,
         })
     }
@@ -411,12 +396,12 @@ impl AccountInfo {
 
         // check if mutable data borrow is already taken (most significant bit
         // of the data borrow state)
-        if borrow_state & 0b_0000_1000 == 0 {
+        if borrow_state & MUTABLE_DATA_BORRROW_BIT == 0 {
             return Err(ProgramError::AccountBorrowFailed);
         }
 
         // check if we have reached the max immutable data borrow count (7)
-        if borrow_state & 0b_0000_0111 == 0 {
+        if borrow_state & IMMUTABLE_DATA_BITS == 0 {
             return Err(ProgramError::AccountBorrowFailed);
         }
 
@@ -438,7 +423,7 @@ impl AccountInfo {
         let borrow_state = unsafe { (*self.raw).borrow_state };
 
         // check if any borrow (mutable or immutable) is already taken for data
-        if borrow_state & 0b_0000_1111 != 0b_0000_1111 {
+        if borrow_state & DATA_BITS != DATA_BITS {
             return Err(ProgramError::AccountBorrowFailed);
         }
 
@@ -610,6 +595,49 @@ impl AccountInfo {
     }
 }
 
+/// Mask to "consume" the mutable borrow bit for lamports.
+const UNSET_MUTABLE_LAMPORTS_BIT: u8 = 0b_0111_1111;
+
+/// Mask representing the immutable borrow bits for lamports.
+const IMMUTABLE_LAMPORTS_BITS: u8 = 0b_0111_0000;
+
+/// Mask representing the borrow bits for lamports.
+const LAMPORTS_BITS: u8 = 0b_1111_0000;
+
+/// Mask to assert the mutable borrow lamports bit.
+const MUTABLE_LAMPORTS_BORROW_BIT: u8 = 0b_1000_0000;
+
+/// Mask to "consume" the mutable borrow bit for data.
+const UNSET_MUTABLE_DATA_BIT: u8 = 0b_1111_0111;
+
+/// Mask representing the immutable borrow bits for data.
+const IMMUTABLE_DATA_BITS: u8 = 0b_0000_0111;
+
+/// Mask representing the borrow bits for data.
+const DATA_BITS: u8 = 0b_0000_1111;
+
+/// Mask to assert the mutable borrow data bit.
+const MUTABLE_DATA_BORRROW_BIT: u8 = 0b_0000_1000;
+
+/// Represents masks for borrow state of an account.
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum BorrowState {
+    /// Mask to check whether an account is already borrowed.
+    ///
+    /// This will test both data and lamports borrow state. Any position
+    /// in the borrow byte that is not set means that the account
+    /// is borrowed in that state.
+    Borrowed = 0b_1111_1111,
+
+    /// Mask to check whether an account is already mutably borrowed.
+    ///
+    /// This will test both data and lamports mutable borrow state. If
+    /// one of the mutably borrowed bits is not set, then the account
+    /// is mutably borrowed in that state.
+    MutablyBorrowed = 0b_1000_1000,
+}
+
 /// Bytes to shift to get to the borrow state of lamports.
 const LAMPORTS_SHIFT: u8 = 4;
 
@@ -680,12 +708,6 @@ impl<T: ?Sized> Drop for Ref<'_, T> {
         unsafe { *self.state.as_mut() += 1 << self.borrow_shift };
     }
 }
-
-/// Mask representing the mutable borrow flag for lamports.
-const LAMPORTS_MASK: u8 = 0b_1000_0000;
-
-/// Mask representing the mutable borrow flag for data.
-const DATA_MASK: u8 = 0b_0000_1000;
 
 /// Mutable reference to account data or lamports with checked borrow rules.
 pub struct RefMut<'a, T: ?Sized> {
@@ -841,11 +863,11 @@ mod tests {
     #[test]
     fn test_data_ref_mut() {
         let mut data: [u8; 4] = [0, 1, 2, 3];
-        let mut state = 0b_1111_0111;
+        let mut state = UNSET_MUTABLE_DATA_BIT;
 
         let ref_data = RefMut {
             value: NonNull::from(&mut data),
-            borrow_mask: DATA_MASK,
+            borrow_mask: MUTABLE_DATA_BORRROW_BIT,
             // borrow state must be a mutable reference
             state: NonNull::from(&mut state),
             marker: PhantomData,
@@ -857,7 +879,7 @@ mod tests {
 
         *new_ref = 4;
 
-        assert_eq!(state, 0b_1111_0111);
+        assert_eq!(state, UNSET_MUTABLE_DATA_BIT);
         assert_eq!(*new_ref, 4);
 
         drop(new_ref);
@@ -869,11 +891,11 @@ mod tests {
     #[test]
     fn test_lamports_ref_mut() {
         let mut lamports: u64 = 10000;
-        let mut state = 0b_0111_1111;
+        let mut state = UNSET_MUTABLE_LAMPORTS_BIT;
 
         let ref_lamports = RefMut {
             value: NonNull::from(&mut lamports),
-            borrow_mask: LAMPORTS_MASK,
+            borrow_mask: MUTABLE_LAMPORTS_BORROW_BIT,
             // borrow state must be a mutable reference
             state: NonNull::from(&mut state),
             marker: PhantomData,
@@ -884,7 +906,7 @@ mod tests {
             lamports
         });
 
-        assert_eq!(state, 0b_0111_1111);
+        assert_eq!(state, UNSET_MUTABLE_LAMPORTS_BIT);
         assert_eq!(*new_ref, 200);
 
         drop(new_ref);
