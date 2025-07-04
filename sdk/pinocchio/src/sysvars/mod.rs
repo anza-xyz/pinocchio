@@ -7,6 +7,7 @@ use crate::{program_error::ProgramError, pubkey::Pubkey};
 use core::hint::black_box;
 
 pub mod clock;
+pub mod epoch_rewards;
 pub mod fees;
 pub mod instructions;
 pub mod rent;
