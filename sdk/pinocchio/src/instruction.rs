@@ -73,19 +73,32 @@ pub struct Account<'a> {
     _account_info: PhantomData<&'a AccountInfo>,
 }
 
+/// Return a pointer to a field of type `U` at the given offset from the pointer to `T`.
 #[inline(always)]
 const fn offset<T, U>(ptr: *const T, offset: usize) -> *const U {
     unsafe { (ptr as *const u8).add(offset) as *const U }
 }
 
+/// Offset for the `key` field in the `Account` struct.
+const ACCOUNT_KEY_OFFSET: usize = 8;
+
+/// Offset for the `owner` field in the `Account` struct.
+const ACCOUNT_OWNER_OFFSET: usize = 40;
+
+/// Offset for the `lamports` field in the `Account` struct.
+const ACCOUNT_LAMPORTS_OFFSET: usize = 72;
+
+/// Offset for the `data` field in the `Account` struct.
+const ACCOUNT_DATA_OFFSET: usize = 88;
+
 impl<'a> From<&'a AccountInfo> for Account<'a> {
     fn from(account: &'a AccountInfo) -> Self {
         Account {
-            key: offset(account.raw, 8),
-            lamports: offset(account.raw, 72),
+            key: offset(account.raw, ACCOUNT_KEY_OFFSET),
+            lamports: offset(account.raw, ACCOUNT_LAMPORTS_OFFSET),
             data_len: account.data_len() as u64,
-            data: offset(account.raw, 88),
-            owner: offset(account.raw, 40),
+            data: offset(account.raw, ACCOUNT_DATA_OFFSET),
+            owner: offset(account.raw, ACCOUNT_OWNER_OFFSET),
             // The `rent_epoch` field is not present in the `AccountInfo` struct,
             // since the value occurs after the variable data of the account in
             // the runtime input data.
