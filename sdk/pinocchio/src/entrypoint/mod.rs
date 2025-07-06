@@ -318,22 +318,22 @@ pub unsafe fn parse(
 
         if processed > 1 {
             // Counter for the number of accounts remaining.
-            let mut to_process = processed;
+            let mut to_process_plus_one = processed;
 
             // This is an optimization to reduce the number of jumps required
             // to process the accounts. The macro `process_accounts` will generate
             // inline code to process the specified number of accounts.
-            if to_process == 2 {
+            if to_process_plus_one == 2 {
                 process_accounts!(1 => (input, accounts, accounts_slice));
             } else {
-                while to_process > 5 {
+                while to_process_plus_one > 5 {
                     // Process 5 accounts at a time.
                     process_accounts!(5 => (input, accounts, accounts_slice));
-                    to_process -= 5;
+                    to_process_plus_one -= 5;
                 }
 
                 // There might be remaining accounts to process.
-                match to_process {
+                match to_process_plus_one {
                     5 => {
                         process_accounts!(4 => (input, accounts, accounts_slice));
                     }
@@ -348,8 +348,8 @@ pub unsafe fn parse(
                     }
                     1 => (),
                     _ => {
-                        // SAFETY: `while` loop above makes sure that `to_process` has 1 to 5
-                        // entries left.
+                        // SAFETY: `while` loop above makes sure that `to_process_plus_one`
+                        // has 1 to 5 entries left.
                         unsafe { core::hint::unreachable_unchecked() }
                     }
                 }
