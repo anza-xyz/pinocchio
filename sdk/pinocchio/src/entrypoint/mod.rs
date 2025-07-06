@@ -209,6 +209,8 @@ macro_rules! program_entrypoint {
 /// Align a pointer to the BPF alignment of `u128`.
 macro_rules! align_pointer {
     ($ptr:ident) => {
+        // integer-to-pointer cast: the resulting pointer will have the same provenance as
+        // the original pointer and it follows the alignment requirement for the input.
         (($ptr as usize + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1)) as *mut u8
     };
 }
@@ -738,5 +740,207 @@ unsafe impl core::alloc::GlobalAlloc for NoAllocator {
     #[inline]
     unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
         // I deny all allocations, so I don't need to free.
+    }
+}
+
+#[cfg(all(test, not(target_os = "solana")))]
+mod tests {
+    extern crate std;
+
+    use core::{alloc::Layout, ptr::copy_nonoverlapping};
+    use std::{
+        alloc::{alloc, dealloc},
+        vec,
+    };
+
+    use super::*;
+
+    /// The mock program ID used for testing.
+    const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
+
+    /// An uninitialized account info.
+    const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
+
+    /// Struct representing a memory region with a specific alignment.
+    struct AlignedMemory {
+        ptr: *mut u8,
+        layout: Layout,
+    }
+
+    impl AlignedMemory {
+        pub fn new(len: usize) -> Self {
+            let layout = Layout::from_size_align(len, BPF_ALIGN_OF_U128).unwrap();
+            // SAFETY: `align` is set to `BPF_ALIGN_OF_U128`.
+            unsafe {
+                let ptr = alloc(layout);
+                if ptr.is_null() {
+                    std::alloc::handle_alloc_error(layout);
+                }
+                AlignedMemory { ptr, layout }
+            }
+        }
+
+        /// Write data to the memory region at the specified offset.
+        ///
+        /// # Safety
+        ///
+        /// The caller must ensure that the `data` length does not exceed the
+        /// remaining space in the memory region starting from the `offset`.
+        pub unsafe fn write(&mut self, data: &[u8], offset: usize) {
+            copy_nonoverlapping(data.as_ptr(), self.ptr.add(offset), data.len());
+        }
+
+        /// Return a mutable pointer to the memory region.
+        pub fn as_mut_ptr(&mut self) -> *mut u8 {
+            self.ptr
+        }
+    }
+
+    impl Drop for AlignedMemory {
+        fn drop(&mut self) {
+            unsafe {
+                dealloc(self.ptr, self.layout);
+            }
+        }
+    }
+
+    /// Creates an input buffer with a specified number of accounts and
+    /// instruction data.
+    ///
+    /// This function mimics the input buffer created by the SVM loader.
+    /// Each account created has zeroed data, apart from the `data_len`
+    /// field, which is set to the index of the account.
+    ///
+    /// # Safety
+    ///
+    /// The returned `AlignedMemory` should only be used within the test
+    /// context.
+    unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemory {
+        let mut input = AlignedMemory::new(1_000_000_000);
+        // Number of accounts.
+        input.write(&(accounts as u64).to_le_bytes(), 0);
+        let mut offset = size_of::<u64>();
+
+        for i in 0..accounts {
+            // Account data.
+            let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
+            account[0] = NON_DUP_MARKER;
+            // Set the accounts data length. The actual account data is zeroed.
+            account[80..88].copy_from_slice(&i.to_le_bytes());
+            input.write(&account, offset);
+            offset += account.len();
+            // Padding for the account data to align to `BPF_ALIGN_OF_U128`.
+            let padding_for_data = (i + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1);
+            input.write(&vec![0u8; padding_for_data], offset);
+            offset += padding_for_data;
+        }
+
+        // Instruction data length.
+        input.write(&instruction_data.len().to_le_bytes(), offset);
+        offset += size_of::<u64>();
+        // Instruction data.
+        input.write(instruction_data, offset);
+        offset += instruction_data.len();
+        // Program ID (mock).
+        input.write(&MOCK_PROGRAM_ID, offset);
+
+        input
+    }
+
+    /// Asserts that the accounts slice contains the expected number of accounts
+    /// and that each account's data length matches its index.
+    fn assert_accounts(accounts: &[MaybeUninit<AccountInfo>]) {
+        for (i, account) in accounts.iter().enumerate() {
+            let account_info = unsafe { account.assume_init_ref() };
+            assert_eq!(account_info.data_len(), i);
+        }
+    }
+
+    #[test]
+    fn test_parse() {
+        let ix_data = [3u8; 10];
+
+        // Input with 0 accounts.
+
+        let mut input = unsafe { create_input(0, &ix_data) };
+        let mut accounts = [UNINIT; MAX_TX_ACCOUNTS];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { parse(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 0);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+
+        // Input with 3 accounts.
+
+        let mut input = unsafe { create_input(3, &ix_data) };
+        let mut accounts = [UNINIT; MAX_TX_ACCOUNTS];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { parse(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 3);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+        assert_accounts(&accounts[..count]);
+
+        // Input with `MAX_TX_ACCOUNTS` accounts.
+
+        let mut input = unsafe { create_input(MAX_TX_ACCOUNTS, &ix_data) };
+        let mut accounts = [UNINIT; MAX_TX_ACCOUNTS];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { parse(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, MAX_TX_ACCOUNTS);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+        assert_accounts(&accounts);
+    }
+
+    #[test]
+    fn test_parse_into() {
+        let ix_data = [3u8; 100];
+
+        // Input with 0 accounts.
+
+        let mut input = unsafe { create_input(0, &ix_data) };
+        let mut accounts = [UNINIT; 1];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { parse_into(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 0);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+
+        // Input with 3 accounts but the accounts array has only space
+        // for 1.
+
+        let mut input = unsafe { create_input(3, &ix_data) };
+        let mut accounts = [UNINIT; 1];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { parse_into(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 1);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+        assert_accounts(&accounts[..count]);
+
+        // Input with `MAX_TX_ACCOUNTS` accounts but accounts array has
+        // only space for 64.
+
+        let mut input = unsafe { create_input(MAX_TX_ACCOUNTS, &ix_data) };
+        let mut accounts = [UNINIT; 64];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { parse_into(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 64);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+        assert_accounts(&accounts);
     }
 }
