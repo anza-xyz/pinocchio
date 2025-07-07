@@ -11,6 +11,16 @@ rust-version = { workspace = true }
 [lib]
 crate-type = ["rlib"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(target_os, values("solana"))',
+] }
+
+[features]
+base58 = ["dep:five8_const"]
+sha2 = ["dep:sha2-const-stable"]
+
 [dependencies]
-five8_const = { workspace = true }
+five8_const = { workspace = true, optional = true }
 pinocchio = { workspace = true }
+sha2-const-stable = { version = "0.1.0", optional = true }
