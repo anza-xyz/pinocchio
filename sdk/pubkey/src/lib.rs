@@ -7,6 +7,8 @@ pub use five8_const::decode_32_const;
 
 pub use pinocchio::pubkey::Pubkey as __Pubkey;
 use pinocchio::pubkey::{MAX_SEEDS, PDA_MARKER};
+#[cfg(target_os = "solana")]
+use pinocchio::syscalls::sol_sha256;
 
 #[cfg(feature = "sha2")]
 use sha2_const_stable::Sha256;

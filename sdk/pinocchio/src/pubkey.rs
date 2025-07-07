@@ -1,8 +1,6 @@
 //! Public key type and functions.
 
 use crate::program_error::ProgramError;
-#[cfg(target_os = "solana")]
-use crate::syscalls::sol_sha256;
 
 /// Number of bytes in a pubkey.
 pub const PUBKEY_BYTES: usize = 32;
