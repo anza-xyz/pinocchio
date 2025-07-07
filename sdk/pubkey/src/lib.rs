@@ -2,16 +2,14 @@
 
 use core::mem::MaybeUninit;
 
-#[cfg(feature = "base58")]
-pub use five8_const::decode_32_const;
-
-pub use pinocchio::pubkey::Pubkey as __Pubkey;
-use pinocchio::pubkey::{MAX_SEEDS, PDA_MARKER};
+use pinocchio::pubkey::{Pubkey, MAX_SEEDS, PDA_MARKER};
 #[cfg(target_os = "solana")]
 use pinocchio::syscalls::sol_sha256;
 
-#[cfg(feature = "sha2")]
-use sha2_const_stable::Sha256;
+#[cfg(feature = "const")]
+use const_crypto::{bs58::decode_pubkey, sha2::Sha256};
+#[cfg(feature = "const")]
+pub use pinocchio::pubkey::Pubkey as __Pubkey;
 
 /// Derive a [program address][pda] from the given seeds, bump and program id.
 ///
@@ -22,11 +20,7 @@ use sha2_const_stable::Sha256;
 /// (off-curve) program derived address. It is intended for use in cases where the
 /// seeds, bump, and program id are known to be valid, and the caller wants to derive
 /// the address without incurring the cost of the `create_program_address` syscall.
-pub fn derive_address<const N: usize>(
-    seeds: &[&[u8]; N],
-    bump: u8,
-    program_id: &__Pubkey,
-) -> __Pubkey {
+pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: &Pubkey) -> Pubkey {
     const {
         if N > MAX_SEEDS {
             panic!("number of seeds must be less than `MAX_SEEDS`");
@@ -88,7 +82,7 @@ pub fn derive_address<const N: usize>(
 /// the address without incurring the cost of the `create_program_address` syscall.
 ///
 /// This function is a compile-time constant version of [`derive_address`].
-#[cfg(feature = "sha2")]
+#[cfg(feature = "const")]
 pub const fn derive_address_const<const N: usize>(
     seeds: &[&[u8]; N],
     bump: u8,
@@ -118,7 +112,7 @@ pub const fn derive_address_const<const N: usize>(
 }
 
 /// Convenience macro to define a static `Pubkey` value.
-#[cfg(feature = "base58")]
+#[cfg(feature = "const")]
 #[macro_export]
 macro_rules! pubkey {
     ( $id:literal ) => {
@@ -130,7 +124,7 @@ macro_rules! pubkey {
 ///
 /// This macro also defines a helper function to check whether a given pubkey is
 /// equal to the program ID.
-#[cfg(feature = "base58")]
+#[cfg(feature = "const")]
 #[macro_export]
 macro_rules! declare_id {
     ( $id:expr ) => {
@@ -152,8 +146,8 @@ macro_rules! declare_id {
 }
 
 /// Create a `Pubkey` from a `&str`.
-#[cfg(feature = "base58")]
+#[cfg(feature = "const")]
 #[inline(always)]
 pub const fn from_str(value: &str) -> __Pubkey {
-    decode_32_const(value)
+    decode_pubkey(value)
 }

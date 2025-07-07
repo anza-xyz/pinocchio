@@ -17,10 +17,9 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
-base58 = ["dep:five8_const"]
-sha2 = ["dep:sha2-const-stable"]
+default = ["const"]
+const = ["dep:const-crypto"]
 
 [dependencies]
-five8_const = { workspace = true, optional = true }
+const-crypto = { version = "0.3.0", optional = true }
 pinocchio = { workspace = true }
-sha2-const-stable = { version = "0.1.0", optional = true }
