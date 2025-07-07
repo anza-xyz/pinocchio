@@ -148,6 +148,6 @@ macro_rules! declare_id {
 /// Create a `Pubkey` from a `&str`.
 #[cfg(feature = "const")]
 #[inline(always)]
-pub const fn from_str(value: &str) -> __Pubkey {
+pub const fn from_str(value: &str) -> Pubkey {
     decode_pubkey(value)
 }
