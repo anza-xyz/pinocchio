@@ -13,4 +13,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 pinocchio = { version = "0.8.4", path = "../../sdk/pinocchio" }
-pinocchio-pubkey = { workspace = true }
+pinocchio-pubkey = { workspace = true, features = ["base58"] }
