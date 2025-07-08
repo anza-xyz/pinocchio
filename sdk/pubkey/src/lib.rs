@@ -1,19 +1,33 @@
 #![no_std]
 
-use core::mem::MaybeUninit;
+#[cfg(feature = "const")]
+pub mod reexport {
+    pub use pinocchio::pubkey::Pubkey;
+}
 
+#[cfg(feature = "const")]
+use const_crypto::{bs58::decode_pubkey, sha2::Sha256};
+use core::mem::MaybeUninit;
 use pinocchio::pubkey::{Pubkey, MAX_SEEDS, PDA_MARKER};
 #[cfg(target_os = "solana")]
 use pinocchio::syscalls::sol_sha256;
 
-#[cfg(feature = "const")]
-use const_crypto::{bs58::decode_pubkey, sha2::Sha256};
-#[cfg(feature = "const")]
-pub use pinocchio::pubkey::Pubkey as __Pubkey;
-
 /// Derive a [program address][pda] from the given seeds, bump and program id.
 ///
 /// [pda]: https://solana.com/docs/core/pda
+///
+/// This function avoids the cost of the `create_program_address` syscall,
+/// which is `1500` compute units, by directly computing the derived address
+/// calculating the hash of the seeds, bump, and program id using the
+/// `sol_sha256` syscall.
+///
+/// Even when a program stores a bump to derive a program address, it is necessary
+/// to use the [`pinocchio::pubkey::create_program_address`] to validate the
+/// derivation. In most cases, the program has the correct seeds for the derivation,
+/// so it would be sufficient to just perform the derivation and compare it against
+/// the expected resulting address.
+///
+/// # Important
 ///
 /// This function differs from [`pinocchio::pubkey::create_program_address`] in that it
 /// does not perform a validation to ensure that the derived address is a valid
@@ -22,16 +36,17 @@ pub use pinocchio::pubkey::Pubkey as __Pubkey;
 /// the address without incurring the cost of the `create_program_address` syscall.
 pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: &Pubkey) -> Pubkey {
     const {
-        if N > MAX_SEEDS {
-            panic!("number of seeds must be less than `MAX_SEEDS`");
-        }
+        assert!(
+            N <= MAX_SEEDS,
+            "number of seeds must be less than MAX_SEEDS"
+        );
     }
 
     const UNINIT: MaybeUninit<&[u8]> = MaybeUninit::<&[u8]>::uninit();
     let mut data = [UNINIT; MAX_SEEDS + 3];
     let mut i = 0;
 
-    while i < seeds.len() {
+    while i < N {
         // SAFETY: `data` is guanranteed to have enough space for `N` seeds,
         // so `i` will always be within bounds.
         unsafe {
@@ -57,13 +72,13 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: 
         // SAFETY: `data` has `i + 3` elements initialized.
         unsafe {
             sol_sha256(
-                data.as_ptr() as *const _ as *const u8,
-                (i + 3) as u64,
-                pda.as_mut_ptr() as *mut _ as *mut u8,
+                data.as_ptr() as *const u8,
+                (N + 3) as u64,
+                pda.as_mut_ptr() as *mut u8,
             );
         }
 
-        // SAFATE: `pda` has been initialized by the syscall.
+        // SAFETY: `pda` has been initialized by the syscall.
         unsafe { pda.assume_init() }
     }
 
@@ -74,6 +89,14 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: 
 /// Derive a [program address][pda] from the given seeds, bump and program id.
 ///
 /// [pda]: https://solana.com/docs/core/pda
+///
+/// This function avoids the cost of the `create_program_address` syscall,
+/// which is `1500` compute units, by directly computing the derived address
+/// using the SHA-256 hash of the seeds, bump, and program id.
+///
+/// This function is intended for use in `const` contexts.
+///
+/// # Important
 ///
 /// This function differs from [`pinocchio::pubkey::create_program_address`] in that it
 /// does not perform a validation to ensure that the derived address is a valid
@@ -86,12 +109,13 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: 
 pub const fn derive_address_const<const N: usize>(
     seeds: &[&[u8]; N],
     bump: u8,
-    program_id: &__Pubkey,
-) -> __Pubkey {
+    program_id: &Pubkey,
+) -> Pubkey {
     const {
-        if N > MAX_SEEDS {
-            panic!("number of seeds must be less than `MAX_SEEDS`");
-        }
+        assert!(
+            N <= MAX_SEEDS,
+            "number of seeds must be less than MAX_SEEDS"
+        );
     }
 
     let mut hasher = Sha256::new();
@@ -128,18 +152,20 @@ macro_rules! pubkey {
 #[macro_export]
 macro_rules! declare_id {
     ( $id:expr ) => {
+        use $crate::reexport::Pubkey;
+
         #[doc = "The const program ID."]
-        pub const ID: $crate::__Pubkey = $crate::from_str($id);
+        pub const ID: Pubkey = $crate::from_str($id);
 
         #[doc = "Returns `true` if given pubkey is the program ID."]
         #[inline]
-        pub fn check_id(id: &$crate::__Pubkey) -> bool {
+        pub fn check_id(id: &Pubkey) -> bool {
             id == &ID
         }
 
         #[doc = "Returns the program ID."]
         #[inline]
-        pub const fn id() -> $crate::__Pubkey {
+        pub const fn id() -> Pubkey {
             ID
         }
     };
