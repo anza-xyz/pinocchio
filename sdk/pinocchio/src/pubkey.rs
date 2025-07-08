@@ -11,6 +11,8 @@ pub const MAX_SEED_LEN: usize = 32;
 /// Maximum number of seeds.
 pub const MAX_SEEDS: usize = 16;
 
+const PDA_MARKER: &[u8; 21] = b"ProgramDerivedAddress";
+
 /// The address of a [Solana account][account].
 ///
 /// [account]: https://solana.com/docs/core/accounts
@@ -234,14 +236,23 @@ pub fn checked_create_program_address(
 }
 
 /// Derive a Pubkey from another Pubkey, seed, and a program id.
-/// This function does *not* validate whether the given `seed` is within
-/// the valid length or not.
 #[inline]
-pub fn create_with_seed_unchecked(
+pub fn create_with_seed(
     base: &Pubkey,
     seed: &[u8],
     owner: &Pubkey,
 ) -> Result<Pubkey, ProgramError> {
+    if seed.len() > MAX_SEED_LEN {
+        return Err(ProgramError::MaxSeedLengthExceeded);
+    }
+
+    if owner.len() >= PDA_MARKER.len() {
+        let slice = &owner[owner.len() - PDA_MARKER.len()..];
+        if slice == PDA_MARKER {
+            return Err(ProgramError::IllegalOwner);
+        }
+    }
+
     #[cfg(target_os = "solana")]
     {
         let mut bytes = core::mem::MaybeUninit::<[u8; PUBKEY_BYTES]>::uninit();
@@ -268,18 +279,4 @@ pub fn create_with_seed_unchecked(
         core::hint::black_box((base, seed, owner));
         panic!("create_with_seed is only available on target `solana`")
     }
-}
-
-/// Derive a Pubkey from another Pubkey, seed, and a program id.
-#[inline]
-pub fn create_with_seed(
-    base: &Pubkey,
-    seed: &[u8],
-    owner: &Pubkey,
-) -> Result<Pubkey, ProgramError> {
-    if seed.len() > MAX_SEED_LEN {
-        return Err(ProgramError::MaxSeedLengthExceeded);
-    }
-
-    create_with_seed_unchecked(base, seed, owner)
 }
