@@ -167,7 +167,7 @@ macro_rules! program_entrypoint {
             let mut accounts = [UNINIT; $maximum];
 
             let (program_id, count, instruction_data) =
-                $crate::entrypoint::parse_into::<$maximum>(input, &mut accounts);
+                $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
 
             // Call the program's entrypoint passing `count` account infos; we know that
             // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
@@ -272,7 +272,7 @@ macro_rules! process_accounts {
 /// should last for the lifetime of the program execution since the returned values
 /// reference the `input`.
 #[inline(always)]
-pub unsafe fn parse_into<const MAX_ACCOUNTS: usize>(
+pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
     accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
 ) -> (&'static Pubkey, usize, &'static [u8]) {
@@ -766,7 +766,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_into() {
+    fn test_deserialize() {
         let ix_data = [3u8; 100];
 
         // Input with 0 accounts.
@@ -775,7 +775,7 @@ mod tests {
         let mut accounts = [UNINIT; 1];
 
         let (program_id, count, parsed_ix_data) =
-            unsafe { parse_into(input.as_mut_ptr(), &mut accounts) };
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 0);
         assert_eq!(program_id, &MOCK_PROGRAM_ID);
@@ -788,7 +788,7 @@ mod tests {
         let mut accounts = [UNINIT; 1];
 
         let (program_id, count, parsed_ix_data) =
-            unsafe { parse_into(input.as_mut_ptr(), &mut accounts) };
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 1);
         assert_eq!(program_id, &MOCK_PROGRAM_ID);
@@ -802,7 +802,7 @@ mod tests {
         let mut accounts = [UNINIT; 64];
 
         let (program_id, count, parsed_ix_data) =
-            unsafe { parse_into(input.as_mut_ptr(), &mut accounts) };
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 64);
         assert_eq!(program_id, &MOCK_PROGRAM_ID);
