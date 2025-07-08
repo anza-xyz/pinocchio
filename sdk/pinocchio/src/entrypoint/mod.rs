@@ -5,6 +5,9 @@ pub mod lazy;
 
 pub use lazy::{InstructionContext, MaybeAccount};
 
+#[cfg(not(feature = "std"))]
+use core::alloc::{GlobalAlloc, Layout};
+
 #[cfg(target_os = "solana")]
 pub use alloc::BumpAllocator;
 use core::{
@@ -620,6 +623,12 @@ mod alloc {
 
     extern crate alloc;
 
+    use core::{
+        alloc::{GlobalAlloc, Layout},
+        mem::size_of,
+        ptr::null_mut,
+    };
+
     /// The bump allocator used as the default rust heap when running programs.
     pub struct BumpAllocator {
         pub start: usize,
@@ -630,10 +639,10 @@ mod alloc {
     /// prescribed [`HEAP_START_ADDRESS`] and [`HEAP_LENGTH`]. Any other use may overflow and is
     /// thus unsupported and at one's own risk.
     #[allow(clippy::arithmetic_side_effects)]
-    unsafe impl alloc::alloc::GlobalAlloc for BumpAllocator {
+    unsafe impl GlobalAlloc for BumpAllocator {
         /// Allocates memory as a bump allocator.
         #[inline]
-        unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
             let pos_ptr = self.start as *mut usize;
 
             let mut pos = *pos_ptr;
@@ -643,15 +652,15 @@ mod alloc {
             }
             pos = pos.saturating_sub(layout.size());
             pos &= !(layout.align().wrapping_sub(1));
-            if pos < self.start + core::mem::size_of::<*mut u8>() {
-                return core::ptr::null_mut();
+            if pos < self.start + size_of::<*mut u8>() {
+                return null_mut();
             }
             *pos_ptr = pos;
             pos as *mut u8
         }
 
         #[inline]
-        unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
+        unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
             // I'm a bump allocator, I don't free.
         }
     }
@@ -662,14 +671,14 @@ mod alloc {
 pub struct NoAllocator;
 
 #[cfg(not(feature = "std"))]
-unsafe impl core::alloc::GlobalAlloc for NoAllocator {
+unsafe impl GlobalAlloc for NoAllocator {
     #[inline]
-    unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
+    unsafe fn alloc(&self, _: Layout) -> *mut u8 {
         panic!("** NO ALLOCATOR **");
     }
 
     #[inline]
-    unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
+    unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
         // I deny all allocations, so I don't need to free.
     }
 }
