@@ -1,6 +1,8 @@
 #![no_std]
 
 #[cfg(feature = "const")]
+#[doc(hidden)]
+// Re-export dependencies used in macros.
 pub mod reexport {
     pub use pinocchio::pubkey::Pubkey;
 }
