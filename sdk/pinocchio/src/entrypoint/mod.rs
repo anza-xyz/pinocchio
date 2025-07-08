@@ -121,9 +121,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:expr ) => {
-        $crate::program_entrypoint!($process_instruction);
-        $crate::default_allocator!();
-        $crate::default_panic_handler!();
+        $crate::entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
     };
     ( $process_instruction:expr, $maximum:expr ) => {
         $crate::program_entrypoint!($process_instruction, $maximum);
@@ -157,28 +155,7 @@ macro_rules! entrypoint {
 #[macro_export]
 macro_rules! program_entrypoint {
     ( $process_instruction:expr ) => {
-        /// Program entrypoint.
-        #[no_mangle]
-        pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account_info::AccountInfo> =
-                core::mem::MaybeUninit::<$crate::account_info::AccountInfo>::uninit();
-            // Create an array of uninitialized account infos.
-            let mut accounts = [UNINIT; { $crate::MAX_TX_ACCOUNTS }];
-
-            let (program_id, count, instruction_data) =
-                $crate::entrypoint::parse(input, &mut accounts);
-
-            // Call the program's entrypoint passing `count` account infos; we know that
-            // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
-            match $process_instruction(
-                &program_id,
-                core::slice::from_raw_parts(accounts.as_ptr() as _, count),
-                &instruction_data,
-            ) {
-                Ok(()) => $crate::SUCCESS,
-                Err(error) => error.into(),
-            }
-        }
+        $crate::program_entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
     };
     ( $process_instruction:expr, $maximum:expr ) => {
         /// Program entrypoint.
@@ -284,97 +261,9 @@ macro_rules! process_accounts {
 /// Parse the arguments from the runtime input buffer.
 ///
 /// This function parses the `accounts`, `instruction_data` and `program_id` from
-/// the input buffer.
-///
-/// # Safety
-///
-/// The caller must ensure that the `input` buffer is valid, i.e., it represents the
-/// program input parameters serialized by the SVM loader. Additionally, the `input`
-/// should last for the lifetime of the program execution since the returned values
-/// reference the `input`.
-#[inline(always)]
-pub unsafe fn parse(
-    mut input: *mut u8,
-    accounts: &mut [MaybeUninit<AccountInfo>; MAX_TX_ACCOUNTS],
-) -> (&'static Pubkey, usize, &'static [u8]) {
-    // Number of accounts to process.
-    let processed = *(input as *const u64) as usize;
-    // Skip the number of accounts (8 bytes).
-    input = input.add(size_of::<u64>());
-
-    if processed > 0 {
-        let mut accounts = accounts.as_mut_ptr() as *mut AccountInfo;
-        // Represents the beginning of the accounts slice.
-        let accounts_slice = accounts;
-
-        // The first account is always non-duplicated, so process
-        // it directly as such.
-        let account: *mut Account = input as *mut Account;
-        accounts.write(AccountInfo { raw: account });
-
-        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
-        input = input.add((*account).data_len as usize);
-        input = align_pointer!(input);
-
-        if processed > 1 {
-            // Counter for the number of accounts remaining.
-            let mut to_process_plus_one = processed;
-
-            // This is an optimization to reduce the number of jumps required
-            // to process the accounts. The macro `process_accounts` will generate
-            // inline code to process the specified number of accounts.
-            if to_process_plus_one == 2 {
-                process_accounts!(1 => (input, accounts, accounts_slice));
-            } else {
-                while to_process_plus_one > 5 {
-                    // Process 5 accounts at a time.
-                    process_accounts!(5 => (input, accounts, accounts_slice));
-                    to_process_plus_one -= 5;
-                }
-
-                // There might be remaining accounts to process.
-                match to_process_plus_one {
-                    5 => {
-                        process_accounts!(4 => (input, accounts, accounts_slice));
-                    }
-                    4 => {
-                        process_accounts!(3 => (input, accounts, accounts_slice));
-                    }
-                    3 => {
-                        process_accounts!(2 => (input, accounts, accounts_slice));
-                    }
-                    2 => {
-                        process_accounts!(1 => (input, accounts, accounts_slice));
-                    }
-                    1 => (),
-                    _ => {
-                        // SAFETY: `while` loop above makes sure that `to_process_plus_one`
-                        // has 1 to 5 entries left.
-                        unsafe { core::hint::unreachable_unchecked() }
-                    }
-                }
-            }
-        }
-    }
-
-    // instruction data
-    let instruction_data_len = *(input as *const u64) as usize;
-    input = input.add(size_of::<u64>());
-
-    let instruction_data = { from_raw_parts(input, instruction_data_len) };
-
-    // program id
-    let program_id: &Pubkey = &*(input.add(instruction_data_len) as *const Pubkey);
-
-    (program_id, processed, instruction_data)
-}
-
-/// Parse the arguments from the runtime input buffer.
-///
-/// This function parses the `accounts`, `instruction_data` and `program_id` from
 /// the input buffer. The `MAX_ACCOUNTS` constant defines the maximum number of accounts
 /// that can be parsed from the input buffer. If the number of accounts in the input buffer
-/// exceeds `MAX_ACCOUNTS`, the excess accounts will be ignored.
+/// exceeds `MAX_ACCOUNTS`, the excess accounts will be skipped (ignored).
 ///
 /// # Safety
 ///
@@ -387,6 +276,15 @@ pub unsafe fn parse_into<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
     accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
 ) -> (&'static Pubkey, usize, &'static [u8]) {
+    // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of accounts
+    // (MAX_TX_ACCOUNTS) that can be processed in a transaction.
+    const {
+        assert!(
+            MAX_ACCOUNTS <= MAX_TX_ACCOUNTS,
+            "MAX_ACCOUNTS must be less than or equal to MAX_TX_ACCOUNTS"
+        );
+    }
+
     // Number of accounts to process.
     let mut processed = *(input as *const u64) as usize;
     // Skip the number of accounts (8 bytes).
@@ -417,7 +315,12 @@ pub unsafe fn parse_into<const MAX_ACCOUNTS: usize>(
             // Note that `to_process_plus_one` includes the first (already processed)
             // account to avoid decrementing the value. The actual number of remaining
             // accounts to process is `to_process_plus_one - 1`.
-            let mut to_process_plus_one = min(processed, MAX_ACCOUNTS);
+            let mut to_process_plus_one = if MAX_ACCOUNTS < MAX_TX_ACCOUNTS {
+                min(processed, MAX_ACCOUNTS)
+            } else {
+                processed
+            };
+
             let mut to_skip = processed - to_process_plus_one;
             processed = to_process_plus_one;
 
@@ -459,21 +362,27 @@ pub unsafe fn parse_into<const MAX_ACCOUNTS: usize>(
             // Process any remaining accounts to move the offset to the instruction
             // data (there is a duplication of logic but we avoid testing whether we
             // have space for the account or not).
-            while to_skip > 0 {
-                // Marks the account as skipped.
-                to_skip -= 1;
+            //
+            // There might be accounts to skip only when `MAX_ACCOUNTS < MAX_TX_ACCOUNTS`
+            // so this allows the compiler to optimize the code and avoid the loop when
+            // `MAX_ACCOUNTS == MAX_TX_ACCOUNTS`.
+            if MAX_ACCOUNTS < MAX_TX_ACCOUNTS {
+                while to_skip > 0 {
+                    // Marks the account as skipped.
+                    to_skip -= 1;
 
-                // Read the next account.
-                let account: *mut Account = input as *mut Account;
-                // Adds an 8-bytes offset for:
-                //   - rent epoch in case of a non-duplicated account
-                //   - duplicated marker + 7 bytes of padding in case of a duplicated account
-                input = input.add(size_of::<u64>());
+                    // Read the next account.
+                    let account: *mut Account = input as *mut Account;
+                    // Adds an 8-bytes offset for:
+                    //   - rent epoch in case of a non-duplicated account
+                    //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+                    input = input.add(size_of::<u64>());
 
-                if (*account).borrow_state == NON_DUP_MARKER {
-                    input = input.add(STATIC_ACCOUNT_DATA);
-                    input = input.add((*account).data_len as usize);
-                    input = align_pointer!(input);
+                    if (*account).borrow_state == NON_DUP_MARKER {
+                        input = input.add(STATIC_ACCOUNT_DATA);
+                        input = input.add((*account).data_len as usize);
+                        input = align_pointer!(input);
+                    }
                 }
             }
         }
@@ -854,49 +763,6 @@ mod tests {
             let account_info = unsafe { account.assume_init_ref() };
             assert_eq!(account_info.data_len(), i);
         }
-    }
-
-    #[test]
-    fn test_parse() {
-        let ix_data = [3u8; 10];
-
-        // Input with 0 accounts.
-
-        let mut input = unsafe { create_input(0, &ix_data) };
-        let mut accounts = [UNINIT; MAX_TX_ACCOUNTS];
-
-        let (program_id, count, parsed_ix_data) =
-            unsafe { parse(input.as_mut_ptr(), &mut accounts) };
-
-        assert_eq!(count, 0);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
-
-        // Input with 3 accounts.
-
-        let mut input = unsafe { create_input(3, &ix_data) };
-        let mut accounts = [UNINIT; MAX_TX_ACCOUNTS];
-
-        let (program_id, count, parsed_ix_data) =
-            unsafe { parse(input.as_mut_ptr(), &mut accounts) };
-
-        assert_eq!(count, 3);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
-        assert_accounts(&accounts[..count]);
-
-        // Input with `MAX_TX_ACCOUNTS` accounts.
-
-        let mut input = unsafe { create_input(MAX_TX_ACCOUNTS, &ix_data) };
-        let mut accounts = [UNINIT; MAX_TX_ACCOUNTS];
-
-        let (program_id, count, parsed_ix_data) =
-            unsafe { parse(input.as_mut_ptr(), &mut accounts) };
-
-        assert_eq!(count, MAX_TX_ACCOUNTS);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
-        assert_accounts(&accounts);
     }
 
     #[test]
