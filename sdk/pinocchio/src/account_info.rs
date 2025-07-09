@@ -3,7 +3,7 @@
 use core::{
     marker::PhantomData,
     mem::ManuallyDrop,
-    ptr::NonNull,
+    ptr::{write, NonNull},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
@@ -124,14 +124,9 @@ impl AccountInfo {
     }
 
     /// Program that owns this account.
-    ///
-    /// # Safety
-    ///
-    /// A reference returned by this method is invalidated when [`Self::assign`]
-    /// is called.
     #[inline(always)]
-    pub unsafe fn owner(&self) -> &Pubkey {
-        &(*self.raw).owner
+    pub fn owner(&self) -> &Pubkey {
+        unsafe { &(*self.raw).owner }
     }
 
     /// Indicates whether the transaction was signed by this account.
@@ -187,18 +182,18 @@ impl AccountInfo {
     /// Checks if the account is owned by the given program.
     #[inline(always)]
     pub fn is_owned_by(&self, program: &Pubkey) -> bool {
-        unsafe { &(*self.raw).owner == program }
+        self.owner() == program
     }
 
     /// Changes the owner of the account.
     ///
     /// # Safety
     ///
-    /// Using this method invalidates any reference returned by [`Self::owner`].
+    /// It is undefined behaviour to use this method while there is an active reference
+    /// to the `owner` returned by [`Self::owner`].
     #[inline(always)]
     pub unsafe fn assign(&self, new_owner: &Pubkey) {
-        #[allow(invalid_reference_casting)]
-        core::ptr::write_volatile(&(*self.raw).owner as *const _ as *mut Pubkey, *new_owner);
+        write(&mut (*self.raw).owner, *new_owner);
     }
 
     /// Return true if the account borrow state is set to the given state.

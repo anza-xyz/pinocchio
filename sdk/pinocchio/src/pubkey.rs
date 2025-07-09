@@ -11,6 +11,11 @@ pub const MAX_SEED_LEN: usize = 32;
 /// Maximum number of seeds.
 pub const MAX_SEEDS: usize = 16;
 
+/// The marker used to derive [program derived addresses][pda].
+///
+/// [pda]: https://solana.com/docs/core/pda
+pub const PDA_MARKER: &[u8; 21] = b"ProgramDerivedAddress";
+
 /// The address of a [Solana account][account].
 ///
 /// [account]: https://solana.com/docs/core/accounts
