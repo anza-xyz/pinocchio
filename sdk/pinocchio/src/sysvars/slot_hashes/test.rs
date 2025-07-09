@@ -196,7 +196,12 @@ fn test_entry_count_no_std() {
         offset += ENTRY_SIZE;
     }
     let res1 = SlotHashes::new(small_data.as_slice());
-    assert!(matches!(res1, Err(ProgramError::InvalidAccountData)));
+    assert!(
+        res1.is_ok(),
+        "SlotHashes::new should succeed with a correctly sized buffer"
+    );
+    let slot_hashes_from_small = res1.unwrap();
+    assert_eq!(slot_hashes_from_small.len(), entries.len());
 
     // Empty data is valid
     let empty_data = create_mock_data(&[]);

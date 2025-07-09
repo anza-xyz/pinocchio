@@ -84,28 +84,33 @@ pub(crate) unsafe fn read_entry_count_from_bytes_unchecked(data: &[u8]) -> usize
     u64::from_le_bytes(*(data.as_ptr() as *const [u8; NUM_ENTRIES_SIZE])) as usize
 }
 
-/// Validates SlotHashes data format assuming golden mainnet length and returns the entry count.
+/// Validates SlotHashes data format.
 ///
 /// The function checks:
-/// 1. The buffer length is exactly `MAX_SIZE` bytes.
+/// 1. The buffer is large enough to contain the entry count.
 /// 2. The declared entry count is ≤ `MAX_ENTRIES`.
+/// 3. The buffer length is sufficient to hold the declared number of entries.
 ///
 /// It returns `Ok(())` if the data is well-formed, otherwise an appropriate
 /// `ProgramError` describing the issue.
 #[inline]
 fn parse_and_validate_data(data: &[u8]) -> Result<(), ProgramError> {
-    // Must be exactly the golden mainnet size
-    if data.len() != MAX_SIZE {
-        return Err(ProgramError::InvalidAccountData);
+    if data.len() < NUM_ENTRIES_SIZE {
+        return Err(ProgramError::AccountDataTooSmall);
     }
 
-    // Read and validate the entry count from the header
-    let num_entries = read_entry_count_from_bytes(data).ok_or(ProgramError::AccountDataTooSmall)?;
+    // SAFETY: We've confirmed that data has enough bytes to read the entry count.
+    let num_entries = unsafe { read_entry_count_from_bytes_unchecked(data) };
 
-    // num_entries < 512 is allowed, for contexts which padded data up to size
     if num_entries > MAX_ENTRIES {
         return Err(ProgramError::InvalidAccountData);
     }
+
+    let min_size = NUM_ENTRIES_SIZE + num_entries * ENTRY_SIZE;
+    if data.len() < min_size {
+        return Err(ProgramError::AccountDataTooSmall);
+    }
+
     Ok(())
 }
 

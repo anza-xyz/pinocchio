@@ -23,18 +23,22 @@ fn too_many_entries_rejected() {
 
 #[test]
 fn wrong_size_buffer_rejected() {
-    // Test with buffer that's too small
-    let small_buffer = std::vec![0u8; MAX_SIZE - 1];
+    // Buffer that declares 1 entry but is 1 byte too small to hold it.
+    let num_entries: u64 = 1;
+    let required_size = NUM_ENTRIES_SIZE + (num_entries as usize) * ENTRY_SIZE;
+    let mut small_buffer = std::vec![0u8; required_size - 1];
+    small_buffer[0..NUM_ENTRIES_SIZE].copy_from_slice(&num_entries.to_le_bytes());
+
     assert!(matches!(
         SlotHashes::new(small_buffer.as_slice()),
-        Err(ProgramError::InvalidAccountData)
+        Err(ProgramError::AccountDataTooSmall)
     ));
 
-    // Test with buffer that's too large
-    let large_buffer = std::vec![0u8; MAX_SIZE + 1];
+    // Buffer too small to even contain the length header.
+    let too_small_for_header = [0u8; NUM_ENTRIES_SIZE - 1];
     assert!(matches!(
-        SlotHashes::new(large_buffer.as_slice()),
-        Err(ProgramError::InvalidAccountData)
+        SlotHashes::new(too_small_for_header.as_slice()),
+        Err(ProgramError::AccountDataTooSmall)
     ));
 }
 
