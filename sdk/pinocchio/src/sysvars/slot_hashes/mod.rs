@@ -214,7 +214,7 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     #[inline(always)]
     pub fn get_hash(&self, target_slot: Slot) -> Option<&[u8; HASH_BYTES]> {
         self.position(target_slot)
-            .map(|index| &self.entries()[index].hash)
+            .map(|index| unsafe { &self.get_entry_unchecked(index).hash })
     }
 
     /// Finds the position (index) of a specific slot using binary search.
@@ -237,7 +237,11 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     #[inline(always)]
     pub unsafe fn get_entry_unchecked(&self, index: usize) -> &SlotHashEntry {
         debug_assert!(index < self.len());
-        &self.entries()[index]
+        // SAFETY: Caller guarantees `index < self.len()`. The data pointer is valid
+        // and aligned for `SlotHashEntry`. The offset calculation points to a
+        // valid entry within the allocated data.
+        let entries_ptr = self.data.as_ptr().add(NUM_ENTRIES_SIZE) as *const SlotHashEntry;
+        &*entries_ptr.add(index)
     }
 }
 
