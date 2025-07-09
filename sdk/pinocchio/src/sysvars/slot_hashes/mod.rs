@@ -279,13 +279,13 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
 
 #[cfg(feature = "std")]
 impl SlotHashes<Box<[u8]>> {
-    /// Allocates a buffer and fetches SlotHashes sysvar data via syscall.
+    /// Fills the provided buffer with the full SlotHashes sysvar data.
     ///
     /// # Safety
     /// The caller must ensure the buffer pointer is valid for MAX_SIZE bytes.
     /// The syscall will write exactly MAX_SIZE bytes to the buffer.
     #[inline(always)]
-    unsafe fn fetch_into_buffer(buffer_ptr: *mut u8) -> Result<(), ProgramError> {
+    unsafe fn fill_from_sysvar(buffer_ptr: *mut u8) -> Result<(), ProgramError> {
         crate::sysvars::get_sysvar_unchecked(buffer_ptr, &SLOTHASHES_ID, 0, MAX_SIZE)?;
 
         // For tests on builds that don't actually fill the buffer.
@@ -308,7 +308,7 @@ impl SlotHashes<Box<[u8]>> {
             // fully initialise it before use.
             let mut data = Box::new_uninit_slice(MAX_SIZE);
             unsafe {
-                Self::fetch_into_buffer(data.as_mut_ptr() as *mut u8)?;
+                Self::fill_from_sysvar(data.as_mut_ptr() as *mut u8)?;
                 Ok(data.assume_init())
             }
         }
@@ -318,11 +318,11 @@ impl SlotHashes<Box<[u8]>> {
             let mut vec_buf: std::vec::Vec<u8> = std::vec::Vec::with_capacity(MAX_SIZE);
             unsafe {
                 // SAFETY: `vec_buf` was allocated with capacity `MAX_SIZE` so its
-                // pointer is valid for exactly that many bytes. `fetch_into_buffer`
+                // pointer is valid for exactly that many bytes. `fill_from_sysvar`
                 // writes `MAX_SIZE` bytes, and we immediately set the length to
                 // `MAX_SIZE`, marking the entire buffer as initialised before it is
                 // turned into a boxed slice.
-                Self::fetch_into_buffer(vec_buf.as_mut_ptr())?;
+                Self::fill_from_sysvar(vec_buf.as_mut_ptr())?;
                 vec_buf.set_len(MAX_SIZE);
             }
             Ok(vec_buf.into_boxed_slice())
