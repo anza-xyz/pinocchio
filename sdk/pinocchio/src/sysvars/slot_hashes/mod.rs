@@ -173,52 +173,15 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
         self.len() == 0
     }
 
-    /// Returns the entire slice of entries. Call once and reuse the slice if you
-    /// need many look-ups.
-    #[inline(always)]
-    pub fn entries(&self) -> &[SlotHashEntry] {
-        self.as_entries_slice()
-    }
-
-    /// Gets a reference to the entry at `index` or `None` if out of bounds.
-    #[inline(always)]
-    pub fn get_entry(&self, index: usize) -> Option<&SlotHashEntry> {
-        self.as_entries_slice().get(index)
-    }
-
-    /// Finds the hash for a specific slot using binary search.
-    ///
-    /// Returns the hash if the slot is found, or `None` if not found.
-    /// Assumes entries are sorted by slot in descending order.
-    /// If calling repeatedly, prefer getting `entries()` in caller
-    /// to avoid repeated slice construction.
-    #[inline(always)]
-    pub fn get_hash(&self, target_slot: Slot) -> Option<&[u8; HASH_BYTES]> {
-        let entries = self.as_entries_slice();
-        self.position(target_slot).map(|index| &entries[index].hash)
-    }
-
-    /// Finds the position (index) of a specific slot using binary search.
-    ///
-    /// Returns the index if the slot is found, or `None` if not found.
-    /// Assumes entries are sorted by slot in descending order.
-    /// If calling repeatedly, prefer getting `entries()` in caller
-    /// to avoid repeated slice construction.
-    #[inline(always)]
-    pub fn position(&self, target_slot: Slot) -> Option<usize> {
-        let entries = self.as_entries_slice();
-        entries
-            .binary_search_by(|probe_entry| probe_entry.slot().cmp(&target_slot).reverse())
-            .ok()
-    }
-
     /// Returns a `&[SlotHashEntry]` view into the underlying data.
+    ///
+    /// Call once and reuse the slice if you need many look-ups.
     ///
     /// The constructor (in the safe path that called `parse_and_validate_data`)
     /// or caller (if unsafe `new_unchecked` path) is responsible for ensuring
     /// the slice is big enough and properly aligned.
     #[inline(always)]
-    fn as_entries_slice(&self) -> &[SlotHashEntry] {
+    pub fn entries(&self) -> &[SlotHashEntry] {
         let len = self.len();
         debug_assert!(self.data.len() >= NUM_ENTRIES_SIZE + len * ENTRY_SIZE);
 
@@ -236,6 +199,37 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
         }
     }
 
+    /// Gets a reference to the entry at `index` or `None` if out of bounds.
+    #[inline(always)]
+    pub fn get_entry(&self, index: usize) -> Option<&SlotHashEntry> {
+        self.entries().get(index)
+    }
+
+    /// Finds the hash for a specific slot using binary search.
+    ///
+    /// Returns the hash if the slot is found, or `None` if not found.
+    /// Assumes entries are sorted by slot in descending order.
+    /// If calling repeatedly, prefer getting `entries()` in caller
+    /// to avoid repeated slice construction.
+    #[inline(always)]
+    pub fn get_hash(&self, target_slot: Slot) -> Option<&[u8; HASH_BYTES]> {
+        self.position(target_slot)
+            .map(|index| &self.entries()[index].hash)
+    }
+
+    /// Finds the position (index) of a specific slot using binary search.
+    ///
+    /// Returns the index if the slot is found, or `None` if not found.
+    /// Assumes entries are sorted by slot in descending order.
+    /// If calling repeatedly, prefer getting `entries()` in caller
+    /// to avoid repeated slice construction.
+    #[inline(always)]
+    pub fn position(&self, target_slot: Slot) -> Option<usize> {
+        self.entries()
+            .binary_search_by(|probe_entry| probe_entry.slot().cmp(&target_slot).reverse())
+            .ok()
+    }
+
     /// Returns a reference to the entry at `index` **without** bounds checking.
     ///
     /// # Safety
@@ -243,7 +237,7 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     #[inline(always)]
     pub unsafe fn get_entry_unchecked(&self, index: usize) -> &SlotHashEntry {
         debug_assert!(index < self.len());
-        &self.as_entries_slice()[index]
+        &self.entries()[index]
     }
 }
 
@@ -252,7 +246,7 @@ impl<'a, T: Deref<Target = [u8]>> IntoIterator for &'a SlotHashes<T> {
     type IntoIter = core::slice::Iter<'a, SlotHashEntry>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_entries_slice().iter()
+        self.entries().iter()
     }
 }
 
