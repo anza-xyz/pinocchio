@@ -36,6 +36,14 @@ where
         Instructions { data }
     }
 
+    /// Load the number of instructions in the currently executing `Transaction`.
+    #[inline(always)]
+    pub fn num_instructions(&self) -> u16 {
+        // SAFETY: The first 2 bytes of the Instructions sysvar data represents the
+        // number of instructions.
+        unsafe { *(self.data.as_ptr() as *const u16) }
+    }
+
     /// Load the current `Instruction`'s index in the currently executing
     /// `Transaction`.
     #[inline(always)]
@@ -75,11 +83,7 @@ where
         &self,
         index: usize,
     ) -> Result<IntrospectedInstruction, ProgramError> {
-        // SAFETY: The first 2 bytes of the Instructions sysvar data represents the
-        // number of instructions.
-        let num_instructions = unsafe { *(self.data.as_ptr() as *const u16) };
-
-        if index >= num_instructions as usize {
+        if index >= self.num_instructions() as usize {
             return Err(ProgramError::InvalidInstructionData);
         }
 
