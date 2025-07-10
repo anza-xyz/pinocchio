@@ -393,9 +393,10 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     input = input.add(size_of::<u64>());
 
     let instruction_data = { from_raw_parts(input, instruction_data_len) };
+    let input = input.add(instruction_data_len);
 
     // program id
-    let program_id: &Pubkey = &*(input.add(instruction_data_len) as *const Pubkey);
+    let program_id: &Pubkey = &*(input as *const Pubkey);
 
     (program_id, processed, instruction_data)
 }
