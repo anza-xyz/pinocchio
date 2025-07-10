@@ -41,7 +41,7 @@ where
     pub fn num_instructions(&self) -> u16 {
         // SAFETY: The first 2 bytes of the Instructions sysvar data represents the
         // number of instructions.
-        unsafe { *(self.data.as_ptr() as *const u16) }
+        unsafe { u16::from_le_bytes(*(self.data.as_ptr() as *const [u8; 2])) }
     }
 
     /// Load the current `Instruction`'s index in the currently executing
