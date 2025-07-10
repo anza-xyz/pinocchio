@@ -14,29 +14,31 @@ use pinocchio::pubkey::{Pubkey, MAX_SEEDS, PDA_MARKER};
 #[cfg(target_os = "solana")]
 use pinocchio::syscalls::sol_sha256;
 
-/// Derive a [program address][pda] from the given seeds, bump and program id.
+/// Derive a [program address][pda] from the given its seeds and program id.
 ///
 /// [pda]: https://solana.com/docs/core/pda
 ///
-/// This function avoids the cost of the `create_program_address` syscall,
-/// which is `1500` compute units, by directly computing the derived address
-/// calculating the hash of the seeds, bump, and program id using the
-/// `sol_sha256` syscall.
+/// In general, the seeds include a bump (byte) value to ensure a valid PDA
+/// (off-curve) is generated. The bump is typically the last byte of the seeds
+/// array. Even when a program stores a bump to derive a program address, it is
+/// necessary to use the [`pinocchio::pubkey::create_program_address`] to validate
+/// the derivation. In most cases, the program has the correct seeds for the
+/// derivation, so it would be sufficient to just perform the derivation and compare
+/// it against the expected resulting address.
 ///
-/// Even when a program stores a bump to derive a program address, it is necessary
-/// to use the [`pinocchio::pubkey::create_program_address`] to validate the
-/// derivation. In most cases, the program has the correct seeds for the derivation,
-/// so it would be sufficient to just perform the derivation and compare it against
-/// the expected resulting address.
+/// This function avoids the cost of the `create_program_address` syscall
+/// (`1500` compute units) by directly computing the derived address
+/// calculating the hash of the seeds and program id using the
+/// `sol_sha256` syscall.
 ///
 /// # Important
 ///
 /// This function differs from [`pinocchio::pubkey::create_program_address`] in that it
 /// does not perform a validation to ensure that the derived address is a valid
 /// (off-curve) program derived address. It is intended for use in cases where the
-/// seeds, bump, and program id are known to be valid, and the caller wants to derive
+/// seeds and program id are known to be valid, and the caller wants to derive
 /// the address without incurring the cost of the `create_program_address` syscall.
-pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: &Pubkey) -> Pubkey {
+pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], program_id: &Pubkey) -> Pubkey {
     const {
         assert!(
             N <= MAX_SEEDS,
@@ -45,11 +47,11 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: 
     }
 
     const UNINIT: MaybeUninit<&[u8]> = MaybeUninit::<&[u8]>::uninit();
-    let mut data = [UNINIT; MAX_SEEDS + 3];
+    let mut data = [UNINIT; MAX_SEEDS + 2];
     let mut i = 0;
 
     while i < N {
-        // SAFETY: `data` is guanranteed to have enough space for `N` seeds,
+        // SAFETY: `data` is guaranteed to have enough space for `N` seeds,
         // so `i` will always be within bounds.
         unsafe {
             data.get_unchecked_mut(i).write(seeds.get_unchecked(i));
@@ -57,25 +59,22 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: 
         i += 1;
     }
 
-    let bump = [bump];
-
-    // SAFETY: `data` is guaranteed to have enough space for `MAX_SEEDS + 3`
+    // SAFETY: `data` is guaranteed to have enough space for `MAX_SEEDS + 2`
     // elements, and `MAX_SEEDS` is as large as `N`.
     unsafe {
-        data.get_unchecked_mut(i).write(bump.as_ref());
-        data.get_unchecked_mut(i + 1).write(program_id.as_ref());
-        data.get_unchecked_mut(i + 2).write(PDA_MARKER.as_ref());
+        data.get_unchecked_mut(i).write(program_id.as_ref());
+        data.get_unchecked_mut(i + 1).write(PDA_MARKER.as_ref());
     }
 
     #[cfg(target_os = "solana")]
     {
         let mut pda = MaybeUninit::<[u8; 32]>::uninit();
 
-        // SAFETY: `data` has `i + 3` elements initialized.
+        // SAFETY: `data` has `N + 2` elements initialized.
         unsafe {
             sol_sha256(
                 data.as_ptr() as *const u8,
-                (N + 3) as u64,
+                (N + 2) as u64,
                 pda.as_mut_ptr() as *mut u8,
             );
         }
@@ -88,15 +87,20 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: 
     unreachable!("deriving a pda is only available on target `solana`");
 }
 
-/// Derive a [program address][pda] from the given seeds, bump and program id.
+/// Derive a [program address][pda] from the given seeds and program id.
 ///
 /// [pda]: https://solana.com/docs/core/pda
 ///
-/// This function avoids the cost of the `create_program_address` syscall,
-/// which is `1500` compute units, by directly computing the derived address
-/// using the SHA-256 hash of the seeds, bump, and program id.
+/// In general, the seeds include a bump (byte) value to ensure a valid PDA
+/// (off-curve) is generated. The bump is typically the last byte of the seeds
+/// array.
 ///
-/// This function is intended for use in `const` contexts.
+/// This function avoids the cost of the `create_program_address` syscall
+/// (`1500` compute units) by directly computing the derived address
+/// using the SHA-256 hash of the seeds and program id.
+///
+/// This function is intended for use in `const` contexts - i.e., the seeds are
+/// known at compile time and the program id is also a constant.
 ///
 /// # Important
 ///
@@ -110,7 +114,6 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], bump: u8, program_id: 
 #[cfg(feature = "const")]
 pub const fn derive_address_const<const N: usize>(
     seeds: &[&[u8]; N],
-    bump: u8,
     program_id: &Pubkey,
 ) -> Pubkey {
     const {
@@ -128,13 +131,7 @@ pub const fn derive_address_const<const N: usize>(
         i += 1;
     }
 
-    let bump = [bump];
-
-    hasher
-        .update(&bump)
-        .update(program_id)
-        .update(PDA_MARKER)
-        .finalize()
+    hasher.update(program_id).update(PDA_MARKER).finalize()
 }
 
 /// Convenience macro to define a static `Pubkey` value.
