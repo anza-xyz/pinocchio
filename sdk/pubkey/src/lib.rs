@@ -14,17 +14,18 @@ use pinocchio::pubkey::{Pubkey, MAX_SEEDS, PDA_MARKER};
 #[cfg(target_os = "solana")]
 use pinocchio::syscalls::sol_sha256;
 
-/// Derive a [program address][pda] from the given its seeds and program id.
+/// Derive a [program address][pda] from the given seeds, optional bump and
+/// program id.
 ///
 /// [pda]: https://solana.com/docs/core/pda
 ///
-/// In general, the seeds include a bump (byte) value to ensure a valid PDA
-/// (off-curve) is generated. The bump is typically the last byte of the seeds
-/// array. Even when a program stores a bump to derive a program address, it is
-/// necessary to use the [`pinocchio::pubkey::create_program_address`] to validate
-/// the derivation. In most cases, the program has the correct seeds for the
-/// derivation, so it would be sufficient to just perform the derivation and compare
-/// it against the expected resulting address.
+/// In general, the derivation uses an optional bump (byte) value to ensure a
+/// valid PDA (off-curve) is generated. Even when a program stores a bump to
+/// derive a program address, it is necessary to use the
+/// [`pinocchio::pubkey::create_program_address`] to validate the derivation. In
+/// most cases, the program has the correct seeds for the derivation, so it would
+/// be sufficient to just perform the derivation and compare it against the
+/// expected resulting address.
 ///
 /// This function avoids the cost of the `create_program_address` syscall
 /// (`1500` compute units) by directly computing the derived address
@@ -36,14 +37,15 @@ use pinocchio::syscalls::sol_sha256;
 /// This function differs from [`pinocchio::pubkey::create_program_address`] in that it
 /// does not perform a validation to ensure that the derived address is a valid
 /// (off-curve) program derived address. It is intended for use in cases where the
-/// seeds and program id are known to be valid, and the caller wants to derive
+/// seeds, bump, and program id are known to be valid, and the caller wants to derive
 /// the address without incurring the cost of the `create_program_address` syscall.
-pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], program_id: &Pubkey) -> Pubkey {
+pub fn derive_address<const N: usize>(
+    seeds: &[&[u8]; N],
+    bump: Option<u8>,
+    program_id: &Pubkey,
+) -> Pubkey {
     const {
-        assert!(
-            N <= MAX_SEEDS,
-            "number of seeds must be less than MAX_SEEDS"
-        );
+        assert!(N < MAX_SEEDS, "number of seeds must be less than MAX_SEEDS");
     }
 
     const UNINIT: MaybeUninit<&[u8]> = MaybeUninit::<&[u8]>::uninit();
@@ -59,9 +61,15 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], program_id: &Pubkey) -
         i += 1;
     }
 
+    let bump = bump.as_slice();
+
     // SAFETY: `data` is guaranteed to have enough space for `MAX_SEEDS + 2`
     // elements, and `MAX_SEEDS` is as large as `N`.
     unsafe {
+        if !bump.is_empty() {
+            data.get_unchecked_mut(i).write(bump);
+            i += 1;
+        }
         data.get_unchecked_mut(i).write(program_id.as_ref());
         data.get_unchecked_mut(i + 1).write(PDA_MARKER.as_ref());
     }
@@ -87,20 +95,19 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], program_id: &Pubkey) -
     unreachable!("deriving a pda is only available on target `solana`");
 }
 
-/// Derive a [program address][pda] from the given seeds and program id.
+/// Derive a [program address][pda] from the given seeds, optional bump and
+/// program id.
 ///
 /// [pda]: https://solana.com/docs/core/pda
 ///
-/// In general, the seeds include a bump (byte) value to ensure a valid PDA
-/// (off-curve) is generated. The bump is typically the last byte of the seeds
-/// array.
+/// In general, the derivation uses an optional bump (byte) value to ensure a
+/// valid PDA (off-curve) is generated.
 ///
-/// This function avoids the cost of the `create_program_address` syscall
-/// (`1500` compute units) by directly computing the derived address
-/// using the SHA-256 hash of the seeds and program id.
-///
-/// This function is intended for use in `const` contexts - i.e., the seeds are
-/// known at compile time and the program id is also a constant.
+/// This function is intended for use in `const` contexts - i.e., the seeds and
+/// bump are known at compile time and the program id is also a constant. It avoids
+/// the cost of the `create_program_address` syscall (`1500` compute units) by
+/// directly computing the derived address using the SHA-256 hash of the seeds
+/// and program id.
 ///
 /// # Important
 ///
@@ -114,13 +121,11 @@ pub fn derive_address<const N: usize>(seeds: &[&[u8]; N], program_id: &Pubkey) -
 #[cfg(feature = "const")]
 pub const fn derive_address_const<const N: usize>(
     seeds: &[&[u8]; N],
+    bump: Option<u8>,
     program_id: &Pubkey,
 ) -> Pubkey {
     const {
-        assert!(
-            N <= MAX_SEEDS,
-            "number of seeds must be less than MAX_SEEDS"
-        );
+        assert!(N < MAX_SEEDS, "number of seeds must be less than MAX_SEEDS");
     }
 
     let mut hasher = Sha256::new();
@@ -129,6 +134,12 @@ pub const fn derive_address_const<const N: usize>(
     while i < seeds.len() {
         hasher = hasher.update(seeds[i]);
         i += 1;
+    }
+
+    let bump = bump.as_slice();
+
+    if !bump.is_empty() {
+        hasher = hasher.update(bump);
     }
 
     hasher.update(program_id).update(PDA_MARKER).finalize()
