@@ -29,7 +29,7 @@ use pinocchio::syscalls::sol_sha256;
 ///
 /// This function avoids the cost of the `create_program_address` syscall
 /// (`1500` compute units) by directly computing the derived address
-/// calculating the hash of the seeds and program id using the
+/// calculating the hash of the seeds, bump and program id using the
 /// `sol_sha256` syscall.
 ///
 /// # Important
@@ -106,8 +106,8 @@ pub fn derive_address<const N: usize>(
 /// This function is intended for use in `const` contexts - i.e., the seeds and
 /// bump are known at compile time and the program id is also a constant. It avoids
 /// the cost of the `create_program_address` syscall (`1500` compute units) by
-/// directly computing the derived address using the SHA-256 hash of the seeds
-/// and program id.
+/// directly computing the derived address using the SHA-256 hash of the seeds,
+/// bump and program id.
 ///
 /// # Important
 ///
