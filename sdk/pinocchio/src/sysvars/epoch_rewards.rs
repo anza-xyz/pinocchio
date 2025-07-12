@@ -5,7 +5,7 @@ pub const HASH_BYTES: usize = 32;
 
 #[derive(Default, Debug, Clone)]
 #[repr(transparent)]
-pub struct Hash([u8; HASH_BYTES]);
+pub struct Hash(pub(crate) [u8; HASH_BYTES]);
 
 impl Hash {
     pub fn to_bytes(self) -> [u8; HASH_BYTES] {
@@ -13,7 +13,7 @@ impl Hash {
     }
 }
 
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Debug, Default, Clone)]
 pub struct EpochRewards {
     /// The starting block height of the rewards distribution in the current
