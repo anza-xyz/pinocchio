@@ -34,8 +34,8 @@ use pinocchio::syscalls::sol_sha256;
 ///
 /// # Important
 ///
-/// This function differs from [`pinocchio::pubkey::create_program_address`] in that it
-/// does not perform a validation to ensure that the derived address is a valid
+/// This function differs from [`pinocchio::pubkey::create_program_address`] in that
+/// it does not perform a validation to ensure that the derived address is a valid
 /// (off-curve) program derived address. It is intended for use in cases where the
 /// seeds, bump, and program id are known to be valid, and the caller wants to derive
 /// the address without incurring the cost of the `create_program_address` syscall.
@@ -61,13 +61,15 @@ pub fn derive_address<const N: usize>(
         i += 1;
     }
 
-    let bump = bump.as_slice();
+    // TODO: replace this with `as_slice` when the msrv is upgraded
+    // to `1.84.0+`.
+    let bump_seed = [bump.unwrap_or_default()];
 
     // SAFETY: `data` is guaranteed to have enough space for `MAX_SEEDS + 2`
     // elements, and `MAX_SEEDS` is as large as `N`.
     unsafe {
-        if !bump.is_empty() {
-            data.get_unchecked_mut(i).write(bump);
+        if bump.is_some() {
+            data.get_unchecked_mut(i).write(&bump_seed);
             i += 1;
         }
         data.get_unchecked_mut(i).write(program_id.as_ref());
@@ -82,7 +84,7 @@ pub fn derive_address<const N: usize>(
         unsafe {
             sol_sha256(
                 data.as_ptr() as *const u8,
-                (N + 2) as u64,
+                (i + 2) as u64,
                 pda.as_mut_ptr() as *mut u8,
             );
         }
@@ -111,8 +113,8 @@ pub fn derive_address<const N: usize>(
 ///
 /// # Important
 ///
-/// This function differs from [`pinocchio::pubkey::create_program_address`] in that it
-/// does not perform a validation to ensure that the derived address is a valid
+/// This function differs from [`pinocchio::pubkey::create_program_address`] in that
+/// it does not perform a validation to ensure that the derived address is a valid
 /// (off-curve) program derived address. It is intended for use in cases where the
 /// seeds, bump, and program id are known to be valid, and the caller wants to derive
 /// the address without incurring the cost of the `create_program_address` syscall.
@@ -136,10 +138,8 @@ pub const fn derive_address_const<const N: usize>(
         i += 1;
     }
 
-    let bump = bump.as_slice();
-
-    if !bump.is_empty() {
-        hasher = hasher.update(bump);
+    if bump.is_some() {
+        hasher = hasher.update(&[bump.unwrap()]);
     }
 
     hasher.update(program_id).update(PDA_MARKER).finalize()
