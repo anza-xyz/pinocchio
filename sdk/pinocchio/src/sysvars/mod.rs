@@ -26,7 +26,7 @@ const OFFSET_LENGTH_EXCEEDS_SYSVAR: u64 = 1;
 const SYSVAR_NOT_FOUND: u64 = 2;
 
 /// A type that holds sysvar data.
-pub trait Sysvar: Default + Sized {
+pub trait Sysvar: Sized {
     /// Load the sysvar directly from the runtime.
     ///
     /// This is the preferred way to load a sysvar. Calling this method does not

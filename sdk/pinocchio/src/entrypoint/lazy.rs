@@ -132,7 +132,15 @@ impl InstructionContext {
     /// # Safety
     ///
     /// The caller must ensure that the input buffer is valid, i.e., it represents
-    /// the program input parameters serialized by the SVM loader.
+    /// the program input parameters serialized by the SVM loader. The SVM loader
+    /// serializes the input parameters aligned to `8` bytes, with the first
+    /// `8` bytes representing the number of accounts, followed by the accounts
+    /// themselves, the instruction data and the program id.
+    ///
+    /// More information on the input buffer format can be found in the
+    /// [SVM documentation].
+    ///
+    /// [SVM documentation]: https://solana.com/docs/programs/faq#input-parameter-serialization
     #[inline(always)]
     pub unsafe fn new_unchecked(input: *mut u8) -> Self {
         Self {
