@@ -61,7 +61,7 @@ pub fn derive_address<const N: usize>(
         i += 1;
     }
 
-    // TODO: replace this with `as_slice` when the msrv is upgraded
+    // TODO: replace this with `as_slice` when the MSRV is upgraded
     // to `1.84.0+`.
     let bump_seed = [bump.unwrap_or_default()];
 
@@ -138,11 +138,17 @@ pub const fn derive_address_const<const N: usize>(
         i += 1;
     }
 
-    if bump.is_some() {
-        hasher = hasher.update(&[bump.unwrap()]);
+    // TODO: replace this with `is_some` when the MSRV is upgraded
+    // to `1.84.0+`.
+    if let Some(bump) = bump {
+        hasher
+            .update(&[bump])
+            .update(program_id)
+            .update(PDA_MARKER)
+            .finalize()
+    } else {
+        hasher.update(program_id).update(PDA_MARKER).finalize()
     }
-
-    hasher.update(program_id).update(PDA_MARKER).finalize()
 }
 
 /// Convenience macro to define a static `Pubkey` value.
