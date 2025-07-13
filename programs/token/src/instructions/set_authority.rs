@@ -57,23 +57,27 @@ impl SetAuthority<'_> {
         // -  [2]: new_authority presence flag (1 byte, AuthorityType)
         // -  [3..35] new_authority (optional, 32 bytes, Pubkey)
         let mut instruction_data = [UNINIT_BYTE; 35];
+        let mut length = instruction_data.len();
 
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[6]);
         // Set authority_type as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[self.authority_type as u8]);
-        // Set new_authority as [u8; 32] at offset [2..35]
+
         if let Some(new_authority) = self.new_authority {
+            // Set new_authority as [u8; 32] at offset [2..35]
             write_bytes(&mut instruction_data[2..3], &[1]);
             write_bytes(&mut instruction_data[3..], new_authority);
         } else {
             write_bytes(&mut instruction_data[2..3], &[0]);
+            // Adjust length if no new authority
+            length = 3;
         }
 
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 35) },
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
         };
 
         invoke_signed(&instruction, &[self.account, self.authority], signers)

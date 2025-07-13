@@ -7,14 +7,16 @@ mod syscalls {
         pub fn sol_log_(message: *const u8, len: u64);
 
         pub fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64);
+
+        pub fn sol_remaining_compute_units() -> u64;
     }
 }
 
 #[cfg(all(target_os = "solana", target_feature = "static-syscalls"))]
 mod syscalls {
     // Syscalls provided by the SVM runtime (SBPFv3 and newer).
-    unsafe extern "C" fn sol_log_(message: *const u8, length: u64) {
-        let syscall: extern "C" fn(*const u8, u64) = core::mem::transmute(544561597u64); // murmur32 hash of "sol_log_"
+    pub(crate) fn sol_log_(message: *const u8, length: u64) {
+        let syscall: extern "C" fn(*const u8, u64) = unsafe { core::mem::transmute(544561597u64) }; // murmur32 hash of "sol_log_"
         syscall(message, length)
     }
 
@@ -22,6 +24,11 @@ mod syscalls {
         let syscall: extern "C" fn(*mut u8, *const u8, u64) =
             unsafe { core::mem::transmute(1904002211u64) }; // murmur32 hash of "sol_memcpy_"
         syscall(dest, src, n)
+    }
+
+    pub(crate) fn sol_remaining_compute_units() -> u64 {
+        let syscall: extern "C" fn() -> u64 = unsafe { core::mem::transmute(3991886574u64) }; // murmur32 hash of "sol_remaining_compute_units"
+        syscall()
     }
 }
 
@@ -147,6 +154,18 @@ pub fn log_message(message: &[u8]) {
     }
 }
 
+/// Remaining CUs.
+#[inline(always)]
+pub fn remaining_compute_units() -> u64 {
+    #[cfg(target_os = "solana")]
+    // SAFETY: `sol_remaining_compute_units` is a syscall that returns the remaining compute units.
+    unsafe {
+        syscalls::sol_remaining_compute_units()
+    }
+    #[cfg(not(target_os = "solana"))]
+    core::hint::black_box(0u64)
+}
+
 /// Formatting arguments.
 ///
 /// Arguments can be used to specify additional formatting options for the log message.
@@ -172,7 +191,14 @@ pub enum Argument {
 }
 
 /// Trait to specify the log behavior for a type.
-pub trait Log {
+///
+/// # Safety
+///
+/// The implementation must ensure that the value returned by any of the methods correctly
+/// reflects the actual number of bytes written to the buffer. Returning a value greater
+/// than the number of bytes written to the buffer will result in undefined behavior, since
+/// it will lead to reading uninitialized memory from the buffer.
+pub unsafe trait Log {
     #[inline(always)]
     fn debug(&self, buffer: &mut [MaybeUninit<u8>]) -> usize {
         self.debug_with_args(buffer, &[])
@@ -193,10 +219,13 @@ pub trait Log {
 
 /// Implement the log trait for unsigned integer types.
 macro_rules! impl_log_for_unsigned_integer {
-    ( $type:tt, $max_digits:literal ) => {
-        impl Log for $type {
+    ( $type:tt ) => {
+        unsafe impl Log for $type {
             #[inline]
             fn write_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
+                // The maximum number of digits that the type can have.
+                const MAX_DIGITS: usize = $type::MAX.ilog10() as usize + 1;
+
                 if buffer.is_empty() {
                     return 0;
                 }
@@ -211,8 +240,8 @@ macro_rules! impl_log_for_unsigned_integer {
                         1
                     }
                     mut value => {
-                        let mut digits = [UNINIT_BYTE; $max_digits];
-                        let mut offset = $max_digits;
+                        let mut digits = [UNINIT_BYTE; MAX_DIGITS];
+                        let mut offset = MAX_DIGITS;
 
                         while value > 0 {
                             let remainder = value % 10;
@@ -239,7 +268,7 @@ macro_rules! impl_log_for_unsigned_integer {
                         };
 
                         // Number of digits written.
-                        let mut written = $max_digits - offset;
+                        let mut written = MAX_DIGITS - offset;
 
                         if precision > 0 {
                             while precision >= written {
@@ -340,21 +369,17 @@ macro_rules! impl_log_for_unsigned_integer {
 }
 
 // Supported unsigned integer types.
-impl_log_for_unsigned_integer!(u8, 3);
-impl_log_for_unsigned_integer!(u16, 5);
-impl_log_for_unsigned_integer!(u32, 10);
-impl_log_for_unsigned_integer!(u64, 20);
-impl_log_for_unsigned_integer!(u128, 39);
-// Handle the `usize` type.
-#[cfg(target_pointer_width = "32")]
-impl_log_for_unsigned_integer!(usize, 10);
-#[cfg(target_pointer_width = "64")]
-impl_log_for_unsigned_integer!(usize, 20);
+impl_log_for_unsigned_integer!(u8);
+impl_log_for_unsigned_integer!(u16);
+impl_log_for_unsigned_integer!(u32);
+impl_log_for_unsigned_integer!(u64);
+impl_log_for_unsigned_integer!(u128);
+impl_log_for_unsigned_integer!(usize);
 
 /// Implement the log trait for the signed integer types.
 macro_rules! impl_log_for_signed {
     ( $type:tt ) => {
-        impl Log for $type {
+        unsafe impl Log for $type {
             #[inline]
             fn write_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
                 if buffer.is_empty() {
@@ -400,7 +425,7 @@ impl_log_for_signed!(i128);
 impl_log_for_signed!(isize);
 
 /// Implement the log trait for the &str type.
-impl Log for &str {
+unsafe impl Log for &str {
     #[inline]
     fn debug_with_args(&self, buffer: &mut [MaybeUninit<u8>], _args: &[Argument]) -> usize {
         if buffer.is_empty() {
@@ -558,7 +583,7 @@ impl Log for &str {
 /// Implement the log trait for the slice type.
 macro_rules! impl_log_for_slice {
     ( [$type:ident] ) => {
-        impl<$type> Log for &[$type]
+        unsafe impl<$type> Log for &[$type]
         where
             $type: Log
         {
@@ -566,7 +591,7 @@ macro_rules! impl_log_for_slice {
         }
     };
     ( [$type:ident; $size:ident] ) => {
-        impl<$type, const $size: usize> Log for &[$type; $size]
+        unsafe impl<$type, const $size: usize> Log for &[$type; $size]
         where
             $type: Log
         {
@@ -642,7 +667,7 @@ impl_log_for_slice!([T]);
 impl_log_for_slice!([T; N]);
 
 /// Implement the log trait for the bool type.
-impl Log for bool {
+unsafe impl Log for bool {
     #[inline]
     fn debug_with_args(&self, buffer: &mut [MaybeUninit<u8>], args: &[Argument]) -> usize {
         let value = if *self { "true" } else { "false" };

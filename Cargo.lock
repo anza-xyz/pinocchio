@@ -12,19 +12,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "five8_const"
-version = "0.1.4"
+name = "const-crypto"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26dec3da8bc3ef08f2c04f61eab298c3ab334523e55f076354d6d6f613799a7b"
+checksum = "1c06f1eb05f06cf2e380fdded278fbf056a38974299d77960555a311dcf91a52"
 dependencies = [
- "five8_core",
+ "keccak-const",
+ "sha2-const-stable",
 ]
 
 [[package]]
-name = "five8_core"
-version = "0.1.2"
+name = "keccak-const"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2551bf44bc5f776c15044b9b94153a00198be06743e262afaaa61f11ac7523a5"
+checksum = "57d8d8ce877200136358e0bbff3a77965875db3af755a11e1fa6b1b3e2df13ea"
 
 [[package]]
 name = "memchr"
@@ -72,7 +73,7 @@ dependencies = [
 name = "pinocchio-pubkey"
 version = "0.2.4"
 dependencies = [
- "five8_const",
+ "const-crypto",
  "pinocchio",
 ]
 
@@ -138,6 +139,12 @@ name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
+
+[[package]]
+name = "sha2-const-stable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9"
 
 [[package]]
 name = "syn"
