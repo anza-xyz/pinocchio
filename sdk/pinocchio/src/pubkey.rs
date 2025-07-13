@@ -240,43 +240,37 @@ pub fn checked_create_program_address(
 pub fn create_with_seed(
     base: &Pubkey,
     seed: &[u8],
-    owner: &Pubkey,
+    program_id: &Pubkey,
 ) -> Result<Pubkey, ProgramError> {
     if seed.len() > MAX_SEED_LEN {
         return Err(ProgramError::MaxSeedLengthExceeded);
     }
 
-    if owner.len() >= PDA_MARKER.len() {
-        let slice = &owner[owner.len() - PDA_MARKER.len()..];
-        if slice == PDA_MARKER {
-            return Err(ProgramError::IllegalOwner);
-        }
+    if program_id.ends_with(PDA_MARKER) {
+        return Err(ProgramError::IllegalOwner);
     }
 
     #[cfg(target_os = "solana")]
     {
         let mut bytes = core::mem::MaybeUninit::<[u8; PUBKEY_BYTES]>::uninit();
 
-        let vals = &[base, seed, owner];
+        let vals = &[base, seed, program_id];
 
-        let result = unsafe {
+        unsafe {
             crate::syscalls::sol_sha256(
                 vals as *const _ as *const u8,
                 vals.len() as u64,
                 bytes.as_mut_ptr() as *mut _,
-            )
-        };
-
-        match result {
-            // SAFETY: The syscall has initialized the bytes.
-            crate::SUCCESS => Ok(unsafe { bytes.assume_init() }),
-            _ => Err(result.into()),
+            );
         }
+
+        // SAFETY: The syscall has initialized the bytes.
+        Ok(unsafe { bytes.assume_init() })
     }
 
     #[cfg(not(target_os = "solana"))]
     {
-        core::hint::black_box((base, seed, owner));
+        core::hint::black_box((base, seed, program_id));
         panic!("create_with_seed is only available on target `solana`")
     }
 }
