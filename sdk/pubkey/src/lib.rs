@@ -80,7 +80,7 @@ pub fn derive_address<const N: usize>(
     {
         let mut pda = MaybeUninit::<[u8; 32]>::uninit();
 
-        // SAFETY: `data` has `N + 2` elements initialized.
+        // SAFETY: `data` has `i + 2` elements initialized.
         unsafe {
             sol_sha256(
                 data.as_ptr() as *const u8,
