@@ -298,13 +298,17 @@ impl SlotHashes<Box<[u8]>> {
     /// Allocates an optimal buffer for the sysvar data based on available features.
     #[inline(always)]
     fn allocate_and_fetch() -> Result<Box<[u8]>, ProgramError> {
-        // SAFETY: The buffer length matches the requested syscall length and we
-        // fully initialise it before use.
-        let mut data = Box::new_uninit_slice(MAX_SIZE);
+        let mut vec_buf: std::vec::Vec<u8> = std::vec::Vec::with_capacity(MAX_SIZE);
         unsafe {
-            Self::fill_from_sysvar(data.as_mut_ptr() as *mut u8)?;
-            Ok(data.assume_init())
+            // SAFETY: `vec_buf` was allocated with capacity `MAX_SIZE` so its
+            // pointer is valid for exactly that many bytes. `fill_from_sysvar`
+            // writes `MAX_SIZE` bytes, and we immediately set the length to
+            // `MAX_SIZE`, marking the entire buffer as initialised before it is
+            // turned into a boxed slice.
+            Self::fill_from_sysvar(vec_buf.as_mut_ptr())?;
+            vec_buf.set_len(MAX_SIZE);
         }
+        Ok(vec_buf.into_boxed_slice())
     }
 
     /// Fetches the SlotHashes sysvar data directly via syscall. This copies
