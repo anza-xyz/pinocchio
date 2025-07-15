@@ -1,7 +1,7 @@
 [package]
 name = "pinocchio-memo"
 description = "Pinocchio helpers to invoke Memo program instructions"
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"
@@ -12,5 +12,5 @@ rust-version = { workspace = true }
 crate-type = ["rlib"]
 
 [dependencies]
-pinocchio = { version = "0.8.4", path = "../../sdk/pinocchio" }
+pinocchio = { workspace = true }
 pinocchio-pubkey = { workspace = true }
