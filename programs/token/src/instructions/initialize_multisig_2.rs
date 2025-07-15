@@ -1,83 +1,94 @@
-use core::slice::from_raw_parts;
+use core::{mem::MaybeUninit, slice};
 
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
+    cpi::invoke_with_bounds,
+    instruction::{AccountMeta, Instruction},
     program_error::ProgramError,
     ProgramResult,
 };
 
-extern crate alloc;
-
-use alloc::vec::Vec;
-
-use crate::{write_bytes, UNINIT_BYTE};
+use crate::instructions::MAX_MULTISIG_SIGNERS;
 
 /// Initialize a new Multisig.
 ///
 /// ### Accounts:
 ///   0. `[writable]` The multisig account to initialize.
-///   1. `[]` Rent sysvar
-///   2. ..`2+N`. `[]` The signer accounts, must equal to N where `1 <= N <=
-///      11`.
-pub struct InitializeMultisig2<'a> {
+///   1. ..`1+N`. `[]` The N signer accounts, where N is between 1 and 11.
+pub struct InitializeMultisig2<'a, 'b>
+where
+    'a: 'b,
+{
     /// Multisig Account.
     pub multisig: &'a AccountInfo,
     /// Signer Accounts
-    pub multisig_signers: Vec<&'a AccountInfo>,
+    pub signers: &'b [&'a AccountInfo],
     /// The number of signers (M) required to validate this multisignature
     /// account.
     pub m: u8,
 }
 
-impl InitializeMultisig2<'_> {
+impl InitializeMultisig2<'_, '_> {
     #[inline(always)]
-    pub fn invoke<const ACCOUNTS: usize>(&self) -> ProgramResult {
-        self.invoke_signed::<ACCOUNTS>(&[])
-    }
+    pub fn invoke(&self) -> ProgramResult {
+        let &Self {
+            multisig,
+            signers,
+            m,
+        } = self;
 
-    pub fn invoke_signed<const ACCOUNTS: usize>(&self, signers: &[Signer]) -> ProgramResult {
-        if ACCOUNTS != self.multisig_signers.len() + 1 {
+        if signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
         }
 
-        // Account metadata
-        let mut account_metas = Vec::with_capacity(1 + self.multisig_signers.len());
-        account_metas.push(AccountMeta::writable(self.multisig.key()));
+        let num_accounts = 1 + signers.len();
 
-        account_metas.extend(
-            self.multisig_signers
-                .iter()
-                .map(|a| AccountMeta::readonly(a.key())),
-        );
+        // Account metadata
+        const UNINIT_META: MaybeUninit<AccountMeta> = MaybeUninit::<AccountMeta>::uninit();
+        let mut acc_metas = [UNINIT_META; 1 + MAX_MULTISIG_SIGNERS];
+
+        unsafe {
+            // SAFETY:
+            // - `account_metas` is sized to 1 + MAX_MULTISIG_SIGNERS
+            // - Index 0 is always present
+            acc_metas
+                .get_unchecked_mut(0)
+                .write(AccountMeta::writable(multisig.key()));
+        }
+
+        for (account_meta, signer) in acc_metas[1..].iter_mut().zip(signers.iter()) {
+            account_meta.write(AccountMeta::readonly(signer.key()));
+        }
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: m (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 2];
-
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[2]);
-        // Set number of signers (m) at offset 1
-        write_bytes(&mut instruction_data[1..2], &[self.m]);
+        let data = &[19, m];
 
         let instruction = Instruction {
             program_id: &crate::ID,
-            accounts: account_metas.as_slice(),
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            accounts: unsafe { slice::from_raw_parts(acc_metas.as_ptr() as _, num_accounts) },
+            data,
         };
 
-        let mut account_infos = Vec::with_capacity(1 + self.multisig_signers.len());
+        // Account info array
+        const UNINIT_INFO: MaybeUninit<&AccountInfo> = MaybeUninit::uninit();
+        let mut acc_infos = [UNINIT_INFO; 1 + MAX_MULTISIG_SIGNERS];
 
-        account_infos.push(self.multisig);
+        unsafe {
+            // SAFETY:
+            // - `account_infos` is sized to 1 + MAX_MULTISIG_SIGNERS
+            // - Index 0 is always present
+            acc_infos.get_unchecked_mut(0).write(multisig);
+        }
 
-        account_infos.extend_from_slice(self.multisig_signers.as_slice());
+        // Fill signer accounts
+        for (account_info, signer) in acc_infos[1..].iter_mut().zip(signers.iter()) {
+            account_info.write(signer);
+        }
 
-        let account_infos: [&AccountInfo; ACCOUNTS] = account_infos
-            .try_into()
-            .map_err(|_| ProgramError::InvalidArgument)?;
-
-        invoke_signed(&instruction, &account_infos, signers)
+        invoke_with_bounds::<{ 1 + MAX_MULTISIG_SIGNERS }>(&instruction, unsafe {
+            slice::from_raw_parts(acc_infos.as_ptr() as _, num_accounts)
+        })
     }
 }
