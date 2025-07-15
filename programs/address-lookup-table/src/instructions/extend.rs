@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
@@ -18,7 +17,7 @@ use pinocchio::{
 ///   2. `[SIGNER, WRITE, OPTIONAL]` Account that will fund the table
 ///      reallocation
 ///   3. `[OPTIONAL]` System program for CPI.
-pub struct Extend<'a> {
+pub struct Extend<'a, 'b> {
     /// Address lookup table account to deactivate
     pub lookup_table: &'a AccountInfo,
     /// Current authority
@@ -28,15 +27,16 @@ pub struct Extend<'a> {
     /// System program for CPI.
     pub system_program: Option<&'a AccountInfo>,
     /// Addresses to extend the table with
-    pub new_addresses: Vec<&'a Pubkey>,
+    pub new_addresses: &'b [&'a Pubkey],
 }
 
-impl Extend<'_> {
+impl Extend<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
+    #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data:
         // - [0]: Instruction discriminator (4 bytes, u32) (2 for Extend)
