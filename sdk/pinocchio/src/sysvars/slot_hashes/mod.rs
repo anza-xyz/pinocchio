@@ -1,5 +1,9 @@
 //! Efficient, zero-copy access to SlotHashes sysvar data.
 
+pub mod raw;
+#[doc(inline)]
+pub use raw::{fetch_into, fetch_into_unchecked, validate_fetch_offset};
+
 #[cfg(test)]
 mod test;
 #[cfg(test)]
@@ -321,7 +325,3 @@ impl SlotHashes<Box<[u8]>> {
         Ok(unsafe { SlotHashes::new_unchecked(data_init) })
     }
 }
-
-pub mod raw;
-#[doc(inline)]
-pub use raw::{fetch_into, fetch_into_unchecked, validate_fetch_offset};
