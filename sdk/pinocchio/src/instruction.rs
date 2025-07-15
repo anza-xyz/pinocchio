@@ -73,19 +73,35 @@ pub struct Account<'a> {
     _account_info: PhantomData<&'a AccountInfo>,
 }
 
+/// Return a pointer to a type `U` given a source pointer for `T` and the relative offset
+/// to `U` in units of `T`.
+///
+/// # Safety
+///
+/// The caller must ensure that the `source` pointer is valid for `T` and that the offset is
+/// within the bounds of the memory region pointed to by `source`. The resulting pointer must
+/// at an aligned memory location that can be safely cast to `*const U`.
+///
+/// If any of this requirements is not valid, this function leads to undefined behavior.
 #[inline(always)]
-const fn offset<T, U>(ptr: *const T, offset: usize) -> *const U {
-    unsafe { (ptr as *const u8).add(offset) as *const U }
+const unsafe fn offset<T, U>(source: *const T, offset: usize) -> *const U {
+    // SAFETY: The caller ensures that the offset is valid for the type `T` and that
+    // the resulting pointer is valid for type `U`.
+    unsafe { (source as *const u8).add(offset) as *const U }
 }
 
 impl<'a> From<&'a AccountInfo> for Account<'a> {
     fn from(account: &'a AccountInfo) -> Self {
         Account {
-            key: offset(account.raw, 8),
-            lamports: offset(account.raw, 72),
+            // SAFETY: offset `8` is the `key` field in the `Account` struct.
+            key: unsafe { offset(account.raw, 8) },
+            // SAFETY: offset `72` is the `lamports` field in the `Account` struct.
+            lamports: unsafe { offset(account.raw, 72) },
             data_len: account.data_len() as u64,
-            data: offset(account.raw, 88),
-            owner: offset(account.raw, 40),
+            // SAFETY: offset `88` is the start of the account data in the `Account` struct.
+            data: unsafe { offset(account.raw, 88) },
+            // SAFETY: offset `40` is the `owner` field in the `Account` struct.
+            owner: unsafe { offset(account.raw, 40) },
             // The `rent_epoch` field is not present in the `AccountInfo` struct,
             // since the value occurs after the variable data of the account in
             // the runtime input data.
