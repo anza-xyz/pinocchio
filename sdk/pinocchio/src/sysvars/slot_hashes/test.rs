@@ -255,7 +255,7 @@ fn test_iterator_into_ref_no_std() {
 
 // Tests to verify mock data helpers
 #[test]
-fn mock_data_max_entries_boundary() {
+fn test_mock_data_max_entries_boundary() {
     let entries = generate_mock_entries(MAX_ENTRIES, 1000, DecrementStrategy::Strictly1);
     let data = create_mock_data(&entries);
     let sh = unsafe { SlotHashes::new_unchecked(data.as_slice()) };
@@ -263,7 +263,7 @@ fn mock_data_max_entries_boundary() {
 }
 
 #[test]
-fn mock_data_raw_byte_layout() {
+fn test_mock_data_raw_byte_layout() {
     let entries = &[(100u64, [0xAB; 32])];
     let data = create_mock_data(entries);
     // length prefix

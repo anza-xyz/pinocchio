@@ -3,7 +3,7 @@ extern crate std;
 use super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account_info};
 
 #[test]
-fn wrong_key_from_account_info() {
+fn test_wrong_key_from_account_info() {
     let bytes = raw_slot_hashes(0, &[]);
     let (info, _backing) = unsafe { make_account_info([1u8; 32], &bytes, crate::NON_DUP_MARKER) };
     assert!(matches!(
@@ -13,7 +13,7 @@ fn wrong_key_from_account_info() {
 }
 
 #[test]
-fn wrong_size_buffer_rejected() {
+fn test_wrong_size_buffer_rejected() {
     // Buffer that declares 1 entry but is 1 byte too small to hold it.
     let num_entries: u64 = 1;
     let required_size = NUM_ENTRIES_SIZE + (num_entries as usize) * ENTRY_SIZE;
@@ -34,7 +34,7 @@ fn wrong_size_buffer_rejected() {
 }
 
 #[test]
-fn truncated_payload_with_max_size_buffer_is_valid() {
+fn test_truncated_payload_with_max_size_buffer_is_valid() {
     let entry = (123u64, [7u8; HASH_BYTES]);
     let bytes = raw_slot_hashes(2, &[entry]); // says 2 but provides 1, rest is zeros
 
@@ -54,7 +54,7 @@ fn truncated_payload_with_max_size_buffer_is_valid() {
 }
 
 #[test]
-fn duplicate_slots_binary_search_safe() {
+fn test_duplicate_slots_binary_search_safe() {
     let entries = &[
         (200, [0u8; HASH_BYTES]),
         (200, [1u8; HASH_BYTES]),
@@ -71,7 +71,7 @@ fn duplicate_slots_binary_search_safe() {
 }
 
 #[test]
-fn zero_len_minimal_slice_iterates_empty() {
+fn test_zero_len_minimal_slice_iterates_empty() {
     let zero_data = raw_slot_hashes(0, &[]);
     let sh = unsafe { SlotHashes::new_unchecked(&zero_data[..]) };
     assert_eq!(sh.len(), 0);
@@ -79,7 +79,7 @@ fn zero_len_minimal_slice_iterates_empty() {
 }
 
 #[test]
-fn borrow_state_failure_from_account_info() {
+fn test_borrow_state_failure_from_account_info() {
     let bytes = raw_slot_hashes(0, &[]);
     let (info, _backing) = unsafe { make_account_info(SLOTHASHES_ID, &bytes, 0) };
     assert!(matches!(
