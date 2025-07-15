@@ -15,7 +15,7 @@ members = [
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/anza-xyz/pinocchio"
-rust-version = "1.84.1"
+rust-version = "1.79"
 
 [workspace.dependencies]
 five8_const = "0.1.4"
