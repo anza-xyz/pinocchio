@@ -106,10 +106,6 @@ fn parse_and_validate_data(data: &[u8]) -> Result<(), ProgramError> {
     // SAFETY: We've confirmed that data has enough bytes to read the entry count.
     let num_entries = unsafe { read_entry_count_from_bytes_unchecked(data) };
 
-    if num_entries > MAX_ENTRIES {
-        return Err(ProgramError::InvalidAccountData);
-    }
-
     let min_size = NUM_ENTRIES_SIZE + num_entries * ENTRY_SIZE;
     if data.len() < min_size {
         return Err(ProgramError::AccountDataTooSmall);

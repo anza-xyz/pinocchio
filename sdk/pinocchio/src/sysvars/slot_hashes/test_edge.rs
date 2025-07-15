@@ -13,15 +13,6 @@ fn wrong_key_from_account_info() {
 }
 
 #[test]
-fn too_many_entries_rejected() {
-    let bytes = raw_slot_hashes((MAX_ENTRIES as u64) + 1, &[]);
-    assert!(matches!(
-        SlotHashes::new(bytes.as_slice()),
-        Err(ProgramError::InvalidAccountData)
-    ));
-}
-
-#[test]
 fn wrong_size_buffer_rejected() {
     // Buffer that declares 1 entry but is 1 byte too small to hold it.
     let num_entries: u64 = 1;
