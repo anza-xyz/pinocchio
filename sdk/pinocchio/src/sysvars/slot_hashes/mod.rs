@@ -92,8 +92,7 @@ pub(crate) unsafe fn read_entry_count_from_bytes_unchecked(data: &[u8]) -> usize
 ///
 /// The function checks:
 /// 1. The buffer is large enough to contain the entry count.
-/// 2. The declared entry count is ≤ `MAX_ENTRIES`.
-/// 3. The buffer length is sufficient to hold the declared number of entries.
+/// 2. The buffer length is sufficient to hold the declared number of entries.
 ///
 /// It returns `Ok(())` if the data is well-formed, otherwise an appropriate
 /// `ProgramError` describing the issue.
@@ -123,26 +122,26 @@ impl SlotHashEntry {
 }
 
 impl<T: Deref<Target = [u8]>> SlotHashes<T> {
-    /// Creates a `SlotHashes` instance from mainnet-sized data with full validation.
+    /// Creates a `SlotHashes` instance with validation of the entry count and buffer size.
     ///
-    /// This constructor expects exactly MAX_SIZE (20,488) bytes and performs validation
-    /// of the entry count. Callers with different buffer sizes must pad their data
-    /// to the required length or use test-specific constructors.
+    /// This constructor validates that the buffer has at least enough bytes to contain
+    /// the declared number of entries. The buffer can be any size >= the minimum required,
+    /// making it suitable for both full MAX_SIZE buffers and smaller test data.
     /// Does not validate that entries are sorted in descending order.
     #[inline(always)]
     pub fn new(data: T) -> Result<Self, ProgramError> {
         parse_and_validate_data(&data)?;
-        // SAFETY: `parse_and_validate_data` verifies that the data slice is exactly
-        // `MAX_SIZE` bytes long and that the declared entry count is within
-        // `MAX_ENTRIES`, thus upholding all invariants required by
-        // `SlotHashes::new_unchecked`.
+        // SAFETY: `parse_and_validate_data` verifies that the data slice has at least
+        // `NUM_ENTRIES_SIZE` bytes for the entry count and enough additional bytes to
+        // contain the declared number of entries, thus upholding all invariants required
+        // by `SlotHashes::new_unchecked`.
         Ok(unsafe { Self::new_unchecked(data) })
     }
 
-    /// Creates a `SlotHashes` instance assuming golden mainnet buffer size.
-    /// Reads the entry count from the data but assumes the buffer is MAX_SIZE bytes.
-    /// Callers with different needs must pad their incomplete sysvar data up to
-    /// the required length in test or new network contexts.
+    /// Creates a `SlotHashes` instance without validation.
+    /// 
+    /// This is an unsafe constructor that bypasses all validation checks for performance.
+    /// In debug builds, it still runs `parse_and_validate_data` as a sanity check.
     ///
     /// # Safety
     ///
@@ -150,7 +149,7 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// The caller must ensure:
     /// 1. The underlying byte slice in `data` represents valid SlotHashes data
     ///    (length prefix + entries, where entries are sorted in descending order by slot).
-    /// 2. The data slice contains exactly MAX_SIZE (20,488) bytes.
+    /// 2. The data slice has at least `NUM_ENTRIES_SIZE + (declared_entries * ENTRY_SIZE)` bytes.
     /// 3. The first 8 bytes contain a valid entry count in little-endian format.
     ///
     #[inline(always)]
