@@ -64,3 +64,4 @@ RPC
 ed25519
 performant
 syscall/S
+bitmask
