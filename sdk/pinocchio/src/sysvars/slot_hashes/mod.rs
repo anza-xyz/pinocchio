@@ -263,6 +263,14 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
     ///
     /// This function verifies that:
     /// - The account key matches the `SLOTHASHES_ID`
+    /// - The account data can be successfully borrowed
+    ///
+    /// Returns a `SlotHashes` instance that borrows the account's data for zero-copy access.
+    /// The returned instance is valid for the lifetime of the borrow.
+    ///
+    /// # Errors
+    /// - `ProgramError::InvalidArgument` if the account key doesn't match the SlotHashes sysvar ID
+    /// - `ProgramError::AccountBorrowFailed` if the account data is already mutably borrowed
     #[inline(always)]
     pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
         if account_info.key() != &SLOTHASHES_ID {
