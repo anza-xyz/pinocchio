@@ -40,6 +40,7 @@ impl ApproveChecked<'_, '_> {
         self.invoke_signed(&[])
     }
 
+    #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 4] = [
