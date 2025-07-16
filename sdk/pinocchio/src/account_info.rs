@@ -189,7 +189,7 @@ impl AccountInfo {
     ///
     /// # Safety
     ///
-    /// It is undefined behaviour to use this method while there is an active reference
+    /// It is undefined behavior to use this method while there is an active reference
     /// to the `owner` returned by [`Self::owner`].
     #[inline(always)]
     pub unsafe fn assign(&self, new_owner: &Pubkey) {
