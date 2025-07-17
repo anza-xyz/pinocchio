@@ -9,6 +9,23 @@ use crate::pubkey::Pubkey;
 use core::{mem, ptr};
 use std::vec::Vec;
 
+/// Matches the pinocchio Account struct.
+/// Account fields are private, so this struct allows more readable
+/// use of them in tests.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct AccountLayout {
+    borrow_state: u8,
+    is_signer: u8,
+    is_writable: u8,
+    executable: u8,
+    resize_delta: i32,
+    key: Pubkey,
+    owner: Pubkey,
+    lamports: u64,
+    data_len: u64,
+}
+
 /// Strategy that decides how much the slot number is decremented between
 /// successive entries in `generate_mock_entries`.
 #[allow(dead_code)]
@@ -103,29 +120,15 @@ pub unsafe fn make_account_info(
     data: &[u8],
     borrow_state: u8,
 ) -> (AccountInfo, Vec<u64>) {
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    struct Header {
-        borrow_state: u8,
-        is_signer: u8,
-        is_writable: u8,
-        executable: u8,
-        resize_delta: i32,
-        key: Pubkey,
-        owner: Pubkey,
-        lamports: u64,
-        data_len: u64,
-    }
-
-    let hdr_size = mem::size_of::<Header>();
+    let hdr_size = mem::size_of::<AccountLayout>();
     let total = hdr_size + data.len();
     let words = (total + 7) / 8;
     let mut backing: Vec<u64> = std::vec![0u64; words];
 
-    let hdr_ptr = backing.as_mut_ptr() as *mut Header;
+    let hdr_ptr = backing.as_mut_ptr() as *mut AccountLayout;
     ptr::write(
         hdr_ptr,
-        Header {
+        AccountLayout {
             borrow_state,
             is_signer: 0,
             is_writable: 0,
@@ -150,4 +153,44 @@ pub unsafe fn make_account_info(
         },
         backing,
     )
+}
+
+#[cfg(test)]
+#[test]
+fn test_account_layout_compatibility() {
+    assert_eq!(
+        mem::size_of::<AccountLayout>(),
+        mem::size_of::<Account>(),
+        "Header size must match Account size"
+    );
+    assert_eq!(
+        mem::align_of::<AccountLayout>(),
+        mem::align_of::<Account>(),
+        "Header alignment must match Account alignment"
+    );
+
+    unsafe {
+        let test_header = AccountLayout {
+            borrow_state: 42,
+            is_signer: 1,
+            is_writable: 1,
+            executable: 0,
+            resize_delta: 100,
+            key: [1u8; 32],
+            owner: [2u8; 32],
+            lamports: 1000,
+            data_len: 256,
+        };
+
+        let account_ptr = &test_header as *const AccountLayout as *const Account;
+        let account_ref = &*account_ptr;
+        assert_eq!(
+            account_ref.borrow_state, 42,
+            "borrow_state field should be accessible and match"
+        );
+        assert_eq!(
+            account_ref.data_len, 256,
+            "data_len field should be accessible and match"
+        );
+    }
 }
