@@ -1,10 +1,7 @@
 //! Tests that rely on the `std` feature (host-only helpers, alloc, etc.).
 
 use super::*;
-use crate::{
-    account_info::{Account, AccountInfo},
-    pubkey::Pubkey,
-};
+use crate::account_info::{Account, AccountInfo};
 use core::ptr;
 extern crate std;
 use super::test_utils::*;

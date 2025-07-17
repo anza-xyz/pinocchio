@@ -124,6 +124,10 @@ pub unsafe fn make_account_info(
     let total = hdr_size + data.len();
     let words = (total + 7) / 8;
     let mut backing: Vec<u64> = std::vec![0u64; words];
+    assert!(
+        mem::align_of::<u64>() >= mem::align_of::<AccountLayout>(),
+        "`backing` should be properly aligned to store an `AccountLayout` instance"
+    );
 
     let hdr_ptr = backing.as_mut_ptr() as *mut AccountLayout;
     ptr::write(
