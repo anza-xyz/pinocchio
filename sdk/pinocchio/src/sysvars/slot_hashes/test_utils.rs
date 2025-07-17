@@ -104,7 +104,7 @@ pub fn create_mock_data(entries: &[(u64, [u8; HASH_BYTES])]) -> Vec<u8> {
     build_slot_hashes_bytes(entries.len() as u64, entries)
 }
 
-/// Allocate a heap-backed `AccountInfo` whose data region is initialised with
+/// Allocate a heap-backed `AccountInfo` whose data region is initialized with
 /// `data` and whose key is `key`.
 ///
 /// The function also returns the backing `Vec<u64>` so the caller can keep it

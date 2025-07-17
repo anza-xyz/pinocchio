@@ -83,7 +83,7 @@ fn test_from_account_info_constructor() {
 /// allocates a MAX_SIZE-sized buffer without panicking.
 ///
 /// On non-Solana targets the underlying syscall is stubbed; the returned buffer
-/// is zero-initialised and contains zero entries.  We overwrite
+/// is zero-initialized and contains zero entries.  We overwrite
 /// that buffer with deterministic fixture data and then exercise the normal
 /// `SlotHashes` getters to make sure the view itself works.  We do not verify
 /// that the syscall populated real on-chain bytes, as doing so requires an

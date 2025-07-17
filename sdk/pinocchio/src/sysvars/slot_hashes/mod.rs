@@ -310,7 +310,7 @@ impl SlotHashes<Box<[u8]>> {
             // SAFETY: `buf` was allocated with capacity `MAX_SIZE` so its
             // pointer is valid for exactly that many bytes. `fill_from_sysvar`
             // writes `MAX_SIZE` bytes, and we immediately set the length to
-            // `MAX_SIZE`, marking the entire buffer as initialised before it is
+            // `MAX_SIZE`, marking the entire buffer as initialized before it is
             // turned into a boxed slice.
             Self::fill_from_sysvar(buf.as_mut_ptr())?;
             buf.set_len(MAX_SIZE);
