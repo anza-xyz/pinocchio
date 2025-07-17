@@ -542,8 +542,76 @@ impl AccountInfo {
     /// in the `process_instruction` entrypoint of a program.
     #[inline]
     pub fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
-        #[allow(deprecated)]
-        self.realloc(new_len, true)
+        // Check wheather the account data is already borrowed.
+        self.can_borrow_mut_data()?;
+
+        let current_len = self.data_len();
+
+        unsafe {
+            // SAFETY: account data is not borrowed at this point and the new
+            // memory will be zero-initialized if the new length is larger than
+            // the current length.
+            self.resize_unchecked(new_len)?;
+        }
+
+        let difference = new_len.saturating_sub(current_len);
+
+        if difference > 0 {
+            unsafe {
+                #[cfg(target_os = "solana")]
+                sol_memset_(self.data_ptr().add(current_len), 0, difference as u64);
+
+                #[cfg(not(target_os = "solana"))]
+                core::ptr::write_bytes(self.data_ptr().add(current_len), 0, difference);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Resize (either truncating or extending) the account's data.
+    ///
+    /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`]
+    /// bytes within an instruction.
+    ///
+    /// # Important
+    ///
+    /// This method makes assumptions about the layout and location of memory
+    /// referenced by `AccountInfo` fields. It should only be called for
+    /// instances of `AccountInfo` that were created by the runtime and received
+    /// in the `process_instruction` entrypoint of a program.
+    ///
+    /// # Safety
+    ///
+    /// This method does not check if the account data is already borrowed. It should
+    /// only be called when the account is not being used. Additionaly, it does not
+    /// zero-initialize the new memory. Program should ensure to initialize the new
+    /// memory before using it; otherwise, it will result in undefined behavior.
+    #[inline(always)]
+    pub unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError> {
+        // Account length is always `< i32::MAX`...
+        let current_len = self.data_len() as i32;
+        // ...so the new length must fit in an `i32`.
+        let new_len = i32::try_from(new_len).map_err(|_| ProgramError::InvalidRealloc)?;
+
+        // Only resize if the length has changed.
+        if new_len != current_len {
+            let difference = new_len - current_len;
+            let accumulated_resize_delta = self.resize_delta() + difference;
+
+            // Return an error when the length increase from the original serialized data
+            // length is too large and would result in an out of bounds allocation
+            if accumulated_resize_delta > MAX_PERMITTED_DATA_INCREASE as i32 {
+                return Err(ProgramError::InvalidRealloc);
+            }
+
+            unsafe {
+                (*self.raw).data_len = new_len as u64;
+                (*self.raw).resize_delta = accumulated_resize_delta;
+            }
+        }
+
+        Ok(())
     }
 
     /// Zero out the the account's data length, lamports and owner fields, effectively
