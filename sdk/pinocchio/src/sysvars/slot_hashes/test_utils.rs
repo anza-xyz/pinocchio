@@ -4,6 +4,8 @@
 
 use super::*;
 extern crate std;
+use crate::account_info::{Account, AccountInfo};
+use crate::pubkey::Pubkey;
 use core::{mem, ptr};
 use std::vec::Vec;
 
@@ -84,9 +86,6 @@ pub fn build_slot_hashes_bytes(declared_len: u64, entries: &[(u64, [u8; HASH_BYT
 pub fn create_mock_data(entries: &[(u64, [u8; HASH_BYTES])]) -> Vec<u8> {
     build_slot_hashes_bytes(entries.len() as u64, entries)
 }
-
-use crate::account_info::{Account, AccountInfo};
-use crate::pubkey::Pubkey;
 
 /// Allocate a heap-backed `AccountInfo` whose data region is initialised with
 /// `data` and whose key is `key`.

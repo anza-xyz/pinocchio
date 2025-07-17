@@ -75,8 +75,6 @@ fn test_fetch_into_offset_validation() {
 /// On a host build the underlying sysvar syscall is stubbed out.
 #[test]
 fn test_fetch_into_host_stub() {
-    use super::raw;
-
     // 1. Full-size buffer, offset 0.
     let mut full = std::vec![0u8; MAX_SIZE];
     let n = raw::fetch_into(&mut full, 0).expect("fetch_into(full, 0)");

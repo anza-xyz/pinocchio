@@ -13,8 +13,6 @@ use std::vec::Vec;
 
 #[test]
 fn test_from_account_info_constructor() {
-    use std::eprintln;
-    eprintln!("DEBUG: Test starting");
     std::io::stderr().flush().unwrap();
 
     const NUM_ENTRIES: usize = 3;
