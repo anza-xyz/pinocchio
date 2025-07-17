@@ -45,6 +45,8 @@ pub const ENTRY_SIZE: usize = SLOT_SIZE + HASH_BYTES;
 pub const MAX_ENTRIES: usize = 512;
 /// Max size of the sysvar data in bytes. 20488. Golden on mainnet (never smaller)
 pub const MAX_SIZE: usize = NUM_ENTRIES_SIZE + MAX_ENTRIES * ENTRY_SIZE;
+/// A single hash.
+pub type Hash = [u8; HASH_BYTES];
 
 /// A single entry in the `SlotHashes` sysvar.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -53,7 +55,7 @@ pub struct SlotHashEntry {
     /// The slot number stored as little-endian bytes.
     slot_le: [u8; 8],
     /// The hash corresponding to the slot.
-    pub hash: [u8; HASH_BYTES],
+    pub hash: Hash,
 }
 
 // Fail compilation if `SlotHashEntry` is not byte-aligned.
@@ -62,6 +64,11 @@ const _: [(); 1] = [(); mem::align_of::<SlotHashEntry>()];
 /// SlotHashes provides read-only, zero-copy access to SlotHashes sysvar bytes.
 pub struct SlotHashes<T: Deref<Target = [u8]>> {
     data: T,
+}
+
+/// Log a `Hash` from a program.
+pub fn log(hash: &Hash) {
+    crate::pubkey::log(hash);
 }
 
 /// Reads the entry count from the first 8 bytes of data.
@@ -216,7 +223,7 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// If calling repeatedly, prefer getting `entries()` in caller
     /// to avoid repeated slice construction.
     #[inline(always)]
-    pub fn get_hash(&self, target_slot: Slot) -> Option<&[u8; HASH_BYTES]> {
+    pub fn get_hash(&self, target_slot: Slot) -> Option<&Hash> {
         self.position(target_slot)
             .map(|index| unsafe { &self.get_entry_unchecked(index).hash })
     }

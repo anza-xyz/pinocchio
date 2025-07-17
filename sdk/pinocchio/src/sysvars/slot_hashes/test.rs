@@ -167,7 +167,7 @@ fn test_basic_getters_and_iterator_no_std() {
 #[test]
 fn test_entry_count_no_std() {
     // Valid data (2 entries)
-    let entries: &[(Slot, [u8; HASH_BYTES])] = &[(100, [1u8; HASH_BYTES]), (98, [2u8; HASH_BYTES])];
+    let entries: &[(Slot, Hash)] = &[(100, [1u8; HASH_BYTES]), (98, [2u8; HASH_BYTES])];
     let data = create_mock_data(entries);
     let slot_hashes = unsafe { SlotHashes::new_unchecked(data.as_slice()) };
     assert_eq!(slot_hashes.len(), 2);
@@ -199,7 +199,7 @@ fn test_entry_count_no_std() {
 
 #[test]
 fn test_get_entry_unchecked_no_std() {
-    let single_entry: &[(Slot, [u8; HASH_BYTES])] = &[(100, [1u8; HASH_BYTES])];
+    let single_entry: &[(Slot, Hash)] = &[(100, [1u8; HASH_BYTES])];
     let data = create_mock_data(single_entry);
     let slot_hashes = unsafe { SlotHashes::new_unchecked(data.as_slice()) };
 
@@ -393,4 +393,15 @@ fn test_entry_count_header_too_short() {
     let short = [0u8; 4];
     assert!(SlotHashes::new(&short[..]).is_err());
     assert_eq!(read_entry_count_from_bytes(&short), None);
+}
+
+#[test]
+fn test_log_function() {
+    let test_hash: Hash = [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+        26, 27, 28, 29, 30, 31, 32,
+    ];
+
+    // Should not panic
+    log(&test_hash);
 }

@@ -53,7 +53,7 @@ pub fn generate_mock_entries(
     num_entries: usize,
     start_slot: u64,
     strategy: DecrementStrategy,
-) -> Vec<(u64, [u8; HASH_BYTES])> {
+) -> Vec<(u64, Hash)> {
     let mut entries = Vec::with_capacity(num_entries);
     let mut current_slot = start_slot;
     for i in 0..num_entries {
@@ -86,7 +86,7 @@ pub fn generate_mock_entries(
 
 /// Build a `Vec<u8>` the size of the *golden* SlotHashes sysvar (20 488 bytes)
 /// containing the supplied `entries` and with the `declared_len` header.
-pub fn build_slot_hashes_bytes(declared_len: u64, entries: &[(u64, [u8; HASH_BYTES])]) -> Vec<u8> {
+pub fn build_slot_hashes_bytes(declared_len: u64, entries: &[(u64, Hash)]) -> Vec<u8> {
     let mut data = std::vec![0u8; MAX_SIZE];
     data[..NUM_ENTRIES_SIZE].copy_from_slice(&declared_len.to_le_bytes());
     let mut offset = NUM_ENTRIES_SIZE;
@@ -100,7 +100,7 @@ pub fn build_slot_hashes_bytes(declared_len: u64, entries: &[(u64, [u8; HASH_BYT
 
 /// Convenience wrapper where `declared_len == entries.len()`.
 #[inline]
-pub fn create_mock_data(entries: &[(u64, [u8; HASH_BYTES])]) -> Vec<u8> {
+pub fn create_mock_data(entries: &[(u64, Hash)]) -> Vec<u8> {
     build_slot_hashes_bytes(entries.len() as u64, entries)
 }
 
