@@ -19,3 +19,6 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [features]
 std = []
+
+[dev-dependencies]
+bs58 = "0.5.1"
