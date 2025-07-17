@@ -25,31 +25,17 @@ fn test_from_account_info_constructor() {
     #[allow(unused_assignments)]
     let mut acct_ptr: *mut Account = core::ptr::null_mut();
 
-    #[repr(C)]
-    #[derive(Clone, Copy, Default)]
-    struct FakeAccount {
-        borrow_state: u8,
-        is_signer: u8,
-        is_writable: u8,
-        executable: u8,
-        resize_delta: i32,
-        key: Pubkey,
-        owner: Pubkey,
-        lamports: u64,
-        data_len: u64,
-    }
-
     unsafe {
-        let header_size = core::mem::size_of::<FakeAccount>();
+        let header_size = core::mem::size_of::<AccountLayout>();
         let total_size = header_size + data.len();
         let word_len = (total_size + 7) / 8;
         aligned_backing = std::vec![0u64; word_len];
         let base_ptr = aligned_backing.as_mut_ptr() as *mut u8;
 
-        let header_ptr = base_ptr as *mut FakeAccount;
+        let header_ptr = base_ptr as *mut AccountLayout;
         ptr::write(
             header_ptr,
-            FakeAccount {
+            AccountLayout {
                 borrow_state: crate::NON_DUP_MARKER,
                 is_signer: 0,
                 is_writable: 0,

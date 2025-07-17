@@ -14,16 +14,16 @@ use std::vec::Vec;
 /// use of them in tests.
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct AccountLayout {
-    borrow_state: u8,
-    is_signer: u8,
-    is_writable: u8,
-    executable: u8,
-    resize_delta: i32,
-    key: Pubkey,
-    owner: Pubkey,
-    lamports: u64,
-    data_len: u64,
+pub struct AccountLayout {
+    pub borrow_state: u8,
+    pub is_signer: u8,
+    pub is_writable: u8,
+    pub executable: u8,
+    pub resize_delta: i32,
+    pub key: Pubkey,
+    pub owner: Pubkey,
+    pub lamports: u64,
+    pub data_len: u64,
 }
 
 /// Strategy that decides how much the slot number is decremented between
