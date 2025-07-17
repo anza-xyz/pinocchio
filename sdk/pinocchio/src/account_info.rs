@@ -456,32 +456,42 @@ impl AccountInfo {
         Ok(())
     }
 
-    /// Realloc the account's data and optionally zero-initialize the new
-    /// memory.
+    /// Realloc (either truncating or zero extending) the account's data.
     ///
     /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
     /// within an instruction.
     ///
     /// # Important
     ///
-    /// Memory used to grow is already zero-initialized upon program
-    /// entrypoint and re-zeroing it wastes compute units. If within the same
-    /// call a program reallocs from larger to smaller and back to larger again
-    /// the new space could contain stale data. Pass `true` for `zero_init` in
-    /// this case, otherwise compute units will be wasted re-zero-initializing.
-    ///
-    /// Note that `zero_init` being `false` will not be supported by the
-    /// program runtime in the future. Programs should not rely on being able to
-    /// access stale data and use [`Self::resize`] instead.
-    ///
-    /// # Safety
+    /// The use of the `zero_init` parameter, which indicated whether the newly
+    /// allocated memory should be zero-initialized or not, is now deprecated and
+    /// ignored. The method will always zero-initialize the newly allocated memory
+    /// if the new length is larger than the current data length. This is the same
+    /// behavior as [`Self::resize`].
     ///
     /// This method makes assumptions about the layout and location of memory
     /// referenced by `AccountInfo` fields. It should only be called for
     /// instances of `AccountInfo` that were created by the runtime and received
     /// in the `process_instruction` entrypoint of a program.
     #[deprecated(since = "0.9.0", note = "Use AccountInfo::resize() instead")]
-    pub fn realloc(&self, new_len: usize, zero_init: bool) -> Result<(), ProgramError> {
+    #[inline(always)]
+    pub fn realloc(&self, new_len: usize, _zero_init: bool) -> Result<(), ProgramError> {
+        self.resize(new_len)
+    }
+
+    /// Resize (either truncating or zero extending) the account's data.
+    ///
+    /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
+    /// within an instruction.
+    ///
+    /// # Important
+    ///
+    /// This method makes assumptions about the layout and location of memory
+    /// referenced by `AccountInfo` fields. It should only be called for
+    /// instances of `AccountInfo` that were created by the runtime and received
+    /// in the `process_instruction` entrypoint of a program.
+    #[inline]
+    pub fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
         // Check wheather the account data is already borrowed.
         self.can_borrow_mut_data()?;
 
@@ -509,7 +519,7 @@ impl AccountInfo {
             (*self.raw).resize_delta = accumulated_resize_delta;
         }
 
-        if zero_init && difference > 0 {
+        if difference > 0 {
             unsafe {
                 #[cfg(target_os = "solana")]
                 sol_memset_(
@@ -527,23 +537,6 @@ impl AccountInfo {
         }
 
         Ok(())
-    }
-
-    /// Resize (either truncating or zero extending) the account's data.
-    ///
-    /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
-    /// within an instruction.
-    ///
-    /// # Important
-    ///
-    /// This method makes assumptions about the layout and location of memory
-    /// referenced by `AccountInfo` fields. It should only be called for
-    /// instances of `AccountInfo` that were created by the runtime and received
-    /// in the `process_instruction` entrypoint of a program.
-    #[inline]
-    pub fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
-        #[allow(deprecated)]
-        self.realloc(new_len, true)
     }
 
     /// Zero out the the account's data length, lamports and owner fields, effectively
