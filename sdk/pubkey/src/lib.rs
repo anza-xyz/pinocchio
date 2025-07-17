@@ -7,12 +7,14 @@ pub mod reexport {
     pub use pinocchio::pubkey::Pubkey;
 }
 
-#[cfg(feature = "const")]
-use const_crypto::{bs58::decode_pubkey, sha2::Sha256};
 use core::mem::MaybeUninit;
+#[cfg(feature = "const")]
+pub use five8_const::decode_32_const;
 use pinocchio::pubkey::{Pubkey, MAX_SEEDS, PDA_MARKER};
 #[cfg(target_os = "solana")]
 use pinocchio::syscalls::sol_sha256;
+#[cfg(feature = "const")]
+use sha2_const_stable::Sha256;
 
 /// Derive a [program address][pda] from the given seeds, optional bump and
 /// program id.
@@ -191,5 +193,5 @@ macro_rules! declare_id {
 #[cfg(feature = "const")]
 #[inline(always)]
 pub const fn from_str(value: &str) -> Pubkey {
-    decode_pubkey(value)
+    decode_32_const(value)
 }
