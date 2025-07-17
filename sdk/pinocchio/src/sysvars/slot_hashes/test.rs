@@ -23,34 +23,22 @@ fn test_layout_constants() {
             197, 41, 208, 190, 59, 19, 110, 45, 0, 85, 32, 0, 0, 0,
         ]
     );
-    const BASE_58: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    // quick base58 comparison just for test
+
     pub fn check_base58(input_bytes: &[u8], expected_b58: &str) {
-        let mut b58_digits_rev = std::vec![0u8];
-        for &byte_val in input_bytes {
-            let mut carry = byte_val as u32;
-            for digit_ref in b58_digits_rev.iter_mut() {
-                let temp_val = ((*digit_ref as u32) << 8) | carry;
-                *digit_ref = (temp_val % 58) as u8;
-                carry = temp_val / 58;
+        match bs58::decode(expected_b58).into_vec() {
+            Ok(decoded) => {
+                assert_eq!(
+                    input_bytes,
+                    decoded.as_slice(),
+                    "Base58 decode mismatch: expected {:?}, got {:?}",
+                    input_bytes,
+                    decoded
+                );
             }
-            while carry > 0 {
-                b58_digits_rev.push((carry % 58) as u8);
-                carry /= 58;
-            }
-        }
-        for &byte_val in input_bytes {
-            if byte_val == 0 {
-                b58_digits_rev.push(0)
-            } else {
-                break;
+            Err(e) => {
+                panic!("Failed to decode base58 string '{}': {}", expected_b58, e);
             }
         }
-        let mut output_chars = Vec::with_capacity(b58_digits_rev.len());
-        for &digit_val in b58_digits_rev.iter().rev() {
-            output_chars.push(BASE_58[digit_val as usize]);
-        }
-        assert_eq!(expected_b58.as_bytes(), output_chars.as_slice());
     }
     check_base58(
         &SLOTHASHES_ID,
