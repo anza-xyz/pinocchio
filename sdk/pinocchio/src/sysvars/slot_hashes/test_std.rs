@@ -19,8 +19,7 @@ fn test_from_account_info_constructor() {
     let data = create_mock_data(&mock_entries);
 
     let mut aligned_backing: Vec<u64>;
-    #[allow(unused_assignments)]
-    let mut acct_ptr: *mut Account = core::ptr::null_mut();
+    let acct_ptr;
 
     unsafe {
         let header_size = core::mem::size_of::<AccountLayout>();
