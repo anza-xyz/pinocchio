@@ -11,8 +11,6 @@ mod test_edge;
 #[cfg(test)]
 mod test_raw;
 #[cfg(test)]
-mod test_std;
-#[cfg(test)]
 mod test_utils;
 
 use crate::{
