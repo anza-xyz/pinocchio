@@ -170,20 +170,18 @@ macro_rules! pubkey {
 #[macro_export]
 macro_rules! declare_id {
     ( $id:expr ) => {
-        use $crate::reexport::Pubkey;
-
         #[doc = "The constant program ID."]
-        pub const ID: Pubkey = $crate::from_str($id);
+        pub const ID: $crate::reexport::Pubkey = $crate::from_str($id);
 
         #[doc = "Returns `true` if given pubkey is the program ID."]
         #[inline]
-        pub fn check_id(id: &Pubkey) -> bool {
+        pub fn check_id(id: &$crate::reexport::Pubkey) -> bool {
             id == &ID
         }
 
         #[doc = "Returns the program ID."]
         #[inline]
-        pub const fn id() -> Pubkey {
+        pub const fn id() -> $crate::reexport::Pubkey {
             ID
         }
     };
