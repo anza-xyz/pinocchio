@@ -2,6 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
+    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -11,12 +12,14 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE]`  The native token account to sync with its underlying
 ///      lamports.
-pub struct SyncNative<'a> {
+pub struct SyncNative<'a, 'b> {
     /// Native Token Account
     pub native_token: &'a AccountInfo,
+    /// Token Program
+    pub token_program: &'b Pubkey,
 }
 
-impl SyncNative<'_> {
+impl SyncNative<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -28,7 +31,7 @@ impl SyncNative<'_> {
         let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.native_token.key())];
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: self.token_program,
             accounts: &account_metas,
             data: &[17],
         };

@@ -4,6 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
+    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -15,7 +16,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITE]` The mint.
 ///   1. `[WRITE]` The account to mint tokens to.
 ///   2. `[SIGNER]` The mint's minting authority.
-pub struct MintToChecked<'a> {
+pub struct MintToChecked<'a, 'b> {
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Token Account.
@@ -26,9 +27,11 @@ pub struct MintToChecked<'a> {
     pub amount: u64,
     /// Decimals
     pub decimals: u8,
+    /// Token Program
+    pub token_program: &'b Pubkey,
 }
 
-impl MintToChecked<'_> {
+impl MintToChecked<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -57,7 +60,7 @@ impl MintToChecked<'_> {
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: self.token_program,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };
