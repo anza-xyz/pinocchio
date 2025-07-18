@@ -3,6 +3,8 @@ use pinocchio::{
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     pubkey::Pubkey,
+    sysvars::rent::Rent,
+    program_error::ProgramError,
     ProgramResult,
 };
 
@@ -28,7 +30,34 @@ pub struct CreateAccount<'a> {
     pub owner: &'a Pubkey,
 }
 
-impl CreateAccount<'_> {
+impl<'a> CreateAccount<'a> {
+    pub fn with_rent_check(
+        from: &'a AccountInfo,
+        to: &'a AccountInfo,
+        rent_sysvar: &'a AccountInfo,
+        space: u64,        
+        owner: &'a Pubkey,
+    ) -> Result<Self, ProgramError> {
+        let rent = Rent::from_account_info(rent_sysvar)?;
+        let lamports = rent.minimum_balance(space as usize);
+
+        if from.lamports() < lamports {
+            return Err(ProgramError::InsufficientFunds);
+        }
+
+        if !to.data_is_empty() {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        Ok(Self {
+            from,
+            to,
+            lamports,
+            space,
+            owner,
+        })
+    }
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

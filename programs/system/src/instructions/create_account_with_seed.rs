@@ -2,7 +2,9 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
+    program_error::ProgramError,
+    pubkey::{Pubkey, MAX_SEED_LEN},
+    sysvars::rent::Rent,
     ProgramResult,
 };
 
@@ -40,7 +42,42 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     pub owner: &'c Pubkey,
 }
 
-impl CreateAccountWithSeed<'_, '_, '_> {
+impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
+    pub fn with_rent_check(
+        from: &'a AccountInfo,
+        to: &'a AccountInfo,
+        base: Option<&'a AccountInfo>,
+        seed: &'b str,
+        rent_sysvar: &'a AccountInfo,
+        space: u64,
+        owner: &'c Pubkey,
+    ) -> Result<Self, ProgramError> {
+        let rent = Rent::from_account_info(rent_sysvar)?;
+        let lamports = rent.minimum_balance(space as usize);
+
+        if seed.len() > MAX_SEED_LEN {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        if from.lamports() < lamports {
+            return Err(ProgramError::InsufficientFunds);
+        }
+
+        if !to.data_is_empty() {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        Ok(Self {
+            from,
+            to,
+            base,
+            seed,
+            lamports,
+            space,
+            owner,
+        })
+    }
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
