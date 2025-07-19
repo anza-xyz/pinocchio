@@ -225,9 +225,7 @@ macro_rules! process_n_accounts {
         $input = $input.add(size_of::<u64>());
 
         if (*account).borrow_state != NON_DUP_MARKER {
-            $accounts.write(AccountInfo {
-                raw: $accounts_slice.add((*account).borrow_state as usize) as *mut Account,
-            });
+            clone_account_info($accounts, $accounts_slice, (*account).borrow_state);
         } else {
             $accounts.write(AccountInfo { raw: account });
 
@@ -256,6 +254,29 @@ macro_rules! process_accounts {
     ( 5 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
         process_n_accounts!( (_ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
     };
+}
+
+/// Create an `AccountInfo` referencing the same account referenced
+/// by the `AccountInfo` at the specified `index`.
+///
+/// # Safety
+///
+/// The caller must ensure that:
+///   - `accounts` pointer must point to an array of `AccountInfo`s where
+///      the new `AccountInfo` will be written.
+///   - `accounts_slice` pointer must point to a slice of `AccountInfo`s
+///     already initialized.
+///   - `index` is a valid index in the `accounts_slice`.
+#[cold]
+#[inline(always)]
+unsafe fn clone_account_info(
+    accounts: *mut AccountInfo,
+    accounts_slice: *const AccountInfo,
+    index: u8,
+) {
+    accounts.write(AccountInfo {
+        raw: (*accounts_slice.add(index as usize)).raw,
+    });
 }
 
 /// Parse the arguments from the runtime input buffer.
