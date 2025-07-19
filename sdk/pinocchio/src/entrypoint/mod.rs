@@ -267,6 +267,10 @@ macro_rules! process_accounts {
 ///   - `accounts_slice` pointer must point to a slice of `AccountInfo`s
 ///     already initialized.
 ///   - `index` is a valid index in the `accounts_slice`.
+//
+// Note: The function is marked as `cold` to stop the compiler from optimizing the
+// parsing of duplicated accounts, which leads to an overall increase in CU
+// consumption.
 #[cold]
 #[inline(always)]
 unsafe fn clone_account_info(
