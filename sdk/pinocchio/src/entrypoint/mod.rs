@@ -870,15 +870,27 @@ mod tests {
             assert_eq!(account_info.data_len(), i);
         }
 
+        // Last unique account.
+        let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
+
         // Duplicated accounts should have the same `data_len` as the
         // last unique account.
         for account in accounts[unique..].iter() {
             let account_info = unsafe { account.assume_init_ref() };
-            let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
 
             assert_eq!(account_info.raw, duplicated.raw);
             assert_eq!(account_info.data_len(), duplicated.data_len());
+
+            let borrowed = account_info.try_borrow_mut_data().unwrap();
+            // Only one mutable borrow at the same time should be allowed
+            // on the duplicated account.
+            assert!(duplicated.try_borrow_mut_data().is_err());
+            drop(borrowed);
         }
+
+        // There should not be any mutable borrow on the duplicated account
+        // at this point.
+        assert!(duplicated.try_borrow_mut_data().is_ok());
     }
 
     #[test]
