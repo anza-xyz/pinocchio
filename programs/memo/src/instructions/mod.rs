@@ -25,6 +25,7 @@ impl Memo<'_, '_, '_> {
         self.invoke_signed(&[])
     }
 
+    #[inline(always)]
     pub fn invoke_signed(&self, signers_seeds: &[Signer]) -> ProgramResult {
         const UNINIT_META: MaybeUninit<AccountMeta> = MaybeUninit::<AccountMeta>::uninit();
 

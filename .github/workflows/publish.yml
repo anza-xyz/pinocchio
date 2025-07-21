@@ -144,7 +144,7 @@ jobs:
 
       - name: Generate a changelog
         if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
-        uses: orhun/git-cliff-action@v3
+        uses: orhun/git-cliff-action@v4
         with:
           config: ".github/cliff.toml"
           args: |

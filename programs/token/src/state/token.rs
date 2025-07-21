@@ -32,9 +32,9 @@ pub struct TokenAccount {
     /// Indicates whether this account represents a native token or not.
     is_native: [u8; 4],
 
-    /// If is_native.is_some, this is a native token, and the value logs the
-    /// rent-exempt reserve. An Account is required to be rent-exempt, so
-    /// the value is used by the Processor to ensure that wrapped SOL
+    /// When `is_native.is_some()` is `true`, this is a native token, and the
+    /// value logs the rent-exempt reserve. An Account is required to be rent-exempt,
+    /// so the value is used by the Processor to ensure that wrapped SOL
     /// accounts do not drop below this threshold.
     native_amount: [u8; 8],
 
@@ -66,7 +66,7 @@ impl TokenAccount {
             return Err(ProgramError::InvalidAccountData);
         }
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
-            Self::from_bytes(data)
+            Self::from_bytes_unchecked(data)
         }))
     }
 
@@ -77,8 +77,8 @@ impl TokenAccount {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that it is safe to borrow the account data – e.g., there are
-    /// no mutable borrows of the account data.
+    /// The caller must ensure that it is safe to borrow the account data (e.g., there are
+    /// no mutable borrows of the account data).
     #[inline]
     pub unsafe fn from_account_info_unchecked(
         account_info: &AccountInfo,
@@ -89,16 +89,21 @@ impl TokenAccount {
         if account_info.owner() != &ID {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Self::from_bytes(account_info.borrow_data_unchecked()))
+        Ok(Self::from_bytes_unchecked(
+            account_info.borrow_data_unchecked(),
+        ))
     }
 
     /// Return a `TokenAccount` from the given bytes.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `bytes` contains a valid representation of `TokenAccount`.
+    /// The caller must ensure that `bytes` contains a valid representation of `TokenAccount`, and
+    /// it is properly aligned to be interpreted as an instance of `TokenAccount`.
+    /// At the moment `TokenAccount` has an alignment of 1 byte.
+    /// This method does not perform a length validation.
     #[inline(always)]
-    pub unsafe fn from_bytes(bytes: &[u8]) -> &Self {
+    pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes.as_ptr() as *const TokenAccount)
     }
 
@@ -111,7 +116,7 @@ impl TokenAccount {
     }
 
     pub fn amount(&self) -> u64 {
-        unsafe { core::ptr::read_unaligned(self.amount.as_ptr() as *const u64) }
+        u64::from_le_bytes(self.amount)
     }
 
     #[inline(always)]
@@ -157,11 +162,11 @@ impl TokenAccount {
     /// skips the `Option` check.
     #[inline(always)]
     pub fn native_amount_unchecked(&self) -> u64 {
-        unsafe { core::ptr::read_unaligned(self.native_amount.as_ptr() as *const u64) }
+        u64::from_le_bytes(self.native_amount)
     }
 
     pub fn delegated_amount(&self) -> u64 {
-        unsafe { core::ptr::read_unaligned(self.delegated_amount.as_ptr() as *const u64) }
+        u64::from_le_bytes(self.delegated_amount)
     }
 
     #[inline(always)]

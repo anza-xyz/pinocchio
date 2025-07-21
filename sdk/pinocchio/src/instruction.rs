@@ -28,7 +28,7 @@ pub struct ProcessedSiblingInstruction {
     /// Length of the instruction data
     pub data_len: u64,
 
-    /// Number of AccountMeta structures
+    /// Number of `AccountMeta` structures
     pub accounts_len: u64,
 }
 
@@ -73,19 +73,35 @@ pub struct Account<'a> {
     _account_info: PhantomData<&'a AccountInfo>,
 }
 
+/// Return a pointer to a type `U` given type `T` has a field of type `U` at the specified
+/// offset (in bytes) from the start of the `T` type.
+///
+/// # Safety
+///
+/// The caller must ensure that the `ptr` is a valid pointer to a type `T`, and `ptr + offset`
+/// points to bytes that are properly aligned for `U` and represent a bit pattern that is a
+/// valid instance of `U`.
+///
+/// If any of this requirements is not valid, this function leads to undefined behavior.
 #[inline(always)]
-const fn offset<T, U>(ptr: *const T, offset: usize) -> *const U {
+const unsafe fn field_at_offset<T, U>(ptr: *const T, offset: usize) -> *const U {
+    // SAFETY: The caller ensures that the offset is valid for the type `T` and that
+    // the resulting pointer is valid for type `U`.
     unsafe { (ptr as *const u8).add(offset) as *const U }
 }
 
 impl<'a> From<&'a AccountInfo> for Account<'a> {
     fn from(account: &'a AccountInfo) -> Self {
         Account {
-            key: offset(account.raw, 8),
-            lamports: offset(account.raw, 72),
+            // SAFETY: offset `8` is the `key` field in the `Account` struct.
+            key: unsafe { field_at_offset(account.raw, 8) },
+            // SAFETY: offset `72` is the `lamports` field in the `Account` struct.
+            lamports: unsafe { field_at_offset(account.raw, 72) },
             data_len: account.data_len() as u64,
-            data: offset(account.raw, 88),
-            owner: offset(account.raw, 40),
+            // SAFETY: offset `88` is the start of the account data in the `Account` struct.
+            data: unsafe { field_at_offset(account.raw, 88) },
+            // SAFETY: offset `40` is the `owner` field in the `Account` struct.
+            owner: unsafe { field_at_offset(account.raw, 40) },
             // The `rent_epoch` field is not present in the `AccountInfo` struct,
             // since the value occurs after the variable data of the account in
             // the runtime input data.
@@ -133,7 +149,7 @@ impl<'a> AccountMeta<'a> {
         }
     }
 
-    /// Creates a new readonly `AccountMeta`.
+    /// Creates a new read-only `AccountMeta`.
     #[inline(always)]
     pub const fn readonly(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, false, false)
@@ -145,7 +161,7 @@ impl<'a> AccountMeta<'a> {
         Self::new(pubkey, true, false)
     }
 
-    /// Creates a new readonly and signer `AccountMeta`.
+    /// Creates a new read-only and signer `AccountMeta`.
     #[inline(always)]
     pub const fn readonly_signer(pubkey: &'a Pubkey) -> Self {
         Self::new(pubkey, false, true)

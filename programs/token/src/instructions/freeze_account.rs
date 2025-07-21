@@ -5,7 +5,7 @@ use pinocchio::{
     ProgramResult,
 };
 
-/// Freeze an Initialized account using the Mint's freeze_authority
+/// Freeze an initialized account using the Mint's freeze authority.
 ///
 /// ### Accounts:
 ///   0. `[WRITE]` The account to freeze.

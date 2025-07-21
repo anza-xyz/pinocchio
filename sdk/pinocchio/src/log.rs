@@ -115,7 +115,7 @@ pub fn sol_log_64(arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64) {
     core::hint::black_box((arg1, arg2, arg3, arg4, arg5));
 }
 
-/// Print some slices as base64.
+/// Print some slices as `base64`.
 pub fn sol_log_data(data: &[&[u8]]) {
     #[cfg(target_os = "solana")]
     unsafe {

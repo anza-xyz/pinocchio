@@ -261,7 +261,7 @@ pub fn log(input: TokenStream) -> TokenStream {
 ///
 /// logging output will look like:
 ///
-/// "Program log: Function my_function consumed 36 compute units"
+/// "Program log: Function `my_function` consumed 36 compute units"
 ///
 /// # References
 ///

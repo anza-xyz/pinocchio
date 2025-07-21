@@ -16,13 +16,13 @@ use pinocchio::{
 ///
 /// ### Accounts:
 ///   0. `[WRITE]` Nonce account
-///   1. `[]` RecentBlockhashes sysvar
+///   1. `[]` Recent blockhashes sysvar
 ///   2. `[]` Rent sysvar
 pub struct InitializeNonceAccount<'a, 'b> {
     /// Nonce account.
     pub account: &'a AccountInfo,
 
-    /// RecentBlockhashes sysvar.
+    /// Recent blockhashes sysvar.
     pub recent_blockhashes_sysvar: &'a AccountInfo,
 
     /// Rent sysvar.
@@ -30,7 +30,7 @@ pub struct InitializeNonceAccount<'a, 'b> {
 
     /// Lamports to withdraw.
     ///
-    /// The account balance muat be left above the rent exempt reserve
+    /// The account balance must be left above the rent exempt reserve
     /// or at zero.
     pub authority: &'b Pubkey,
 }

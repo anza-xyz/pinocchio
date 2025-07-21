@@ -2,15 +2,21 @@
 //! global handlers.
 
 pub mod lazy;
+
 pub use lazy::{InstructionContext, MaybeAccount};
 
 #[cfg(target_os = "solana")]
 pub use alloc::BumpAllocator;
+use core::{
+    cmp::min,
+    mem::{size_of, MaybeUninit},
+    slice::from_raw_parts,
+};
 
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
     pubkey::Pubkey,
-    BPF_ALIGN_OF_U128, NON_DUP_MARKER,
+    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, NON_DUP_MARKER,
 };
 
 /// Start address of the memory region used for program heap.
@@ -33,7 +39,7 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data increase.
-const STATIC_ACCOUNT_DATA: usize = core::mem::size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -115,9 +121,7 @@ const STATIC_ACCOUNT_DATA: usize = core::mem::size_of::<Account>() + MAX_PERMITT
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:expr ) => {
-        $crate::program_entrypoint!($process_instruction);
-        $crate::default_allocator!();
-        $crate::default_panic_handler!();
+        $crate::entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
     };
     ( $process_instruction:expr, $maximum:expr ) => {
         $crate::program_entrypoint!($process_instruction, $maximum);
@@ -151,28 +155,7 @@ macro_rules! entrypoint {
 #[macro_export]
 macro_rules! program_entrypoint {
     ( $process_instruction:expr ) => {
-        /// Program entrypoint.
-        #[no_mangle]
-        pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account_info::AccountInfo> =
-                core::mem::MaybeUninit::<$crate::account_info::AccountInfo>::uninit();
-            // Create an array of uninitialized account infos.
-            let mut accounts = [UNINIT; { $crate::MAX_TX_ACCOUNTS }];
-
-            let (program_id, count, instruction_data) =
-                $crate::entrypoint::parse(input, &mut accounts);
-
-            // Call the program's entrypoint passing `count` account infos; we know that
-            // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
-            match $process_instruction(
-                &program_id,
-                core::slice::from_raw_parts(accounts.as_ptr() as _, count),
-                &instruction_data,
-            ) {
-                Ok(()) => $crate::SUCCESS,
-                Err(error) => error.into(),
-            }
-        }
+        $crate::program_entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
     };
     ( $process_instruction:expr, $maximum:expr ) => {
         /// Program entrypoint.
@@ -200,150 +183,217 @@ macro_rules! program_entrypoint {
     };
 }
 
-/// Parse the input arguments from the runtime input buffer.
+/// Align a pointer to the BPF alignment of `u128`.
+macro_rules! align_pointer {
+    ($ptr:ident) => {
+        // integer-to-pointer cast: the resulting pointer will have the same provenance as
+        // the original pointer and it follows the alignment requirement for the input.
+        (($ptr as usize + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1)) as *mut u8
+    };
+}
+
+/// A macro to repeat a pattern to process an account `n` times,
+/// where `n` is the number of `_` tokens in the input.
 ///
-/// Note that this function will only parse up to `MAX_ACCOUNTS` accounts; any
-/// additional accounts will be ignored.
+/// The main advantage of this macro is to inline the code to process
+/// `n` accounts, which is useful to reduce the number of jumps required.
+/// As a result, it reduces the number of CUs required to process each
+/// account.
 ///
-/// This can only be called from the entrypoint function of a Solana program and with
-/// a buffer that was serialized by the runtime.
+/// Note that this macro emits code to update both the `input` and
+/// `accounts` pointers.
+macro_rules! process_n_accounts {
+    // Base case: no tokens left.
+    ( () => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {};
+
+    // Recursive case: one `_` token per repetition.
+    ( ( _ $($rest:tt)* ) => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!(@process_account => ($input, $accounts, $accounts_slice));
+        process_n_accounts!(($($rest)*) => ($input, $accounts, $accounts_slice));
+    };
+
+    // Process one account.
+    ( @process_account => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        // Increment the `accounts` pointer to the next account.
+        $accounts = $accounts.add(1);
+
+        // Read the next account.
+        let account: *mut Account = $input as *mut Account;
+        // Adds an 8-bytes offset for:
+        //   - rent epoch in case of a non-duplicated account
+        //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+        $input = $input.add(size_of::<u64>());
+
+        if (*account).borrow_state != NON_DUP_MARKER {
+            $accounts.write(AccountInfo {
+                raw: $accounts_slice.add((*account).borrow_state as usize) as *mut Account,
+            });
+        } else {
+            $accounts.write(AccountInfo { raw: account });
+
+            $input = $input.add(STATIC_ACCOUNT_DATA);
+            $input = $input.add((*account).data_len as usize);
+            $input = align_pointer!($input);
+        }
+    };
+}
+
+/// Convenience macro to transform the number of accounts to process
+/// into a pattern of `_` tokens for the [`process_n_accounts`] macro.
+macro_rules! process_accounts {
+    ( 1 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 2 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 3 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 4 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 5 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        process_n_accounts!( (_ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+}
+
+/// Parse the arguments from the runtime input buffer.
+///
+/// This function parses the `accounts`, `instruction_data` and `program_id` from
+/// the input buffer. The `MAX_ACCOUNTS` constant defines the maximum number of accounts
+/// that can be parsed from the input buffer. If the number of accounts in the input buffer
+/// exceeds `MAX_ACCOUNTS`, the excess accounts will be skipped (ignored).
 ///
 /// # Safety
 ///
-/// The caller must ensure that the input buffer is valid, i.e., it represents the
-/// program input parameters serialized by the SVM loader.
-#[allow(clippy::cast_ptr_alignment)]
+/// The caller must ensure that the `input` buffer is valid, i.e., it represents the
+/// program input parameters serialized by the SVM loader. Additionally, the `input`
+/// should last for the lifetime of the program execution since the returned values
+/// reference the `input`.
 #[inline(always)]
-pub unsafe fn deserialize<'a, const MAX_ACCOUNTS: usize>(
+pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
-    accounts: &mut [core::mem::MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
-) -> (&'a Pubkey, usize, &'a [u8]) {
-    // Total number of accounts present in the input buffer.
+    accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
+) -> (&'static Pubkey, usize, &'static [u8]) {
+    // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of accounts
+    // (MAX_TX_ACCOUNTS) that can be processed in a transaction.
+    const {
+        assert!(
+            MAX_ACCOUNTS <= MAX_TX_ACCOUNTS,
+            "MAX_ACCOUNTS must be less than or equal to MAX_TX_ACCOUNTS"
+        );
+    }
+
+    // Number of accounts to process.
     let mut processed = *(input as *const u64) as usize;
-    input = input.add(core::mem::size_of::<u64>());
+    // Skip the number of accounts (8 bytes).
+    input = input.add(size_of::<u64>());
 
     if processed > 0 {
-        let total_accounts = processed;
-        // Number of accounts to process (limited to MAX_ACCOUNTS).
-        processed = core::cmp::min(total_accounts, MAX_ACCOUNTS);
+        let mut accounts = accounts.as_mut_ptr() as *mut AccountInfo;
+        // Represents the beginning of the accounts slice.
+        let accounts_slice = accounts;
 
-        for i in 0..processed {
-            let account_info: *mut Account = input as *mut Account;
-            // Adds an 8-bytes offset for:
-            //   - rent epoch in case of a non-duplicated account
-            //   - duplicated marker + 7 bytes of padding in case of a duplicated account
-            input = input.add(core::mem::size_of::<u64>());
+        // The first account is always non-duplicated, so process
+        // it directly as such.
+        let account: *mut Account = input as *mut Account;
+        accounts.write(AccountInfo { raw: account });
 
-            let account = if (*account_info).borrow_state == NON_DUP_MARKER {
-                // Unique account: create a new `AccountInfo` to represent the account.
-                input = input.add(STATIC_ACCOUNT_DATA);
-                input = input.add((*account_info).data_len as usize);
-                input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
+        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
+        input = input.add((*account).data_len as usize);
+        input = align_pointer!(input);
 
-                AccountInfo { raw: account_info }
+        if processed > 1 {
+            // The number of accounts to process (`to_process_plus_one`) is limited to
+            // `MAX_ACCOUNTS`, which is the capacity of the accounts array. When there
+            // are more accounts to process than the maximum, we still need to skip the
+            // remaining accounts (`to_skip`) to move the input pointer to the instruction
+            // data. At the end, we return the number of accounts processed (`processed`),
+            // which represents the accounts initialized in the `accounts` slice.
+            //
+            // Note that `to_process_plus_one` includes the first (already processed)
+            // account to avoid decrementing the value. The actual number of remaining
+            // accounts to process is `to_process_plus_one - 1`.
+            let mut to_process_plus_one = if MAX_ACCOUNTS < MAX_TX_ACCOUNTS {
+                min(processed, MAX_ACCOUNTS)
             } else {
-                // Duplicated account: clone the original pointer using `borrow_state` since
-                // it represents the index of the duplicated account passed by the runtime.
-                accounts
-                    .get_unchecked((*account_info).borrow_state as usize)
-                    .assume_init_ref()
-                    .clone()
+                processed
             };
 
-            accounts.get_unchecked_mut(i).write(account);
-        }
+            let mut to_skip = processed - to_process_plus_one;
+            processed = to_process_plus_one;
 
-        // Process any remaining accounts to move the offset to the instruction
-        // data (there is a duplication of logic but we avoid testing whether we
-        // have space for the account or not).
-        for _ in processed..total_accounts {
-            let account_info: *mut Account = input as *mut Account;
-            // Adds an 8-bytes offset for:
-            //   - rent epoch in case of a non-duplicate account
-            //   - duplicate marker + 7 bytes of padding in case of a duplicate account
-            input = input.add(core::mem::size_of::<u64>());
+            // This is an optimization to reduce the number of jumps required
+            // to process the accounts. The macro `process_accounts` will generate
+            // inline code to process the specified number of accounts.
+            if to_process_plus_one == 2 {
+                process_accounts!(1 => (input, accounts, accounts_slice));
+            } else {
+                while to_process_plus_one > 5 {
+                    // Process 5 accounts at a time.
+                    process_accounts!(5 => (input, accounts, accounts_slice));
+                    to_process_plus_one -= 5;
+                }
 
-            if (*account_info).borrow_state == NON_DUP_MARKER {
-                input = input.add(STATIC_ACCOUNT_DATA);
-                input = input.add((*account_info).data_len as usize);
-                input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
+                // There might be remaining accounts to process.
+                match to_process_plus_one {
+                    5 => {
+                        process_accounts!(4 => (input, accounts, accounts_slice));
+                    }
+                    4 => {
+                        process_accounts!(3 => (input, accounts, accounts_slice));
+                    }
+                    3 => {
+                        process_accounts!(2 => (input, accounts, accounts_slice));
+                    }
+                    2 => {
+                        process_accounts!(1 => (input, accounts, accounts_slice));
+                    }
+                    1 => (),
+                    _ => {
+                        // SAFETY: `while` loop above makes sure that `to_process_plus_one`
+                        // has 1 to 5 entries left.
+                        unsafe { core::hint::unreachable_unchecked() }
+                    }
+                }
+            }
+
+            // Process any remaining accounts to move the offset to the instruction
+            // data (there is a duplication of logic but we avoid testing whether we
+            // have space for the account or not).
+            //
+            // There might be accounts to skip only when `MAX_ACCOUNTS < MAX_TX_ACCOUNTS`
+            // so this allows the compiler to optimize the code and avoid the loop when
+            // `MAX_ACCOUNTS == MAX_TX_ACCOUNTS`.
+            if MAX_ACCOUNTS < MAX_TX_ACCOUNTS {
+                while to_skip > 0 {
+                    // Marks the account as skipped.
+                    to_skip -= 1;
+
+                    // Read the next account.
+                    let account: *mut Account = input as *mut Account;
+                    // Adds an 8-bytes offset for:
+                    //   - rent epoch in case of a non-duplicated account
+                    //   - duplicated marker + 7 bytes of padding in case of a duplicated account
+                    input = input.add(size_of::<u64>());
+
+                    if (*account).borrow_state == NON_DUP_MARKER {
+                        input = input.add(STATIC_ACCOUNT_DATA);
+                        input = input.add((*account).data_len as usize);
+                        input = align_pointer!(input);
+                    }
+                }
             }
         }
     }
 
     // instruction data
     let instruction_data_len = *(input as *const u64) as usize;
-    input = input.add(core::mem::size_of::<u64>());
+    input = input.add(size_of::<u64>());
 
-    let instruction_data = { core::slice::from_raw_parts(input, instruction_data_len) };
-    input = input.add(instruction_data_len);
-
-    // program id
-    let program_id: &Pubkey = &*(input as *const Pubkey);
-
-    (program_id, processed, instruction_data)
-}
-
-/// Parse the input arguments from the runtime input buffer.
-///
-/// This can only be called from the entrypoint function of a Solana program with
-/// a buffer serialized by the runtime.
-///
-/// # Safety
-///
-/// The caller must ensure that the `input` buffer is valid, i.e., it represents the
-/// program input parameters serialized by the SVM loader. Additionally, the `input`
-/// should last for the lifetime of the program execution since the returnerd values
-/// reference the `input`.
-#[inline(always)]
-pub unsafe fn parse<const ACCOUNTS: usize>(
-    mut input: *mut u8,
-    accounts: &mut [core::mem::MaybeUninit<AccountInfo>; ACCOUNTS],
-) -> (&'static Pubkey, usize, &'static [u8]) {
-    // Ensure that the number of accounts is equal to `MAX_TX_ACCOUNTS`.
-    const {
-        assert!(
-            ACCOUNTS == crate::MAX_TX_ACCOUNTS,
-            "The number of accounts must be equal to MAX_TX_ACCOUNTS"
-        );
-    }
-    // The runtime guarantees that the number of accounts does not exceed
-    // `MAX_TX_ACCOUNTS`.
-    let processed = *(input as *const u64) as usize;
-    input = input.add(core::mem::size_of::<u64>());
-
-    for i in 0..processed {
-        let account_info: *mut Account = input as *mut Account;
-        // Adds an 8-bytes offset for:
-        //   - rent epoch in case of a non-duplicated account
-        //   - duplicated marker + 7 bytes of padding in case of a duplicated account
-        input = input.add(core::mem::size_of::<u64>());
-
-        let account = if (*account_info).borrow_state == NON_DUP_MARKER {
-            // Unique account: create a new `AccountInfo` to represent the account.
-            input = input.add(STATIC_ACCOUNT_DATA);
-            input = input.add((*account_info).data_len as usize);
-            input = input.add(input.align_offset(BPF_ALIGN_OF_U128));
-
-            AccountInfo { raw: account_info }
-        } else {
-            // Duplicated account: clone the original pointer using `borrow_state` since
-            // it represents the index of the duplicated account passed by the runtime.
-            accounts
-                .get_unchecked((*account_info).borrow_state as usize)
-                .assume_init_ref()
-                .clone()
-        };
-
-        accounts.get_unchecked_mut(i).write(account);
-    }
-
-    // instruction data
-    let instruction_data_len = *(input as *const u64) as usize;
-    input = input.add(core::mem::size_of::<u64>());
-
-    let instruction_data = { core::slice::from_raw_parts(input, instruction_data_len) };
-    input = input.add(instruction_data_len);
+    let instruction_data = { from_raw_parts(input, instruction_data_len) };
+    let input = input.add(instruction_data_len);
 
     // program id
     let program_id: &Pubkey = &*(input as *const Pubkey);
@@ -600,5 +650,164 @@ unsafe impl core::alloc::GlobalAlloc for NoAllocator {
     #[inline]
     unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
         // I deny all allocations, so I don't need to free.
+    }
+}
+
+#[cfg(all(test, not(target_os = "solana")))]
+mod tests {
+    extern crate std;
+
+    use core::{alloc::Layout, ptr::copy_nonoverlapping};
+    use std::{
+        alloc::{alloc, dealloc},
+        vec,
+    };
+
+    use super::*;
+
+    /// The mock program ID used for testing.
+    const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
+
+    /// An uninitialized account info.
+    const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
+
+    /// Struct representing a memory region with a specific alignment.
+    struct AlignedMemory {
+        ptr: *mut u8,
+        layout: Layout,
+    }
+
+    impl AlignedMemory {
+        pub fn new(len: usize) -> Self {
+            let layout = Layout::from_size_align(len, BPF_ALIGN_OF_U128).unwrap();
+            // SAFETY: `align` is set to `BPF_ALIGN_OF_U128`.
+            unsafe {
+                let ptr = alloc(layout);
+                if ptr.is_null() {
+                    std::alloc::handle_alloc_error(layout);
+                }
+                AlignedMemory { ptr, layout }
+            }
+        }
+
+        /// Write data to the memory region at the specified offset.
+        ///
+        /// # Safety
+        ///
+        /// The caller must ensure that the `data` length does not exceed the
+        /// remaining space in the memory region starting from the `offset`.
+        pub unsafe fn write(&mut self, data: &[u8], offset: usize) {
+            copy_nonoverlapping(data.as_ptr(), self.ptr.add(offset), data.len());
+        }
+
+        /// Return a mutable pointer to the memory region.
+        pub fn as_mut_ptr(&mut self) -> *mut u8 {
+            self.ptr
+        }
+    }
+
+    impl Drop for AlignedMemory {
+        fn drop(&mut self) {
+            unsafe {
+                dealloc(self.ptr, self.layout);
+            }
+        }
+    }
+
+    /// Creates an input buffer with a specified number of accounts and
+    /// instruction data.
+    ///
+    /// This function mimics the input buffer created by the SVM loader.
+    /// Each account created has zeroed data, apart from the `data_len`
+    /// field, which is set to the index of the account.
+    ///
+    /// # Safety
+    ///
+    /// The returned `AlignedMemory` should only be used within the test
+    /// context.
+    unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemory {
+        let mut input = AlignedMemory::new(1_000_000_000);
+        // Number of accounts.
+        input.write(&(accounts as u64).to_le_bytes(), 0);
+        let mut offset = size_of::<u64>();
+
+        for i in 0..accounts {
+            // Account data.
+            let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
+            account[0] = NON_DUP_MARKER;
+            // Set the accounts data length. The actual account data is zeroed.
+            account[80..88].copy_from_slice(&i.to_le_bytes());
+            input.write(&account, offset);
+            offset += account.len();
+            // Padding for the account data to align to `BPF_ALIGN_OF_U128`.
+            let padding_for_data = (i + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1);
+            input.write(&vec![0u8; padding_for_data], offset);
+            offset += padding_for_data;
+        }
+
+        // Instruction data length.
+        input.write(&instruction_data.len().to_le_bytes(), offset);
+        offset += size_of::<u64>();
+        // Instruction data.
+        input.write(instruction_data, offset);
+        offset += instruction_data.len();
+        // Program ID (mock).
+        input.write(&MOCK_PROGRAM_ID, offset);
+
+        input
+    }
+
+    /// Asserts that the accounts slice contains the expected number of accounts
+    /// and that each account's data length matches its index.
+    fn assert_accounts(accounts: &[MaybeUninit<AccountInfo>]) {
+        for (i, account) in accounts.iter().enumerate() {
+            let account_info = unsafe { account.assume_init_ref() };
+            assert_eq!(account_info.data_len(), i);
+        }
+    }
+
+    #[test]
+    fn test_deserialize() {
+        let ix_data = [3u8; 100];
+
+        // Input with 0 accounts.
+
+        let mut input = unsafe { create_input(0, &ix_data) };
+        let mut accounts = [UNINIT; 1];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 0);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+
+        // Input with 3 accounts but the accounts array has only space
+        // for 1.
+
+        let mut input = unsafe { create_input(3, &ix_data) };
+        let mut accounts = [UNINIT; 1];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 1);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+        assert_accounts(&accounts[..count]);
+
+        // Input with `MAX_TX_ACCOUNTS` accounts but accounts array has
+        // only space for 64.
+
+        let mut input = unsafe { create_input(MAX_TX_ACCOUNTS, &ix_data) };
+        let mut accounts = [UNINIT; 64];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 64);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+        assert_accounts(&accounts);
     }
 }
