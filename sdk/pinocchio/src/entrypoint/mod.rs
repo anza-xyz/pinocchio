@@ -872,9 +872,11 @@ mod tests {
 
         // Last unique account.
         let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
+        // No mutable borrow active at this point.
+        assert!(duplicated.try_borrow_mut_data().is_ok());
 
-        // Duplicated accounts should have the same `data_len` as the
-        // last unique account.
+        // Duplicated accounts should reference (share) the account pointer
+        // to the last unique account.
         for account in accounts[unique..].iter() {
             let account_info = unsafe { account.assume_init_ref() };
 
