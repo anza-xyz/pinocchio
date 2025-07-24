@@ -31,7 +31,7 @@ fn test_layout_constants() {
     );
 
     pub fn check_base58(input_bytes: &[u8], expected_b58: &str) {
-        match bs58::decode(expected_b58).into_vec() {
+        match five8_const::decode_32_const(expected_b58).into_vec() {
             Ok(decoded) => {
                 assert_eq!(
                     input_bytes,
