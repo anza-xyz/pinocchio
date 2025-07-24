@@ -6,7 +6,7 @@ use pinocchio::{
     ProgramResult,
 };
 
-/// Thaw a Frozen account using the Mint's freeze_authority
+/// Thaw a Frozen account using the Mint's freeze authority
 ///
 /// ### Accounts:
 ///   0. `[WRITE]` The account to thaw.

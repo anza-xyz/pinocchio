@@ -23,7 +23,7 @@ pub struct Transfer<'a, 'b> {
     pub to: &'a AccountInfo,
     /// Authority account.
     pub authority: &'a AccountInfo,
-    /// Amount of microtokens to transfer.
+    /// Amount of micro-tokens to transfer.
     pub amount: u64,
     /// Token Program
     pub token_program: &'b Pubkey,

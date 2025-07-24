@@ -11,7 +11,7 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE]`  The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
-///   2. `[]` The new account's owner/multisignature.
+///   2. `[]` The new account's owner/multi-signature.
 ///   3. `[]` Rent sysvar
 pub struct InitializeAccount<'a, 'b> {
     /// New Account.
