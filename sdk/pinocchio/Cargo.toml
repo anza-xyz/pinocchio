@@ -21,4 +21,4 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 std = []
 
 [dev-dependencies]
-bs58 = "0.5.1"
+five8_const = { workspace = true }
