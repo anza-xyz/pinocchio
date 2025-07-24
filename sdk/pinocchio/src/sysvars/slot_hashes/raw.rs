@@ -64,7 +64,8 @@ pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramErro
 
     validate_fetch_offset(offset, buffer.len())?;
 
-    fetch_into_unchecked(buffer, offset)?;
+    // SAFETY: `buffer.len()` and `offset` are both validated above.
+    unsafe { fetch_into_unchecked(buffer, offset) }?;
 
     let num_entries = read_entry_count_from_bytes(buffer).unwrap_or(0);
 
@@ -90,22 +91,15 @@ pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramErro
 ///
 /// # Safety
 /// Internally this function performs an unchecked Solana syscall that writes
-/// raw bytes into the provided pointer. That call is wrapped in an `unsafe`
-/// block with the guarantees listed above.
+/// raw bytes into the provided pointer.
 #[inline(always)]
-pub fn fetch_into_unchecked(buffer: &mut [u8], offset: usize) -> Result<(), ProgramError> {
-    // SAFETY: `buffer.as_mut_ptr()` is valid for `buffer.len()` bytes and
-    // writable for the duration of the call. We rely on the caller to have
-    // ensured that `offset + buffer.len()` does not exceed the real sysvar
-    // size (`MAX_SIZE`).
-    unsafe {
-        crate::sysvars::get_sysvar_unchecked(
-            buffer.as_mut_ptr(),
-            &SLOTHASHES_ID,
-            offset,
-            buffer.len(),
-        )
-    }?;
+pub unsafe fn fetch_into_unchecked(buffer: &mut [u8], offset: usize) -> Result<(), ProgramError> {
+    crate::sysvars::get_sysvar_unchecked(
+        buffer.as_mut_ptr(),
+        &SLOTHASHES_ID,
+        offset,
+        buffer.len(),
+    )?;
 
     Ok(())
 }

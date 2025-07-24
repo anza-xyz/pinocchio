@@ -31,21 +31,9 @@ fn test_layout_constants() {
     );
 
     pub fn check_base58(input_bytes: &[u8], expected_b58: &str) {
-        match five8_const::decode_32_const(expected_b58).into_vec() {
-            Ok(decoded) => {
-                assert_eq!(
-                    input_bytes,
-                    decoded.as_slice(),
-                    "Base58 decode mismatch: expected {:?}, got {:?}",
-                    input_bytes,
-                    decoded
-                );
-            }
-            Err(e) => {
-                panic!("Failed to decode base58 string '{}': {}", expected_b58, e);
-            }
-        }
+        assert_eq!(five8_const::decode_32_const(expected_b58), input_bytes);
     }
+
     check_base58(
         &SLOTHASHES_ID,
         "SysvarS1otHashes111111111111111111111111111",
