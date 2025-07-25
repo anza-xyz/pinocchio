@@ -196,11 +196,9 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
 
         unsafe {
             // SAFETY: The slice begins `NUM_ENTRIES_SIZE` bytes into `self.data`, which
-            // is guaranteed to have at least `len * ENTRY_SIZE` additional bytes. The
-            // pointer is properly aligned for `SlotHashEntry` because the struct is
-            // `repr(C)` and the original slice is aligned to at least u64.
-            // Therefore the constructed slice is valid
-            // for `len` elements for the lifetime of `&self`.
+            // is guaranteed by parse_and_validate_data() to have at least `len * ENTRY_SIZE`
+            // additional bytes. The pointer is properly aligned for `SlotHashEntry` (which
+            // a compile-time assertion ensures is alignment 1).
             from_raw_parts(
                 self.data.as_ptr().add(NUM_ENTRIES_SIZE) as *const SlotHashEntry,
                 len,
