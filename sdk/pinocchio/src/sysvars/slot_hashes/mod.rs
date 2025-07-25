@@ -1,4 +1,4 @@
-//! Efficient, zero-copy access to SlotHashes sysvar data.
+//! Efficient, zero-copy access to `SlotHashes` sysvar data.
 
 pub mod raw;
 #[doc(inline)]
@@ -59,7 +59,7 @@ pub struct SlotHashEntry {
 // Fail compilation if `SlotHashEntry` is not byte-aligned.
 const _: [(); 1] = [(); mem::align_of::<SlotHashEntry>()];
 
-/// SlotHashes provides read-only, zero-copy access to SlotHashes sysvar bytes.
+/// `SlotHashes` provides read-only, zero-copy access to `SlotHashes` sysvar bytes.
 pub struct SlotHashes<T: Deref<Target = [u8]>> {
     data: T,
 }
@@ -93,7 +93,7 @@ pub(crate) unsafe fn read_entry_count_from_bytes_unchecked(data: &[u8]) -> usize
     u64::from_le_bytes(*(data.as_ptr() as *const [u8; NUM_ENTRIES_SIZE])) as usize
 }
 
-/// Validates SlotHashes data format.
+/// Validates `SlotHashes` data format.
 ///
 /// The function checks:
 /// 1. The buffer is large enough to contain the entry count.
@@ -152,7 +152,7 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     ///
     /// This function is unsafe because it does not validate the data size or format.
     /// The caller must ensure:
-    /// 1. The underlying byte slice in `data` represents valid SlotHashes data
+    /// 1. The underlying byte slice in `data` represents valid `SlotHashes` data
     ///    (length prefix + entries, where entries are sorted in descending order by slot).
     /// 2. The data slice has at least `NUM_ENTRIES_SIZE + (declared_entries * ENTRY_SIZE)` bytes.
     /// 3. The first 8 bytes contain a valid entry count in little-endian format.
@@ -272,7 +272,7 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
     /// The returned instance is valid for the lifetime of the borrow.
     ///
     /// # Errors
-    /// - `ProgramError::InvalidArgument` if the account key doesn't match the SlotHashes sysvar ID
+    /// - `ProgramError::InvalidArgument` if the account key doesn't match the `SlotHashes` sysvar ID
     /// - `ProgramError::AccountBorrowFailed` if the account data is already mutably borrowed
     #[inline(always)]
     pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
@@ -289,7 +289,7 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
 
 #[cfg(feature = "std")]
 impl SlotHashes<Box<[u8]>> {
-    /// Fills the provided buffer with the full SlotHashes sysvar data.
+    /// Fills the provided buffer with the full `SlotHashes` sysvar data.
     ///
     /// # Safety
     /// The caller must ensure the buffer pointer is valid for MAX_SIZE bytes.
@@ -321,7 +321,7 @@ impl SlotHashes<Box<[u8]>> {
         Ok(buf.into_boxed_slice())
     }
 
-    /// Fetches the SlotHashes sysvar data directly via syscall. This copies
+    /// Fetches the `SlotHashes` sysvar data directly via syscall. This copies
     /// the full sysvar data (`MAX_SIZE` bytes).
     #[inline(always)]
     pub fn fetch() -> Result<Self, ProgramError> {

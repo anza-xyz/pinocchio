@@ -1,4 +1,4 @@
-//! Shared helpers for SlotHashes sysvar tests.
+//! Shared helpers for `SlotHashes` sysvar tests.
 //! This module is compiled only when `cfg(test)` is active so `std` can be used
 //! freely while production code remains `#![no_std]`.
 
@@ -84,7 +84,7 @@ pub fn generate_mock_entries(
     entries
 }
 
-/// Build a `Vec<u8>` the size of the *golden* SlotHashes sysvar (20 488 bytes)
+/// Build a `Vec<u8>` the size of the *golden* `SlotHashes` sysvar (20 488 bytes)
 /// containing the supplied `entries` and with the `declared_len` header.
 pub fn build_slot_hashes_bytes(declared_len: u64, entries: &[(u64, Hash)]) -> Vec<u8> {
     let mut data = std::vec![0u8; MAX_SIZE];
