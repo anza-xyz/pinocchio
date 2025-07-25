@@ -14,7 +14,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///
 /// ### Accounts:
 ///   0. `[WRITABLE]` Mint account
-pub struct InitializeMint2<'a> {
+pub struct InitializeMint2<'a, 'b> {
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Decimals.
@@ -23,9 +23,11 @@ pub struct InitializeMint2<'a> {
     pub mint_authority: &'a Pubkey,
     /// Freeze Authority.
     pub freeze_authority: Option<&'a Pubkey>,
+    /// Token Program
+    pub token_program: &'b Pubkey,
 }
 
-impl InitializeMint2<'_> {
+impl InitializeMint2<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -64,7 +66,7 @@ impl InitializeMint2<'_> {
         }
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: self.token_program,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
         };

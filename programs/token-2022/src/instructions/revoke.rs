@@ -2,6 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
+    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -10,14 +11,16 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE]` The source account.
 ///   1. `[SIGNER]` The source account owner.
-pub struct Revoke<'a> {
+pub struct Revoke<'a, 'b> {
     /// Source Account.
     pub source: &'a AccountInfo,
     ///  Source Owner Account.
     pub authority: &'a AccountInfo,
+    /// Token Program
+    pub token_program: &'b Pubkey,
 }
 
-impl Revoke<'_> {
+impl Revoke<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -32,7 +35,7 @@ impl Revoke<'_> {
         ];
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: self.token_program,
             accounts: &account_metas,
             data: &[5],
         };

@@ -4,29 +4,32 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
+    pubkey::Pubkey,
     ProgramResult,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};
 
-/// Burns tokens by removing them from an account.
+/// Transfer Tokens from one Token Account to another.
 ///
 /// ### Accounts:
-///   0. `[WRITE]` The account to burn from.
-///   1. `[WRITE]` The token mint.
-///   2. `[SIGNER]` The account's owner/delegate.
-pub struct Burn<'a> {
-    /// Source of the Burn Account
-    pub account: &'a AccountInfo,
-    /// Mint Account
-    pub mint: &'a AccountInfo,
-    /// Owner of the Token Account
+///   0. `[WRITE]` Sender account
+///   1. `[WRITE]` Recipient account
+///   2. `[SIGNER]` Authority account
+pub struct Transfer<'a, 'b> {
+    /// Sender account.
+    pub from: &'a AccountInfo,
+    /// Recipient account.
+    pub to: &'a AccountInfo,
+    /// Authority account.
     pub authority: &'a AccountInfo,
-    /// Amount
+    /// Amount of micro-tokens to transfer.
     pub amount: u64,
+    /// Token Program
+    pub token_program: &'b Pubkey,
 }
 
-impl Burn<'_> {
+impl Transfer<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -34,33 +37,29 @@ impl Burn<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // Account metadata
+        // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.mint.key()),
+            AccountMeta::writable(self.from.key()),
+            AccountMeta::writable(self.to.key()),
             AccountMeta::readonly_signer(self.authority.key()),
         ];
 
-        // Instruction data
+        // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1..9]: amount (8 bytes, u64)
         let mut instruction_data = [UNINIT_BYTE; 9];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[8]);
+        write_bytes(&mut instruction_data, &[3]);
         // Set amount as u64 at offset [1..9]
-        write_bytes(&mut instruction_data[1..], &self.amount.to_le_bytes());
+        write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: self.token_program,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
         };
 
-        invoke_signed(
-            &instruction,
-            &[self.account, self.mint, self.authority],
-            signers,
-        )
+        invoke_signed(&instruction, &[self.from, self.to, self.authority], signers)
     }
 }

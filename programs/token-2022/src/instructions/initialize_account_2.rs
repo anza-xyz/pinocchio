@@ -16,7 +16,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITE]`  The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 ///   3. `[]` Rent sysvar
-pub struct InitializeAccount2<'a> {
+pub struct InitializeAccount2<'a, 'b> {
     /// New Account.
     pub account: &'a AccountInfo,
     /// Mint Account.
@@ -25,9 +25,11 @@ pub struct InitializeAccount2<'a> {
     pub rent_sysvar: &'a AccountInfo,
     /// Owner of the new Account.
     pub owner: &'a Pubkey,
+    /// Token Program
+    pub token_program: &'b Pubkey,
 }
 
-impl InitializeAccount2<'_> {
+impl InitializeAccount2<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -53,7 +55,7 @@ impl InitializeAccount2<'_> {
         write_bytes(&mut instruction_data[1..], self.owner);
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: self.token_program,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },
         };

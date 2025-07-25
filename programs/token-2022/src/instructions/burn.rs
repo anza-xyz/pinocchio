@@ -4,6 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
+    pubkey::Pubkey,
     ProgramResult,
 };
 
@@ -15,7 +16,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITE]` The account to burn from.
 ///   1. `[WRITE]` The token mint.
 ///   2. `[SIGNER]` The account's owner/delegate.
-pub struct Burn<'a> {
+pub struct Burn<'a, 'b> {
     /// Source of the Burn Account
     pub account: &'a AccountInfo,
     /// Mint Account
@@ -24,9 +25,11 @@ pub struct Burn<'a> {
     pub authority: &'a AccountInfo,
     /// Amount
     pub amount: u64,
+    /// Token Program
+    pub token_program: &'b Pubkey,
 }
 
-impl Burn<'_> {
+impl Burn<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -52,7 +55,7 @@ impl Burn<'_> {
         write_bytes(&mut instruction_data[1..], &self.amount.to_le_bytes());
 
         let instruction = Instruction {
-            program_id: &crate::ID,
+            program_id: self.token_program,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
         };
