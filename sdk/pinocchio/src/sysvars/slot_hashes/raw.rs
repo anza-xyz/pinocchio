@@ -69,11 +69,6 @@ pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramErro
 
     let num_entries = read_entry_count_from_bytes(buffer).unwrap_or(0);
 
-    // Reject oversized entry counts to prevent surprises.
-    if num_entries > MAX_ENTRIES {
-        return Err(ProgramError::InvalidArgument);
-    }
-
     let required_len = NUM_ENTRIES_SIZE + num_entries * ENTRY_SIZE;
     if buffer.len() < required_len {
         return Err(ProgramError::InvalidArgument);
