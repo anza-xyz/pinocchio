@@ -191,9 +191,6 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// the slice is big enough and properly aligned.
     #[inline(always)]
     pub fn entries(&self) -> &[SlotHashEntry] {
-        let len = self.len();
-        debug_assert!(self.data.len() >= NUM_ENTRIES_SIZE + len * ENTRY_SIZE);
-
         unsafe {
             // SAFETY: The slice begins `NUM_ENTRIES_SIZE` bytes into `self.data`, which
             // is guaranteed by parse_and_validate_data() to have at least `len * ENTRY_SIZE`
@@ -201,7 +198,7 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
             // a compile-time assertion ensures is alignment 1).
             from_raw_parts(
                 self.data.as_ptr().add(NUM_ENTRIES_SIZE) as *const SlotHashEntry,
-                len,
+                self.len(),
             )
         }
     }
@@ -209,7 +206,10 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// Gets a reference to the entry at `index` or `None` if out of bounds.
     #[inline(always)]
     pub fn get_entry(&self, index: usize) -> Option<&SlotHashEntry> {
-        self.entries().get(index)
+        if index >= self.len() {
+            return None;
+        }
+        Some(unsafe { self.get_entry_unchecked(index) })
     }
 
     /// Finds the hash for a specific slot using binary search.
