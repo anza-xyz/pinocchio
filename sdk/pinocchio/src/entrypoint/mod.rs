@@ -225,9 +225,7 @@ macro_rules! process_n_accounts {
         $input = $input.add(size_of::<u64>());
 
         if (*account).borrow_state != NON_DUP_MARKER {
-            $accounts.write(AccountInfo {
-                raw: $accounts_slice.add((*account).borrow_state as usize) as *mut Account,
-            });
+            clone_account_info($accounts, $accounts_slice, (*account).borrow_state);
         } else {
             $accounts.write(AccountInfo { raw: account });
 
@@ -256,6 +254,33 @@ macro_rules! process_accounts {
     ( 5 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
         process_n_accounts!( (_ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
     };
+}
+
+/// Create an `AccountInfo` referencing the same account referenced
+/// by the `AccountInfo` at the specified `index`.
+///
+/// # Safety
+///
+/// The caller must ensure that:
+///   - `accounts` pointer must point to an array of `AccountInfo`s where
+///      the new `AccountInfo` will be written.
+///   - `accounts_slice` pointer must point to a slice of `AccountInfo`s
+///     already initialized.
+///   - `index` is a valid index in the `accounts_slice`.
+//
+// Note: The function is marked as `cold` to stop the compiler from optimizing the
+// parsing of duplicated accounts, which leads to an overall increase in CU
+// consumption.
+#[cold]
+#[inline(always)]
+unsafe fn clone_account_info(
+    accounts: *mut AccountInfo,
+    accounts_slice: *const AccountInfo,
+    index: u8,
+) {
+    accounts.write(AccountInfo {
+        raw: (*accounts_slice.add(index as usize)).raw,
+    });
 }
 
 /// Parse the arguments from the runtime input buffer.
@@ -757,6 +782,72 @@ mod tests {
         input
     }
 
+    /// Creates an input buffer with a specified number of accounts, including
+    /// duplicated accounts, and instruction data.
+    ///
+    /// This function differs from `create_input` in that it creates accounts
+    /// with a marker indicating that they are duplicated. There will be
+    /// `accounts - duplicated` unique accounts, and the remaining `duplicated`
+    /// accounts will be duplicates of the last unique account.
+    ///
+    /// This function mimics the input buffer created by the SVM loader.
+    /// Each account created has zeroed data, apart from the `data_len`
+    /// field, which is set to the index of the account.
+    ///
+    /// # Safety
+    ///
+    /// The returned `AlignedMemory` should only be used within the test
+    /// context.
+    unsafe fn create_input_with_duplicates(
+        accounts: usize,
+        instruction_data: &[u8],
+        duplicated: usize,
+    ) -> AlignedMemory {
+        let mut input = AlignedMemory::new(1_000_000_000);
+        // Number of accounts.
+        input.write(&(accounts as u64).to_le_bytes(), 0);
+        let mut offset = size_of::<u64>();
+
+        if accounts > 0 {
+            assert!(
+                duplicated < accounts,
+                "Duplicated accounts must be less than total accounts"
+            );
+            let unique = accounts - duplicated;
+
+            for i in 0..unique {
+                // Account data.
+                let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
+                account[0] = NON_DUP_MARKER;
+                // Set the accounts data length. The actual account data is zeroed.
+                account[80..88].copy_from_slice(&i.to_le_bytes());
+                input.write(&account, offset);
+                offset += account.len();
+                // Padding for the account data to align to `BPF_ALIGN_OF_U128`.
+                let padding_for_data = (i + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1);
+                input.write(&vec![0u8; padding_for_data], offset);
+                offset += padding_for_data;
+            }
+
+            // Remaining accounts are duplicated of the last unique account.
+            for _ in unique..accounts {
+                input.write(&[(unique - 1) as u8, 0, 0, 0, 0, 0, 0, 0], offset);
+                offset += size_of::<u64>();
+            }
+        }
+
+        // Instruction data length.
+        input.write(&instruction_data.len().to_le_bytes(), offset);
+        offset += size_of::<u64>();
+        // Instruction data.
+        input.write(instruction_data, offset);
+        offset += instruction_data.len();
+        // Program ID (mock).
+        input.write(&MOCK_PROGRAM_ID, offset);
+
+        input
+    }
+
     /// Asserts that the accounts slice contains the expected number of accounts
     /// and that each account's data length matches its index.
     fn assert_accounts(accounts: &[MaybeUninit<AccountInfo>]) {
@@ -764,6 +855,44 @@ mod tests {
             let account_info = unsafe { account.assume_init_ref() };
             assert_eq!(account_info.data_len(), i);
         }
+    }
+
+    /// Asserts that the accounts slice contains the expected number of accounts
+    /// and all accounts are duplicated, apart from the first one.
+    fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountInfo>], duplicated: usize) {
+        assert!(accounts.len() > duplicated);
+
+        let unique = accounts.len() - duplicated;
+
+        // Unique accounts should have `data_len` equal to their index.
+        for (i, account) in accounts[..unique].iter().enumerate() {
+            let account_info = unsafe { account.assume_init_ref() };
+            assert_eq!(account_info.data_len(), i);
+        }
+
+        // Last unique account.
+        let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
+        // No mutable borrow active at this point.
+        assert!(duplicated.try_borrow_mut_data().is_ok());
+
+        // Duplicated accounts should reference (share) the account pointer
+        // to the last unique account.
+        for account in accounts[unique..].iter() {
+            let account_info = unsafe { account.assume_init_ref() };
+
+            assert_eq!(account_info.raw, duplicated.raw);
+            assert_eq!(account_info.data_len(), duplicated.data_len());
+
+            let borrowed = account_info.try_borrow_mut_data().unwrap();
+            // Only one mutable borrow at the same time should be allowed
+            // on the duplicated account.
+            assert!(duplicated.try_borrow_mut_data().is_err());
+            drop(borrowed);
+        }
+
+        // There should not be any mutable borrow on the duplicated account
+        // at this point.
+        assert!(duplicated.try_borrow_mut_data().is_ok());
     }
 
     #[test]
@@ -809,5 +938,54 @@ mod tests {
         assert_eq!(program_id, &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_accounts(&accounts);
+    }
+
+    #[test]
+    fn test_deserialize_duplicated() {
+        let ix_data = [3u8; 100];
+
+        // Input with 0 accounts.
+
+        let mut input = unsafe { create_input_with_duplicates(0, &ix_data, 0) };
+        let mut accounts = [UNINIT; 1];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 0);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+
+        // Input with 3 (1 + 2 duplicated) accounts but the accounts array has only
+        // space for 2. The assert checks that the second account is a duplicate of
+        // the first one and the first one is unique.
+
+        let mut input = unsafe { create_input_with_duplicates(3, &ix_data, 2) };
+        let mut accounts = [UNINIT; 2];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 2);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+        assert_duplicated_accounts(&accounts[..count], 1);
+
+        // Input with `MAX_TX_ACCOUNTS` accounts (only 32 unique ones) but accounts
+        // array has only space for 64. The assert checks that the first 32 accounts
+        // are unique and the rest are duplicates of the account at index 31.
+
+        let mut input = unsafe {
+            create_input_with_duplicates(MAX_TX_ACCOUNTS, &ix_data, MAX_TX_ACCOUNTS - 32)
+        };
+        let mut accounts = [UNINIT; 64];
+
+        let (program_id, count, parsed_ix_data) =
+            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+
+        assert_eq!(count, 64);
+        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert_eq!(&ix_data, parsed_ix_data);
+        assert_duplicated_accounts(&accounts, 32);
     }
 }
