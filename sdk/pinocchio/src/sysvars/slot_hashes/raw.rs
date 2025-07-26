@@ -8,16 +8,19 @@
 
 use super::*;
 
-/// Validates that a buffer is properly sized for `SlotHashes` data.
+/// Validates buffer format for `SlotHashes` data and calculates entry capacity.
 ///
-/// Does not ensure the buffer doesn't exceed available sysvar data
-/// from the given offset. A later syscall will fail in this case.
+/// Validates that the buffer follows the correct format:
+/// - If `offset == 0`: Buffer must have `8 + (N × 40)` format (header + entries)
+/// - If `offset != 0`: Buffer must be a multiple of 40 bytes (entries only)
 ///
-/// This function assumes the mainnet slot hashes sysvar length of `MAX_SIZE` (20,488).
+/// Does not validate that `offset + buffer_len ≤ MAX_SIZE`; this is checked
+/// separately in `validate_fetch_offset`, and the syscall will fail anyway if
+/// `offset + buffer_len > MAX_SIZE`.
 ///
-/// Returns the number of entries that will be copied into the buffer.
+/// Returns the number of entries that can fit in the buffer.
 #[inline(always)]
-pub(crate) fn validate_buffer_size(
+pub(crate) fn validate_and_get_buffer_capacity(
     buffer_len: usize,
     offset: usize,
 ) -> Result<usize, ProgramError> {
@@ -78,24 +81,25 @@ pub fn validate_fetch_offset(offset: usize, buffer_len: usize) -> Result<(), Pro
 ///
 /// # Returns
 ///
-/// Since `num_entries` is used, it is returned for caller's convenience, as the
-/// caller will almost certainly want to use this information.
+/// Returns the number of entries:
+/// - If `offset == 0`: The actual entry count read from the sysvar header
+/// - If `offset != 0`: The number of entries that can fit in the buffer
+///
+/// The return value helps callers understand the structure of the copied data.
 #[inline(always)]
 pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramError> {
-    let num_entries = validate_buffer_size(buffer.len(), offset)?;
+    let num_entries = validate_and_get_buffer_capacity(buffer.len(), offset)?;
 
     validate_fetch_offset(offset, buffer.len())?;
 
-    // SAFETY: `buffer.len()` and `offset` are both validated above. It is possible
-    // that the two added together are greater than `MAX_SIZE`, but the syscall will
-    // fail in that case.
+    // SAFETY: Buffer format and offset alignment validated above.
     unsafe { fetch_into_unchecked(buffer, offset) }?;
 
     if offset == 0 {
-        // If header is preset, read entries from it
+        // Buffer includes header: return actual entry count from sysvar data
         Ok(read_entry_count_from_bytes(buffer).unwrap_or(0))
     } else {
-        // Otherwise, return the number of entries that can fit in the buffer
+        // Buffer excludes header: return calculated entry capacity
         Ok(num_entries)
     }
 }
