@@ -23,7 +23,7 @@ use core::{mem, ops::Deref, slice::from_raw_parts};
 #[cfg(feature = "std")]
 use std::boxed::Box;
 
-/// SysvarS1otHashes111111111111111111111111111
+/// `SysvarS1otHashes111111111111111111111111111`
 pub const SLOTHASHES_ID: Pubkey = [
     6, 167, 213, 23, 25, 47, 10, 175, 198, 242, 101, 227, 251, 119, 204, 122, 218, 130, 197, 41,
     208, 190, 59, 19, 110, 45, 0, 85, 32, 0, 0, 0,
@@ -31,13 +31,13 @@ pub const SLOTHASHES_ID: Pubkey = [
 /// Number of bytes in a hash.
 pub const HASH_BYTES: usize = 32;
 /// Sysvar data is:
-/// len    (8 bytes): little-endian entry count (≤ 512)
-/// entries(len × 40 bytes):    consecutive `(u64 slot, [u8;32] hash)` pairs
+/// `len`    (8 bytes): little-endian entry count (`≤ 512`)
+/// `entries`(`len × 40 bytes`):    consecutive `(u64 slot, [u8;32] hash)` pairs
 /// Size of the entry count field at the beginning of sysvar data.
 pub const NUM_ENTRIES_SIZE: usize = mem::size_of::<u64>();
 /// Size of a slot number in bytes.
 pub const SLOT_SIZE: usize = mem::size_of::<Slot>();
-/// Size of a single slot hash entry (slot + hash).
+/// Size of a single slot hash entry.
 pub const ENTRY_SIZE: usize = SLOT_SIZE + HASH_BYTES;
 /// Maximum number of slot hash entries that can be stored in the sysvar.
 pub const MAX_ENTRIES: usize = 512;
@@ -87,7 +87,7 @@ pub(crate) fn read_entry_count_from_bytes(data: &[u8]) -> Option<usize> {
 /// Reads the entry count from the first 8 bytes of data.
 ///
 /// # Safety
-/// Caller must ensure data has at least NUM_ENTRIES_SIZE bytes.
+/// Caller must ensure data has at least `NUM_ENTRIES_SIZE` bytes.
 #[inline(always)]
 pub(crate) unsafe fn read_entry_count_from_bytes_unchecked(data: &[u8]) -> usize {
     u64::from_le_bytes(*(data.as_ptr() as *const [u8; NUM_ENTRIES_SIZE])) as usize
@@ -119,7 +119,7 @@ fn parse_and_validate_data(data: &[u8]) -> Result<(), ProgramError> {
 }
 
 impl SlotHashEntry {
-    /// Returns the slot number as a u64.
+    /// Returns the slot number as a `u64`.
     #[inline(always)]
     pub fn slot(&self) -> Slot {
         u64::from_le_bytes(self.slot_le)
@@ -130,8 +130,8 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// Creates a `SlotHashes` instance with validation of the entry count and buffer size.
     ///
     /// This constructor validates that the buffer has at least enough bytes to contain
-    /// the declared number of entries. The buffer can be any size >= the minimum required,
-    /// making it suitable for both full MAX_SIZE buffers and smaller test data.
+    /// the declared number of entries. The buffer can be any size above the minimum required,
+    /// making it suitable for both full `MAX_SIZE` buffers and smaller test data.
     /// Does not validate that entries are sorted in descending order.
     #[inline(always)]
     pub fn new(data: T) -> Result<Self, ProgramError> {
@@ -153,7 +153,7 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// This function is unsafe because it does not validate the data size or format.
     /// The caller must ensure:
     /// 1. The underlying byte slice in `data` represents valid `SlotHashes` data
-    ///    (length prefix + entries, where entries are sorted in descending order by slot).
+    ///    (length prefix plus entries, where entries are sorted in descending order by slot).
     /// 2. The data slice has at least `NUM_ENTRIES_SIZE + (declared_entries * ENTRY_SIZE)` bytes.
     /// 3. The first 8 bytes contain a valid entry count in little-endian format.
     ///
@@ -292,8 +292,8 @@ impl SlotHashes<Box<[u8]>> {
     /// Fills the provided buffer with the full `SlotHashes` sysvar data.
     ///
     /// # Safety
-    /// The caller must ensure the buffer pointer is valid for MAX_SIZE bytes.
-    /// The syscall will write exactly MAX_SIZE bytes to the buffer.
+    /// The caller must ensure the buffer pointer is valid for `MAX_SIZE` bytes.
+    /// The syscall will write exactly `MAX_SIZE` bytes to the buffer.
     #[inline(always)]
     unsafe fn fill_from_sysvar(buffer_ptr: *mut u8) -> Result<(), ProgramError> {
         crate::sysvars::get_sysvar_unchecked(buffer_ptr, &SLOTHASHES_ID, 0, MAX_SIZE)?;

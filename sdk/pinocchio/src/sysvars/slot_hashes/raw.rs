@@ -10,34 +10,47 @@ use super::*;
 
 /// Validates that a buffer is properly sized for `SlotHashes` data.
 ///
-/// Checks that the buffer length is 8 + (N × 40) for some N ≤ 512.
-/// Unlike the `SlotHashes` constructor, this function does not require
-/// the buffer to be exactly 20,488 bytes.
+/// Does not ensure the buffer doesn't exceed available sysvar data
+/// from the given offset. A later syscall will fail in this case.
+///
+/// This function assumes the mainnet slot hashes sysvar length of `MAX_SIZE` (20,488).
+///
+/// Returns the number of entries that will be copied into the buffer.
 #[inline(always)]
-pub(crate) fn validate_buffer_size(buffer_len: usize) -> Result<(), ProgramError> {
-    // Must have space for 8-byte header
-    if buffer_len < NUM_ENTRIES_SIZE {
-        return Err(ProgramError::AccountDataTooSmall);
-    }
+pub(crate) fn validate_buffer_size(
+    buffer_len: usize,
+    offset: usize,
+) -> Result<usize, ProgramError> {
+    if offset == 0 {
+        // Buffer includes header: must have 8 + (N × 40) format
+        if buffer_len == MAX_SIZE {
+            return Ok(MAX_ENTRIES);
+        }
 
-    // Calculate how many entries can fit
-    let data_len = buffer_len - NUM_ENTRIES_SIZE;
-    if data_len % ENTRY_SIZE != 0 {
-        return Err(ProgramError::InvalidArgument);
-    }
+        if buffer_len < NUM_ENTRIES_SIZE {
+            return Err(ProgramError::AccountDataTooSmall);
+        }
 
-    let max_entries = data_len / ENTRY_SIZE;
-    if max_entries > MAX_ENTRIES {
-        return Err(ProgramError::InvalidArgument);
-    }
+        let entry_data_len = buffer_len - NUM_ENTRIES_SIZE;
+        if entry_data_len % ENTRY_SIZE != 0 {
+            return Err(ProgramError::InvalidArgument);
+        }
 
-    Ok(())
+        Ok(entry_data_len / ENTRY_SIZE)
+    } else {
+        // Buffer contains only entry data: must be multiple of ENTRY_SIZE
+        if buffer_len % ENTRY_SIZE != 0 {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        Ok(buffer_len / ENTRY_SIZE)
+    }
 }
 
 /// Validates offset parameters for fetching `SlotHashes` data.
 ///
-/// * `offset` – Byte offset within the `SlotHashes` sysvar data.
-/// * `buffer_len` – Length of the destination buffer.
+/// * `offset` - Byte offset within the `SlotHashes` sysvar data.
+/// * `buffer_len` - Length of the destination buffer.
 #[inline(always)]
 pub fn validate_fetch_offset(offset: usize, buffer_len: usize) -> Result<(), ProgramError> {
     if offset >= MAX_SIZE {
@@ -46,6 +59,9 @@ pub fn validate_fetch_offset(offset: usize, buffer_len: usize) -> Result<(), Pro
     if offset != 0 && (offset < NUM_ENTRIES_SIZE || (offset - NUM_ENTRIES_SIZE) % ENTRY_SIZE != 0) {
         return Err(ProgramError::InvalidArgument);
     }
+    // Perhaps redundant, as the syscall will fail later if
+    // `buffer.len() + offset > MAX_SIZE`, but this is for
+    // checked paths.
     if offset.saturating_add(buffer_len) > MAX_SIZE {
         return Err(ProgramError::InvalidArgument);
     }
@@ -55,32 +71,39 @@ pub fn validate_fetch_offset(offset: usize, buffer_len: usize) -> Result<(), Pro
 
 /// Copies `SlotHashes` sysvar bytes into `buffer`, performing validation.
 ///
-/// Returns the number of entries present in the sysvar.
+/// # Arguments
+///
+/// * `buffer` - Destination buffer to copy sysvar data into
+/// * `offset` - Byte offset within the `SlotHashes` sysvar data to start copying from
+///
+/// # Returns
+///
+/// Since `num_entries` is used, it is returned for caller's convenience, as the
+/// caller will almost certainly want to use this information.
 #[inline(always)]
 pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramError> {
-    if buffer.len() != MAX_SIZE {
-        validate_buffer_size(buffer.len())?;
-    }
+    let num_entries = validate_buffer_size(buffer.len(), offset)?;
 
     validate_fetch_offset(offset, buffer.len())?;
 
-    // SAFETY: `buffer.len()` and `offset` are both validated above.
+    // SAFETY: `buffer.len()` and `offset` are both validated above. It is possible
+    // that the two added together are greater than `MAX_SIZE`, but the syscall will
+    // fail in that case.
     unsafe { fetch_into_unchecked(buffer, offset) }?;
 
-    let num_entries = read_entry_count_from_bytes(buffer).unwrap_or(0);
-
-    let required_len = NUM_ENTRIES_SIZE + num_entries * ENTRY_SIZE;
-    if buffer.len() < required_len {
-        return Err(ProgramError::InvalidArgument);
+    if offset == 0 {
+        // If header is preset, read entries from it
+        Ok(read_entry_count_from_bytes(buffer).unwrap_or(0))
+    } else {
+        // Otherwise, return the number of entries that can fit in the buffer
+        Ok(num_entries)
     }
-
-    Ok(num_entries)
 }
 
 /// Copies `SlotHashes` sysvar bytes into `buffer` **without** validation.
 ///
 /// The caller is responsible for ensuring that:
-/// 1. `buffer` is large enough for the requested `offset` + `buffer.len()` range and
+/// 1. `buffer` is large enough for the requested `offset + buffer.len()` range and
 ///    properly laid out (see `validate_buffer_size` and `validate_fetch_offset`).
 /// 2. The memory behind `buffer` is writable for its full length.
 ///

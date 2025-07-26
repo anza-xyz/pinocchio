@@ -33,9 +33,10 @@ pub struct AccountLayout {
 pub enum DecrementStrategy {
     /// Always decrement by exactly 1.
     Strictly1,
-    /// Mostly ‑1 with occasional ‑2 so that the *average* decrement ≈ 1.05.
+    /// Mostly a decrement of 1 with occasional decrement of 2 so that the
+    /// *average* decrement is `1.05`.
     Average1_05,
-    /// Roughly 50 % chance of ‑1 and 50 % chance of ‑3 (average ≈ 2).
+    /// Average decrement of 2.
     Average2,
 }
 
