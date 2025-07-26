@@ -11,7 +11,7 @@ use super::*;
 /// Validates buffer format for `SlotHashes` data and calculates entry capacity.
 ///
 /// Validates that the buffer follows the correct format:
-/// - If `offset == 0`: Buffer must have `8 + (N × 40)` format (header + entries)
+/// - If `offset == 0`: Buffer must have `8 + (N × 40)` format (header and entries)
 /// - If `offset != 0`: Buffer must be a multiple of 40 bytes (entries only)
 ///
 /// Does not validate that `offset + buffer_len ≤ MAX_SIZE`; this is checked
