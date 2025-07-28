@@ -10,34 +10,31 @@ fn test_validate_buffer_size() {
 
     // Too small to fit header
     let small_len = 4;
-    assert!(raw::validate_and_get_buffer_capacity(small_len, 0).is_err());
+    assert!(raw::get_valid_buffer_capacity(small_len, 0).is_err());
 
     // Misaligned: header + partial entry
     let misaligned_len = NUM_ENTRIES_SIZE + 39;
-    assert!(raw::validate_and_get_buffer_capacity(misaligned_len, 0).is_err());
+    assert!(raw::get_valid_buffer_capacity(misaligned_len, 0).is_err());
 
     // Valid cases with offset = 0
     let valid_empty_len = NUM_ENTRIES_SIZE;
     assert_eq!(
-        raw::validate_and_get_buffer_capacity(valid_empty_len, 0).unwrap(),
+        raw::get_valid_buffer_capacity(valid_empty_len, 0).unwrap(),
         0
     );
 
     let valid_one_len = NUM_ENTRIES_SIZE + ENTRY_SIZE;
-    assert_eq!(
-        raw::validate_and_get_buffer_capacity(valid_one_len, 0).unwrap(),
-        1
-    );
+    assert_eq!(raw::get_valid_buffer_capacity(valid_one_len, 0).unwrap(), 1);
 
     let valid_max_len = NUM_ENTRIES_SIZE + MAX_ENTRIES * ENTRY_SIZE;
     assert_eq!(
-        raw::validate_and_get_buffer_capacity(valid_max_len, 0).unwrap(),
+        raw::get_valid_buffer_capacity(valid_max_len, 0).unwrap(),
         MAX_ENTRIES
     );
 
     // Edge case: exactly at the boundary (MAX_SIZE)
     assert_eq!(
-        raw::validate_and_get_buffer_capacity(MAX_SIZE, 0).unwrap(),
+        raw::get_valid_buffer_capacity(MAX_SIZE, 0).unwrap(),
         MAX_ENTRIES
     );
 
@@ -46,58 +43,55 @@ fn test_validate_buffer_size() {
     // Valid cases with non-zero offset - buffer contains only entry data
 
     // Buffer for exactly 1 entry
-    assert_eq!(
-        raw::validate_and_get_buffer_capacity(ENTRY_SIZE, 8).unwrap(),
-        1
-    );
+    assert_eq!(raw::get_valid_buffer_capacity(ENTRY_SIZE, 8).unwrap(), 1);
 
     // Buffer for exactly 2 entries
     assert_eq!(
-        raw::validate_and_get_buffer_capacity(2 * ENTRY_SIZE, 8).unwrap(),
+        raw::get_valid_buffer_capacity(2 * ENTRY_SIZE, 8).unwrap(),
         2
     );
 
     // Buffer for maximum entries (without header space)
     assert_eq!(
-        raw::validate_and_get_buffer_capacity(MAX_ENTRIES * ENTRY_SIZE, 8).unwrap(),
+        raw::get_valid_buffer_capacity(MAX_ENTRIES * ENTRY_SIZE, 8).unwrap(),
         MAX_ENTRIES
     );
 
     // Buffer for 10 entries
     assert_eq!(
-        raw::validate_and_get_buffer_capacity(10 * ENTRY_SIZE, 48).unwrap(),
+        raw::get_valid_buffer_capacity(10 * ENTRY_SIZE, 48).unwrap(),
         10
     );
 
     // Error cases with non-zero offset
 
     // Misaligned buffer - not a multiple of ENTRY_SIZE
-    assert!(raw::validate_and_get_buffer_capacity(ENTRY_SIZE + 1, 8).is_err());
-    assert!(raw::validate_and_get_buffer_capacity(ENTRY_SIZE - 1, 8).is_err());
-    assert!(raw::validate_and_get_buffer_capacity(39, 8).is_err()); // 39 is not divisible by 40
+    assert!(raw::get_valid_buffer_capacity(ENTRY_SIZE + 1, 8).is_err());
+    assert!(raw::get_valid_buffer_capacity(ENTRY_SIZE - 1, 8).is_err());
+    assert!(raw::get_valid_buffer_capacity(39, 8).is_err()); // 39 is not divisible by 40
 
     // Large buffers that would exceed MAX_SIZE - these now pass validate_buffer_size
     // (the syscall will fail later, but that's acceptable)
     assert_eq!(
-        raw::validate_and_get_buffer_capacity((MAX_ENTRIES + 1) * ENTRY_SIZE, 8).unwrap(),
+        raw::get_valid_buffer_capacity((MAX_ENTRIES + 1) * ENTRY_SIZE, 8).unwrap(),
         MAX_ENTRIES + 1
     );
     assert_eq!(
-        raw::validate_and_get_buffer_capacity((MAX_ENTRIES + 10) * ENTRY_SIZE, 48).unwrap(),
+        raw::get_valid_buffer_capacity((MAX_ENTRIES + 10) * ENTRY_SIZE, 48).unwrap(),
         MAX_ENTRIES + 10
     );
 
     // Empty buffer with offset (valid - 0 entries)
-    assert_eq!(raw::validate_and_get_buffer_capacity(0, 8).unwrap(), 0);
+    assert_eq!(raw::get_valid_buffer_capacity(0, 8).unwrap(), 0);
 
     // ===== Additional edge cases =====
 
     // Large offset values (should still work for buffer size validation)
     assert_eq!(
-        raw::validate_and_get_buffer_capacity(5 * ENTRY_SIZE, 1000).unwrap(),
+        raw::get_valid_buffer_capacity(5 * ENTRY_SIZE, 1000).unwrap(),
         5
     );
-    assert!(raw::validate_and_get_buffer_capacity(5 * ENTRY_SIZE + 1, 2000).is_err());
+    assert!(raw::get_valid_buffer_capacity(5 * ENTRY_SIZE + 1, 2000).is_err());
     // misaligned
 }
 

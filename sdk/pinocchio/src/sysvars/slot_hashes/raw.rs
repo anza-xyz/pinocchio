@@ -20,7 +20,7 @@ use super::*;
 ///
 /// Returns the number of entries that can fit in the buffer.
 #[inline(always)]
-pub(crate) fn validate_and_get_buffer_capacity(
+pub(crate) fn get_valid_buffer_capacity(
     buffer_len: usize,
     offset: usize,
 ) -> Result<usize, ProgramError> {
@@ -88,7 +88,7 @@ pub fn validate_fetch_offset(offset: usize, buffer_len: usize) -> Result<(), Pro
 /// The return value helps callers understand the structure of the copied data.
 #[inline(always)]
 pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramError> {
-    let num_entries = validate_and_get_buffer_capacity(buffer.len(), offset)?;
+    let num_entries = get_valid_buffer_capacity(buffer.len(), offset)?;
 
     validate_fetch_offset(offset, buffer.len())?;
 
