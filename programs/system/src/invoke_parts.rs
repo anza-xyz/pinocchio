@@ -1,7 +1,9 @@
+use core::{mem::MaybeUninit, slice};
+
 use pinocchio::{
     account_info::AccountInfo,
-    cpi,
-    instruction::{AccountMeta, Instruction, Signer},
+    cpi::{self, MAX_CPI_ACCOUNTS},
+    instruction::{Account, AccountMeta, Instruction, Signer},
     pubkey::Pubkey,
     ProgramResult,
 };
@@ -56,13 +58,21 @@ impl Invoke for SliceInvokeParts<'_> {
     }
 
     unsafe fn invoke_signed_unchecked(self, signers: &[Signer]) {
+        const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
+        let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
+
+        self.accounts
+            .iter()
+            .enumerate()
+            .for_each(|(i, account)| accounts[i] = MaybeUninit::new(Account::from(*account)));
+
         cpi::invoke_signed_unchecked(
             &Instruction {
                 program_id: &self.program_id,
                 data: &self.instruction_data,
                 accounts: &self.account_metas,
             },
-            todo!(),
+            slice::from_raw_parts(accounts.as_ptr() as _, self.accounts.len()),
             signers,
         )
     }
@@ -82,13 +92,14 @@ impl<const N: usize, const M: usize> Invoke for FixedInvokeParts<'_, N, M> {
     }
 
     unsafe fn invoke_signed_unchecked(self, signers: &[Signer]) {
+        let accounts = self.accounts.map(Account::from);
         cpi::invoke_signed_unchecked(
             &Instruction {
                 program_id: &self.program_id,
                 data: &self.instruction_data,
                 accounts: &self.account_metas,
             },
-            todo!(),
+            &accounts,
             signers,
         )
     }
