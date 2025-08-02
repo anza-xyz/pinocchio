@@ -28,16 +28,21 @@ pub trait IntoInvokeParts {
     fn into_invoke_parts(self) -> Self::Output;
 }
 
-pub trait Invoke: sealed::Sealed {
-    fn invoke(self) -> ProgramResult;
-    fn invoke_signed(self, signers: &[Signer]) -> ProgramResult;
-}
-
-impl Invoke for SliceInvokeParts<'_> {
+pub trait Invoke: sealed::Sealed + Sized {
     fn invoke(self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
+    fn invoke_signed(self, signers: &[Signer]) -> ProgramResult;
+
+    unsafe fn invoke_unchecked(self) {
+        self.invoke_signed_unchecked(&[])
+    }
+
+    unsafe fn invoke_signed_unchecked(self, signers: &[Signer]);
+}
+
+impl Invoke for SliceInvokeParts<'_> {
     fn invoke_signed(self, signers: &[Signer]) -> ProgramResult {
         cpi::slice_invoke_signed(
             &Instruction {
@@ -49,13 +54,21 @@ impl Invoke for SliceInvokeParts<'_> {
             signers,
         )
     }
+
+    unsafe fn invoke_signed_unchecked(self, signers: &[Signer]) {
+        cpi::invoke_signed_unchecked(
+            &Instruction {
+                program_id: &self.program_id,
+                data: &self.instruction_data,
+                accounts: &self.account_metas,
+            },
+            todo!(),
+            signers,
+        )
+    }
 }
 
 impl<const N: usize, const M: usize> Invoke for FixedInvokeParts<'_, N, M> {
-    fn invoke(self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
-
     fn invoke_signed(self, signers: &[Signer]) -> ProgramResult {
         cpi::invoke_signed(
             &Instruction {
@@ -67,6 +80,18 @@ impl<const N: usize, const M: usize> Invoke for FixedInvokeParts<'_, N, M> {
             signers,
         )
     }
+
+    unsafe fn invoke_signed_unchecked(self, signers: &[Signer]) {
+        cpi::invoke_signed_unchecked(
+            &Instruction {
+                program_id: &self.program_id,
+                data: &self.instruction_data,
+                accounts: &self.account_metas,
+            },
+            todo!(),
+            signers,
+        )
+    }
 }
 
 impl<T> Invoke for T
@@ -74,12 +99,12 @@ where
     T: IntoInvokeParts,
     T::Output: Invoke,
 {
-    fn invoke(self) -> ProgramResult {
-        self.into_invoke_parts().invoke()
-    }
-
     fn invoke_signed(self, signers: &[Signer]) -> ProgramResult {
         self.into_invoke_parts().invoke_signed(signers)
+    }
+
+    unsafe fn invoke_signed_unchecked(self, signers: &[Signer]) {
+        self.into_invoke_parts().invoke_signed_unchecked(signers)
     }
 }
 
