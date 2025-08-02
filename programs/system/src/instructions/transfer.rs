@@ -1,8 +1,4 @@
-use pinocchio::{
-    account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey, ProgramResult,
-};
-
-use crate::CanInvoke;
+use pinocchio::account_info::AccountInfo;
 
 /// Transfer lamports.
 ///
@@ -20,35 +16,5 @@ pub struct Transfer<'a> {
     pub lamports: u64,
 }
 
-const ACCOUNTS_LEN: usize = 2;
-
-impl<'a> CanInvoke for Transfer<'a> {
-    type Accounts = [&'a AccountInfo; ACCOUNTS_LEN];
-
-    fn invoke_via(
-        &self,
-        invoke: impl FnOnce(
-            /* program_id: */ &Pubkey,
-            /* accounts: */ &Self::Accounts,
-            /* account_metas: */ &[AccountMeta],
-            /* data: */ &[u8],
-        ) -> ProgramResult,
-    ) -> ProgramResult {
-        // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..12]: lamports amount
-        let mut instruction_data = [0; 12];
-        instruction_data[0] = 2;
-        instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
-
-        invoke(
-            &crate::ID,
-            &[self.from, self.to],
-            &[
-                AccountMeta::writable_signer(self.from.key()),
-                AccountMeta::writable(self.to.key()),
-            ],
-            &instruction_data,
-        )
-    }
-}
+pub const TRANSFER_ACCOUNTS_LEN: usize = 2;
+pub const TRANSFER_DATA_SIZE: usize = 12;

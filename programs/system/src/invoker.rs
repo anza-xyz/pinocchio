@@ -7,6 +7,8 @@ use pinocchio::{
     ProgramResult,
 };
 
+use crate::instructions::{Transfer, TRANSFER_ACCOUNTS_LEN};
+
 pub type ConstAccounts<'a, const ACCOUNTS_LEN: usize> = [&'a AccountInfo; ACCOUNTS_LEN];
 pub type SliceAccounts<'a> = [&'a AccountInfo];
 
@@ -65,15 +67,7 @@ where
 {
     #[inline]
     fn invoke(&self) -> ProgramResult {
-        self.inner
-            .invoke_via(|program_id, accounts, account_metas, data| {
-                let instruction = Instruction {
-                    program_id: program_id,
-                    accounts: &account_metas,
-                    data: data,
-                };
-                pinocchio::cpi::invoke(&instruction, accounts)
-            })
+        self.invoke_signed(&[])
     }
 
     #[inline]
@@ -96,15 +90,7 @@ where
 {
     #[inline]
     fn invoke(&self) -> ProgramResult {
-        self.inner
-            .invoke_via(|program_id, accounts, account_metas, data| {
-                let instruction = Instruction {
-                    program_id: program_id,
-                    accounts: &account_metas,
-                    data: data,
-                };
-                pinocchio::cpi::slice_invoke(&instruction, accounts)
-            })
+        self.invoke_signed(&[])
     }
 
     #[inline]
@@ -118,5 +104,36 @@ where
                 };
                 pinocchio::cpi::slice_invoke_signed(&instruction, accounts, signers)
             })
+    }
+}
+
+impl<'a> CanInvoke for Transfer<'a> {
+    type Accounts = [&'a AccountInfo; TRANSFER_ACCOUNTS_LEN];
+
+    fn invoke_via(
+        &self,
+        invoke: impl FnOnce(
+            /* program_id: */ &Pubkey,
+            /* accounts: */ &Self::Accounts,
+            /* account_metas: */ &[AccountMeta],
+            /* data: */ &[u8],
+        ) -> ProgramResult,
+    ) -> ProgramResult {
+        // instruction data
+        // -  [0..4 ]: instruction discriminator
+        // -  [4..12]: lamports amount
+        let mut instruction_data = [0; 12];
+        instruction_data[0] = 2;
+        instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
+
+        invoke(
+            &crate::ID,
+            &[self.from, self.to],
+            &[
+                AccountMeta::writable_signer(self.from.key()),
+                AccountMeta::writable(self.to.key()),
+            ],
+            &instruction_data,
+        )
     }
 }
