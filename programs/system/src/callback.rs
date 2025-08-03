@@ -1,7 +1,9 @@
+use core::{mem::MaybeUninit, slice};
+
 use pinocchio::{
     account_info::AccountInfo,
-    cpi,
-    instruction::{AccountMeta, Instruction, Signer},
+    cpi::{self, MAX_CPI_ACCOUNTS},
+    instruction::{Account, AccountMeta, Instruction, Signer},
     pubkey::Pubkey,
     ProgramResult,
 };
@@ -34,18 +36,23 @@ pub trait CanInvoke {
 }
 
 pub trait Invoke: sealed::Sealed {
-    fn invoke(&self) -> ProgramResult;
+    fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
     fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult;
+
+    unsafe fn invoke_unchecked(&self) {
+        self.invoke_signed_unchecked(&[])
+    }
+
+    unsafe fn invoke_signed_unchecked(&self, signers: &[Signer]);
 }
 
 impl<'a, const ACCOUNTS_LEN: usize, T> Invoke for T
 where
     T: CanInvoke<Accounts = [&'a AccountInfo; ACCOUNTS_LEN]>,
 {
-    fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
-
     fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         self.invoke_via(
             |program_id, accounts, account_metas, data| {
@@ -65,6 +72,40 @@ where
                 cpi::slice_invoke_signed(&instruction, accounts, signers)
             },
         )
+    }
+    unsafe fn invoke_signed_unchecked(&self, signers: &[Signer]) {
+        self.invoke_via(
+            |program_id, accounts, account_metas, data| unsafe {
+                let instruction = Instruction {
+                    program_id,
+                    accounts: &account_metas,
+                    data,
+                };
+                cpi::invoke_signed_unchecked(&instruction, &accounts.map(Account::from), signers);
+                Ok(())
+            },
+            |program_id, accounts, account_metas, data| unsafe {
+                const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
+                let mut ix_accounts = [UNINIT; MAX_CPI_ACCOUNTS];
+
+                accounts.iter().enumerate().for_each(|(i, account)| {
+                    ix_accounts[i] = MaybeUninit::new(Account::from(*account))
+                });
+
+                let instruction = Instruction {
+                    program_id,
+                    accounts: &account_metas,
+                    data,
+                };
+                cpi::invoke_signed_unchecked(
+                    &instruction,
+                    slice::from_raw_parts(ix_accounts.as_ptr() as _, accounts.len()),
+                    signers,
+                );
+                Ok(())
+            },
+        )
+        .unwrap();
     }
 }
 
