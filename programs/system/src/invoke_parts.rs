@@ -31,12 +31,14 @@ pub trait IntoInvokeParts {
 }
 
 pub trait Invoke: sealed::Sealed + Sized {
+    #[inline]
     fn invoke(self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
     fn invoke_signed(self, signers: &[Signer]) -> ProgramResult;
 
+    #[inline]
     unsafe fn invoke_unchecked(self) {
         self.invoke_signed_unchecked(&[])
     }
@@ -45,6 +47,7 @@ pub trait Invoke: sealed::Sealed + Sized {
 }
 
 impl Invoke for SliceInvokeParts<'_> {
+    #[inline]
     fn invoke_signed(self, signers: &[Signer]) -> ProgramResult {
         cpi::slice_invoke_signed(
             &Instruction {
@@ -57,6 +60,7 @@ impl Invoke for SliceInvokeParts<'_> {
         )
     }
 
+    #[inline]
     unsafe fn invoke_signed_unchecked(self, signers: &[Signer]) {
         const UNINIT: MaybeUninit<Account> = MaybeUninit::<Account>::uninit();
         let mut accounts = [UNINIT; MAX_CPI_ACCOUNTS];
@@ -79,6 +83,7 @@ impl Invoke for SliceInvokeParts<'_> {
 }
 
 impl<const N: usize, const M: usize> Invoke for FixedInvokeParts<'_, N, M> {
+    #[inline]
     fn invoke_signed(self, signers: &[Signer]) -> ProgramResult {
         cpi::invoke_signed(
             &Instruction {
@@ -91,6 +96,7 @@ impl<const N: usize, const M: usize> Invoke for FixedInvokeParts<'_, N, M> {
         )
     }
 
+    #[inline]
     unsafe fn invoke_signed_unchecked(self, signers: &[Signer]) {
         let accounts = self.accounts.map(Account::from);
         cpi::invoke_signed_unchecked(
@@ -110,10 +116,12 @@ where
     T: IntoInvokeParts,
     T::Output: Invoke,
 {
+    #[inline]
     fn invoke_signed(self, signers: &[Signer]) -> ProgramResult {
         self.into_invoke_parts().invoke_signed(signers)
     }
 
+    #[inline]
     unsafe fn invoke_signed_unchecked(self, signers: &[Signer]) {
         self.into_invoke_parts().invoke_signed_unchecked(signers)
     }
@@ -131,6 +139,7 @@ mod sealed {
 impl<'a> IntoInvokeParts for Transfer<'a> {
     type Output = FixedInvokeParts<'a, TRANSFER_ACCOUNTS_LEN, TRANSFER_DATA_SIZE>;
 
+    #[inline]
     fn into_invoke_parts(self) -> Self::Output {
         // instruction data
         // -  [0..4 ]: instruction discriminator
