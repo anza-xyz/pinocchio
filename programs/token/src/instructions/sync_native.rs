@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
+    cpi::invoke,
+    instruction::{AccountMeta, Instruction},
     ProgramResult,
 };
 
@@ -19,11 +19,6 @@ pub struct SyncNative<'a> {
 impl SyncNative<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
-
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.native_token.key())];
 
@@ -33,6 +28,6 @@ impl SyncNative<'_> {
             data: &[17],
         };
 
-        invoke_signed(&instruction, &[self.native_token], signers)
+        invoke(&instruction, &[self.native_token])
     }
 }
