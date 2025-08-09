@@ -1,15 +1,12 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
+    cpi::invoke,
+    instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     ProgramResult,
 };
 
 /// Drive state of Uninitialized nonce account to Initialized, setting the nonce value.
-///
-/// The `Pubkey` parameter specifies the entity authorized to execute nonce
-/// instruction on the account
 ///
 /// No signatures are required to execute this instruction, enabling derived
 /// nonce account addresses.
@@ -28,21 +25,14 @@ pub struct InitializeNonceAccount<'a, 'b> {
     /// Rent sysvar.
     pub rent_sysvar: &'a AccountInfo,
 
-    /// Lamports to withdraw.
-    ///
-    /// The account balance must be left above the rent exempt reserve
-    /// or at zero.
+    /// Indicates the entity authorized to execute nonce
+    /// instruction on the account
     pub authority: &'b Pubkey,
 }
 
 impl InitializeNonceAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
-
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
             AccountMeta::writable(self.account.key()),
@@ -63,14 +53,13 @@ impl InitializeNonceAccount<'_, '_> {
             data: &instruction_data,
         };
 
-        invoke_signed(
+        invoke(
             &instruction,
             &[
                 self.account,
                 self.recent_blockhashes_sysvar,
                 self.rent_sysvar,
             ],
-            signers,
         )
     }
 }
