@@ -1,9 +1,8 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+    account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey, ProgramResult,
 };
+
+use crate::CanInvoke;
 
 /// Consumes a stored nonce, replacing it with a successor.
 ///
@@ -22,32 +21,29 @@ pub struct AdvanceNonceAccount<'a> {
     pub authority: &'a AccountInfo,
 }
 
-impl AdvanceNonceAccount<'_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const ACCOUNTS_LEN: usize = 3;
 
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
-        ];
+impl<'a> CanInvoke for AdvanceNonceAccount<'a> {
+    type Accounts = [&'a AccountInfo; ACCOUNTS_LEN];
 
-        // instruction
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &[4],
-        };
-
-        invoke_signed(
-            &instruction,
+    fn invoke_via(
+        &self,
+        invoke: impl FnOnce(
+            /* program_id: */ &Pubkey,
+            /* accounts: */ &Self::Accounts,
+            /* account_metas: */ &[AccountMeta],
+            /* data: */ &[u8],
+        ) -> ProgramResult,
+    ) -> ProgramResult {
+        invoke(
+            &crate::ID,
             &[self.account, self.recent_blockhashes_sysvar, self.authority],
-            signers,
+            &[
+                AccountMeta::writable(self.account.key()),
+                AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
+                AccountMeta::readonly_signer(self.authority.key()),
+            ],
+            &[4],
         )
     }
 }

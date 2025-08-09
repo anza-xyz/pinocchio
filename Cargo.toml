@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "examples/cpi-call",
     "programs/associated-token-account",
     "programs/memo",
     "programs/system",

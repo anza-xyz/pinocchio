@@ -1,10 +1,8 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey, ProgramResult,
 };
+
+use crate::CanInvoke;
 
 /// Assign account to a program
 ///
@@ -18,17 +16,20 @@ pub struct Assign<'a, 'b> {
     pub owner: &'b Pubkey,
 }
 
-impl Assign<'_, '_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const ACCOUNTS_LEN: usize = 1;
 
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable_signer(self.account.key())];
+impl<'a, 'b> CanInvoke for Assign<'a, 'b> {
+    type Accounts = [&'a AccountInfo; ACCOUNTS_LEN];
 
+    fn invoke_via(
+        &self,
+        invoke: impl FnOnce(
+            /* program_id: */ &Pubkey,
+            /* accounts: */ &Self::Accounts,
+            /* account_metas: */ &[AccountMeta],
+            /* data: */ &[u8],
+        ) -> ProgramResult,
+    ) -> ProgramResult {
         // instruction data
         // -  [0..4 ]: instruction discriminator
         // -  [4..36]: owner pubkey
@@ -36,12 +37,11 @@ impl Assign<'_, '_> {
         instruction_data[0] = 1;
         instruction_data[4..36].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data,
-        };
-
-        invoke_signed(&instruction, &[self.account], signers)
+        invoke(
+            &crate::ID,
+            &[self.account],
+            &[AccountMeta::writable_signer(self.account.key())],
+            &instruction_data,
+        )
     }
 }

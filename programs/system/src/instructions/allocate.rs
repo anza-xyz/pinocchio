@@ -1,9 +1,8 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+    account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey, ProgramResult,
 };
+
+use crate::CanInvoke;
 
 /// Allocate space in a (possibly new) account without funding.
 ///
@@ -17,17 +16,20 @@ pub struct Allocate<'a> {
     pub space: u64,
 }
 
-impl Allocate<'_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const ACCOUNTS_LEN: usize = 1;
 
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable_signer(self.account.key())];
+impl<'a> CanInvoke for Allocate<'a> {
+    type Accounts = [&'a AccountInfo; ACCOUNTS_LEN];
 
+    fn invoke_via(
+        &self,
+        invoke: impl FnOnce(
+            /* program_id: */ &Pubkey,
+            /* accounts: */ &Self::Accounts,
+            /* account_metas: */ &[AccountMeta],
+            /* data: */ &[u8],
+        ) -> ProgramResult,
+    ) -> ProgramResult {
         // instruction data
         // -  [0..4 ]: instruction discriminator
         // -  [4..12]: space
@@ -35,12 +37,11 @@ impl Allocate<'_> {
         instruction_data[0] = 8;
         instruction_data[4..12].copy_from_slice(&self.space.to_le_bytes());
 
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data,
-        };
-
-        invoke_signed(&instruction, &[self.account], signers)
+        invoke(
+            &crate::ID,
+            &[self.account],
+            &[AccountMeta::writable_signer(self.account.key())],
+            &instruction_data,
+        )
     }
 }

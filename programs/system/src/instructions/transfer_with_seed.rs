@@ -1,10 +1,8 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey, ProgramResult,
 };
+
+use crate::CanInvoke;
 
 /// Transfer lamports from a derived address.
 ///
@@ -36,21 +34,20 @@ pub struct TransferWithSeed<'a, 'b, 'c> {
     pub owner: &'c Pubkey,
 }
 
-impl TransferWithSeed<'_, '_, '_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const ACCOUNTS_LEN: usize = 3;
 
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::readonly_signer(self.base.key()),
-            AccountMeta::writable(self.to.key()),
-        ];
+impl<'a, 'b, 'c> CanInvoke for TransferWithSeed<'a, 'b, 'c> {
+    type Accounts = [&'a AccountInfo; ACCOUNTS_LEN];
 
+    fn invoke_via(
+        &self,
+        invoke: impl FnOnce(
+            /* program_id: */ &Pubkey,
+            /* accounts: */ &Self::Accounts,
+            /* account_metas: */ &[AccountMeta],
+            /* data: */ &[u8],
+        ) -> ProgramResult,
+    ) -> ProgramResult {
         // instruction data
         // - [0..4  ]: instruction discriminator
         // - [4..12 ]: lamports amount
@@ -66,12 +63,15 @@ impl TransferWithSeed<'_, '_, '_> {
         instruction_data[20..offset].copy_from_slice(self.seed.as_bytes());
         instruction_data[offset..offset + 32].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data[..offset + 32],
-        };
-
-        invoke_signed(&instruction, &[self.from, self.base, self.to], signers)
+        invoke(
+            &crate::ID,
+            &[self.from, self.base, self.to],
+            &[
+                AccountMeta::writable(self.from.key()),
+                AccountMeta::readonly_signer(self.base.key()),
+                AccountMeta::writable(self.to.key()),
+            ],
+            &instruction_data[..offset + 32],
+        )
     }
 }

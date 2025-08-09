@@ -1,9 +1,8 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+    account_info::AccountInfo, instruction::AccountMeta, pubkey::Pubkey, ProgramResult,
 };
+
+use crate::CanInvoke;
 
 /// Withdraw funds from a nonce account.
 ///
@@ -39,23 +38,20 @@ pub struct WithdrawNonceAccount<'a> {
     pub lamports: u64,
 }
 
-impl WithdrawNonceAccount<'_> {
-    #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
+const ACCOUNTS_LEN: usize = 5;
 
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 5] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.recipient.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
-        ];
+impl<'a> CanInvoke for WithdrawNonceAccount<'a> {
+    type Accounts = [&'a AccountInfo; ACCOUNTS_LEN];
 
+    fn invoke_via(
+        &self,
+        invoke: impl FnOnce(
+            /* program_id: */ &Pubkey,
+            /* accounts: */ &Self::Accounts,
+            /* account_metas: */ &[AccountMeta],
+            /* data: */ &[u8],
+        ) -> ProgramResult,
+    ) -> ProgramResult {
         // instruction data
         // -  [0..4 ]: instruction discriminator
         // -  [4..12]: lamports
@@ -63,14 +59,8 @@ impl WithdrawNonceAccount<'_> {
         instruction_data[0] = 5;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
 
-        let instruction = Instruction {
-            program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &instruction_data,
-        };
-
-        invoke_signed(
-            &instruction,
+        invoke(
+            &crate::ID,
             &[
                 self.account,
                 self.recipient,
@@ -78,7 +68,14 @@ impl WithdrawNonceAccount<'_> {
                 self.rent_sysvar,
                 self.authority,
             ],
-            signers,
+            &[
+                AccountMeta::writable(self.account.key()),
+                AccountMeta::writable(self.recipient.key()),
+                AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
+                AccountMeta::readonly(self.rent_sysvar.key()),
+                AccountMeta::readonly_signer(self.authority.key()),
+            ],
+            &instruction_data,
         )
     }
 }
