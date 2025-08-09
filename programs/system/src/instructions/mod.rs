@@ -9,7 +9,7 @@ mod create_account_with_seed;
 mod initialize_nonce_account;
 mod transfer;
 mod transfer_with_seed;
-mod update_nonce_account;
+mod upgrade_nonce_account;
 mod withdraw_nonce_account;
 
 pub use advance_nonce_account::*;
@@ -23,5 +23,5 @@ pub use create_account_with_seed::*;
 pub use initialize_nonce_account::*;
 pub use transfer::*;
 pub use transfer_with_seed::*;
-pub use update_nonce_account::*;
+pub use upgrade_nonce_account::*;
 pub use withdraw_nonce_account::*;

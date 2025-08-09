@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
+    cpi::invoke,
+    instruction::{AccountMeta, Instruction},
     ProgramResult,
 };
 
@@ -10,19 +10,14 @@ use pinocchio::{
 ///
 /// ### Accounts:
 ///   0. `[WRITE]` Nonce account
-pub struct UpdateNonceAccount<'a> {
+pub struct UpgradeNonceAccount<'a> {
     /// Nonce account.
     pub account: &'a AccountInfo,
 }
 
-impl UpdateNonceAccount<'_> {
+impl UpgradeNonceAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
-
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.account.key())];
 
@@ -33,6 +28,6 @@ impl UpdateNonceAccount<'_> {
             data: &[12],
         };
 
-        invoke_signed(&instruction, &[self.account], signers)
+        invoke(&instruction, &[self.account])
     }
 }
