@@ -2,8 +2,8 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
+    cpi::invoke,
+    instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     ProgramResult,
 };
@@ -32,11 +32,6 @@ pub struct InitializeAccount2<'a, 'b> {
 impl InitializeAccount2<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
-
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
             AccountMeta::writable(self.account.key()),
@@ -60,10 +55,6 @@ impl InitializeAccount2<'_, '_> {
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },
         };
 
-        invoke_signed(
-            &instruction,
-            &[self.account, self.mint, self.rent_sysvar],
-            signers,
-        )
+        invoke(&instruction, &[self.account, self.mint, self.rent_sysvar])
     }
 }

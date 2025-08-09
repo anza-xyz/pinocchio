@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
+    cpi::invoke,
+    instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     ProgramResult,
 };
@@ -29,11 +29,6 @@ pub struct InitializeAccount<'a, 'b> {
 impl InitializeAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
-
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 4] = [
             AccountMeta::writable(self.account.key()),
@@ -48,10 +43,9 @@ impl InitializeAccount<'_, '_> {
             data: &[1],
         };
 
-        invoke_signed(
+        invoke(
             &instruction,
             &[self.account, self.mint, self.owner, self.rent_sysvar],
-            signers,
         )
     }
 }
