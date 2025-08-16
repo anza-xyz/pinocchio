@@ -37,6 +37,14 @@ name = "pinocchio"
 version = "0.9.0"
 
 [[package]]
+name = "pinocchio-address-lookup-table"
+version = "0.1.0"
+dependencies = [
+ "pinocchio",
+ "pinocchio-pubkey",
+]
+
+[[package]]
 name = "pinocchio-associated-token-account"
 version = "0.2.0"
 dependencies = [
