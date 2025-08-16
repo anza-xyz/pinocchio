@@ -15,7 +15,7 @@ use crate::instructions::MAX_MULTISIG_SIGNERS;
 ///
 /// ### Accounts:
 ///   0. `[writable]` The multisig account to initialize.
-///   2. `..+N` `[]` The `N` signer accounts, where `N` is `1 <=
+///   1. `..+N` `[]` The `N` signer accounts, where `N` is `1 <=
 ///      N <= 11`.
 pub struct InitializeMultisig2<'a, 'b, 'c>
 where
