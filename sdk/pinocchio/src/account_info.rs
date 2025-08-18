@@ -134,13 +134,6 @@ impl AccountInfo {
         unsafe { &(*self.raw).owner }
     }
 
-    #[inline(always)]
-    pub fn owner_key(&self) -> Pubkey {
-        // SAFETY:
-        // We immediately copy out the pubkey, so the reference can never be invalidated
-        unsafe { *self.owner() }
-    }
-
     /// Indicates whether the transaction was signed by this account.
     #[inline(always)]
     pub fn is_signer(&self) -> bool {
