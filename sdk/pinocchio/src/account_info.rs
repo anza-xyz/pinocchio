@@ -495,31 +495,18 @@ impl AccountInfo {
     pub fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
         // Check wheather the account data is already borrowed.
         self.can_borrow_mut_data()?;
-
-        let (difference, current_len) = unsafe { self.resize_unchecked(new_len)? };
-
-        if difference > 0 {
-            unsafe {
-                #[cfg(target_os = "solana")]
-                sol_memset_(self.data_ptr().add(current_len), 0, difference as u64);
-                #[cfg(not(target_os = "solana"))]
-                core::ptr::write_bytes(self.data_ptr().add(current_len), 0, difference as usize);
-            }
-        }
-
+        unsafe { self.resize_unchecked(new_len)? };
         Ok(())
     }
 
-    /// Resizes the account's data and udpates the resize delta without checking if the account is already borrowed, returning a tuple containing `(len difference, current length)`.
+    /// Resizes the account's data and udpates the resize delta without checking if the account is already borrowed.
     ///
     /// # Safety
     ///
     /// This method is unsafe because it does not check if the account data is already
     /// borrowed.
-    ///
-    /// TODO: I think this might actually be sound, but we should add some invariants just in case (i.e. that there are either no borrows or we currently control the only mutable borrow and are updating its length too)
     #[inline]
-    pub unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(i32, usize), ProgramError> {
+    pub unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError> {
         // Account length is always `< i32::MAX`...
         let current_len = self.data_len() as i32;
         // ...so the new length must fit in an `i32`.
@@ -527,7 +514,7 @@ impl AccountInfo {
 
         // Return early if length hasn't changed.
         if new_len == current_len {
-            return Ok((0, current_len as usize));
+            return Ok(());
         }
 
         let difference = new_len - current_len;
@@ -544,7 +531,19 @@ impl AccountInfo {
             (*self.raw).resize_delta = accumulated_resize_delta;
         }
 
-        Ok((difference, current_len as usize))
+        if difference > 0 {
+            unsafe {
+                #[cfg(target_os = "solana")]
+                sol_memset_(self.data_ptr().add(current_len), 0, difference as u64);
+                #[cfg(not(target_os = "solana"))]
+                core::ptr::write_bytes(
+                    self.data_ptr().add(current_len as usize),
+                    0,
+                    difference as usize,
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Zero out the the account's data length, lamports and owner fields, effectively
