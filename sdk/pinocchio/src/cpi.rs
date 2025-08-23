@@ -515,6 +515,7 @@ pub fn get_return_data() -> Option<ReturnData> {
 }
 
 /// Struct to hold the return data from an invoked program.
+#[derive(Debug)]
 pub struct ReturnData {
     /// Program that most recently set the return data.
     program_id: Pubkey,

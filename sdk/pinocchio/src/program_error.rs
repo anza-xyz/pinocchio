@@ -6,7 +6,7 @@
 //! <https://github.com/anza-xyz/solana-sdk/blob/master/program-error/src/lib.rs>
 
 /// Reasons the program may fail.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProgramError {
     /// Allows on-chain programs to implement program-specific error types and see them returned
     /// by the Solana runtime. A program-specific error may be any type that is represented as

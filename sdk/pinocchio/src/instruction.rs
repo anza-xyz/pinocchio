@@ -37,7 +37,7 @@ pub struct ProcessedSiblingInstruction {
 /// This struct contains the same information as an [`AccountInfo`], but has
 /// the memory layout as expected by `sol_invoke_signed_c` syscall.
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, Debug, Copy)]
 pub struct Account<'a> {
     // Public key of the account.
     key: *const Pubkey,

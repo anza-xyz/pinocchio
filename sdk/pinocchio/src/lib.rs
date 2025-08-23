@@ -217,7 +217,7 @@
 //! ```ignore
 //! cargo build-sbf --features bpf-entrypoint
 //! ```
-
+#![warn(missing_copy_implementations, missing_debug_implementations)]
 #![no_std]
 
 #[cfg(feature = "std")]
