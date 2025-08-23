@@ -495,6 +495,22 @@ impl AccountInfo {
         // Check wheather the account data is already borrowed.
         self.can_borrow_mut_data()?;
 
+        // SAFETY:
+        // We are checking if the account data is already borrowed, so we are safe to call
+        unsafe { self.resize_unchecked(new_len) }
+    }
+
+    /// Resize (either truncating or zero extending) the account's data.
+    ///
+    /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
+    ///
+    /// # Safety
+    ///
+    /// This method is unsafe because it does not check if the account data is already
+    /// borrowed. The caller must guarantee that there are no active borrows to the account
+    /// data.
+    #[inline(always)]
+    pub unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError> {
         // Account length is always `< i32::MAX`...
         let current_len = self.data_len() as i32;
         // ...so the new length must fit in an `i32`.
