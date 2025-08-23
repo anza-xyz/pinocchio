@@ -500,7 +500,7 @@ impl AccountInfo {
         unsafe { self.resize_unchecked(new_len) }
     }
 
-    /// Resizes the account's data and udpates the resize delta without checking if the account is already borrowed.
+    /// Resize (either truncating or zero extending) the account's data.
     ///
     /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
     ///
