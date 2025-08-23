@@ -507,7 +507,8 @@ impl AccountInfo {
     /// # Safety
     ///
     /// This method is unsafe because it does not check if the account data is already
-    /// borrowed.
+    /// borrowed. The caller must guarantee that there are no active borrows to the account
+    /// data.
     #[inline(always)]
     pub unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError> {
         // Account length is always `< i32::MAX`...
