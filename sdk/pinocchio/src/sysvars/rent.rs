@@ -16,33 +16,15 @@ pub const RENT_ID: Pubkey = [
     253, 68, 227, 219, 217, 138, 0, 0, 0, 0,
 ];
 
-/// Default rental rate in lamports/byte-year.
+/// Default lamports per byte cost.
 ///
 /// This calculation is based on:
 /// - `10^9` lamports per SOL
 /// - `$1` per SOL
 /// - `$0.01` per megabyte day
 /// - `$3.65` per megabyte year
-pub const DEFAULT_LAMPORTS_PER_BYTE_YEAR: u64 = 1_000_000_000 / 100 * 365 / (1024 * 1024);
-
-/// Default amount of time (in years) the balance has to include rent for the
-/// account to be rent exempt.
-pub const DEFAULT_EXEMPTION_THRESHOLD: f64 = 2.0;
-
-/// Default amount of time (in years) the balance has to include rent for the
-/// account to be rent exempt as a `u64`.
-const DEFAULT_EXEMPTION_THRESHOLD_AS_U64: u64 = 2;
-
-/// The `u64` representation of the default exemption threshold.
-///
-/// This is used to check whether the `f64` value can be safely cast to a `u64`.
-const F64_EXEMPTION_THRESHOLD_AS_U64: u64 = 4611686018427387904;
-
-/// Default percentage of collected rent that is burned.
-///
-/// Valid values are in the range [0, 100]. The remaining percentage is
-/// distributed to validators.
-pub const DEFAULT_BURN_PERCENT: u8 = 50;
+/// - `2` years period
+pub const DEFAULT_LAMPORTS_PER_BYTE: u64 = 6960;
 
 /// Account storage overhead for calculation of base rent.
 ///
@@ -50,18 +32,21 @@ pub const DEFAULT_BURN_PERCENT: u8 = 50;
 /// added to an accounts data length when calculating [`Rent::minimum_balance`].
 pub const ACCOUNT_STORAGE_OVERHEAD: u64 = 128;
 
-/// Rent sysvar data
+/// Rent sysvar data.
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Rent {
-    /// Rental rate in lamports per byte-year
-    pub lamports_per_byte_year: u64,
+    /// Rental rate in lamports.
+    _lamports_per_byte: u64,
 
-    /// Exemption threshold in years
-    pub exemption_threshold: f64,
+    /// Exemption threshold in years.
+    ///
+    /// This was deprecated (see SIMD-0194). Use only `lamports_per_byte` instead.
+    /// It was originally a `f64`, now represented as an array of 8 bytes.
+    _exemption_threshold: [u8; 8],
 
-    /// Burn percentage
-    pub burn_percent: u8,
+    /// Burn percentage.
+    _burn_percent: u8,
 }
 
 impl Rent {
@@ -71,6 +56,13 @@ impl Rent {
     /// Return a `Rent` from the given account info.
     ///
     /// This method performs a check on the account info key.
+    ///
+    /// # Important
+    ///
+    /// The values from the account are not used. The calculation is done following the
+    /// changes proposed in [`SIMD-0194`].
+    ///
+    /// [`SIMD-0194`]: https://github.com/solana-foundation/solana-improvement-documents/pull/194
     #[inline]
     pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Rent>, ProgramError> {
         if account_info.key() != &RENT_ID {
@@ -90,6 +82,13 @@ impl Rent {
     ///
     /// The caller must ensure that it is safe to borrow the account data - e.g., there are
     /// no mutable borrows of the account data.
+    ///
+    /// # Important
+    ///
+    /// The values from the account are not used. The calculation is done following the
+    /// changes proposed in [`SIMD-0194`].
+    ///
+    /// [`SIMD-0194`]: https://github.com/solana-foundation/solana-improvement-documents/pull/194
     #[inline]
     pub unsafe fn from_account_info_unchecked(
         account_info: &AccountInfo,
@@ -106,6 +105,13 @@ impl Rent {
     ///
     /// This method performs a length validation. The caller must ensure that `bytes` contains
     /// a valid representation of `Rent`.
+    ///
+    /// # Important
+    ///
+    /// The values from the rent bytes are not used. The calculation is done following the
+    /// changes proposed in [`SIMD-0194`].
+    ///
+    /// [`SIMD-0194`]: https://github.com/solana-foundation/solana-improvement-documents/pull/194
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<&Self, ProgramError> {
         if bytes.len() < Self::LEN {
@@ -122,37 +128,16 @@ impl Rent {
     ///
     /// The caller must ensure that `bytes` contains a valid representation of `Rent` and
     /// that is has the expected length.
+    ///
+    /// # Important
+    ///
+    /// The values from the rent bytes are not used. The calculation is done following the
+    /// changes proposed in [`SIMD-0194`].
+    ///
+    /// [`SIMD-0194`]: https://github.com/solana-foundation/solana-improvement-documents/pull/194
     #[inline]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes.as_ptr() as *const Rent)
-    }
-
-    /// Calculate how much rent to burn from the collected rent.
-    ///
-    /// The first value returned is the amount burned. The second is the amount
-    /// to distribute to validators.
-    #[inline]
-    pub fn calculate_burn(&self, rent_collected: u64) -> (u64, u64) {
-        let burned_portion = (rent_collected * u64::from(self.burn_percent)) / 100;
-        (burned_portion, rent_collected - burned_portion)
-    }
-
-    /// Rent due on account's data length with balance.
-    #[inline]
-    pub fn due(&self, balance: u64, data_len: usize, years_elapsed: f64) -> RentDue {
-        if self.is_exempt(balance, data_len) {
-            RentDue::Exempt
-        } else {
-            RentDue::Paying(self.due_amount(data_len, years_elapsed))
-        }
-    }
-
-    /// Rent due for account that is known to be not exempt.
-    #[inline]
-    pub fn due_amount(&self, data_len: usize, years_elapsed: f64) -> u64 {
-        let actual_data_len = data_len as u64 + ACCOUNT_STORAGE_OVERHEAD;
-        let lamports_per_year = self.lamports_per_byte_year * actual_data_len;
-        (lamports_per_year as f64 * years_elapsed) as u64
     }
 
     /// Calculates the minimum balance for rent exemption.
@@ -169,15 +154,7 @@ impl Rent {
     /// The minimum balance in lamports for rent exemption.
     #[inline]
     pub fn minimum_balance(&self, data_len: usize) -> u64 {
-        let bytes = data_len as u64;
-
-        if self.is_default_rent_threshold() {
-            ((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte_year)
-                * DEFAULT_EXEMPTION_THRESHOLD_AS_U64
-        } else {
-            (((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte_year) as f64
-                * self.exemption_threshold) as u64
-        }
+        (ACCOUNT_STORAGE_OVERHEAD + data_len as u64) * DEFAULT_LAMPORTS_PER_BYTE
     }
 
     /// Determines if an account can be considered rent exempt.
@@ -193,15 +170,6 @@ impl Rent {
     #[inline]
     pub fn is_exempt(&self, lamports: u64, data_len: usize) -> bool {
         lamports >= self.minimum_balance(data_len)
-    }
-
-    /// Determines if the `exemption_threshold` is the default value.
-    ///
-    /// This is used to check whether the `f64` value can be safely cast to a `u64`
-    /// to avoid floating-point operations.
-    #[inline]
-    fn is_default_rent_threshold(&self) -> bool {
-        u64::from_le_bytes(self.exemption_threshold.to_le_bytes()) == F64_EXEMPTION_THRESHOLD_AS_U64
     }
 }
 
@@ -238,34 +206,40 @@ impl RentDue {
 
 #[cfg(test)]
 mod tests {
-    use crate::sysvars::rent::{
-        ACCOUNT_STORAGE_OVERHEAD, DEFAULT_BURN_PERCENT, DEFAULT_EXEMPTION_THRESHOLD,
-        DEFAULT_LAMPORTS_PER_BYTE_YEAR,
-    };
+    use crate::sysvars::rent::ACCOUNT_STORAGE_OVERHEAD;
+
+    /// Deprecated: previous values used in the rent calculation.
+    const DEFAULT_LAMPORTS_PER_BYTE_YEAR: u64 = 1_000_000_000 / 100 * 365 / (1024 * 1024);
+
+    /// Deprecated: previous values used in the rent calculation.
+    const DEFAULT_EXEMPTION_THRESHOLD: f64 = 2.0;
 
     #[test]
     pub fn test_minimum_balance() {
+        // The struct values should not be not used.
         let mut rent = super::Rent {
-            lamports_per_byte_year: DEFAULT_LAMPORTS_PER_BYTE_YEAR,
-            exemption_threshold: DEFAULT_EXEMPTION_THRESHOLD,
-            burn_percent: DEFAULT_BURN_PERCENT,
+            _lamports_per_byte: 0,
+            _exemption_threshold: [0; 8],
+            _burn_percent: 0,
         };
 
         // Using the default exemption threshold.
 
         let balance = rent.minimum_balance(100);
-        let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte_year) as f64
-            * rent.exemption_threshold) as u64;
+        let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 100) * DEFAULT_LAMPORTS_PER_BYTE_YEAR)
+            as f64
+            * DEFAULT_EXEMPTION_THRESHOLD) as u64;
 
         assert!(calculated > 0);
         assert_eq!(balance, calculated);
 
         // Using a different exemption threshold.
-        rent.exemption_threshold = 0.5;
+        rent._lamports_per_byte = 1000;
 
-        let balance = rent.minimum_balance(100);
-        let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte_year) as f64
-            * rent.exemption_threshold) as u64;
+        let balance = rent.minimum_balance(500);
+        let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 500) * DEFAULT_LAMPORTS_PER_BYTE_YEAR)
+            as f64
+            * DEFAULT_EXEMPTION_THRESHOLD) as u64;
 
         assert!(calculated > 0);
         assert_eq!(balance, calculated);
