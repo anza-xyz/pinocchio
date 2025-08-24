@@ -283,3 +283,14 @@ impl ToStr for ProgramError {
         }
     }
 }
+
+#[cfg(feature = "std")]
+impl core::fmt::Display for ProgramError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+// TODO: Replace with core import when we bump rust version
+#[cfg(feature = "std")]
+impl std::error::Error for ProgramError {}
