@@ -373,7 +373,6 @@ impl_log_for_unsigned_integer!(u8);
 impl_log_for_unsigned_integer!(u16);
 impl_log_for_unsigned_integer!(u32);
 impl_log_for_unsigned_integer!(u64);
-impl_log_for_unsigned_integer!(u128);
 impl_log_for_unsigned_integer!(usize);
 
 /// Implement the log trait for the signed integer types.
@@ -421,7 +420,6 @@ impl_log_for_signed!(i8);
 impl_log_for_signed!(i16);
 impl_log_for_signed!(i32);
 impl_log_for_signed!(i64);
-impl_log_for_signed!(i128);
 impl_log_for_signed!(isize);
 
 /// Implement the log trait for the `&str` type.
