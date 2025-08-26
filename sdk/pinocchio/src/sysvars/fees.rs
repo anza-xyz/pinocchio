@@ -74,7 +74,7 @@ impl FeeRateGovernor {
 }
 
 /// Fees sysvar
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Fees {
     /// Fee calculator for processing transactions
     pub fee_calculator: FeeCalculator,
