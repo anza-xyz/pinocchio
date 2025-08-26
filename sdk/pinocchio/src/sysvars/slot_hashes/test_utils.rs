@@ -4,7 +4,7 @@
 
 use super::*;
 extern crate std;
-use crate::account_info::{Account, AccountInfo};
+use crate::account_info::{Account, AccountInfo, AccountStatic, MAX_PERMITTED_DATA_INCREASE};
 use crate::pubkey::Pubkey;
 use core::{mem, ptr};
 use std::vec::Vec;
@@ -122,8 +122,8 @@ pub unsafe fn make_account_info(
     borrow_state: u8,
 ) -> (AccountInfo, Vec<u64>) {
     let hdr_size = mem::size_of::<AccountLayout>();
-    let total = hdr_size + data.len();
-    let words = (total + 7) / 8;
+    let total = hdr_size + data.len() + MAX_PERMITTED_DATA_INCREASE;
+    let words = total.div_ceil(8);
     let mut backing: Vec<u64> = std::vec![0u64; words];
     assert!(
         mem::align_of::<u64>() >= mem::align_of::<AccountLayout>(),
@@ -154,7 +154,7 @@ pub unsafe fn make_account_info(
 
     (
         AccountInfo {
-            raw: &*(hdr_ptr as *mut Account),
+            raw: unsafe { Account::from_bytes_ptr_not_cloned(hdr_ptr.cast()).0 },
         },
         backing,
     )
@@ -165,17 +165,17 @@ pub unsafe fn make_account_info(
 fn test_account_layout_compatibility() {
     assert_eq!(
         mem::size_of::<AccountLayout>(),
-        mem::size_of::<Account>(),
+        mem::size_of::<AccountStatic>(),
         "Header size must match Account size"
     );
     assert_eq!(
         mem::align_of::<AccountLayout>(),
-        mem::align_of::<Account>(),
+        mem::align_of::<AccountStatic>(),
         "Header alignment must match Account alignment"
     );
 
     unsafe {
-        let test_header = AccountLayout {
+        let mut test_header = AccountLayout {
             borrow_state: 42,
             is_signer: 1,
             is_writable: 1,
@@ -187,7 +187,7 @@ fn test_account_layout_compatibility() {
             data_len: 256,
         };
 
-        let account_ptr = &test_header as *const AccountLayout as *const Account;
+        let account_ptr = &mut test_header as *mut AccountLayout as *mut AccountStatic;
         let account_ref = &*account_ptr;
         assert_eq!(
             account_ref.borrow_state.get(),
@@ -195,7 +195,7 @@ fn test_account_layout_compatibility() {
             "borrow_state field should be accessible and match"
         );
         assert_eq!(
-            *account_ref.data_len.get(),
+            account_ref.data_len.get(),
             256,
             "data_len field should be accessible and match"
         );

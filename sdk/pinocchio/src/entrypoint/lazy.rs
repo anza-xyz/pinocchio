@@ -1,12 +1,12 @@
 //! Defines the lazy program entrypoint and the context to access the
 //! input buffer.
 
+use crate::account_info::AccountFromPtr;
 use crate::{
     account_info::{Account, AccountInfo},
-    entrypoint::STATIC_ACCOUNT_DATA,
     program_error::ProgramError,
     pubkey::Pubkey,
-    BPF_ALIGN_OF_U128, NON_DUP_MARKER,
+    BPF_ALIGN_OF_U128,
 };
 
 /// Declare the lazy program entrypoint.
@@ -257,21 +257,20 @@ impl InstructionContext {
     #[allow(clippy::cast_ptr_alignment, clippy::missing_safety_doc)]
     #[inline(always)]
     unsafe fn read_account(&mut self) -> MaybeAccount {
-        let account: &'static Account = &*(self.buffer as *mut Account);
+        let result = Account::from_bytes_ptr(self.buffer);
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicate account
         //   - duplicate marker + 7 bytes of padding in case of a duplicate account
         self.buffer = self.buffer.add(size_of::<u64>());
 
-        if account.borrow_state.get() == NON_DUP_MARKER {
-            self.buffer = self.buffer.add(STATIC_ACCOUNT_DATA);
-            self.buffer = self.buffer.add(account.data_len.get() as usize);
-            self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
+        match result {
+            AccountFromPtr::Cloned { index } => MaybeAccount::Duplicated(index),
+            AccountFromPtr::Account { account, offset } => {
+                self.buffer = self.buffer.add(offset);
+                self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
 
-            MaybeAccount::Account(AccountInfo { raw: account })
-        } else {
-            // The caller will handle the mapping to the original account.
-            MaybeAccount::Duplicated(account.borrow_state.get())
+                MaybeAccount::Account(AccountInfo { raw: account })
+            }
         }
     }
 }

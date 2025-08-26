@@ -2,11 +2,12 @@
 
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_memset_;
-use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
+use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult, NON_DUP_MARKER};
 use core::{
     cell::{Cell, UnsafeCell},
     marker::PhantomData,
     mem::ManuallyDrop,
+    ops::Deref,
     ptr::{self, NonNull},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
@@ -34,13 +35,9 @@ pub enum BorrowState {
     MutablyBorrowed = 0b_1000_1000,
 }
 
-/// Raw account data.
-///
-/// This data is wrapped in an `AccountInfo` struct, which provides safe access
-/// to the data.
 #[repr(C)]
 #[derive(Default, Debug)]
-pub(crate) struct Account {
+pub(crate) struct AccountStatic {
     /// Borrow state for lamports and account data.
     ///
     /// This reuses the memory reserved for the duplicate flag in the
@@ -84,13 +81,8 @@ pub(crate) struct Account {
     /// Indicates whether this account represents a program.
     executable: u8,
 
-    /// Difference between the original data length and the current
-    /// data length.
-    ///
-    /// This is used to track the original data length of the account
-    /// when the account is resized. The runtime guarantees that this
-    /// value is zero at the start of the instruction.
-    resize_delta: Cell<i32>,
+    /// The runtime guarantees that this value is zero at the start of the instruction.
+    _padding: [u8; 4],
 
     /// Public key of the account.
     key: Pubkey,
@@ -102,7 +94,61 @@ pub(crate) struct Account {
     lamports: Cell<u64>,
 
     /// Length of the data. Modifiable by programs.
-    pub(crate) data_len: UnsafeCell<u64>,
+    pub(crate) data_len: Cell<u64>,
+}
+
+union PtrRepr {
+    const_ptr: *const Account,
+    components: (*const (), usize),
+}
+
+/// Raw account data.
+///
+/// This data is wrapped in an `AccountInfo` struct, which provides safe access
+/// to the data.
+#[repr(C)]
+#[derive(Debug)]
+pub(crate) struct Account {
+    account: AccountStatic,
+    data: UnsafeCell<[u8]>,
+}
+impl Deref for Account {
+    type Target = AccountStatic;
+
+    fn deref(&self) -> &Self::Target {
+        &self.account
+    }
+}
+impl Account {
+    pub(crate) unsafe fn from_bytes_ptr<'a>(bytes: *mut u8) -> AccountFromPtr<'a> {
+        if *bytes != NON_DUP_MARKER {
+            AccountFromPtr::Cloned { index: *bytes }
+        } else {
+            let (account, offset) = Self::from_bytes_ptr_not_cloned(bytes);
+            AccountFromPtr::Account { account, offset }
+        }
+    }
+
+    pub(crate) unsafe fn from_bytes_ptr_not_cloned<'a>(bytes: *mut u8) -> (&'a Self, usize) {
+        let account_static = &*bytes.cast::<AccountStatic>();
+        let data_len = account_static.data_len.get() as usize;
+        let ptr = &*(PtrRepr {
+            components: (
+                bytes.cast_const().cast(),
+                data_len + MAX_PERMITTED_DATA_INCREASE,
+            ),
+        }
+        .const_ptr);
+        (
+            ptr,
+            size_of::<AccountStatic>() + MAX_PERMITTED_DATA_INCREASE + data_len,
+        )
+    }
+}
+
+pub(crate) enum AccountFromPtr<'a> {
+    Cloned { index: u8 },
+    Account { account: &'a Account, offset: usize },
 }
 
 /// Wrapper struct for an `Account`.
@@ -182,17 +228,25 @@ impl AccountInfo {
     /// Returns the size of the data in the account.
     #[inline(always)]
     pub fn data_len(&self) -> usize {
-        unsafe { *self.raw.data_len.get() as usize }
+        self.raw.data_len.get() as usize
     }
 
     /// Returns the delta between the original data length and the current
     /// data length.
     ///
-    /// This value will be different than zero if the account has been resized
+    /// This value will be different from zero if the account has been resized
     /// during the current instruction.
     #[inline(always)]
     pub fn resize_delta(&self) -> i32 {
-        self.raw.resize_delta.get()
+        let current_size = self.data_len() as i32;
+        let data_max_size = unsafe {
+            PtrRepr {
+                const_ptr: self.raw,
+            }
+            .components
+            .1
+        } as i32;
+        current_size - (data_max_size - MAX_PERMITTED_DATA_INCREASE as i32)
     }
 
     /// Returns the lamports in the account.
@@ -258,7 +312,7 @@ impl AccountInfo {
     /// flag untouched. Useful when an instruction has verified non-duplicate accounts.
     #[inline(always)]
     pub unsafe fn borrow_data_unchecked(&self) -> &[u8] {
-        from_raw_parts(self.data_ptr().as_ptr(), self.data_len())
+        from_raw_parts(self.raw.data.get().cast(), self.data_len())
     }
 
     /// Returns a mutable reference to the data in the account.
@@ -270,7 +324,7 @@ impl AccountInfo {
     #[allow(clippy::mut_from_ref)]
     #[inline(always)]
     pub unsafe fn borrow_mut_data_unchecked(&self) -> &mut [u8] {
-        from_raw_parts_mut(self.data_ptr().as_ptr(), self.data_len())
+        from_raw_parts_mut(self.raw.data.get().cast(), self.data_len())
     }
 
     /// Tries to get a read-only reference to the data field, failing if the field
@@ -287,7 +341,10 @@ impl AccountInfo {
 
         // return the reference to data
         Ok(Ref {
-            value: NonNull::slice_from_raw_parts(self.data_ptr(), self.data_len()),
+            value: NonNull::slice_from_raw_parts(
+                unsafe { NonNull::new_unchecked(self.raw.data.get().cast()) },
+                self.data_len(),
+            ),
             state: &self.raw.borrow_state,
             borrow_shift: DATA_BORROW_SHIFT,
             marker: PhantomData,
@@ -309,7 +366,10 @@ impl AccountInfo {
 
         // return the mutable reference to data
         Ok(RefMut {
-            value: NonNull::slice_from_raw_parts(self.data_ptr(), self.data_len()),
+            value: NonNull::slice_from_raw_parts(
+                unsafe { NonNull::new_unchecked(self.raw.data.get().cast()) },
+                self.data_len(),
+            ),
             state: &self.raw.borrow_state,
             borrow_bitmask: DATA_MUTABLE_BORROW_BITMASK,
             marker: PhantomData,
@@ -406,7 +466,7 @@ impl AccountInfo {
     /// in the `process_instruction` entrypoint of a program.
     #[inline]
     pub fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
-        // Check wheather the account data is already borrowed.
+        // Check whether the account data is already borrowed.
         self.can_borrow_mut_data()?;
 
         // SAFETY:
@@ -426,41 +486,39 @@ impl AccountInfo {
     #[inline(always)]
     pub unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError> {
         // Account length is always `< i32::MAX`...
-        let current_len = self.data_len() as i32;
+        let current_len = self.data_len();
         // ...so the new length must fit in an `i32`.
-        let new_len = i32::try_from(new_len).map_err(|_| ProgramError::InvalidRealloc)?;
 
         // Return early if length hasn't changed.
         if new_len == current_len {
             return Ok(());
         }
 
-        let difference = new_len - current_len;
-        let accumulated_resize_delta = self.resize_delta() + difference;
-
         // Return an error when the length increase from the original serialized data
         // length is too large and would result in an out of bounds allocation
-        if accumulated_resize_delta > MAX_PERMITTED_DATA_INCREASE as i32 {
+        if new_len > self.raw.data.get().len() {
             return Err(ProgramError::InvalidRealloc);
         }
 
-        unsafe {
-            *self.raw.data_len.get() = new_len as u64;
-        }
-        self.raw.resize_delta.set(accumulated_resize_delta);
+        let difference = new_len.saturating_sub(current_len);
+
+        self.raw.data_len.set(new_len as u64);
 
         if difference > 0 {
             unsafe {
                 #[cfg(target_os = "solana")]
                 sol_memset_(
-                    self.data_ptr().add(current_len as usize).get(),
+                    self.raw.data.get().cast::<u8>().add(current_len),
                     0,
                     difference as u64,
                 );
                 #[cfg(not(target_os = "solana"))]
-                self.data_ptr()
-                    .add(current_len as usize)
-                    .write_bytes(0, difference as usize)
+                self.raw
+                    .data
+                    .get()
+                    .cast::<u8>()
+                    .add(current_len)
+                    .write_bytes(0, difference)
             }
         }
 
@@ -488,12 +546,6 @@ impl AccountInfo {
 
         // SAFETY: The are no active borrows on the account data or lamports.
         unsafe {
-            // Update the resize delta since closing an account will set its data length
-            // to zero (account length is always `< i32::MAX`).
-            self.raw
-                .resize_delta
-                .set(self.resize_delta() - self.data_len() as i32);
-
             self.close_unchecked();
         }
 
@@ -536,15 +588,6 @@ impl AccountInfo {
         // So we can zero out them directly.
         #[cfg(target_os = "solana")]
         sol_memset_(self.data_ptr().sub(48), 0, 48);
-    }
-
-    /// Returns the memory address of the account data.
-    fn data_ptr(&self) -> NonNull<u8> {
-        unsafe {
-            NonNull::new_unchecked(self.raw.data_len.get())
-                .cast::<u8>()
-                .add(size_of::<u64>())
-        }
     }
 }
 
@@ -773,11 +816,12 @@ mod tests {
     #[test]
     fn test_borrow_data() {
         // 8-bytes aligned account data.
-        let mut data = [0u64; size_of::<Account>() / size_of::<u64>()];
+        let mut data =
+            [0u64; (size_of::<AccountStatic>() + MAX_PERMITTED_DATA_INCREASE) / size_of::<u64>()];
         // Set the borrow state.
         data[0] = NOT_BORROWED as u64;
         let account_info = AccountInfo {
-            raw: unsafe { &*(data.as_mut_ptr() as *mut Account) },
+            raw: unsafe { Account::from_bytes_ptr_not_cloned(data.as_mut_ptr().cast()).0 },
         };
 
         // Check that we can borrow data and lamports.
@@ -834,7 +878,8 @@ mod tests {
     #[allow(deprecated)]
     fn test_realloc() {
         // 8-bytes aligned account data.
-        let mut data = [0u64; 100 * size_of::<u64>()];
+        let mut data =
+            [0u64; 100 * size_of::<u64>() + MAX_PERMITTED_DATA_INCREASE / size_of::<u64>()];
 
         // Set the borrow state.
         data[0] = NOT_BORROWED as u64;
@@ -843,7 +888,7 @@ mod tests {
         data[10] = 100;
 
         let account = AccountInfo {
-            raw: unsafe { &*(data.as_mut_ptr() as *mut Account) },
+            raw: unsafe { Account::from_bytes_ptr_not_cloned(data.as_mut_ptr().cast()).0 },
         };
 
         let data_len = account.data_len();

@@ -16,10 +16,14 @@ use core::{
     slice::from_raw_parts,
 };
 
+#[cfg(test)]
+use crate::account_info::AccountStatic;
+#[cfg(test)]
+use crate::account_info::MAX_PERMITTED_DATA_INCREASE;
 use crate::{
-    account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
+    account_info::{Account, AccountFromPtr, AccountInfo},
     pubkey::Pubkey,
-    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, NON_DUP_MARKER,
+    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
 /// Start address of the memory region used for program heap.
@@ -42,7 +46,8 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data increase.
-const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+#[cfg(test)]
+const STATIC_ACCOUNT_DATA: usize = size_of::<AccountStatic>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -222,20 +227,21 @@ macro_rules! process_n_accounts {
         $accounts = $accounts.add(1);
 
         // Read the next account.
-        let account: &'static Account = &*($input as *mut Account);
+        let result: AccountFromPtr<'static> = Account::from_bytes_ptr::<'static>($input);
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicated account
         //   - duplicated marker + 7 bytes of padding in case of a duplicated account
         $input = $input.add(size_of::<u64>());
 
-        if account.borrow_state.get() != NON_DUP_MARKER {
-            clone_account_info($accounts, $accounts_slice, account.borrow_state.get());
-        } else {
-            $accounts.write(AccountInfo { raw: account });
-
-            $input = $input.add(STATIC_ACCOUNT_DATA);
-            $input = $input.add(*account.data_len.get() as usize);
-            $input = align_pointer!($input);
+        match result {
+            AccountFromPtr::Cloned { index } => {
+                clone_account_info($accounts, $accounts_slice, index);
+            },
+            AccountFromPtr::Account { account, offset } => {
+                $accounts.write(AccountInfo { raw: account });
+                $input = $input.add(offset);
+                $input = align_pointer!($input);
+            }
         }
     };
 }
@@ -320,11 +326,11 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     if processed > 0 {
         // The first account is always non-duplicated, so process
         // it directly as such.
-        let account: &'static Account = &*(input as *mut Account);
+        let (account, account_offset) = Account::from_bytes_ptr_not_cloned::<'static>(input);
         *accounts.get_unchecked_mut(0) = MaybeUninit::new(AccountInfo { raw: account });
 
-        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
-        input = input.add(*account.data_len.get() as usize);
+        input = input.add(size_of::<u64>());
+        input = input.add(account_offset);
         input = align_pointer!(input);
 
         let mut accounts_ptr = accounts.as_mut_ptr() as *mut AccountInfo;
@@ -399,15 +405,14 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     to_skip -= 1;
 
                     // Read the next account.
-                    let account: &'static Account = &*(input as *mut Account);
+                    let result = Account::from_bytes_ptr(input);
                     // Adds an 8-bytes offset for:
                     //   - rent epoch in case of a non-duplicated account
                     //   - duplicated marker + 7 bytes of padding in case of a duplicated account
                     input = input.add(size_of::<u64>());
 
-                    if account.borrow_state.get() == NON_DUP_MARKER {
-                        input = input.add(STATIC_ACCOUNT_DATA);
-                        input = input.add(*account.data_len.get() as usize);
+                    if let AccountFromPtr::Account { offset, .. } = result {
+                        input = input.add(offset);
                         input = align_pointer!(input);
                     }
                 }
@@ -689,13 +694,13 @@ unsafe impl GlobalAlloc for NoAllocator {
 mod tests {
     extern crate std;
 
+    use super::*;
+    use crate::NON_DUP_MARKER;
     use core::{alloc::Layout, ptr::copy_nonoverlapping};
     use std::{
         alloc::{alloc, dealloc},
         vec,
     };
-
-    use super::*;
 
     /// The mock program ID used for testing.
     const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
