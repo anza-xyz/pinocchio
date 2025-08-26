@@ -213,7 +213,7 @@ const IS_SIGNER: u8 = 0b00000001;
 const IS_WRITABLE: u8 = 0b00000010;
 
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq, Debug, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct IntrospectedAccountMeta {
     /// Account flags:
     ///   * bit `0`: signer
