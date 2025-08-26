@@ -7,228 +7,122 @@
 
 /// Reasons the program may fail.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
 pub enum ProgramError {
     /// Allows on-chain programs to implement program-specific error types and see them returned
     /// by the Solana runtime. A program-specific error may be any type that is represented as
     /// or serialized to a `u32` integer.
     ///
     /// Custom program error: `{0:#x}`
-    Custom(u32),
+    Custom(u32) = 1,
 
     /// The arguments provided to a program instruction were invalid
-    InvalidArgument,
+    InvalidArgument = 2,
 
     /// An instruction's data contents was invalid
-    InvalidInstructionData,
+    InvalidInstructionData = 3,
 
     /// An account's data contents was invalid
-    InvalidAccountData,
+    InvalidAccountData = 4,
 
     /// An account's data was too small
-    AccountDataTooSmall,
+    AccountDataTooSmall = 5,
 
     /// An account's balance was too small to complete the instruction
-    InsufficientFunds,
+    InsufficientFunds = 6,
 
     /// The account did not have the expected program id
-    IncorrectProgramId,
+    IncorrectProgramId = 7,
 
     /// A signature was required but not found
-    MissingRequiredSignature,
+    MissingRequiredSignature = 8,
 
     /// An initialize instruction was sent to an account that has already been initialized
-    AccountAlreadyInitialized,
+    AccountAlreadyInitialized = 9,
 
     /// An attempt to operate on an account that hasn't been initialized
-    UninitializedAccount,
+    UninitializedAccount = 10,
 
     /// The instruction expected additional account keys
-    NotEnoughAccountKeys,
+    NotEnoughAccountKeys = 11,
 
     /// Failed to borrow a reference to account data, already borrowed
-    AccountBorrowFailed,
+    AccountBorrowFailed = 12,
 
     /// Length of the seed is too long for address generation
-    MaxSeedLengthExceeded,
+    MaxSeedLengthExceeded = 13,
 
     /// Provided seeds do not result in a valid address
-    InvalidSeeds,
+    InvalidSeeds = 14,
 
     /// IO Error
-    BorshIoError,
+    BorshIoError = 15,
 
     /// An account does not have enough lamports to be rent-exempt
-    AccountNotRentExempt,
+    AccountNotRentExempt = 16,
 
     /// Unsupported sysvar
-    UnsupportedSysvar,
+    UnsupportedSysvar = 17,
 
     /// Provided owner is not allowed
-    IllegalOwner,
+    IllegalOwner = 18,
 
     /// Accounts data allocations exceeded the maximum allowed per transaction
-    MaxAccountsDataAllocationsExceeded,
+    MaxAccountsDataAllocationsExceeded = 19,
 
     /// Account data reallocation was invalid
-    InvalidRealloc,
+    InvalidRealloc = 20,
 
     /// Instruction trace length exceeded the maximum allowed per transaction
-    MaxInstructionTraceLengthExceeded,
+    MaxInstructionTraceLengthExceeded = 21,
 
     /// Builtin programs must consume compute units
-    BuiltinProgramsMustConsumeComputeUnits,
+    BuiltinProgramsMustConsumeComputeUnits = 22,
 
     /// Invalid account owner
-    InvalidAccountOwner,
+    InvalidAccountOwner = 23,
 
     /// Program arithmetic overflowed
-    ArithmeticOverflow,
+    ArithmeticOverflow = 24,
 
     /// Account is immutable
-    Immutable,
+    Immutable = 25,
 
     /// Incorrect authority provided
-    IncorrectAuthority,
+    IncorrectAuthority = 26,
 }
 
 /// Builtin return values occupy the upper 32 bits
 const BUILTIN_BIT_SHIFT: usize = 32;
-macro_rules! to_builtin {
-    ($error:expr) => {
-        ($error as u64) << BUILTIN_BIT_SHIFT
-    };
-}
-
-/// Builtin value for `ProgramError::Custom(0)`.
-pub const CUSTOM_ZERO: u64 = to_builtin!(1);
-/// Builtin value for `ProgramError::InvalidArgument`.
-pub const INVALID_ARGUMENT: u64 = to_builtin!(2);
-/// Builtin value for `ProgramError::InvalidInstructionData`.
-pub const INVALID_INSTRUCTION_DATA: u64 = to_builtin!(3);
-/// Builtin value for `ProgramError::InvalidAccountData`.
-pub const INVALID_ACCOUNT_DATA: u64 = to_builtin!(4);
-/// Builtin value for `ProgramError::AccountDataTooSmall`.
-pub const ACCOUNT_DATA_TOO_SMALL: u64 = to_builtin!(5);
-/// Builtin value for `ProgramError::InsufficientFunds`.
-pub const INSUFFICIENT_FUNDS: u64 = to_builtin!(6);
-/// Builtin value for `ProgramError::IncorrectProgramId`.
-pub const INCORRECT_PROGRAM_ID: u64 = to_builtin!(7);
-/// Builtin value for `ProgramError::MissingRequiredSignature`.
-pub const MISSING_REQUIRED_SIGNATURES: u64 = to_builtin!(8);
-/// Builtin value for `ProgramError::AccountAlreadyInitialized`.
-pub const ACCOUNT_ALREADY_INITIALIZED: u64 = to_builtin!(9);
-/// Builtin value for `ProgramError::UninitializedAccount`.
-pub const UNINITIALIZED_ACCOUNT: u64 = to_builtin!(10);
-/// Builtin value for `ProgramError::NotEnoughAccountKeys`.
-pub const NOT_ENOUGH_ACCOUNT_KEYS: u64 = to_builtin!(11);
-/// Builtin value for `ProgramError::AccountBorrowFailed`.
-pub const ACCOUNT_BORROW_FAILED: u64 = to_builtin!(12);
-/// Builtin value for `ProgramError::MaxSeedLengthExceeded`.
-pub const MAX_SEED_LENGTH_EXCEEDED: u64 = to_builtin!(13);
-/// Builtin value for `ProgramError::InvalidSeeds`.
-pub const INVALID_SEEDS: u64 = to_builtin!(14);
-/// Builtin value for `ProgramError::BorshIoError`.
-pub const BORSH_IO_ERROR: u64 = to_builtin!(15);
-/// Builtin value for `ProgramError::AccountNotRentExempt`.
-pub const ACCOUNT_NOT_RENT_EXEMPT: u64 = to_builtin!(16);
-/// Builtin value for `ProgramError::UnsupportedSysvar`.
-pub const UNSUPPORTED_SYSVAR: u64 = to_builtin!(17);
-/// Builtin value for `ProgramError::IllegalOwner`.
-pub const ILLEGAL_OWNER: u64 = to_builtin!(18);
-/// Builtin value for `ProgramError::MaxAccountsDataAllocationsExceeded`.
-pub const MAX_ACCOUNTS_DATA_ALLOCATIONS_EXCEEDED: u64 = to_builtin!(19);
-/// Builtin value for `ProgramError::InvalidRealloc`.
-pub const INVALID_ACCOUNT_DATA_REALLOC: u64 = to_builtin!(20);
-/// Builtin value for `ProgramError::MaxInstructionTraceLengthExceeded`.
-pub const MAX_INSTRUCTION_TRACE_LENGTH_EXCEEDED: u64 = to_builtin!(21);
-/// Builtin value for `ProgramError::BuiltinProgramsMustConsumeComputeUnits`.
-pub const BUILTIN_PROGRAMS_MUST_CONSUME_COMPUTE_UNITS: u64 = to_builtin!(22);
-/// Builtin value for `ProgramError::InvalidAccountOwner`.
-pub const INVALID_ACCOUNT_OWNER: u64 = to_builtin!(23);
-/// Builtin value for `ProgramError::ArithmeticOverflow`.
-pub const ARITHMETIC_OVERFLOW: u64 = to_builtin!(24);
-/// Builtin value for `ProgramError::Immutable`.
-pub const IMMUTABLE: u64 = to_builtin!(25);
-/// Builtin value for `ProgramError::IncorrectAuthority`.
-pub const INCORRECT_AUTHORITY: u64 = to_builtin!(26);
-
-impl From<u64> for ProgramError {
-    fn from(error: u64) -> Self {
-        match error {
-            CUSTOM_ZERO => Self::Custom(0),
-            INVALID_ARGUMENT => Self::InvalidArgument,
-            INVALID_INSTRUCTION_DATA => Self::InvalidInstructionData,
-            INVALID_ACCOUNT_DATA => Self::InvalidAccountData,
-            ACCOUNT_DATA_TOO_SMALL => Self::AccountDataTooSmall,
-            INSUFFICIENT_FUNDS => Self::InsufficientFunds,
-            INCORRECT_PROGRAM_ID => Self::IncorrectProgramId,
-            MISSING_REQUIRED_SIGNATURES => Self::MissingRequiredSignature,
-            ACCOUNT_ALREADY_INITIALIZED => Self::AccountAlreadyInitialized,
-            UNINITIALIZED_ACCOUNT => Self::UninitializedAccount,
-            NOT_ENOUGH_ACCOUNT_KEYS => Self::NotEnoughAccountKeys,
-            ACCOUNT_BORROW_FAILED => Self::AccountBorrowFailed,
-            MAX_SEED_LENGTH_EXCEEDED => Self::MaxSeedLengthExceeded,
-            INVALID_SEEDS => Self::InvalidSeeds,
-            BORSH_IO_ERROR => Self::BorshIoError,
-            ACCOUNT_NOT_RENT_EXEMPT => Self::AccountNotRentExempt,
-            UNSUPPORTED_SYSVAR => Self::UnsupportedSysvar,
-            ILLEGAL_OWNER => Self::IllegalOwner,
-            MAX_ACCOUNTS_DATA_ALLOCATIONS_EXCEEDED => Self::MaxAccountsDataAllocationsExceeded,
-            INVALID_ACCOUNT_DATA_REALLOC => Self::InvalidRealloc,
-            MAX_INSTRUCTION_TRACE_LENGTH_EXCEEDED => Self::MaxInstructionTraceLengthExceeded,
-            BUILTIN_PROGRAMS_MUST_CONSUME_COMPUTE_UNITS => {
-                Self::BuiltinProgramsMustConsumeComputeUnits
-            }
-            INVALID_ACCOUNT_OWNER => Self::InvalidAccountOwner,
-            ARITHMETIC_OVERFLOW => Self::ArithmeticOverflow,
-            IMMUTABLE => Self::Immutable,
-            INCORRECT_AUTHORITY => Self::IncorrectAuthority,
-            _ => Self::Custom(error as u32),
-        }
-    }
-}
 
 impl From<ProgramError> for u64 {
     fn from(error: ProgramError) -> Self {
         match error {
-            ProgramError::InvalidArgument => INVALID_ARGUMENT,
-            ProgramError::InvalidInstructionData => INVALID_INSTRUCTION_DATA,
-            ProgramError::InvalidAccountData => INVALID_ACCOUNT_DATA,
-            ProgramError::AccountDataTooSmall => ACCOUNT_DATA_TOO_SMALL,
-            ProgramError::InsufficientFunds => INSUFFICIENT_FUNDS,
-            ProgramError::IncorrectProgramId => INCORRECT_PROGRAM_ID,
-            ProgramError::MissingRequiredSignature => MISSING_REQUIRED_SIGNATURES,
-            ProgramError::AccountAlreadyInitialized => ACCOUNT_ALREADY_INITIALIZED,
-            ProgramError::UninitializedAccount => UNINITIALIZED_ACCOUNT,
-            ProgramError::NotEnoughAccountKeys => NOT_ENOUGH_ACCOUNT_KEYS,
-            ProgramError::AccountBorrowFailed => ACCOUNT_BORROW_FAILED,
-            ProgramError::MaxSeedLengthExceeded => MAX_SEED_LENGTH_EXCEEDED,
-            ProgramError::InvalidSeeds => INVALID_SEEDS,
-            ProgramError::BorshIoError => BORSH_IO_ERROR,
-            ProgramError::AccountNotRentExempt => ACCOUNT_NOT_RENT_EXEMPT,
-            ProgramError::UnsupportedSysvar => UNSUPPORTED_SYSVAR,
-            ProgramError::IllegalOwner => ILLEGAL_OWNER,
-            ProgramError::MaxAccountsDataAllocationsExceeded => {
-                MAX_ACCOUNTS_DATA_ALLOCATIONS_EXCEEDED
-            }
-            ProgramError::InvalidRealloc => INVALID_ACCOUNT_DATA_REALLOC,
-            ProgramError::MaxInstructionTraceLengthExceeded => {
-                MAX_INSTRUCTION_TRACE_LENGTH_EXCEEDED
-            }
-            ProgramError::BuiltinProgramsMustConsumeComputeUnits => {
-                BUILTIN_PROGRAMS_MUST_CONSUME_COMPUTE_UNITS
-            }
-            ProgramError::InvalidAccountOwner => INVALID_ACCOUNT_OWNER,
-            ProgramError::ArithmeticOverflow => ARITHMETIC_OVERFLOW,
-            ProgramError::Immutable => IMMUTABLE,
-            ProgramError::IncorrectAuthority => INCORRECT_AUTHORITY,
             ProgramError::Custom(error) => {
                 if error == 0 {
-                    CUSTOM_ZERO
+                    // CUSTOM_ZERO
+                    1 << BUILTIN_BIT_SHIFT
                 } else {
                     error as u64
                 }
             }
+            // SAFETY: the discriminant is always the first field for non Custom
+            _ => {
+                let discriminant = unsafe { *(&error as *const ProgramError as *const u8) };
+                (discriminant as u64) << BUILTIN_BIT_SHIFT
+            }
+        }
+    }
+}
+
+impl From<u64> for ProgramError {
+    fn from(value: u64) -> Self {
+        let discriminant = (value >> BUILTIN_BIT_SHIFT) as u8;
+        match discriminant {
+            1 => Self::Custom(0),
+            // SAFETY: the discriminant is always the first field for non Custom
+            2..=26 => unsafe { (*(&discriminant as *const u8 as *const ProgramError)).clone() },
+            _ => Self::Custom(value as u32),
         }
     }
 }
