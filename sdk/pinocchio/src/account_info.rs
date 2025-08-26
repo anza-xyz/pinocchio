@@ -587,7 +587,13 @@ impl AccountInfo {
         //
         // So we can zero out them directly.
         #[cfg(target_os = "solana")]
-        sol_memset_(self.data_ptr().sub(48), 0, 48);
+        sol_memset_(self.raw.data.get().cast::<u8>().sub(48), 0, 48);
+        #[cfg(not(target_os = "solana"))]
+        {
+            *self.raw.owner.get() = Pubkey::default();
+            self.raw.lamports.set(0);
+            self.raw.data_len.set(0);
+        }
     }
 }
 
