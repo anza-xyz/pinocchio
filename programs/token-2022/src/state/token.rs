@@ -86,7 +86,7 @@ impl TokenAccount {
         if account_info.data_len() < Self::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner_is(&ID) {
+        if !account_info.owner_is(&ID) {
             return Err(ProgramError::InvalidAccountData);
         }
         Ok(Self::from_bytes_unchecked(

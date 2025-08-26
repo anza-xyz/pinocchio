@@ -71,7 +71,7 @@ impl Mint {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner_is(&ID) {
+        if !account_info.owner_is(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Self::from_bytes_unchecked(
