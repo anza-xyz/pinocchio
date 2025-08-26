@@ -705,9 +705,6 @@ mod tests {
     /// The mock program ID used for testing.
     const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
 
-    /// An uninitialized account info.
-    const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
-
     /// Struct representing a memory region with a specific alignment.
     struct AlignedMemory {
         ptr: *mut u8,
@@ -908,7 +905,7 @@ mod tests {
         // Input with 0 accounts.
 
         let mut input = unsafe { create_input(0, &ix_data) };
-        let mut accounts = [UNINIT; 1];
+        let mut accounts = [MaybeUninit::uninit(); 1];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -921,7 +918,7 @@ mod tests {
         // for 1.
 
         let mut input = unsafe { create_input(3, &ix_data) };
-        let mut accounts = [UNINIT; 1];
+        let mut accounts = [MaybeUninit::uninit(); 1];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -935,7 +932,7 @@ mod tests {
         // only space for 64.
 
         let mut input = unsafe { create_input(MAX_TX_ACCOUNTS, &ix_data) };
-        let mut accounts = [UNINIT; 64];
+        let mut accounts = [MaybeUninit::uninit(); 64];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -953,7 +950,7 @@ mod tests {
         // Input with 0 accounts.
 
         let mut input = unsafe { create_input_with_duplicates(0, &ix_data, 0) };
-        let mut accounts = [UNINIT; 1];
+        let mut accounts = [MaybeUninit::uninit(); 1];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -967,7 +964,7 @@ mod tests {
         // is unique.
 
         let mut input = unsafe { create_input_with_duplicates(3, &ix_data, 2) };
-        let mut accounts = [UNINIT; 2];
+        let mut accounts = [MaybeUninit::uninit(); 2];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -984,7 +981,7 @@ mod tests {
         let mut input = unsafe {
             create_input_with_duplicates(MAX_TX_ACCOUNTS, &ix_data, MAX_TX_ACCOUNTS - 32)
         };
-        let mut accounts = [UNINIT; 64];
+        let mut accounts = [MaybeUninit::uninit(); 64];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };

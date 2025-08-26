@@ -750,9 +750,9 @@ impl<T: ?Sized> Drop for RefMut<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use core::mem::{size_of, MaybeUninit};
-
     use crate::NON_DUP_MARKER as NOT_BORROWED;
+    use core::mem::{size_of, MaybeUninit};
+    use std::vec::Vec;
 
     use super::*;
 
@@ -835,8 +835,9 @@ mod tests {
         assert!(account_info.can_borrow_mut_data().is_ok());
 
         // Borrow immutable data (7 immutable borrows available).
-        const ACCOUNT_REF: MaybeUninit<Ref<[u8]>> = MaybeUninit::<Ref<[u8]>>::uninit();
-        let mut refs = [ACCOUNT_REF; 7];
+        let mut refs = (0..7)
+            .map(|_| MaybeUninit::<Ref<[u8]>>::uninit())
+            .collect::<Vec<_>>();
 
         refs.iter_mut().for_each(|r| {
             let Ok(data_ref) = account_info.try_borrow_data() else {
