@@ -60,6 +60,7 @@ pub struct SlotHashEntry {
 const _: [(); 1] = [(); mem::align_of::<SlotHashEntry>()];
 
 /// `SlotHashes` provides read-only, zero-copy access to `SlotHashes` sysvar bytes.
+#[derive(Debug)]
 pub struct SlotHashes<T: Deref<Target = [u8]>> {
     data: T,
 }

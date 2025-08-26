@@ -18,7 +18,7 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
 /// Represents masks for borrow state of an account.
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum BorrowState {
     /// Mask to check whether an account is already borrowed.
     ///
@@ -112,7 +112,7 @@ pub(crate) struct Account {
 /// used to track borrows of the account data and lamports, given that an
 /// account can be "shared" across multiple `AccountInfo` instances.
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct AccountInfo {
     /// Raw (pointer to) account data.
     ///
@@ -495,6 +495,22 @@ impl AccountInfo {
         // Check wheather the account data is already borrowed.
         self.can_borrow_mut_data()?;
 
+        // SAFETY:
+        // We are checking if the account data is already borrowed, so we are safe to call
+        unsafe { self.resize_unchecked(new_len) }
+    }
+
+    /// Resize (either truncating or zero extending) the account's data.
+    ///
+    /// The account data can be increased by up to [`MAX_PERMITTED_DATA_INCREASE`] bytes
+    ///
+    /// # Safety
+    ///
+    /// This method is unsafe because it does not check if the account data is already
+    /// borrowed. The caller must guarantee that there are no active borrows to the account
+    /// data.
+    #[inline(always)]
+    pub unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError> {
         // Account length is always `< i32::MAX`...
         let current_len = self.data_len() as i32;
         // ...so the new length must fit in an `i32`.
@@ -633,6 +649,7 @@ const LAMPORTS_BORROW_SHIFT: u8 = 4;
 const DATA_BORROW_SHIFT: u8 = 0;
 
 /// Reference to account data or lamports with checked borrow rules.
+#[derive(Debug)]
 pub struct Ref<'a, T: ?Sized> {
     value: NonNull<T>,
     state: NonNull<u8>,
@@ -704,6 +721,7 @@ const LAMPORTS_MUTABLE_BORROW_BITMASK: u8 = 0b_1000_0000;
 const DATA_MUTABLE_BORROW_BITMASK: u8 = 0b_0000_1000;
 
 /// Mutable reference to account data or lamports with checked borrow rules.
+#[derive(Debug)]
 pub struct RefMut<'a, T: ?Sized> {
     value: NonNull<T>,
     state: NonNull<u8>,

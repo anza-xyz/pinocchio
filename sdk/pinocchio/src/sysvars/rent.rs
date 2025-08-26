@@ -52,7 +52,7 @@ pub const ACCOUNT_STORAGE_OVERHEAD: u64 = 128;
 
 /// Rent sysvar data
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Rent {
     /// Rental rate in lamports per byte-year
     pub lamports_per_byte_year: u64,
