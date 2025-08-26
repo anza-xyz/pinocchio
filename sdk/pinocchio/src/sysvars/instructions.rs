@@ -126,7 +126,7 @@ impl<'a> TryFrom<&'a AccountInfo> for Instructions<Ref<'a, [u8]>> {
 }
 
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IntrospectedInstruction<'a> {
     pub raw: *const u8,
     pub marker: PhantomData<&'a [u8]>,
