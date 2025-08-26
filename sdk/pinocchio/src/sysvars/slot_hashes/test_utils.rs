@@ -154,7 +154,7 @@ pub unsafe fn make_account_info(
 
     (
         AccountInfo {
-            raw: hdr_ptr as *mut Account,
+            raw: &*(hdr_ptr as *mut Account),
         },
         backing,
     )
@@ -190,11 +190,13 @@ fn test_account_layout_compatibility() {
         let account_ptr = &test_header as *const AccountLayout as *const Account;
         let account_ref = &*account_ptr;
         assert_eq!(
-            account_ref.borrow_state, 42,
+            account_ref.borrow_state.get(),
+            42,
             "borrow_state field should be accessible and match"
         );
         assert_eq!(
-            account_ref.data_len, 256,
+            *account_ref.data_len.get(),
+            256,
             "data_len field should be accessible and match"
         );
     }

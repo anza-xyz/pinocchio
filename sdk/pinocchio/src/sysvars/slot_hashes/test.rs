@@ -438,7 +438,7 @@ fn test_from_account_info_constructor() {
 
         ptr::copy_nonoverlapping(data.as_ptr(), base_ptr.add(header_size), data.len());
 
-        acct_ptr = base_ptr as *mut Account;
+        acct_ptr = &*(base_ptr as *mut Account);
     }
 
     let account_info = AccountInfo { raw: acct_ptr };

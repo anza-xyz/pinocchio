@@ -150,7 +150,7 @@ pub fn sol_log_params(accounts: &[AccountInfo], data: &[u8]) {
         msg!("- Account data length");
         sol_log_64(0, 0, 0, 0, account.data_len() as u64);
         msg!("- Owner");
-        pubkey::log(account.owner());
+        account.owner_with_fn(pubkey::log);
     }
     msg!("Instruction data");
     sol_log_slice(data);
