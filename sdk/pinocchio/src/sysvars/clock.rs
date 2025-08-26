@@ -33,7 +33,7 @@ pub type UnixTimestamp = i64;
 ///
 /// All members of `Clock` start from 0 upon network boot.
 #[repr(C)]
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Clock {
     /// The current `Slot`.
     pub slot: Slot,
