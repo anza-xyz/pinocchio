@@ -72,7 +72,7 @@ impl Rent {
     ///
     /// This method performs a check on the account info key.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Rent>, ProgramError> {
+    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<'_, Rent>, ProgramError> {
         if account_info.key() != &RENT_ID {
             return Err(ProgramError::InvalidArgument);
         }

@@ -77,8 +77,8 @@ impl InitializeMultisig2<'_, '_, '_> {
         };
 
         // Account info array
-        const UNINIT_INFO: MaybeUninit<&AccountInfo> = MaybeUninit::uninit();
-        let mut acc_infos = [UNINIT_INFO; 1 + MAX_MULTISIG_SIGNERS];
+        let uninit_info: MaybeUninit<&AccountInfo> = MaybeUninit::uninit();
+        let mut acc_infos = [uninit_info; 1 + MAX_MULTISIG_SIGNERS];
 
         unsafe {
             // SAFETY:

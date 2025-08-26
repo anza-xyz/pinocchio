@@ -58,7 +58,7 @@ impl TokenAccount {
     #[inline]
     pub fn from_account_info(
         account_info: &AccountInfo,
-    ) -> Result<Ref<TokenAccount>, ProgramError> {
+    ) -> Result<Ref<'_, TokenAccount>, ProgramError> {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }

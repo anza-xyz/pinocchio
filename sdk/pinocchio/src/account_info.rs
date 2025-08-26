@@ -2,15 +2,14 @@
 
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_memset_;
+use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
 use core::{
     cell::{Cell, UnsafeCell},
     marker::PhantomData,
     mem::ManuallyDrop,
-    ptr::NonNull,
+    ptr::{self, NonNull},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
-
-use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
 
 /// Maximum number of bytes a program may add to an account during a
 /// single top-level instruction.
@@ -59,7 +58,7 @@ pub(crate) struct Account {
     ///     - `7 6 5 4 3 2 1 0`
     ///     - `. x x x . . . .`: number of immutable borrows that can still be
     ///       allocated, for the lamports field. Ranges from 7 (`111`) to
-    ///        0 (`000`).
+    ///       0 (`000`).
     ///
     ///   * data mutable borrow flag
     ///     - `7 6 5 4 3 2 1 0`
@@ -121,7 +120,7 @@ pub struct AccountInfo {
 }
 impl PartialEq for AccountInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.raw as *const _ == other.raw as *const _
+        ptr::eq(self.raw as *const _, other.raw as *const _)
     }
 }
 impl Eq for AccountInfo {}
@@ -153,7 +152,8 @@ impl AccountInfo {
 
     /// Program that owns this account.
     ///
-    /// SAFETY: This reference should not be held when `assign` is called.
+    /// # Safety
+    /// This reference should not be held when `assign` is called.
     #[inline(always)]
     pub unsafe fn owner_ref(&self) -> &Pubkey {
         unsafe { &*self.raw.owner.get() }
@@ -162,13 +162,13 @@ impl AccountInfo {
     /// Indicates whether the transaction was signed by this account.
     #[inline(always)]
     pub fn is_signer(&self) -> bool {
-        (*self.raw).is_signer != 0
+        self.raw.is_signer != 0
     }
 
     /// Indicates whether the account is writable.
     #[inline(always)]
     pub fn is_writable(&self) -> bool {
-        (*self.raw).is_writable != 0
+        self.raw.is_writable != 0
     }
 
     /// Indicates whether this account represents a program.
@@ -176,7 +176,7 @@ impl AccountInfo {
     /// Program accounts are always read-only.
     #[inline(always)]
     pub fn executable(&self) -> bool {
-        (*self.raw).executable != 0
+        self.raw.executable != 0
     }
 
     /// Returns the size of the data in the account.
@@ -275,7 +275,7 @@ impl AccountInfo {
 
     /// Tries to get a read-only reference to the data field, failing if the field
     /// is already mutable borrowed or if `7` borrows already exist.
-    pub fn try_borrow_data(&self) -> Result<Ref<[u8]>, ProgramError> {
+    pub fn try_borrow_data(&self) -> Result<Ref<'_, [u8]>, ProgramError> {
         // check if the account data is already borrowed
         self.can_borrow_data()?;
 
@@ -296,7 +296,7 @@ impl AccountInfo {
 
     /// Tries to get a mutable reference to the data field, failing if the field
     /// is already borrowed in any form.
-    pub fn try_borrow_mut_data(&self) -> Result<RefMut<[u8]>, ProgramError> {
+    pub fn try_borrow_mut_data(&self) -> Result<RefMut<'_, [u8]>, ProgramError> {
         // check if the account data is already borrowed
         self.can_borrow_mut_data()?;
 
@@ -620,9 +620,6 @@ impl<T: ?Sized> Drop for Ref<'_, T> {
     }
 }
 
-/// Mask representing the mutable borrow flag for lamports.
-const LAMPORTS_MUTABLE_BORROW_BITMASK: u8 = 0b_1000_0000;
-
 /// Mask representing the mutable borrow flag for data.
 const DATA_MUTABLE_BORROW_BITMASK: u8 = 0b_0000_1000;
 
@@ -770,33 +767,6 @@ mod tests {
         drop(new_ref);
 
         assert_eq!(data, [4, 1, 2, 3]);
-        assert_eq!(state.get(), NOT_BORROWED);
-    }
-
-    #[test]
-    fn test_lamports_ref_mut() {
-        let mut lamports: u64 = 10000;
-        let state = Cell::new(0b_0111_1111);
-
-        let ref_lamports = RefMut {
-            value: NonNull::from(&mut lamports),
-            borrow_bitmask: LAMPORTS_MUTABLE_BORROW_BITMASK,
-            // borrow state must be a mutable reference
-            state: &state,
-            marker: PhantomData,
-        };
-
-        let new_ref = RefMut::map(ref_lamports, |lamports| {
-            *lamports = 200;
-            lamports
-        });
-
-        assert_eq!(state.get(), 0b_0111_1111);
-        assert_eq!(*new_ref, 200);
-
-        drop(new_ref);
-
-        assert_eq!(lamports, 200);
         assert_eq!(state.get(), NOT_BORROWED);
     }
 
