@@ -341,10 +341,7 @@ impl AccountInfo {
 
         // return the reference to data
         Ok(Ref {
-            value: NonNull::slice_from_raw_parts(
-                unsafe { NonNull::new_unchecked(self.raw.data.get().cast()) },
-                self.data_len(),
-            ),
+            value: self.data_ptr(),
             state: &self.raw.borrow_state,
             borrow_shift: DATA_BORROW_SHIFT,
             marker: PhantomData,
@@ -366,10 +363,7 @@ impl AccountInfo {
 
         // return the mutable reference to data
         Ok(RefMut {
-            value: NonNull::slice_from_raw_parts(
-                unsafe { NonNull::new_unchecked(self.raw.data.get().cast()) },
-                self.data_len(),
-            ),
+            value: self.data_ptr(),
             state: &self.raw.borrow_state,
             borrow_bitmask: DATA_MUTABLE_BORROW_BITMASK,
             marker: PhantomData,
@@ -594,6 +588,20 @@ impl AccountInfo {
             self.raw.lamports.set(0);
             self.raw.data_len.set(0);
         }
+    }
+
+    /// Returns the memory address of the account data.
+    /// # Important
+    ///
+    /// Obtaining the raw pointer itself is safe, but de-referencing it requires
+    /// the caller to uphold Rust's aliasing rules. It is undefined behavior to de-reference
+    /// the pointer or write through it while any safe reference (e.g., from any of `borrow_data`
+    /// or `borrow_mut_data` methods) to the same data is still alive.
+    pub fn data_ptr(&self) -> NonNull<[u8]> {
+        NonNull::slice_from_raw_parts(
+            unsafe { NonNull::new_unchecked(self.raw.data.get().cast()) },
+            self.data_len(),
+        )
     }
 }
 
@@ -821,11 +829,11 @@ mod tests {
             unreachable!()
         };
 
-        assert_eq!(state, NOT_BORROWED - (1 << DATA_BORROW_SHIFT));
+        assert_eq!(state.get(), NOT_BORROWED - (1 << DATA_BORROW_SHIFT));
         assert_eq!(*new_ref, 4);
 
         let (new_ref, err) = Ref::try_map::<u8, u8>(new_ref, |_| Err(5)).unwrap_err();
-        assert_eq!(state, NOT_BORROWED - (1 << DATA_BORROW_SHIFT));
+        assert_eq!(state.get(), NOT_BORROWED - (1 << DATA_BORROW_SHIFT));
         assert_eq!(err, 5);
         // Unchanged
         assert_eq!(*new_ref, 4);
@@ -875,9 +883,9 @@ mod tests {
             [0u64; (size_of::<AccountStatic>() + MAX_PERMITTED_DATA_INCREASE) / size_of::<u64>()];
         // Set the borrow state.
         data[0] = NOT_BORROWED as u64;
-        let account_info = AccountInfo {
-            raw: unsafe { Account::from_bytes_ptr_not_cloned(data.as_mut_ptr().cast()).0 },
-        };
+        let raw = unsafe { Account::from_bytes_ptr_not_cloned(data.as_mut_ptr().cast()).0 };
+        raw.data_len.set(1);
+        let account_info = AccountInfo { raw };
 
         // Check that we can borrow data and lamports.
         assert!(account_info.can_borrow_data().is_ok());
@@ -886,8 +894,8 @@ mod tests {
         // It should be sound to mutate the data through the data pointer while no other borrows exist
         let data_ptr = account_info.data_ptr();
         unsafe {
-            let data = core::slice::from_raw_parts_mut(data_ptr, 1); // Data is 1 byte long!
-            data[0] = 1;
+            assert_eq!((*data_ptr.as_ptr()).len(), 1);
+            (*data_ptr.as_ptr())[0] = 1;
         }
 
         // Borrow immutable data (7 immutable borrows available).
@@ -970,7 +978,7 @@ mod tests {
 
         let data_ptr_after = account.data_ptr();
         // The data pointer should point to the same address regardless of the reallocation
-        assert_eq!(data_ptr_before, data_ptr_after);
+        assert_eq!(data_ptr_before.cast::<u8>(), data_ptr_after.cast::<u8>());
 
         assert_eq!(account.data_len(), 200);
         assert_eq!(account.resize_delta(), 100);
