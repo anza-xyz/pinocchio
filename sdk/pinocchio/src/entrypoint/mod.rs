@@ -360,35 +360,31 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
             // This is an optimization to reduce the number of jumps required to process the
             // accounts. The macro `process_accounts` will generate inline code to process the
             // specified number of accounts.
-            if to_process_plus_one == 2 {
-                process_accounts!(1 => (input, accounts_ptr, accounts_slice));
-            } else {
-                while to_process_plus_one > 5 {
-                    // Process 5 accounts at a time.
-                    process_accounts!(5 => (input, accounts_ptr, accounts_slice));
-                    to_process_plus_one -= 5;
-                }
+            while to_process_plus_one > 5 {
+                // Process 5 accounts at a time.
+                process_accounts!(5 => (input, accounts_ptr, accounts_slice));
+                to_process_plus_one -= 5;
+            }
 
-                // There might be remaining accounts to process.
-                match to_process_plus_one {
-                    5 => {
-                        process_accounts!(4 => (input, accounts_ptr, accounts_slice));
-                    }
-                    4 => {
-                        process_accounts!(3 => (input, accounts_ptr, accounts_slice));
-                    }
-                    3 => {
-                        process_accounts!(2 => (input, accounts_ptr, accounts_slice));
-                    }
-                    2 => {
-                        process_accounts!(1 => (input, accounts_ptr, accounts_slice));
-                    }
-                    1 => (),
-                    _ => {
-                        // SAFETY: `while` loop above makes sure that `to_process_plus_one`
-                        // has 1 to 5 entries left.
-                        unsafe { core::hint::unreachable_unchecked() }
-                    }
+            // There might be remaining accounts to process.
+            match to_process_plus_one {
+                5 => {
+                    process_accounts!(4 => (input, accounts_ptr, accounts_slice));
+                }
+                4 => {
+                    process_accounts!(3 => (input, accounts_ptr, accounts_slice));
+                }
+                3 => {
+                    process_accounts!(2 => (input, accounts_ptr, accounts_slice));
+                }
+                2 => {
+                    process_accounts!(1 => (input, accounts_ptr, accounts_slice));
+                }
+                1 => (),
+                _ => {
+                    // SAFETY: `while` loop above makes sure that `to_process_plus_one`
+                    // has 1 to 5 entries left.
+                    unsafe { core::hint::unreachable_unchecked() }
                 }
             }
 

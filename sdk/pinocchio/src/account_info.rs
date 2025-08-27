@@ -625,12 +625,32 @@ impl<'a, T: ?Sized> Ref<'a, T> {
     {
         // Avoid decrementing the borrow flag on Drop.
         let orig = ManuallyDrop::new(orig);
-
         Ref {
             value: NonNull::from(f(&*orig)),
             state: orig.state,
             borrow_shift: orig.borrow_shift,
             marker: PhantomData,
+        }
+    }
+
+    /// Tries to makes a new `Ref` for a component of the borrowed data.
+    /// On failure, the original guard is returned alongside with the error
+    /// returned by the closure.
+    #[inline]
+    pub fn try_map<U: ?Sized, E>(
+        orig: Ref<'a, T>,
+        f: impl FnOnce(&T) -> Result<&U, E>,
+    ) -> Result<Ref<'a, U>, (Self, E)> {
+        // Avoid decrementing the borrow flag on Drop.
+        let orig = ManuallyDrop::new(orig);
+        match f(&*orig) {
+            Ok(value) => Ok(Ref {
+                value: NonNull::from(value),
+                state: orig.state,
+                borrow_shift: orig.borrow_shift,
+                marker: PhantomData,
+            }),
+            Err(e) => Err((ManuallyDrop::into_inner(orig), e)),
         }
     }
 
@@ -696,12 +716,32 @@ impl<'a, T: ?Sized> RefMut<'a, T> {
     {
         // Avoid decrementing the borrow flag on Drop.
         let mut orig = ManuallyDrop::new(orig);
-
         RefMut {
             value: NonNull::from(f(&mut *orig)),
             state: orig.state,
             borrow_bitmask: orig.borrow_bitmask,
             marker: PhantomData,
+        }
+    }
+
+    /// Tries to makes a new `RefMut` for a component of the borrowed data.
+    /// On failure, the original guard is returned alongside with the error
+    /// returned by the closure.
+    #[inline]
+    pub fn try_map<U: ?Sized, E>(
+        orig: RefMut<'a, T>,
+        f: impl FnOnce(&mut T) -> Result<&mut U, E>,
+    ) -> Result<RefMut<'a, U>, (Self, E)> {
+        // Avoid decrementing the borrow flag on Drop.
+        let mut orig = ManuallyDrop::new(orig);
+        match f(&mut *orig) {
+            Ok(value) => Ok(RefMut {
+                value: NonNull::from(value),
+                state: orig.state,
+                borrow_bitmask: orig.borrow_bitmask,
+                marker: PhantomData,
+            }),
+            Err(e) => Err((ManuallyDrop::into_inner(orig), e)),
         }
     }
 
@@ -713,17 +753,13 @@ impl<'a, T: ?Sized> RefMut<'a, T> {
     {
         // Avoid decrementing the mutable borrow flag on Drop.
         let mut orig = ManuallyDrop::new(orig);
-
         match f(&mut *orig) {
-            Some(value) => {
-                let value = NonNull::from(value);
-                Ok(RefMut {
-                    value,
-                    state: orig.state,
-                    borrow_bitmask: orig.borrow_bitmask,
-                    marker: PhantomData,
-                })
-            }
+            Some(value) => Ok(RefMut {
+                value: NonNull::from(value),
+                state: orig.state,
+                borrow_bitmask: orig.borrow_bitmask,
+                marker: PhantomData,
+            }),
             None => Err(ManuallyDrop::into_inner(orig)),
         }
     }
@@ -781,6 +817,19 @@ mod tests {
         assert_eq!(state.get(), NOT_BORROWED - (1 << DATA_BORROW_SHIFT));
         assert_eq!(*new_ref, 3);
 
+        let Ok(new_ref) = Ref::try_map::<_, u8>(new_ref, |_| Ok(&4)) else {
+            unreachable!()
+        };
+
+        assert_eq!(state, NOT_BORROWED - (1 << DATA_BORROW_SHIFT));
+        assert_eq!(*new_ref, 4);
+
+        let (new_ref, err) = Ref::try_map::<u8, u8>(new_ref, |_| Err(5)).unwrap_err();
+        assert_eq!(state, NOT_BORROWED - (1 << DATA_BORROW_SHIFT));
+        assert_eq!(err, 5);
+        // Unchanged
+        assert_eq!(*new_ref, 4);
+
         let new_ref = Ref::filter_map(new_ref, |_| Option::<&u8>::None);
 
         assert_eq!(state.get(), NOT_BORROWED - (1 << DATA_BORROW_SHIFT));
@@ -834,6 +883,13 @@ mod tests {
         assert!(account_info.can_borrow_data().is_ok());
         assert!(account_info.can_borrow_mut_data().is_ok());
 
+        // It should be sound to mutate the data through the data pointer while no other borrows exist
+        let data_ptr = account_info.data_ptr();
+        unsafe {
+            let data = core::slice::from_raw_parts_mut(data_ptr, 1); // Data is 1 byte long!
+            data[0] = 1;
+        }
+
         // Borrow immutable data (7 immutable borrows available).
         let mut refs = (0..7)
             .map(|_| MaybeUninit::<Ref<[u8]>>::uninit())
@@ -864,6 +920,8 @@ mod tests {
 
         // Borrow mutable data.
         let ref_mut = account_info.try_borrow_mut_data().unwrap();
+        // It should be sound to get the data pointer while the data is borrowed as long as we don't use it
+        let _data_ptr = account_info.data_ptr();
 
         // Check that we cannot borrow the data anymore.
         assert!(account_info.can_borrow_data().is_err());
@@ -903,9 +961,16 @@ mod tests {
         assert_eq!(data_len, 100);
         assert_eq!(account.resize_delta(), 0);
 
+        // We should be able to get the data pointer whenever as long as we don't use it while the data is borrowed
+        let data_ptr_before = account.data_ptr();
+
         // increase the size.
 
         account.realloc(200, false).unwrap();
+
+        let data_ptr_after = account.data_ptr();
+        // The data pointer should point to the same address regardless of the reallocation
+        assert_eq!(data_ptr_before, data_ptr_after);
 
         assert_eq!(account.data_len(), 200);
         assert_eq!(account.resize_delta(), 100);

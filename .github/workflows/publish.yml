@@ -13,6 +13,7 @@ on:
           - programs/memo
           - programs/system
           - programs/token
+          - programs/token-2022
           - sdk/log/crate
           - sdk/log/macro
           - sdk/pinocchio
