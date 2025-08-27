@@ -627,8 +627,8 @@ impl AccountInfo {
     /// Returns the memory address of the account data.
     /// # Important
     ///
-    /// Obtaining the raw pointer itself is safe, but dereferencing it requires
-    /// the caller to uphold Rust’s aliasing rules. It is undefined behavior to dereference
+    /// Obtaining the raw pointer itself is safe, but de-referencing it requires
+    /// the caller to uphold Rust's aliasing rules. It is undefined behavior to de-reference
     /// the pointer or write through it while any safe reference (e.g., from any of `borrow_data`
     /// or `borrow_mut_data` methods) to the same data is still alive.
     pub fn data_ptr(&self) -> *mut u8 {
