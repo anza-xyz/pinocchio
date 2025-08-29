@@ -5,7 +5,10 @@ use pinocchio::{
     pubkey::Pubkey,
 };
 
-use crate::ID;
+use crate::{
+    extensions::{BaseState, BaseStateVariant, EXTENSION_START_PADDING},
+    ID,
+};
 
 /// Token account data.
 #[repr(C)]
@@ -199,5 +202,13 @@ impl TokenAccount {
     #[inline(always)]
     pub fn is_frozen(&self) -> bool {
         self.state == AccountState::Frozen as u8
+    }
+}
+
+impl BaseState for TokenAccount {
+    const BASE_STATE: BaseStateVariant = BaseStateVariant::TokenAccount;
+    const LEN: usize = TokenAccount::BASE_LEN;
+    fn extension_data_start_index() -> Option<usize> {
+        Some(TokenAccount::LEN + EXTENSION_START_PADDING)
     }
 }
