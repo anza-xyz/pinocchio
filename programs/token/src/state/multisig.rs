@@ -29,7 +29,9 @@ impl Multisig {
     /// This method performs owner and length validation on `AccountInfo`, safe borrowing
     /// the account data.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Multisig>, ProgramError> {
+    pub fn from_account_info(
+        account_info: &AccountInfo,
+    ) -> Result<Ref<'_, Multisig>, ProgramError> {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -57,7 +59,7 @@ impl Multisig {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner() != &ID {
+        if !account_info.owner_is(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Self::from_bytes_unchecked(

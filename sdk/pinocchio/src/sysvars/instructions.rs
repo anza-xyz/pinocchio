@@ -66,7 +66,7 @@ where
     pub unsafe fn deserialize_instruction_unchecked(
         &self,
         index: usize,
-    ) -> IntrospectedInstruction {
+    ) -> IntrospectedInstruction<'_> {
         let offset = *(self
             .data
             .as_ptr()
@@ -83,7 +83,7 @@ where
     pub fn load_instruction_at(
         &self,
         index: usize,
-    ) -> Result<IntrospectedInstruction, ProgramError> {
+    ) -> Result<IntrospectedInstruction<'_>, ProgramError> {
         if index >= self.num_instructions() as usize {
             return Err(ProgramError::InvalidInstructionData);
         }
@@ -98,7 +98,7 @@ where
     pub fn get_instruction_relative(
         &self,
         index_relative_to_current: i64,
-    ) -> Result<IntrospectedInstruction, ProgramError> {
+    ) -> Result<IntrospectedInstruction<'_>, ProgramError> {
         let current_index = self.load_current_index() as i64;
         let index = current_index.saturating_add(index_relative_to_current);
 
@@ -241,7 +241,7 @@ impl IntrospectedAccountMeta {
 
     /// Convert the `IntrospectedAccountMeta` to an `AccountMeta`.
     #[inline(always)]
-    pub fn to_account_meta(&self) -> AccountMeta {
+    pub fn to_account_meta(&self) -> AccountMeta<'_> {
         AccountMeta::new(&self.key, self.is_writable(), self.is_signer())
     }
 }

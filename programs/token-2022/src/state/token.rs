@@ -58,7 +58,7 @@ impl TokenAccount {
     #[inline]
     pub fn from_account_info(
         account_info: &AccountInfo,
-    ) -> Result<Ref<TokenAccount>, ProgramError> {
+    ) -> Result<Ref<'_, TokenAccount>, ProgramError> {
         if account_info.data_len() < Self::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -86,7 +86,7 @@ impl TokenAccount {
         if account_info.data_len() < Self::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner() != &ID {
+        if !account_info.owner_is(&ID) {
             return Err(ProgramError::InvalidAccountData);
         }
         Ok(Self::from_bytes_unchecked(

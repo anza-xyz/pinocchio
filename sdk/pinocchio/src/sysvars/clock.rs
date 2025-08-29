@@ -85,7 +85,7 @@ impl Clock {
     ///
     /// This method performs a check on the account info key.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Clock>, ProgramError> {
+    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<'_, Clock>, ProgramError> {
         if account_info.key() != &CLOCK_ID {
             return Err(ProgramError::InvalidArgument);
         }

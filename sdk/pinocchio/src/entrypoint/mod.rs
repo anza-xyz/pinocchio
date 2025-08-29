@@ -16,10 +16,14 @@ use core::{
     slice::from_raw_parts,
 };
 
+#[cfg(test)]
+use crate::account_info::AccountStatic;
+#[cfg(test)]
+use crate::account_info::MAX_PERMITTED_DATA_INCREASE;
 use crate::{
-    account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
+    account_info::{Account, AccountFromPtr, AccountInfo},
     pubkey::Pubkey,
-    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, NON_DUP_MARKER,
+    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
 /// Start address of the memory region used for program heap.
@@ -42,7 +46,8 @@ pub const SUCCESS: u64 = super::SUCCESS;
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data increase.
-const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+#[cfg(test)]
+const STATIC_ACCOUNT_DATA: usize = size_of::<AccountStatic>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -222,20 +227,21 @@ macro_rules! process_n_accounts {
         $accounts = $accounts.add(1);
 
         // Read the next account.
-        let account: *mut Account = $input as *mut Account;
+        let result: AccountFromPtr<'static> = Account::from_bytes_ptr::<'static>($input);
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicated account
         //   - duplicated marker + 7 bytes of padding in case of a duplicated account
         $input = $input.add(size_of::<u64>());
 
-        if (*account).borrow_state != NON_DUP_MARKER {
-            clone_account_info($accounts, $accounts_slice, (*account).borrow_state);
-        } else {
-            $accounts.write(AccountInfo { raw: account });
-
-            $input = $input.add(STATIC_ACCOUNT_DATA);
-            $input = $input.add((*account).data_len as usize);
-            $input = align_pointer!($input);
+        match result {
+            AccountFromPtr::Cloned { index } => {
+                clone_account_info($accounts, $accounts_slice, index);
+            },
+            AccountFromPtr::Account { account, offset } => {
+                $accounts.write(AccountInfo { raw: account });
+                $input = $input.add(offset);
+                $input = align_pointer!($input);
+            }
         }
     };
 }
@@ -309,6 +315,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
             MAX_ACCOUNTS <= MAX_TX_ACCOUNTS,
             "MAX_ACCOUNTS must be less than or equal to MAX_TX_ACCOUNTS"
         );
+        assert!(MAX_ACCOUNTS > 0, "MAX_ACCOUNTS must be greater than 0");
     }
 
     // Number of accounts to process.
@@ -317,18 +324,18 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     input = input.add(size_of::<u64>());
 
     if processed > 0 {
-        let mut accounts = accounts.as_mut_ptr() as *mut AccountInfo;
-        // Represents the beginning of the accounts slice.
-        let accounts_slice = accounts;
-
         // The first account is always non-duplicated, so process
         // it directly as such.
-        let account: *mut Account = input as *mut Account;
-        accounts.write(AccountInfo { raw: account });
+        let (account, account_offset) = Account::from_bytes_ptr_not_cloned::<'static>(input);
+        *accounts.get_unchecked_mut(0) = MaybeUninit::new(AccountInfo { raw: account });
 
-        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
-        input = input.add((*account).data_len as usize);
+        input = input.add(size_of::<u64>());
+        input = input.add(account_offset);
         input = align_pointer!(input);
+
+        let mut accounts_ptr = accounts.as_mut_ptr() as *mut AccountInfo;
+        // Represents the beginning of the accounts slice.
+        let accounts_slice = accounts_ptr;
 
         if processed > 1 {
             // The number of accounts to process (`to_process_plus_one`) is limited to
@@ -355,23 +362,23 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
             // specified number of accounts.
             while to_process_plus_one > 5 {
                 // Process 5 accounts at a time.
-                process_accounts!(5 => (input, accounts, accounts_slice));
+                process_accounts!(5 => (input, accounts_ptr, accounts_slice));
                 to_process_plus_one -= 5;
             }
 
             // There might be remaining accounts to process.
             match to_process_plus_one {
                 5 => {
-                    process_accounts!(4 => (input, accounts, accounts_slice));
+                    process_accounts!(4 => (input, accounts_ptr, accounts_slice));
                 }
                 4 => {
-                    process_accounts!(3 => (input, accounts, accounts_slice));
+                    process_accounts!(3 => (input, accounts_ptr, accounts_slice));
                 }
                 3 => {
-                    process_accounts!(2 => (input, accounts, accounts_slice));
+                    process_accounts!(2 => (input, accounts_ptr, accounts_slice));
                 }
                 2 => {
-                    process_accounts!(1 => (input, accounts, accounts_slice));
+                    process_accounts!(1 => (input, accounts_ptr, accounts_slice));
                 }
                 1 => (),
                 _ => {
@@ -394,15 +401,14 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     to_skip -= 1;
 
                     // Read the next account.
-                    let account: *mut Account = input as *mut Account;
+                    let result = Account::from_bytes_ptr(input);
                     // Adds an 8-bytes offset for:
                     //   - rent epoch in case of a non-duplicated account
                     //   - duplicated marker + 7 bytes of padding in case of a duplicated account
                     input = input.add(size_of::<u64>());
 
-                    if (*account).borrow_state == NON_DUP_MARKER {
-                        input = input.add(STATIC_ACCOUNT_DATA);
-                        input = input.add((*account).data_len as usize);
+                    if let AccountFromPtr::Account { offset, .. } = result {
+                        input = input.add(offset);
                         input = align_pointer!(input);
                     }
                 }
@@ -684,19 +690,16 @@ unsafe impl GlobalAlloc for NoAllocator {
 mod tests {
     extern crate std;
 
+    use super::*;
+    use crate::NON_DUP_MARKER;
     use core::{alloc::Layout, ptr::copy_nonoverlapping};
     use std::{
         alloc::{alloc, dealloc},
         vec,
     };
 
-    use super::*;
-
     /// The mock program ID used for testing.
     const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
-
-    /// An uninitialized account info.
-    const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
 
     /// Struct representing a memory region with a specific alignment.
     struct AlignedMemory {
@@ -876,7 +879,7 @@ mod tests {
         for account in accounts[unique..].iter() {
             let account_info = unsafe { account.assume_init_ref() };
 
-            assert_eq!(account_info.raw, duplicated.raw);
+            assert_eq!(account_info, duplicated);
             assert_eq!(account_info.data_len(), duplicated.data_len());
 
             let borrowed = account_info.try_borrow_mut_data().unwrap();
@@ -898,7 +901,7 @@ mod tests {
         // Input with 0 accounts.
 
         let mut input = unsafe { create_input(0, &ix_data) };
-        let mut accounts = [UNINIT; 1];
+        let mut accounts = [MaybeUninit::uninit(); 1];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -911,7 +914,7 @@ mod tests {
         // for 1.
 
         let mut input = unsafe { create_input(3, &ix_data) };
-        let mut accounts = [UNINIT; 1];
+        let mut accounts = [MaybeUninit::uninit(); 1];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -925,7 +928,7 @@ mod tests {
         // only space for 64.
 
         let mut input = unsafe { create_input(MAX_TX_ACCOUNTS, &ix_data) };
-        let mut accounts = [UNINIT; 64];
+        let mut accounts = [MaybeUninit::uninit(); 64];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -943,7 +946,7 @@ mod tests {
         // Input with 0 accounts.
 
         let mut input = unsafe { create_input_with_duplicates(0, &ix_data, 0) };
-        let mut accounts = [UNINIT; 1];
+        let mut accounts = [MaybeUninit::uninit(); 1];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -957,7 +960,7 @@ mod tests {
         // is unique.
 
         let mut input = unsafe { create_input_with_duplicates(3, &ix_data, 2) };
-        let mut accounts = [UNINIT; 2];
+        let mut accounts = [MaybeUninit::uninit(); 2];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
@@ -974,7 +977,7 @@ mod tests {
         let mut input = unsafe {
             create_input_with_duplicates(MAX_TX_ACCOUNTS, &ix_data, MAX_TX_ACCOUNTS - 32)
         };
-        let mut accounts = [UNINIT; 64];
+        let mut accounts = [MaybeUninit::uninit(); 64];
 
         let (program_id, count, parsed_ix_data) =
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };

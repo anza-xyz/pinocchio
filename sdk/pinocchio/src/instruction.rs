@@ -84,7 +84,7 @@ pub struct Account<'a> {
 ///
 /// If any of this requirements is not valid, this function leads to undefined behavior.
 #[inline(always)]
-const unsafe fn field_at_offset<T, U>(ptr: *const T, offset: usize) -> *const U {
+const unsafe fn field_at_offset<T: ?Sized, U>(ptr: *const T, offset: usize) -> *const U {
     // SAFETY: The caller ensures that the offset is valid for the type `T` and that
     // the resulting pointer is valid for type `U`.
     unsafe { (ptr as *const u8).add(offset) as *const U }
