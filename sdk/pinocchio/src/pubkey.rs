@@ -29,7 +29,10 @@ pub fn log(pubkey: &Pubkey) {
         crate::syscalls::sol_log_pubkey(pubkey as *const _ as *const u8)
     };
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    crate::syscalls_stubs::sol_log_pubkey(pubkey);
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     core::hint::black_box(pubkey);
 }
 
@@ -144,7 +147,10 @@ pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Pubkey) -> Option<
         }
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    return crate::syscalls_stubs::sol_try_find_program_address(seeds, program_id);
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     {
         core::hint::black_box((seeds, program_id));
         None
@@ -197,7 +203,10 @@ pub fn create_program_address(
         }
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    return crate::syscalls_stubs::sol_create_program_address(seeds, program_id);
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     {
         core::hint::black_box((seeds, program_id));
         panic!("create_program_address is only available on target `solana`")
@@ -271,7 +280,10 @@ pub fn create_with_seed(
         Ok(unsafe { bytes.assume_init() })
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    return crate::syscalls_stubs::sol_create_with_seed(base, seed, program_id);
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     {
         core::hint::black_box((base, seed, program_id));
         panic!("create_with_seed is only available on target `solana`")

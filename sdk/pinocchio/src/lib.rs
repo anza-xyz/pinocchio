@@ -236,6 +236,8 @@ pub mod program {
 pub mod program_error;
 pub mod pubkey;
 pub mod syscalls;
+#[cfg(feature = "syscalls-stubs")]
+pub mod syscalls_stubs;
 pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
