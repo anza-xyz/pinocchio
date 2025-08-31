@@ -127,10 +127,14 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
     account_infos: &[&AccountInfo; ACCOUNTS],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
+    #[cfg(feature = "syscalls-stubs")]
+    return crate::syscalls_stubs::sol_invoke_signed(instruction, account_infos, signers_seeds);
+
     // SAFETY: The array of `AccountInfo`s will be checked to ensure that it has
     // the same number of accounts as the instruction – this indirectly validates
     // that the stack allocated account storage `ACCOUNTS` is sufficient for the
     // number of accounts expected by the instruction.
+    #[cfg(not(feature = "syscalls-stubs"))]
     unsafe {
         inner_invoke_signed_with_bounds::<ACCOUNTS>(instruction, account_infos, signers_seeds)
     }
@@ -450,7 +454,10 @@ pub fn set_return_data(data: &[u8]) {
         crate::syscalls::sol_set_return_data(data.as_ptr(), data.len() as u64)
     };
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    crate::syscalls_stubs::sol_set_return_data(data);
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     core::hint::black_box(data);
 }
 
@@ -510,7 +517,10 @@ pub fn get_return_data() -> Option<ReturnData> {
         }
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    return crate::syscalls_stubs::sol_get_return_data();
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     core::hint::black_box(None)
 }
 
