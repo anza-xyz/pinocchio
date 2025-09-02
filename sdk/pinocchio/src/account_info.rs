@@ -893,7 +893,8 @@ mod tests {
 
         // It should be sound to mutate the data through the data pointer while no other borrows exist
         let data_ptr = account_info.data_ptr();
-        #[allow(clippy::needless_borrow)] // This is opposite in nightly clippy, it's an error to not have the ref
+        // This is opposite in nightly clippy, it's an error to not have the ref
+        #[allow(clippy::needless_borrow)]
         unsafe {
             assert_eq!((&*data_ptr.as_ptr()).len(), 1);
             (*data_ptr.as_ptr())[0] = 1;
