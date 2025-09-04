@@ -492,7 +492,7 @@ impl AccountInfo {
     /// in the `process_instruction` entrypoint of a program.
     #[inline]
     pub fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
-        // Check wheather the account data is already borrowed.
+        // Check whether the account data is already borrowed.
         self.can_borrow_mut_data()?;
 
         // SAFETY:
