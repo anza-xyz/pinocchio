@@ -26,6 +26,12 @@ pub const RENT_ID: Pubkey = [
 /// - `$3.65` per megabyte year
 pub const DEFAULT_LAMPORTS_PER_BYTE_YEAR: u64 = 1_000_000_000 / 100 * 365 / (1024 * 1024);
 
+/// SIMD-0194
+///
+/// This equates to the integer value of 3480. To account for 2 years of rent
+/// exemption, we multiply this value by 2 to make it 6960.
+pub const DEFAULT_LAMPORTS_PER_BYTE: u64 = 6960;
+
 /// Default amount of time (in years) the balance has to include rent for the
 /// account to be rent exempt.
 pub const DEFAULT_EXEMPTION_THRESHOLD: f64 = 2.0;
@@ -38,6 +44,13 @@ const DEFAULT_EXEMPTION_THRESHOLD_AS_U64: u64 = 2;
 ///
 /// This is used to check whether the `f64` value can be safely cast to a `u64`.
 const F64_EXEMPTION_THRESHOLD_AS_U64: u64 = 4611686018427387904;
+
+/// The `u64` representation of the deprecated exemption threshold.
+///
+/// This value is equivalent to `1f64`. It is only used to check whether
+/// the exmption threshold is the deprecated value to avoid performing
+/// floating-point operations on-chain.
+const F64_SIMD0194_EXEMPTION_THRESHOLD_AS_U64: u64 = 4607182418800017408;
 
 /// Default percentage of collected rent that is burned.
 ///
@@ -56,9 +69,18 @@ pub const ACCOUNT_STORAGE_OVERHEAD: u64 = 128;
 #[derive(Clone, Copy, Debug)]
 pub struct Rent {
     /// Rental rate in lamports per byte-year
+    #[deprecated(
+        since = "0.9.2",
+        note = "SIMD-0194 will rename this field to `lamports_per_byte`"
+    )]
     pub lamports_per_byte_year: u64,
 
-    /// Exemption threshold in years
+    /// Exemption threshold in years.
+    ///
+    /// SIMD-0194 will deprecate this value. The current implementation checks
+    /// the value against known defaults to avoid performing a floating-point
+    /// operation on-chain.
+    #[deprecated(since = "0.9.2", note = "SIMD-0194 will deprecate this value")]
     pub exemption_threshold: f64,
 
     /// Burn percentage
@@ -150,6 +172,7 @@ impl Rent {
 
     /// Rent due for account that is known to be not exempt.
     #[inline]
+    #[allow(deprecated)]
     pub fn due_amount(&self, data_len: usize, years_elapsed: f64) -> u64 {
         let actual_data_len = data_len as u64 + ACCOUNT_STORAGE_OVERHEAD;
         let lamports_per_year = self.lamports_per_byte_year * actual_data_len;
@@ -169,15 +192,23 @@ impl Rent {
     ///
     /// The minimum balance in lamports for rent exemption.
     #[inline]
+    #[allow(deprecated)]
     pub fn minimum_balance(&self, data_len: usize) -> u64 {
         let bytes = data_len as u64;
+        let exemption_threshold_as_u64 = u64::from_le_bytes(self.exemption_threshold.to_le_bytes());
 
-        if self.is_default_rent_threshold() {
-            ((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte_year)
-                * DEFAULT_EXEMPTION_THRESHOLD_AS_U64
-        } else {
-            (((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte_year) as f64
-                * self.exemption_threshold) as u64
+        match exemption_threshold_as_u64 {
+            F64_SIMD0194_EXEMPTION_THRESHOLD_AS_U64 => {
+                (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte_year
+            }
+            F64_EXEMPTION_THRESHOLD_AS_U64 => {
+                ((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte_year)
+                    * DEFAULT_EXEMPTION_THRESHOLD_AS_U64
+            }
+            _ => {
+                (((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte_year) as f64
+                    * self.exemption_threshold) as u64
+            }
         }
     }
 
@@ -194,15 +225,6 @@ impl Rent {
     #[inline]
     pub fn is_exempt(&self, lamports: u64, data_len: usize) -> bool {
         lamports >= self.minimum_balance(data_len)
-    }
-
-    /// Determines if the `exemption_threshold` is the default value.
-    ///
-    /// This is used to check whether the `f64` value can be safely cast to a `u64`
-    /// to avoid floating-point operations.
-    #[inline]
-    fn is_default_rent_threshold(&self) -> bool {
-        u64::from_le_bytes(self.exemption_threshold.to_le_bytes()) == F64_EXEMPTION_THRESHOLD_AS_U64
     }
 }
 
@@ -238,10 +260,11 @@ impl RentDue {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use crate::sysvars::rent::{
         ACCOUNT_STORAGE_OVERHEAD, DEFAULT_BURN_PERCENT, DEFAULT_EXEMPTION_THRESHOLD,
-        DEFAULT_LAMPORTS_PER_BYTE_YEAR,
+        DEFAULT_LAMPORTS_PER_BYTE, DEFAULT_LAMPORTS_PER_BYTE_YEAR,
     };
 
     #[test]
@@ -267,6 +290,32 @@ mod tests {
         let balance = rent.minimum_balance(100);
         let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte_year) as f64
             * rent.exemption_threshold) as u64;
+
+        assert!(calculated > 0);
+        assert_eq!(balance, calculated);
+    }
+
+    #[test]
+    pub fn test_minimum_balance_simd0194() {
+        let mut rent = super::Rent {
+            lamports_per_byte_year: DEFAULT_LAMPORTS_PER_BYTE,
+            exemption_threshold: 1.0, // SIMD-0194 default
+            burn_percent: DEFAULT_BURN_PERCENT,
+        };
+
+        // Using the default exemption threshold.
+
+        let balance = rent.minimum_balance(100);
+        let calculated = (ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte_year;
+
+        assert!(calculated > 0);
+        assert_eq!(balance, calculated);
+
+        // Using a different lamports per byte value.
+        rent.lamports_per_byte_year = DEFAULT_LAMPORTS_PER_BYTE * 2;
+
+        let balance = rent.minimum_balance(100);
+        let calculated = (ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte_year;
 
         assert!(calculated > 0);
         assert_eq!(balance, calculated);
