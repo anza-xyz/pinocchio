@@ -48,7 +48,7 @@ const F64_EXEMPTION_THRESHOLD_AS_U64: u64 = 4611686018427387904;
 /// The `u64` representation of the deprecated exemption threshold.
 ///
 /// This value is equivalent to `1f64`. It is only used to check whether
-/// the exmption threshold is the deprecated value to avoid performing
+/// the exemption threshold is the deprecated value to avoid performing
 /// floating-point operations on-chain.
 const F64_SIMD0194_EXEMPTION_THRESHOLD_AS_U64: u64 = 4607182418800017408;
 
