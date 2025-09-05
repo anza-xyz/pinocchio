@@ -1,4 +1,4 @@
-//! Defines the middleware entrypoint, enabling a hot path to bypass
+//! Defines the middleware program entrypoint, enabling a hot path to bypass
 //! entrypoint deserialization, ejecting to the cold path on failure.
 #[macro_export]
 macro_rules! middleware_program_entrypoint {
