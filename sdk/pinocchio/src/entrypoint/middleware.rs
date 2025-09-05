@@ -3,7 +3,7 @@
 
 /// Declare the middleware program entrypoint.
 ///
-/// The macro expect a `hot` and `cold` path expressions. The `hot` is a function with
+/// The macro expects a `hot` and `cold` path expressions. The `hot` is a function with
 /// the following type signature:
 ///
 /// ```ignore
@@ -29,7 +29,7 @@
 /// use pinocchio::{
 ///     ProgramResult,
 ///     account_info::AccountInfo,
-///     middleware_entrypoint,
+///     middleware_program_entrypoint,
 ///     msg,
 ///     no_allocator,
 ///     nostd_panic_handler,
@@ -39,7 +39,7 @@
 /// nostd_panic_handler!();
 /// no_allocator!();
 /// 
-/// middleware_entrypoint!(hot,cold);
+/// middleware_program_entrypoint!(hot,cold);
 /// 
 /// // This uses 4 CUs
 /// #[inline(always)]
@@ -55,14 +55,14 @@
 ///     _accounts: &[AccountInfo],
 ///     _instruction_data: &[u8],
 /// ) -> ProgramResult {
-///     msg!("Hello from my Pinocchio!");
+///     msg!("Hello from Pinocchio!");
 ///     Ok(())
 /// }
 /// ```
 #[macro_export]
 macro_rules! middleware_program_entrypoint {
     ($hot:expr, $cold:expr) => {
-        $crate::middleware_entrypoint!($hot, $cold, { $crate::MAX_TX_ACCOUNTS });
+        $crate::middleware_program_entrypoint!($hot, $cold, { $crate::MAX_TX_ACCOUNTS });
     };
     ($hot:expr, $cold:expr, $maximum:expr ) => {
 
