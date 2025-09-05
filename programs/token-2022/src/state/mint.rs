@@ -4,7 +4,10 @@ use pinocchio::{
     pubkey::Pubkey,
 };
 
-use crate::ID;
+use crate::{
+    extensions::{BaseState, BaseStateVariant, EXTENSION_START_PADDING},
+    ID,
+};
 
 /// Mint data.
 #[repr(C)]
@@ -146,5 +149,16 @@ impl Mint {
     #[inline(always)]
     pub fn freeze_authority_unchecked(&self) -> &Pubkey {
         &self.freeze_authority
+    }
+}
+
+/// Number of padding bytes after a Mint account's base data before extensions start.
+pub const MINT_EXTENSION_PADDING: usize = 83;
+
+impl BaseState for Mint {
+    const BASE_STATE: BaseStateVariant = BaseStateVariant::Mint;
+    const LEN: usize = Mint::BASE_LEN;
+    fn extension_data_start_index() -> Option<usize> {
+        Some(Mint::LEN + MINT_EXTENSION_PADDING + EXTENSION_START_PADDING)
     }
 }
