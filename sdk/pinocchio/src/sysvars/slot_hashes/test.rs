@@ -10,6 +10,7 @@ use core::{
 };
 
 extern crate std;
+use crate::account_info::MAX_PERMITTED_DATA_INCREASE;
 use std::io::Write;
 use std::vec::Vec;
 
@@ -414,9 +415,9 @@ fn test_from_account_info_constructor() {
     let acct_ptr;
 
     unsafe {
-        let header_size = core::mem::size_of::<AccountLayout>();
-        let total_size = header_size + data.len();
-        let word_len = (total_size + 7) / 8;
+        let header_size = size_of::<AccountLayout>();
+        let total_size = header_size + data.len() + MAX_PERMITTED_DATA_INCREASE;
+        let word_len = total_size.div_ceil(8);
         aligned_backing = std::vec![0u64; word_len];
         let base_ptr = aligned_backing.as_mut_ptr() as *mut u8;
 
@@ -438,7 +439,7 @@ fn test_from_account_info_constructor() {
 
         ptr::copy_nonoverlapping(data.as_ptr(), base_ptr.add(header_size), data.len());
 
-        acct_ptr = base_ptr as *mut Account;
+        acct_ptr = Account::from_bytes_ptr_not_cloned(base_ptr.cast()).0;
     }
 
     let account_info = AccountInfo { raw: acct_ptr };
