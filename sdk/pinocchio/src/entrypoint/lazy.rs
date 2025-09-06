@@ -3,10 +3,10 @@
 
 use crate::{
     account_info::{Account, AccountInfo},
-    entrypoint::STATIC_ACCOUNT_DATA,
+    entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
     program_error::ProgramError,
     pubkey::Pubkey,
-    BPF_ALIGN_OF_U128, NON_DUP_MARKER,
+    BPF_ALIGN_OF_U128,
 };
 
 /// Declare the lazy program entrypoint.

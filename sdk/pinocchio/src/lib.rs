@@ -256,9 +256,6 @@ pub const MAX_TX_ACCOUNTS: usize = (u8::MAX - 1) as usize;
 /// for some host machines.
 const BPF_ALIGN_OF_U128: usize = 8;
 
-/// Value used to indicate that a serialized account is not a duplicate.
-const NON_DUP_MARKER: u8 = u8::MAX;
-
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = 0;
 

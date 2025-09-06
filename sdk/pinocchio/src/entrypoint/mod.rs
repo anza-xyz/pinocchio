@@ -19,7 +19,7 @@ use core::{
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
     pubkey::Pubkey,
-    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, NON_DUP_MARKER,
+    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
 /// Start address of the memory region used for program heap.
@@ -38,6 +38,9 @@ pub type ProgramResult = super::ProgramResult;
 #[deprecated(since = "0.6.0", note = "Use `SUCCESS` from the crate root instead")]
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = super::SUCCESS;
+
+/// Value used to indicate that a serialized account is not a duplicate.
+pub const NON_DUP_MARKER: u8 = u8::MAX;
 
 /// The "static" size of an account in the input buffer.
 ///
