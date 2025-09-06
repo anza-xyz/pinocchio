@@ -5,7 +5,8 @@ use super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account
 #[test]
 fn test_wrong_key_from_account_info() {
     let bytes = raw_slot_hashes(0, &[]);
-    let (info, _backing) = unsafe { make_account_info([1u8; 32], &bytes, crate::NON_DUP_MARKER) };
+    let (info, _backing) =
+        unsafe { make_account_info([1u8; 32], &bytes, crate::entrypoint::NON_DUP_MARKER) };
     assert!(matches!(
         SlotHashes::from_account_info(&info),
         Err(ProgramError::InvalidArgument)

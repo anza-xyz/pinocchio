@@ -834,7 +834,7 @@ impl<T: ?Sized> Drop for RefMut<'_, T> {
 mod tests {
     use core::mem::{size_of, MaybeUninit};
 
-    use crate::NON_DUP_MARKER as NOT_BORROWED;
+    use crate::entrypoint::NON_DUP_MARKER as NOT_BORROWED;
 
     use super::*;
 

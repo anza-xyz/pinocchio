@@ -424,7 +424,7 @@ fn test_from_account_info_constructor() {
         ptr::write(
             header_ptr,
             AccountLayout {
-                borrow_state: crate::NON_DUP_MARKER,
+                borrow_state: crate::entrypoint::NON_DUP_MARKER,
                 is_signer: 0,
                 is_writable: 0,
                 executable: 0,
