@@ -70,3 +70,6 @@ mainnet
 getters
 PRNG
 middleware
+BN254
+G1
+G2
