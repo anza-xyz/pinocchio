@@ -10,6 +10,8 @@ members = [
     "sdk/log/macro",
     "sdk/pinocchio",
     "sdk/pubkey",
+    "cpi-tests/programs/*",
+    "cpi-tests/tests",
 ]
 
 [workspace.package]
@@ -23,6 +25,9 @@ five8_const = "0.1.4"
 pinocchio = { version = "0.9", path = "sdk/pinocchio" }
 pinocchio-log-macro = { version = "0.5", path = "sdk/log/macro" }
 pinocchio-pubkey = { version = "0.3", path = "sdk/pubkey" }
+pinocchio-token = { version = "0.4.0", path = "./programs/token" }
+pinocchio-token-2022 = { version = "0.1.0", path = "./programs/token-2022" }
+token-2022-proxy = { version = "1.0.0", path = "./cpi-tests/programs/token-2022-proxy" }
 quote = "1.0"
 regex = "1"
 syn = "1.0"
