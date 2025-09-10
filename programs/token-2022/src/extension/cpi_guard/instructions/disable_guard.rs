@@ -53,8 +53,8 @@ impl DisableCpiGuard<'_, '_, '_> {
         } = self;
 
         let account_metas = [
-            AccountMeta::writable_signer(token_account.key()),
-            AccountMeta::readonly(owner.key()),
+            AccountMeta::writable(token_account.key()),
+            AccountMeta::readonly_signer(owner.key()),
         ];
 
         let data = cpi_guard_instruction_data(CpiGuardInstruction::Disable);

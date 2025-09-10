@@ -1,32 +1,32 @@
 use core::{mem::MaybeUninit, slice};
 
 use crate::{
-    extension::cpi_guard::state::{
-        cpi_guard_instruction_data, CpiGuardInstruction,
+    extension::pausable::state::{
+        pausable_instruction_data, PausableInstruction,
     },
     instructions::MAX_MULTISIG_SIGNERS,
 };
 
 use pinocchio::{
     account_info::AccountInfo,
-    cpi::invoke_with_bounds,
+    cpi::{invoke_with_bounds, invoke_signed},
     instruction::{AccountMeta, Instruction, Signer},
     pubkey::Pubkey,
     ProgramResult,
 };
 
-pub struct EnableCpiGuard<'a, 'b, 'c> {
-    /// Token Account to update.
-    pub token_account: &'a AccountInfo,
-    /// Owner Account.
-    pub owner: &'a AccountInfo,
+pub struct Resume<'a, 'b, 'c> {
+    /// Mint Account to resume.
+    pub mint_account: &'a AccountInfo,
+    /// Authority Account.
+    pub authority: &'a AccountInfo,
     /// Signer Accounts (for multisig support)
     pub signers: &'b [&'a AccountInfo],
     /// Token Program
     pub token_program: &'c Pubkey,
 }
 
-impl EnableCpiGuard<'_, '_, '_> {
+impl Resume<'_, '_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -46,18 +46,18 @@ impl EnableCpiGuard<'_, '_, '_> {
     #[inline(always)]
     fn invoke_single_owner(&self, signers: &[Signer]) -> ProgramResult {
         let &Self {
-            token_account,
-            owner,
+            mint_account,
+            authority,
             token_program,
             ..
         } = self;
 
         let account_metas = [
-            AccountMeta::writable(token_account.key()),
-            AccountMeta::readonly_signer(owner.key()),
+            AccountMeta::writable(mint_account.key()),
+            AccountMeta::readonly_signer(authority.key()),
         ];
 
-        let data = cpi_guard_instruction_data(CpiGuardInstruction::Enable);
+        let data = pausable_instruction_data(PausableInstruction::Resume);
 
         let instruction = Instruction {
             accounts: &account_metas,
@@ -65,14 +65,14 @@ impl EnableCpiGuard<'_, '_, '_> {
             program_id: token_program,
         };
 
-        pinocchio::cpi::invoke_signed(&instruction, &[token_account, owner], signers)
+        invoke_signed(&instruction, &[mint_account, authority], signers)
     }
 
     #[inline(always)]
     fn invoke_multisig(&self) -> ProgramResult {
         let &Self {
-            token_account,
-            owner,
+            mint_account,
+            authority,
             signers: multisig_signers,
             token_program,
         } = self;
@@ -89,17 +89,17 @@ impl EnableCpiGuard<'_, '_, '_> {
             // SAFETY
             acc_metas
                 .get_unchecked_mut(0)
-                .write(AccountMeta::writable(token_account.key()));
+                .write(AccountMeta::writable(mint_account.key()));
             acc_metas
                 .get_unchecked_mut(1)
-                .write(AccountMeta::readonly(owner.key()));
+                .write(AccountMeta::readonly(authority.key()));
         }
 
         for (account_meta, signer) in acc_metas[2..].iter_mut().zip(multisig_signers.iter()) {
             account_meta.write(AccountMeta::readonly_signer(signer.key()));
         }
 
-        let data = cpi_guard_instruction_data(CpiGuardInstruction::Enable);
+        let data = pausable_instruction_data(PausableInstruction::Resume);
 
         let instruction = Instruction {
             accounts: unsafe { slice::from_raw_parts(acc_metas.as_ptr() as _, num_accounts) },
@@ -112,8 +112,8 @@ impl EnableCpiGuard<'_, '_, '_> {
 
         unsafe {
             // SAFETY
-            acc_infos.get_unchecked_mut(0).write(token_account);
-            acc_infos.get_unchecked_mut(1).write(owner);
+            acc_infos.get_unchecked_mut(0).write(mint_account);
+            acc_infos.get_unchecked_mut(1).write(authority);
         }
 
         for (account_info, signer) in acc_infos[2..].iter_mut().zip(multisig_signers.iter()) {
@@ -125,3 +125,4 @@ impl EnableCpiGuard<'_, '_, '_> {
         })
     }
 }
+
