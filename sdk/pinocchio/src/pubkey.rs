@@ -37,7 +37,7 @@ pub fn log(pubkey: &Pubkey) {
 
 /// Compare two `Pubkey`s for equality.
 ///
-/// The implementation of this function is currectly more efficient
+/// The implementation of this function is currently more efficient
 /// than `p1 == p2` since it compares 8 bytes at a time instead of
 /// byte-by-byte.
 #[inline(always)]
