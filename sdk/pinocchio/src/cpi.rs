@@ -6,7 +6,7 @@ use crate::{
     account_info::{AccountInfo, BorrowState},
     instruction::{Account, Instruction, Signer},
     program_error::ProgramError,
-    pubkey::Pubkey,
+    pubkey::{pubkey_eq, Pubkey},
     ProgramResult,
 };
 
@@ -299,7 +299,7 @@ unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
             // In order to check whether the borrow state is compatible
             // with the invocation, we need to check that we have the
             // correct account info and meta pair.
-            if account_info.key() != account_meta.pubkey {
+            if !pubkey_eq(account_info.key(), account_meta.pubkey) {
                 return Err(ProgramError::InvalidArgument);
             }
 

@@ -10,7 +10,11 @@ use core::{
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_memset_;
 
-use crate::{program_error::ProgramError, pubkey::Pubkey, ProgramResult};
+use crate::{
+    program_error::ProgramError,
+    pubkey::{pubkey_eq, Pubkey},
+    ProgramResult,
+};
 
 /// Maximum number of bytes a program may add to an account during a
 /// single top-level instruction.
@@ -186,7 +190,7 @@ impl AccountInfo {
     /// Checks if the account is owned by the given program.
     #[inline(always)]
     pub fn is_owned_by(&self, program: &Pubkey) -> bool {
-        self.owner() == program
+        pubkey_eq(self.owner(), program)
     }
 
     /// Changes the owner of the account.

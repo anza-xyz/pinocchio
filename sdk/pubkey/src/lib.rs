@@ -4,7 +4,7 @@
 #[doc(hidden)]
 // Re-export dependencies used in macros.
 pub mod reexport {
-    pub use pinocchio::pubkey::Pubkey;
+    pub use pinocchio::pubkey::{pubkey_eq, Pubkey};
 }
 
 use core::mem::MaybeUninit;
@@ -176,7 +176,7 @@ macro_rules! declare_id {
         #[doc = "Returns `true` if given pubkey is the program ID."]
         #[inline]
         pub fn check_id(id: &$crate::reexport::Pubkey) -> bool {
-            id == &ID
+            $crate::reexport::pubkey_eq(id, &ID)
         }
 
         #[doc = "Returns the program ID."]

@@ -3,9 +3,10 @@
 use super::Sysvar;
 use crate::{
     account_info::{AccountInfo, Ref},
+    hint::unlikely,
     impl_sysvar_get,
     program_error::ProgramError,
-    pubkey::Pubkey,
+    pubkey::{pubkey_eq, Pubkey},
 };
 
 /// The ID of the clock sysvar.
@@ -86,7 +87,7 @@ impl Clock {
     /// This method performs a check on the account info key.
     #[inline]
     pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Clock>, ProgramError> {
-        if account_info.key() != &CLOCK_ID {
+        if unlikely(!pubkey_eq(account_info.key(), &CLOCK_ID)) {
             return Err(ProgramError::InvalidArgument);
         }
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {

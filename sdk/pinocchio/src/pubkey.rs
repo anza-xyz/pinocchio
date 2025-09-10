@@ -1,5 +1,7 @@
 //! Public key type and functions.
 
+use core::ptr::read_unaligned;
+
 use crate::program_error::ProgramError;
 
 /// Number of bytes in a pubkey.
@@ -31,6 +33,24 @@ pub fn log(pubkey: &Pubkey) {
 
     #[cfg(not(target_os = "solana"))]
     core::hint::black_box(pubkey);
+}
+
+/// Compare two `Pubkey`s for equality.
+///
+/// The implementation of this function is currectly more efficient
+/// than `p1 == p2` since it compares 8 bytes at a time instead of
+/// byte-by-byte.
+#[inline(always)]
+pub const fn pubkey_eq(p1: &Pubkey, p2: &Pubkey) -> bool {
+    let p1_ptr = p1.as_ptr() as *const u64;
+    let p2_ptr = p2.as_ptr() as *const u64;
+
+    unsafe {
+        read_unaligned(p1_ptr) == read_unaligned(p2_ptr)
+            && read_unaligned(p1_ptr.add(1)) == read_unaligned(p2_ptr.add(1))
+            && read_unaligned(p1_ptr.add(2)) == read_unaligned(p2_ptr.add(2))
+            && read_unaligned(p1_ptr.add(3)) == read_unaligned(p2_ptr.add(3))
+    }
 }
 
 /// Find a valid [program derived address][pda] and its corresponding bump seed.

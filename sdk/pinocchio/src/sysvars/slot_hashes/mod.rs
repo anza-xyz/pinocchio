@@ -15,8 +15,9 @@ mod test_utils;
 
 use crate::{
     account_info::{AccountInfo, Ref},
+    hint::unlikely,
     program_error::ProgramError,
-    pubkey::Pubkey,
+    pubkey::{pubkey_eq, Pubkey},
     sysvars::clock::Slot,
 };
 use core::{mem, ops::Deref, slice::from_raw_parts};
@@ -277,7 +278,7 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
     /// - `ProgramError::AccountBorrowFailed` if the account data is already mutably borrowed
     #[inline(always)]
     pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
-        if account_info.key() != &SLOTHASHES_ID {
+        if unlikely(!pubkey_eq(account_info.key(), &SLOTHASHES_ID)) {
             return Err(ProgramError::InvalidArgument);
         }
 
