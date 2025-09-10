@@ -6,6 +6,9 @@ pub mod group_op;
 pub use compression::*;
 pub use group_op::*;
 
+/// Size of the EC point field, in bytes.
 pub const ALT_BN128_FIELD_SIZE: usize = 32;
-pub const ALT_BN128_G1_SIZE: usize = ALT_BN128_FIELD_SIZE * 2; // x, y each 32 byte
-pub const ALT_BN128_G2_SIZE: usize = ALT_BN128_FIELD_SIZE * 4; // x=(x0,x1), y=(y0,y1) each 32 byte
+/// A group element in G1 consists of two field elements `(x, y)`.
+pub const ALT_BN128_G1_SIZE: usize = ALT_BN128_FIELD_SIZE * 2;
+/// Elements in G2 is represented by 2 field-extension elements `(x, y)`.
+pub const ALT_BN128_G2_SIZE: usize = ALT_BN128_FIELD_SIZE * 4;
