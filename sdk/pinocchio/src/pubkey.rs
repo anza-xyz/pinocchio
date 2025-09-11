@@ -297,3 +297,25 @@ pub fn create_with_seed(
         panic!("create_with_seed is only available on target `solana`")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+    use proptest::{
+        prelude::{any, prop_assert_eq},
+        proptest,
+    };
+    use std::format;
+
+    use crate::pubkey::pubkey_eq;
+
+    proptest! {
+            #[test]
+            fn test_pubkey_eq_matches_default_eq(
+                p1 in any::<[u8; 32]>(),
+                p2 in any::<[u8; 32]>()
+            ) {
+                prop_assert_eq!(pubkey_eq(&p1, &p2), p1 == p2);
+            }
+    }
+}

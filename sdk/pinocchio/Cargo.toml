@@ -22,3 +22,4 @@ std = []
 
 [dev-dependencies]
 five8_const = { workspace = true }
+proptest = "1.7.0"
