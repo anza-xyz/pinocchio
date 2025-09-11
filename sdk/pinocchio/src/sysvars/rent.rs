@@ -74,7 +74,7 @@ impl Rent {
     /// This method performs a check on the account info key.
     #[inline]
     pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Rent>, ProgramError> {
-        if account_info.key() != &RENT_ID {
+        if unlikely(!pubkey_eq(account_info.key(), &RENT_ID)) {
             return Err(ProgramError::InvalidArgument);
         }
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {

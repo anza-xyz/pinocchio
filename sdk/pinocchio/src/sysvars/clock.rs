@@ -108,7 +108,7 @@ impl Clock {
     pub unsafe fn from_account_info_unchecked(
         account_info: &AccountInfo,
     ) -> Result<&Self, ProgramError> {
-        if account_info.key() != &CLOCK_ID {
+        if unlikely(!pubkey_eq(account_info.key(), &CLOCK_ID)) {
             return Err(ProgramError::InvalidArgument);
         }
         Ok(Self::from_bytes_unchecked(
