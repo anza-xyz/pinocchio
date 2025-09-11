@@ -633,6 +633,7 @@ mod alloc {
     };
 
     /// The bump allocator used as the default rust heap when running programs.
+    #[derive(Clone, Copy, Debug)]
     pub struct BumpAllocator {
         pub start: usize,
         pub len: usize,
