@@ -300,22 +300,22 @@ pub fn create_with_seed(
 
 #[cfg(test)]
 mod tests {
-    extern crate std;
-    use proptest::{
-        prelude::{any, prop_assert_eq},
-        proptest,
-    };
-    use std::format;
+    use crate::pubkey::{pubkey_eq, Pubkey, PUBKEY_BYTES};
 
-    use crate::pubkey::pubkey_eq;
+    #[test]
+    fn test_pubkey_eq_matches_default_eq() {
+        for i in 0..u8::MAX {
+            let p1: Pubkey = [i; PUBKEY_BYTES];
+            let p2: Pubkey = [i; PUBKEY_BYTES];
 
-    proptest! {
-            #[test]
-            fn test_pubkey_eq_matches_default_eq(
-                p1 in any::<[u8; 32]>(),
-                p2 in any::<[u8; 32]>()
-            ) {
-                prop_assert_eq!(pubkey_eq(&p1, &p2), p1 == p2);
-            }
+            assert_eq!(pubkey_eq(&p1, &p2), p1 == p2);
+        }
+
+        for i in 0..u8::MAX {
+            let p1: Pubkey = [i; PUBKEY_BYTES];
+            let p2: Pubkey = [u8::MAX - i; PUBKEY_BYTES];
+
+            assert_eq!(!pubkey_eq(&p1, &p2), p1 != p2);
+        }
     }
 }
