@@ -65,7 +65,7 @@ pub(crate) struct Account {
     ///     - `7 6 5 4 3 2 1 0`
     ///     - `. x x x . . . .`: number of immutable borrows that can still be
     ///       allocated, for the lamports field. Ranges from 7 (`111`) to
-    ///        0 (`000`).
+    ///       0 (`000`).
     ///
     ///   * data mutable borrow flag
     ///     - `7 6 5 4 3 2 1 0`
