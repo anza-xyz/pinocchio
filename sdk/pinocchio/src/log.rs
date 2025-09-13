@@ -99,7 +99,10 @@ pub fn sol_log(message: &str) {
         crate::syscalls::sol_log_(message.as_ptr(), message.len() as u64);
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    crate::syscalls_stubs::sol_log(message);
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     core::hint::black_box(message);
 }
 
@@ -111,7 +114,10 @@ pub fn sol_log_64(arg1: u64, arg2: u64, arg3: u64, arg4: u64, arg5: u64) {
         crate::syscalls::sol_log_64_(arg1, arg2, arg3, arg4, arg5);
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    crate::syscalls_stubs::sol_log_64(arg1, arg2, arg3, arg4, arg5);
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     core::hint::black_box((arg1, arg2, arg3, arg4, arg5));
 }
 
@@ -122,7 +128,10 @@ pub fn sol_log_data(data: &[&[u8]]) {
         crate::syscalls::sol_log_data(data as *const _ as *const u8, data.len() as u64)
     };
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+    crate::syscalls_stubs::sol_log_data(data);
+
+    #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
     core::hint::black_box(data);
 }
 
