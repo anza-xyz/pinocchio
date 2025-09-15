@@ -26,6 +26,7 @@ pinocchio-pubkey = { version = "0.3", path = "sdk/pubkey" }
 quote = "1.0"
 regex = "1"
 solana-address = { version = "1.0.0", features = ["decode"] }
+solana-pubkey = { version = "2" }
 syn = "1.0"
 
 [workspace.metadata.cli]

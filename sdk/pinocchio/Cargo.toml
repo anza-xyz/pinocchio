@@ -19,10 +19,12 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [features]
 std = []
-solana-address = ["dep:solana-address"]
+solana-address1 = ["dep:solana-address"]
+solana-pubkey2 = ["dep:solana-pubkey"]
 
 [dependencies]
 solana-address = { workspace = true, optional = true }
+solana-pubkey = { workspace = true, optional = true }
 
 [dev-dependencies]
 five8_const = { workspace = true }

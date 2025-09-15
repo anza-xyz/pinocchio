@@ -21,45 +21,58 @@ pub const PDA_MARKER: &[u8; 21] = b"ProgramDerivedAddress";
 /// The address of a [Solana account][account].
 ///
 /// [account]: https://solana.com/docs/core/accounts
-#[cfg(not(feature = "solana-address"))]
+#[cfg(not(any(feature = "solana-address1", feature = "solana-pubkey2")))]
 pub type Pubkey = [u8; PUBKEY_BYTES];
-#[cfg(feature = "solana-address")]
+#[cfg(feature = "solana-address1")]
 pub use solana_address::Address as Pubkey;
+#[cfg(feature = "solana-pubkey2")]
+pub use solana_pubkey::Pubkey;
+
+#[cfg(all(feature = "solana-pubkey2", feature = "solana-address1"))]
+compile_error!("Cannot enable both `solana-pubkey` and `solana-address` features");
 
 /// Create a `Pubkey` from a byte array. Will use the correct type of `Pubkey` depending on the features enabled.
 #[inline(always)]
 pub const fn pubkey_from_bytes(bytes: [u8; PUBKEY_BYTES]) -> Pubkey {
-    #[cfg(feature = "solana-address")]
-    {
-        Pubkey::new_from_array(bytes)
-    }
-    #[cfg(not(feature = "solana-address"))]
+    #[cfg(not(any(feature = "solana-address1", feature = "solana-pubkey2")))]
     {
         bytes
+    }
+
+    #[cfg(any(feature = "solana-address1", feature = "solana-pubkey2"))]
+    {
+        Pubkey::new_from_array(bytes)
     }
 }
 
 #[inline(always)]
 pub const fn pubkey_ref_from_slice(bytes: &[u8; PUBKEY_BYTES]) -> &Pubkey {
-    #[cfg(feature = "solana-address")]
+    #[cfg(not(any(feature = "solana-address1", feature = "solana-pubkey2")))]
+    {
+        bytes
+    }
+
+    #[cfg(feature = "solana-address1")]
     {
         unsafe { &*(bytes.as_ptr() as *const solana_address::Address) }
     }
-    #[cfg(not(feature = "solana-address"))]
+
+    #[cfg(feature = "solana-pubkey2")]
     {
-        bytes
+        unsafe { &*(bytes.as_ptr() as *const solana_pubkey::Pubkey) }
     }
 }
 
 #[inline(always)]
 pub const fn pubkey_as_slice(pubkey: &Pubkey) -> &[u8; PUBKEY_BYTES] {
-    #[cfg(feature = "solana-address")]
-    {
-        pubkey.as_array()
-    }
-    #[cfg(not(feature = "solana-address"))]
+    #[cfg(not(any(feature = "solana-address1", feature = "solana-pubkey2")))]
     {
         pubkey
+    }
+
+    #[cfg(any(feature = "solana-address1", feature = "solana-pubkey2"))]
+    {
+        pubkey.as_array()
     }
 }
 
