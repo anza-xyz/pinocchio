@@ -1,3 +1,4 @@
+use pinocchio::pubkey::pubkey_as_slice;
 use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke,
@@ -45,7 +46,7 @@ impl InitializeNonceAccount<'_, '_> {
         // -  [4..36]: authority pubkey
         let mut instruction_data = [0; 36];
         instruction_data[0] = 6;
-        instruction_data[4..36].copy_from_slice(self.authority);
+        instruction_data[4..36].copy_from_slice(pubkey_as_slice(self.authority));
 
         let instruction = Instruction {
             program_id: &crate::ID,

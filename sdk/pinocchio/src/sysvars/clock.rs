@@ -6,14 +6,14 @@ use crate::{
     hint::unlikely,
     impl_sysvar_get,
     program_error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
+    pubkey::{pubkey_eq, pubkey_from_bytes, Pubkey},
 };
 
 /// The ID of the clock sysvar.
-pub const CLOCK_ID: Pubkey = [
+pub const CLOCK_ID: Pubkey = pubkey_from_bytes([
     6, 167, 213, 23, 24, 199, 116, 201, 40, 86, 99, 152, 105, 29, 94, 182, 139, 94, 184, 163, 155,
     75, 109, 92, 115, 85, 91, 33, 0, 0, 0, 0,
-];
+]);
 
 /// The unit of time given to a leader for encoding a block.
 ///

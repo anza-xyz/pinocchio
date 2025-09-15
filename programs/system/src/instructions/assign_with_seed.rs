@@ -1,3 +1,4 @@
+use pinocchio::pubkey::pubkey_as_slice;
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
@@ -51,7 +52,7 @@ impl AssignWithSeed<'_, '_, '_> {
         // - [.. +32]: owner pubkey
         let mut instruction_data = [0; 104];
         instruction_data[0] = 10;
-        instruction_data[4..36].copy_from_slice(self.base.key());
+        instruction_data[4..36].copy_from_slice(pubkey_as_slice(self.base.key()));
         instruction_data[36..44].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
 
         let offset = 44 + self.seed.len();

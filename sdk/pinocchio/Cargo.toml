@@ -19,6 +19,10 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [features]
 std = []
+solana-address = ["dep:solana-address"]
+
+[dependencies]
+solana-address = { workspace = true, optional = true }
 
 [dev-dependencies]
 five8_const = { workspace = true }

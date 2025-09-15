@@ -21,7 +21,47 @@ pub const PDA_MARKER: &[u8; 21] = b"ProgramDerivedAddress";
 /// The address of a [Solana account][account].
 ///
 /// [account]: https://solana.com/docs/core/accounts
+#[cfg(not(feature = "solana-address"))]
 pub type Pubkey = [u8; PUBKEY_BYTES];
+#[cfg(feature = "solana-address")]
+pub use solana_address::Address as Pubkey;
+
+/// Create a `Pubkey` from a byte array. Will use the correct type of `Pubkey` depending on the features enabled.
+#[inline(always)]
+pub const fn pubkey_from_bytes(bytes: [u8; PUBKEY_BYTES]) -> Pubkey {
+    #[cfg(feature = "solana-address")]
+    {
+        Pubkey::new_from_array(bytes)
+    }
+    #[cfg(not(feature = "solana-address"))]
+    {
+        bytes
+    }
+}
+
+#[inline(always)]
+pub const fn pubkey_ref_from_slice(bytes: &[u8; PUBKEY_BYTES]) -> &Pubkey {
+    #[cfg(feature = "solana-address")]
+    {
+        unsafe { &*(bytes.as_ptr() as *const solana_address::Address) }
+    }
+    #[cfg(not(feature = "solana-address"))]
+    {
+        bytes
+    }
+}
+
+#[inline(always)]
+pub const fn pubkey_as_slice(pubkey: &Pubkey) -> &[u8; PUBKEY_BYTES] {
+    #[cfg(feature = "solana-address")]
+    {
+        pubkey.as_array()
+    }
+    #[cfg(not(feature = "solana-address"))]
+    {
+        pubkey
+    }
+}
 
 /// Log a `Pubkey` from a program.
 #[inline(always)]
@@ -35,6 +75,11 @@ pub fn log(pubkey: &Pubkey) {
     core::hint::black_box(pubkey);
 }
 
+#[inline(always)]
+pub fn log_bytes(bytes: &[u8; PUBKEY_BYTES]) {
+    log(pubkey_ref_from_slice(bytes))
+}
+
 /// Compare two `Pubkey`s for equality.
 ///
 /// The implementation of this function is currently more efficient
@@ -42,8 +87,8 @@ pub fn log(pubkey: &Pubkey) {
 /// byte-by-byte.
 #[inline(always)]
 pub const fn pubkey_eq(p1: &Pubkey, p2: &Pubkey) -> bool {
-    let p1_ptr = p1.as_ptr() as *const u64;
-    let p2_ptr = p2.as_ptr() as *const u64;
+    let p1_ptr = pubkey_as_slice(p1).as_ptr() as *const u64;
+    let p2_ptr = pubkey_as_slice(p2).as_ptr() as *const u64;
 
     unsafe {
         read_unaligned(p1_ptr) == read_unaligned(p2_ptr)
@@ -269,7 +314,7 @@ pub fn create_with_seed(
         return Err(ProgramError::MaxSeedLengthExceeded);
     }
 
-    if program_id.ends_with(PDA_MARKER) {
+    if pubkey_as_slice(program_id).ends_with(PDA_MARKER) {
         return Err(ProgramError::IllegalOwner);
     }
 
@@ -300,20 +345,20 @@ pub fn create_with_seed(
 
 #[cfg(test)]
 mod tests {
-    use crate::pubkey::{pubkey_eq, Pubkey, PUBKEY_BYTES};
+    use crate::pubkey::{pubkey_eq, pubkey_from_bytes, Pubkey, PUBKEY_BYTES};
 
     #[test]
     fn test_pubkey_eq_matches_default_eq() {
         for i in 0..u8::MAX {
-            let p1: Pubkey = [i; PUBKEY_BYTES];
-            let p2: Pubkey = [i; PUBKEY_BYTES];
+            let p1: Pubkey = pubkey_from_bytes([i; PUBKEY_BYTES]);
+            let p2: Pubkey = pubkey_from_bytes([i; PUBKEY_BYTES]);
 
             assert_eq!(pubkey_eq(&p1, &p2), p1 == p2);
         }
 
         for i in 0..u8::MAX {
-            let p1: Pubkey = [i; PUBKEY_BYTES];
-            let p2: Pubkey = [u8::MAX - i; PUBKEY_BYTES];
+            let p1: Pubkey = pubkey_from_bytes([i; PUBKEY_BYTES]);
+            let p2: Pubkey = pubkey_from_bytes([u8::MAX - i; PUBKEY_BYTES]);
 
             assert_eq!(!pubkey_eq(&p1, &p2), p1 != p2);
         }

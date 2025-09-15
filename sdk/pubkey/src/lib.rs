@@ -10,7 +10,7 @@ pub mod reexport {
 use core::mem::MaybeUninit;
 #[cfg(feature = "const")]
 pub use five8_const::decode_32_const;
-use pinocchio::pubkey::{Pubkey, MAX_SEEDS, PDA_MARKER};
+use pinocchio::pubkey::{pubkey_as_slice, pubkey_from_bytes, Pubkey, MAX_SEEDS, PDA_MARKER};
 #[cfg(target_os = "solana")]
 use pinocchio::syscalls::sol_sha256;
 #[cfg(feature = "const")]
@@ -143,13 +143,20 @@ pub const fn derive_address_const<const N: usize>(
     // TODO: replace this with `is_some` when the MSRV is upgraded
     // to `1.84.0+`.
     if let Some(bump) = bump {
-        hasher
-            .update(&[bump])
-            .update(program_id)
-            .update(PDA_MARKER)
-            .finalize()
+        pubkey_from_bytes(
+            hasher
+                .update(&[bump])
+                .update(pubkey_as_slice(program_id))
+                .update(PDA_MARKER)
+                .finalize(),
+        )
     } else {
-        hasher.update(program_id).update(PDA_MARKER).finalize()
+        pubkey_from_bytes(
+            hasher
+                .update(pubkey_as_slice(program_id))
+                .update(PDA_MARKER)
+                .finalize(),
+        )
     }
 }
 
@@ -191,5 +198,5 @@ macro_rules! declare_id {
 #[cfg(feature = "const")]
 #[inline(always)]
 pub const fn from_str(value: &str) -> Pubkey {
-    decode_32_const(value)
+    pubkey_from_bytes(decode_32_const(value))
 }

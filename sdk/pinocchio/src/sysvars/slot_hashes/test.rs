@@ -10,6 +10,7 @@ use core::{
 };
 
 extern crate std;
+use crate::pubkey::pubkey_as_slice;
 use std::io::Write;
 use std::vec::Vec;
 
@@ -24,10 +25,10 @@ fn test_layout_constants() {
     assert_eq!(align_of::<SlotHashEntry>(), align_of::<[u8; 8]>());
     assert_eq!(
         SLOTHASHES_ID,
-        [
+        pubkey_from_bytes([
             6, 167, 213, 23, 25, 47, 10, 175, 198, 242, 101, 227, 251, 119, 204, 122, 218, 130,
             197, 41, 208, 190, 59, 19, 110, 45, 0, 85, 32, 0, 0, 0,
-        ]
+        ])
     );
 
     pub fn check_base58(input_bytes: &[u8], expected_b58: &str) {
@@ -35,7 +36,7 @@ fn test_layout_constants() {
     }
 
     check_base58(
-        &SLOTHASHES_ID,
+        pubkey_as_slice(&SLOTHASHES_ID),
         "SysvarS1otHashes111111111111111111111111111",
     );
 }
@@ -430,7 +431,7 @@ fn test_from_account_info_constructor() {
                 executable: 0,
                 resize_delta: 0,
                 key: SLOTHASHES_ID,
-                owner: [0u8; 32],
+                owner: pubkey_from_bytes([0u8; 32]),
                 lamports: 0,
                 data_len: data.len() as u64,
             },

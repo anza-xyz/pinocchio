@@ -1,5 +1,7 @@
 use core::slice::from_raw_parts;
 
+use crate::{write_bytes, UNINIT_BYTE};
+use pinocchio::pubkey::pubkey_as_slice;
 use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke,
@@ -7,8 +9,6 @@ use pinocchio::{
     pubkey::Pubkey,
     ProgramResult,
 };
-
-use crate::{write_bytes, UNINIT_BYTE};
 
 /// Initialize a new Token Account.
 ///
@@ -47,7 +47,7 @@ impl InitializeAccount2<'_, '_> {
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[16]);
         // Set owner as [u8; 32] at offset [1..33]
-        write_bytes(&mut instruction_data[1..], self.owner);
+        write_bytes(&mut instruction_data[1..], pubkey_as_slice(self.owner));
 
         let instruction = Instruction {
             program_id: self.token_program,

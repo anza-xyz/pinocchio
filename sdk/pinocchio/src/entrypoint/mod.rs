@@ -692,16 +692,16 @@ unsafe impl GlobalAlloc for NoAllocator {
 mod tests {
     extern crate std;
 
+    use super::*;
+    use crate::pubkey::{pubkey_as_slice, pubkey_from_bytes};
     use core::{alloc::Layout, ptr::copy_nonoverlapping};
     use std::{
         alloc::{alloc, dealloc},
         vec,
     };
 
-    use super::*;
-
     /// The mock program ID used for testing.
-    const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
+    const MOCK_PROGRAM_ID: Pubkey = pubkey_from_bytes([5u8; 32]);
 
     /// An uninitialized account info.
     const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
@@ -784,7 +784,7 @@ mod tests {
         input.write(instruction_data, offset);
         offset += instruction_data.len();
         // Program ID (mock).
-        input.write(&MOCK_PROGRAM_ID, offset);
+        input.write(pubkey_as_slice(&MOCK_PROGRAM_ID), offset);
 
         input
     }
@@ -847,7 +847,7 @@ mod tests {
         input.write(instruction_data, offset);
         offset += instruction_data.len();
         // Program ID (mock).
-        input.write(&MOCK_PROGRAM_ID, offset);
+        input.write(pubkey_as_slice(&MOCK_PROGRAM_ID), offset);
 
         input
     }

@@ -1,3 +1,4 @@
+use pinocchio::pubkey::pubkey_as_slice;
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
@@ -43,7 +44,7 @@ impl AuthorizeNonceAccount<'_, '_> {
         // -  [4..12]: lamports
         let mut instruction_data = [0; 36];
         instruction_data[0] = 7;
-        instruction_data[4..36].copy_from_slice(self.new_authority);
+        instruction_data[4..36].copy_from_slice(pubkey_as_slice(self.new_authority));
 
         let instruction = Instruction {
             program_id: &crate::ID,

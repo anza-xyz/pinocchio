@@ -2,16 +2,16 @@ use crate::{
     account_info::{AccountInfo, Ref},
     instruction::AccountMeta,
     program_error::ProgramError,
-    pubkey::{Pubkey, PUBKEY_BYTES},
+    pubkey::{pubkey_from_bytes, Pubkey, PUBKEY_BYTES},
 };
 
 use core::{marker::PhantomData, mem::size_of, ops::Deref};
 
 /// Instructions sysvar ID `Sysvar1nstructions1111111111111111111111111`.
-pub const INSTRUCTIONS_ID: Pubkey = [
+pub const INSTRUCTIONS_ID: Pubkey = pubkey_from_bytes([
     0x06, 0xa7, 0xd5, 0x17, 0x18, 0x7b, 0xd1, 0x66, 0x35, 0xda, 0xd4, 0x04, 0x55, 0xfd, 0xc2, 0xc0,
     0xc1, 0x24, 0xc6, 0x8f, 0x21, 0x56, 0x75, 0xa5, 0xdb, 0xba, 0xcb, 0x5f, 0x08, 0x00, 0x00, 0x00,
-];
+]);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Instructions<T>

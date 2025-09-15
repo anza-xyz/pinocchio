@@ -17,7 +17,7 @@ use crate::{
     account_info::{AccountInfo, Ref},
     hint::unlikely,
     program_error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
+    pubkey::{pubkey_eq, pubkey_from_bytes, Pubkey},
     sysvars::clock::Slot,
 };
 use core::{mem, ops::Deref, slice::from_raw_parts};
@@ -25,10 +25,10 @@ use core::{mem, ops::Deref, slice::from_raw_parts};
 use std::boxed::Box;
 
 /// `SysvarS1otHashes111111111111111111111111111`
-pub const SLOTHASHES_ID: Pubkey = [
+pub const SLOTHASHES_ID: Pubkey = pubkey_from_bytes([
     6, 167, 213, 23, 25, 47, 10, 175, 198, 242, 101, 227, 251, 119, 204, 122, 218, 130, 197, 41,
     208, 190, 59, 19, 110, 45, 0, 85, 32, 0, 0, 0,
-];
+]);
 /// Number of bytes in a hash.
 pub const HASH_BYTES: usize = 32;
 /// Sysvar data is:
@@ -68,7 +68,7 @@ pub struct SlotHashes<T: Deref<Target = [u8]>> {
 
 /// Log a `Hash` from a program.
 pub fn log(hash: &Hash) {
-    crate::pubkey::log(hash);
+    crate::pubkey::log_bytes(hash);
 }
 
 /// Reads the entry count from the first 8 bytes of data.
