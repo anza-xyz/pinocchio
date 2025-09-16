@@ -303,7 +303,7 @@ macro_rules! signer {
 /// let pda_bump = 0xffu8;
 /// let pda_ref = &[pda_bump];  // prevent temporary value being freed
 /// let example_key = Address::default();
-/// let seeds = seeds!(b"seed", &example_key, pda_ref);
+/// let seeds = seeds!(b"seed", example_key.as_ref(), pda_ref);
 /// let signer = Signer::from(&seeds);
 /// ```
 #[macro_export]
