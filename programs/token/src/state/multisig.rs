@@ -91,7 +91,7 @@ impl Multisig {
     /// Return the signer addresses of the `Multisig`.
     #[inline(always)]
     pub fn signers(&self) -> &[Address] {
-        // SAFETY: `self.signers` is an array of `Pubkey` with a fixed size of
+        // SAFETY: `self.signers` is an array of `Address` with a fixed size of
         // `MAX_MULTISIG_SIGNERS`; `self.signers_len` is always `<= MAX_MULTISIG_SIGNERS`
         // and indicates how many of these signers are valid.
         unsafe { self.signers.get_unchecked(..self.signers_len()) }
