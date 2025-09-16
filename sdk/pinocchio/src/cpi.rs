@@ -101,7 +101,7 @@ pub fn slice_invoke(instruction: &Instruction, account_infos: &[&AccountInfo]) -
 ///   1. It has at least as many accounts as the number of accounts expected by
 ///      the instruction.
 ///   2. The accounts match the expected accounts in the instruction, i.e., their
-///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
+///      `Address` matches the address in the `AccountMeta`.
 ///   3. The borrow state of the accounts is compatible with the mutability of the
 ///      accounts in the instruction.
 ///
@@ -144,7 +144,7 @@ pub fn invoke_signed<const ACCOUNTS: usize>(
 ///   1. It has at least as many accounts as the number of accounts expected by
 ///      the instruction.
 ///   2. The accounts match the expected accounts in the instruction, i.e., their
-///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
+///      `Address` matches the address in the `AccountMeta`.
 ///   3. The borrow state of the accounts is compatible with the mutability of the
 ///      accounts in the instruction.
 ///
@@ -203,7 +203,7 @@ pub fn invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
 ///   1. It has at least as many accounts as the number of accounts expected by
 ///      the instruction.
 ///   2. The accounts match the expected accounts in the instruction, i.e., their
-///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
+///      `Address` matches the address in the `AccountMeta`.
 ///   3. The borrow state of the accounts is compatible with the mutability of the
 ///      accounts in the instruction.
 ///
@@ -258,7 +258,7 @@ pub fn slice_invoke_signed(
 ///   1. It has at least as many accounts as the number of accounts expected by
 ///      the instruction.
 ///   2. The accounts match the expected accounts in the instruction, i.e., their
-///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
+///      `Address` matches the address in the `AccountMeta`.
 ///   3. The borrow state of the accounts is compatible with the mutability of the
 ///      accounts in the instruction.
 ///
@@ -395,8 +395,8 @@ pub unsafe fn invoke_signed_unchecked(
         /// discarded immediately after.
         #[repr(C)]
         struct CInstruction<'a> {
-            /// Public key of the program.
-            program_id: *const Pubkey,
+            /// Address of the program.
+            program_id: *const Address,
 
             /// Accounts expected by the program instruction.
             accounts: *const AccountMeta<'a>,
