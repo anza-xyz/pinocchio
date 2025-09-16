@@ -137,22 +137,28 @@ pub fn sol_log_slice(slice: &[u8]) {
 /// - `accounts` - A slice of [`AccountInfo`].
 /// - `data` - The instruction data.
 pub fn sol_log_params(accounts: &[AccountInfo], data: &[u8]) {
-    for (i, account) in accounts.iter().enumerate() {
-        msg!("AccountInfo");
-        sol_log_64(0, 0, 0, 0, i as u64);
-        msg!("- Is signer");
-        sol_log_64(0, 0, 0, 0, account.is_signer() as u64);
-        msg!("- Key");
-        account.key().log();
-        msg!("- Lamports");
-        sol_log_64(0, 0, 0, 0, account.lamports());
-        msg!("- Account data length");
-        sol_log_64(0, 0, 0, 0, account.data_len() as u64);
-        msg!("- Owner");
-        account.owner().log();
+    #[cfg(target_os = "solana")]
+    {
+        for (i, account) in accounts.iter().enumerate() {
+            msg!("AccountInfo");
+            sol_log_64(0, 0, 0, 0, i as u64);
+            msg!("- Is signer");
+            sol_log_64(0, 0, 0, 0, account.is_signer() as u64);
+            msg!("- Key");
+            account.key().log();
+            msg!("- Lamports");
+            sol_log_64(0, 0, 0, 0, account.lamports());
+            msg!("- Account data length");
+            sol_log_64(0, 0, 0, 0, account.data_len() as u64);
+            msg!("- Owner");
+            account.owner().log();
+        }
+        msg!("Instruction data");
+        sol_log_slice(data);
     }
-    msg!("Instruction data");
-    sol_log_slice(data);
+
+    #[cfg(not(target_os = "solana"))]
+    core::hint::black_box((accounts, data));
 }
 
 /// Print the remaining compute units available to the program.
