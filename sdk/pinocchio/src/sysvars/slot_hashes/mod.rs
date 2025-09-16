@@ -69,7 +69,10 @@ pub struct SlotHashes<T: Deref<Target = [u8]>> {
 /// Log a `Hash` from a program.
 pub fn log(hash: &Hash) {
     #[cfg(target_os = "solana")]
-    solana_address::syscalls::sol_log_pubkey(hash.as_ptr());
+    // SAFETY: `sol_log_pubkey` expects a valid pointer to a 32-byte array.
+    unsafe {
+        solana_address::syscalls::sol_log_pubkey(hash.as_ptr())
+    };
 
     #[cfg(not(target_os = "solana"))]
     core::hint::black_box(hash);

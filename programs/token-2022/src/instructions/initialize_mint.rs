@@ -42,9 +42,9 @@ impl InitializeMint<'_, '_> {
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: decimals (1 byte, u8)
-        // -  [2..34]: mint_authority (32 bytes, Pubkey)
+        // -  [2..34]: mint_authority (32 bytes, Address)
         // -  [34]: freeze_authority presence flag (1 byte, u8)
-        // -  [35..67]: freeze_authority (optional, 32 bytes, Pubkey)
+        // -  [35..67]: freeze_authority (optional, 32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 67];
         let mut length = instruction_data.len();
 

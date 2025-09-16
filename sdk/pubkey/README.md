@@ -34,7 +34,7 @@ Remember to back up the keypair file securely, it is necessary for deploy the pr
 
 Public keys can be embedded into the program code in the following ways.
 
-1) Creating a `Pubkey` constant value from a static `&str`:
+1) Creating an `Address` constant value from a static `&str`:
 ```rust
 use pinocchio::Address;
 
@@ -46,7 +46,7 @@ pub const AUTHORITY: Address = pinocchio_pubkey::address!("7qtAvP4CJuSKauWHtHZJt
 pinocchio_pubkey::declare_id!("Ping111111111111111111111111111111111111111");
 ```
 
-3) Creating a `Pubkey` from a `&str`:
+3) Creating an `Address` from a `&str`:
 ```rust
 let address = String::from("7qtAvP4CJuSKauWHtHZJt9wmQRgvcFeUcU3xKrFzxKf1");
 let owner = pinocchio_pubkey::from_str(&address);

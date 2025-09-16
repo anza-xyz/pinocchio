@@ -55,7 +55,7 @@ impl SetAuthority<'_, '_> {
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: authority_type (1 byte, u8)
         // -  [2]: new_authority presence flag (1 byte, AuthorityType)
-        // -  [3..35] new_authority (optional, 32 bytes, Pubkey)
+        // -  [3..35] new_authority (optional, 32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 35];
         let mut length = instruction_data.len();
 
