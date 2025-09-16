@@ -2,20 +2,21 @@
 //!
 //! This is required for the rent sysvar implementation.
 
-use super::Sysvar;
+use solana_address::Address;
+
 use crate::{
     account_info::{AccountInfo, Ref},
     hint::unlikely,
     impl_sysvar_get,
     program_error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
+    sysvars::Sysvar,
 };
 
 /// The ID of the rent sysvar.
-pub const RENT_ID: Pubkey = [
+pub const RENT_ID: Address = Address::new_from_array([
     6, 167, 213, 23, 25, 44, 92, 81, 33, 140, 201, 76, 61, 74, 241, 127, 88, 218, 238, 8, 155, 161,
     253, 68, 227, 219, 217, 138, 0, 0, 0, 0,
-];
+]);
 
 /// Default rental rate in lamports/byte-year.
 ///
@@ -74,7 +75,7 @@ impl Rent {
     /// This method performs a check on the account info key.
     #[inline]
     pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Rent>, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &RENT_ID)) {
+        if unlikely(account_info.key() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
@@ -95,7 +96,7 @@ impl Rent {
     pub unsafe fn from_account_info_unchecked(
         account_info: &AccountInfo,
     ) -> Result<&Self, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &RENT_ID)) {
+        if unlikely(account_info.key() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
         Ok(Self::from_bytes_unchecked(
