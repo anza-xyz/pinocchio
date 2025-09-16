@@ -24,7 +24,7 @@ use sha2_const_stable::Sha256;
 /// In general, the derivation uses an optional bump (byte) value to ensure a
 /// valid PDA (off-curve) is generated. Even when a program stores a bump to
 /// derive a program address, it is necessary to use the
-/// [`pinocchio::pubkey::create_program_address`] to validate the derivation. In
+/// `Address::create_program_address` to validate the derivation. In
 /// most cases, the program has the correct seeds for the derivation, so it would
 /// be sufficient to just perform the derivation and compare it against the
 /// expected resulting address.
@@ -36,7 +36,7 @@ use sha2_const_stable::Sha256;
 ///
 /// # Important
 ///
-/// This function differs from [`pinocchio::pubkey::create_program_address`] in that
+/// This function differs from `Address::create_program_address` in that
 /// it does not perform a validation to ensure that the derived address is a valid
 /// (off-curve) program derived address. It is intended for use in cases where the
 /// seeds, bump, and program id are known to be valid, and the caller wants to derive
@@ -115,7 +115,7 @@ pub fn derive_address<const N: usize>(
 ///
 /// # Important
 ///
-/// This function differs from [`pinocchio::pubkey::create_program_address`] in that
+/// This function differs from `Address::create_program_address` in that
 /// it does not perform a validation to ensure that the derived address is a valid
 /// (off-curve) program derived address. It is intended for use in cases where the
 /// seeds, bump, and program id are known to be valid, and the caller wants to derive
@@ -176,7 +176,7 @@ macro_rules! declare_id {
     };
 }
 
-/// Create a `Pubkey` from a `&str`.
+/// Create an `Address` from a `&str`.
 #[cfg(feature = "const")]
 #[inline(always)]
 pub const fn from_str(value: &str) -> Address {
