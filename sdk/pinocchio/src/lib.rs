@@ -238,8 +238,9 @@ pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
 pub use entrypoint::lazy as lazy_entrypoint;
-// Re-export the `Address` type for downstream use.
+// Re-export the `solana_address` for downstream use.
 pub use solana_address as address;
+// Re-export the `solana_program_error` for downstream use.
 pub use solana_program_error as program_error;
 pub use solana_program_error::ProgramResult;
 
