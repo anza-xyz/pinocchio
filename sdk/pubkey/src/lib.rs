@@ -128,8 +128,6 @@ pub const fn derive_address_const<const N: usize>(
     bump: Option<u8>,
     program_id: &Address,
 ) -> Address {
-    use pinocchio::address::PDA_MARKER;
-
     const {
         assert!(N < MAX_SEEDS, "number of seeds must be less than MAX_SEEDS");
     }
