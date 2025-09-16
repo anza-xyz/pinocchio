@@ -149,7 +149,7 @@ macro_rules! entrypoint {
 ///
 /// ```ignore
 /// fn process_instruction(
-///     program_id: &Pubkey,      // Public key of the account the program was loaded into
+///     program_id: &Address,     // Address of the account the program was loaded into
 ///     accounts: &[AccountInfo], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
