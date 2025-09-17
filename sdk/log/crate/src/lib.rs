@@ -199,9 +199,47 @@ mod tests {
 
         logger.clear();
 
-        // This should have no effect.
+        // This should have no effect since it is a string.
         logger.append_with_args("0123456789", &[Argument::Precision(2)]);
         assert!(&*logger == "0123456789".as_bytes());
+
+        // Setting a precision equal to or greater than the maximum digits should have
+        // no effect. The value used will be capped at the maximum digits - 1.
+        let mut l1 = Logger::<50>::default();
+        let mut l2 = Logger::<50>::default();
+
+        l1.append_with_args(2u8, &[Argument::Precision(u8::MAX)]);
+        assert_eq!(&*l1, "0.02".as_bytes());
+        // same as 2 precision
+        l2.append_with_args(2u8, &[Argument::Precision(2)]);
+        assert_eq!(&*l1, &*l2);
+
+        l1.clear();
+        l2.clear();
+
+        l1.append_with_args(2u16, &[Argument::Precision(u8::MAX)]);
+        assert_eq!(&*l1, "0.0002".as_bytes());
+        // same as 4 precision
+        l2.append_with_args(2u16, &[Argument::Precision(4)]);
+        assert_eq!(&*l1, &*l2);
+
+        l1.clear();
+        l2.clear();
+
+        l1.append_with_args(2u32, &[Argument::Precision(u8::MAX)]);
+        assert_eq!(&*l1, "0.000000002".as_bytes());
+        // same as 9 precision
+        l2.append_with_args(2u32, &[Argument::Precision(9)]);
+        assert_eq!(&*l1, &*l2);
+
+        l1.clear();
+        l2.clear();
+
+        l1.append_with_args(2u64, &[Argument::Precision(u8::MAX)]);
+        assert_eq!(&*l1, "0.0000000000000000002".as_bytes());
+        // same as 19 precision
+        l2.append_with_args(2u64, &[Argument::Precision(19)]);
+        assert_eq!(&*l1, &*l2);
     }
 
     #[test]
