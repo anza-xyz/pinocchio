@@ -1,25 +1,26 @@
 //! Group operations on the BN254 curve.
 
-use super::{ALT_BN128_FIELD_SIZE, ALT_BN128_G1_SIZE, ALT_BN128_G2_SIZE};
+use super::{ALT_BN128_FIELD_SIZE, ALT_BN128_G1_POINT_SIZE, ALT_BN128_G2_POINT_SIZE};
 use crate::program_error::ProgramError;
 
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_alt_bn128_group_op;
 
 /// Input length for the add operation.
-pub const ALT_BN128_ADDITION_INPUT_LEN: usize = ALT_BN128_G1_SIZE * 2; // 128
+pub const ALT_BN128_ADDITION_INPUT_LEN: usize = ALT_BN128_G1_POINT_SIZE * 2; // 128
 
 /// Input length for the multiplication operation.
-pub const ALT_BN128_MULTIPLICATION_INPUT_LEN: usize = ALT_BN128_G1_SIZE + ALT_BN128_FIELD_SIZE; // 96
+pub const ALT_BN128_MULTIPLICATION_INPUT_LEN: usize =
+    ALT_BN128_G1_POINT_SIZE + ALT_BN128_FIELD_SIZE; // 96
 
 /// Pair element length.
-pub const ALT_BN128_PAIRING_ELEMENT_LEN: usize = ALT_BN128_G1_SIZE + ALT_BN128_G2_SIZE; // 192
+pub const ALT_BN128_PAIRING_ELEMENT_LEN: usize = ALT_BN128_G1_POINT_SIZE + ALT_BN128_G2_POINT_SIZE; // 192
 
 /// Output length for the add operation.
-pub const ALT_BN128_ADDITION_OUTPUT_LEN: usize = ALT_BN128_G1_SIZE; // 64
+pub const ALT_BN128_ADDITION_OUTPUT_LEN: usize = ALT_BN128_G1_POINT_SIZE; // 64
 
 /// Output length for the multiplication operation.
-pub const ALT_BN128_MULTIPLICATION_OUTPUT_LEN: usize = ALT_BN128_G1_SIZE; // 64
+pub const ALT_BN128_MULTIPLICATION_OUTPUT_LEN: usize = ALT_BN128_G1_POINT_SIZE; // 64
 
 const ALT_BN128_ADD: u64 = 0;
 #[allow(dead_code)]

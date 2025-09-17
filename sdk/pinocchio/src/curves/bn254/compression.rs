@@ -1,14 +1,14 @@
 //! Compression/decompression of points on the BN254 curve.
 
-use super::{ALT_BN128_G1_SIZE, ALT_BN128_G2_SIZE};
+use super::{ALT_BN128_G1_POINT_SIZE, ALT_BN128_G2_POINT_SIZE};
 use crate::program_error::ProgramError;
 
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_alt_bn128_compression;
 
 // compression sizes
-pub const ALT_BN128_G1_COMPRESSED_SIZE: usize = ALT_BN128_G1_SIZE / 2; // 32
-pub const ALT_BN128_G2_COMPRESSED_SIZE: usize = ALT_BN128_G2_SIZE / 2; // 64
+pub const ALT_BN128_G1_COMPRESSED_POINT_SIZE: usize = ALT_BN128_G1_POINT_SIZE / 2; // 32
+pub const ALT_BN128_G2_COMPRESSED_POINT_SIZE: usize = ALT_BN128_G2_POINT_SIZE / 2; // 64
 
 // compression operations
 const ALT_BN128_G1_COMPRESS: u64 = 0;
@@ -32,7 +32,7 @@ const ALT_BN128_G2_DECOMPRESS: u64 = 3;
 #[inline(always)]
 pub fn alt_bn128_g1_compress(
     input: &[u8],
-) -> Result<[u8; ALT_BN128_G1_COMPRESSED_SIZE], ProgramError> {
+) -> Result<[u8; ALT_BN128_G1_COMPRESSED_POINT_SIZE], ProgramError> {
     alt_bn128_compression(input, ALT_BN128_G1_COMPRESS)
 }
 
@@ -51,8 +51,8 @@ pub fn alt_bn128_g1_compress(
 /// returning an error without incurring the cost of the syscall.
 pub fn checked_alt_bn128_g1_compress(
     input: &[u8],
-) -> Result<[u8; ALT_BN128_G1_COMPRESSED_SIZE], ProgramError> {
-    if input.len() != ALT_BN128_G1_SIZE {
+) -> Result<[u8; ALT_BN128_G1_COMPRESSED_POINT_SIZE], ProgramError> {
+    if input.len() != ALT_BN128_G1_POINT_SIZE {
         return Err(ProgramError::InvalidArgument);
     }
     alt_bn128_compression(input, ALT_BN128_G1_COMPRESS)
@@ -72,7 +72,9 @@ pub fn checked_alt_bn128_g1_compress(
 /// Note: This function does **not** check if the input has the correct length.
 /// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
-pub fn alt_bn128_g1_decompress(input: &[u8]) -> Result<[u8; ALT_BN128_G1_SIZE], ProgramError> {
+pub fn alt_bn128_g1_decompress(
+    input: &[u8],
+) -> Result<[u8; ALT_BN128_G1_POINT_SIZE], ProgramError> {
     alt_bn128_compression(input, ALT_BN128_G1_DECOMPRESS)
 }
 
@@ -91,8 +93,8 @@ pub fn alt_bn128_g1_decompress(input: &[u8]) -> Result<[u8; ALT_BN128_G1_SIZE], 
 /// returning an error without incurring the cost of the syscall.
 pub fn checked_alt_bn128_g1_decompress(
     input: &[u8],
-) -> Result<[u8; ALT_BN128_G1_SIZE], ProgramError> {
-    if input.len() != ALT_BN128_G1_COMPRESSED_SIZE {
+) -> Result<[u8; ALT_BN128_G1_POINT_SIZE], ProgramError> {
+    if input.len() != ALT_BN128_G1_COMPRESSED_POINT_SIZE {
         return Err(ProgramError::InvalidArgument);
     }
     alt_bn128_compression(input, ALT_BN128_G1_DECOMPRESS)
@@ -114,7 +116,7 @@ pub fn checked_alt_bn128_g1_decompress(
 #[inline(always)]
 pub fn alt_bn128_g2_compress(
     input: &[u8],
-) -> Result<[u8; ALT_BN128_G2_COMPRESSED_SIZE], ProgramError> {
+) -> Result<[u8; ALT_BN128_G2_COMPRESSED_POINT_SIZE], ProgramError> {
     alt_bn128_compression(input, ALT_BN128_G2_COMPRESS)
 }
 
@@ -133,8 +135,8 @@ pub fn alt_bn128_g2_compress(
 /// returning an error without incurring the cost of the syscall.
 pub fn checked_alt_bn128_g2_compress(
     input: &[u8],
-) -> Result<[u8; ALT_BN128_G2_COMPRESSED_SIZE], ProgramError> {
-    if input.len() != ALT_BN128_G2_SIZE {
+) -> Result<[u8; ALT_BN128_G2_COMPRESSED_POINT_SIZE], ProgramError> {
+    if input.len() != ALT_BN128_G2_POINT_SIZE {
         return Err(ProgramError::InvalidArgument);
     }
     alt_bn128_compression(input, ALT_BN128_G2_COMPRESS)
@@ -154,7 +156,9 @@ pub fn checked_alt_bn128_g2_compress(
 /// Note: This function does **not** check if the input has the correct length.
 /// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
-pub fn alt_bn128_g2_decompress(input: &[u8]) -> Result<[u8; ALT_BN128_G2_SIZE], ProgramError> {
+pub fn alt_bn128_g2_decompress(
+    input: &[u8],
+) -> Result<[u8; ALT_BN128_G2_POINT_SIZE], ProgramError> {
     alt_bn128_compression(input, ALT_BN128_G2_DECOMPRESS)
 }
 
@@ -173,8 +177,8 @@ pub fn alt_bn128_g2_decompress(input: &[u8]) -> Result<[u8; ALT_BN128_G2_SIZE], 
 /// returning an error without incurring the cost of the syscall.
 pub fn checked_alt_bn128_g2_decompress(
     input: &[u8],
-) -> Result<[u8; ALT_BN128_G2_SIZE], ProgramError> {
-    if input.len() != ALT_BN128_G2_COMPRESSED_SIZE {
+) -> Result<[u8; ALT_BN128_G2_POINT_SIZE], ProgramError> {
+    if input.len() != ALT_BN128_G2_COMPRESSED_POINT_SIZE {
         return Err(ProgramError::InvalidArgument);
     }
     alt_bn128_compression(input, ALT_BN128_G2_DECOMPRESS)
