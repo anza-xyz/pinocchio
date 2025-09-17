@@ -22,11 +22,11 @@ pub const ALT_BN128_ADDITION_OUTPUT_LEN: usize = ALT_BN128_G1_POINT_SIZE; // 64
 /// Output length for the multiplication operation.
 pub const ALT_BN128_MULTIPLICATION_OUTPUT_LEN: usize = ALT_BN128_G1_POINT_SIZE; // 64
 
-const ALT_BN128_ADD: u64 = 0;
+const ALT_BN128_G1_ADD_BE: u64 = 0;
 #[allow(dead_code)]
-const ALT_BN128_SUB: u64 = 1; // not implemented in the syscall
-const ALT_BN128_MUL: u64 = 2;
-const ALT_BN128_PAIRING: u64 = 3;
+const ALT_BN128_G1_SUB_BE: u64 = 1; // not implemented in the syscall
+const ALT_BN128_G1_MUL_BE: u64 = 2;
+const ALT_BN128_PAIRING_BE: u64 = 3;
 
 /// Add two G1 points on the BN254 curve in big-endian (EIP-197) encoding.
 ///
@@ -42,10 +42,10 @@ const ALT_BN128_PAIRING: u64 = 3;
 /// Note: This function does **not** check if the input has the correct length.
 /// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
-pub fn alt_bn128_addition(
+pub fn alt_bn128_g1_addition_be(
     input: &[u8],
 ) -> Result<[u8; ALT_BN128_ADDITION_OUTPUT_LEN], ProgramError> {
-    alt_bn128_group_op(input, ALT_BN128_ADD)
+    alt_bn128_group_op(input, ALT_BN128_G1_ADD_BE)
 }
 
 /// Multiply a G1 point by a scalar on the BN254 curve in big-endian (EIP-197) encoding.
@@ -63,10 +63,10 @@ pub fn alt_bn128_addition(
 /// Note: This function does **not** check if the input has the correct length.
 /// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
-pub fn alt_bn128_multiplication(
+pub fn alt_bn128_g1_multiplication_be(
     input: &[u8],
 ) -> Result<[u8; ALT_BN128_MULTIPLICATION_OUTPUT_LEN], ProgramError> {
-    alt_bn128_group_op(input, ALT_BN128_MUL)
+    alt_bn128_group_op(input, ALT_BN128_G1_MUL_BE)
 }
 
 /// Perform a pairing operation on the BN254 curve in big-endian (EIP-197) encoding.
@@ -85,8 +85,8 @@ pub fn alt_bn128_multiplication(
 /// After SIMD-0334 is implemented, it will return an error if the length is invalid,
 /// incurring the cost of the syscall.
 #[inline(always)]
-pub fn alt_bn128_pairing(input: &[u8]) -> Result<u8, ProgramError> {
-    alt_bn128_group_op::<32>(input, ALT_BN128_PAIRING).map(|data| data[31])
+pub fn alt_bn128_pairing_be(input: &[u8]) -> Result<u8, ProgramError> {
+    alt_bn128_group_op::<32>(input, ALT_BN128_PAIRING_BE).map(|data| data[31])
 }
 
 #[inline]

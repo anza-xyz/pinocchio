@@ -11,10 +11,10 @@ pub const ALT_BN128_G1_COMPRESSED_POINT_SIZE: usize = ALT_BN128_G1_POINT_SIZE / 
 pub const ALT_BN128_G2_COMPRESSED_POINT_SIZE: usize = ALT_BN128_G2_POINT_SIZE / 2; // 64
 
 // compression operations
-const ALT_BN128_G1_COMPRESS: u64 = 0;
-const ALT_BN128_G1_DECOMPRESS: u64 = 1;
-const ALT_BN128_G2_COMPRESS: u64 = 2;
-const ALT_BN128_G2_DECOMPRESS: u64 = 3;
+const ALT_BN128_G1_COMPRESS_BE: u64 = 0;
+const ALT_BN128_G1_DECOMPRESS_BE: u64 = 1;
+const ALT_BN128_G2_COMPRESS_BE: u64 = 2;
+const ALT_BN128_G2_DECOMPRESS_BE: u64 = 3;
 
 /// Compress a G1 point on the BN254 curve.
 ///
@@ -27,10 +27,10 @@ const ALT_BN128_G2_DECOMPRESS: u64 = 3;
 /// A `Result` containing the compressed G1 point in big-endian (EIP-197) encoding,
 /// or an error if the input is not a valid G1 point.
 #[inline(always)]
-pub fn alt_bn128_g1_compress(
+pub fn alt_bn128_g1_compress_be(
     input: &[u8; ALT_BN128_G1_POINT_SIZE],
 ) -> Result<[u8; ALT_BN128_G1_COMPRESSED_POINT_SIZE], ProgramError> {
-    alt_bn128_compression(input, ALT_BN128_G1_COMPRESS)
+    alt_bn128_compression(input, ALT_BN128_G1_COMPRESS_BE)
 }
 
 /// Decompress a G1 point on the BN254 curve.
@@ -44,10 +44,10 @@ pub fn alt_bn128_g1_compress(
 /// A `Result` containing the decompressed G1 point in big-endian (EIP-197) encoding,
 /// or an error if the input is not a valid compressed G1 point.
 #[inline(always)]
-pub fn alt_bn128_g1_decompress(
+pub fn alt_bn128_g1_decompress_be(
     input: &[u8; ALT_BN128_G1_COMPRESSED_POINT_SIZE],
 ) -> Result<[u8; ALT_BN128_G1_POINT_SIZE], ProgramError> {
-    alt_bn128_compression(input, ALT_BN128_G1_DECOMPRESS)
+    alt_bn128_compression(input, ALT_BN128_G1_DECOMPRESS_BE)
 }
 
 /// Compress a G2 point on the BN254 curve.
@@ -61,10 +61,10 @@ pub fn alt_bn128_g1_decompress(
 /// A `Result` containing the compressed G2 point in big-endian (EIP-197) encoding,
 /// or an error if the input is not a valid G2 point.
 #[inline(always)]
-pub fn alt_bn128_g2_compress(
+pub fn alt_bn128_g2_compress_be(
     input: &[u8; ALT_BN128_G2_POINT_SIZE],
 ) -> Result<[u8; ALT_BN128_G2_COMPRESSED_POINT_SIZE], ProgramError> {
-    alt_bn128_compression(input, ALT_BN128_G2_COMPRESS)
+    alt_bn128_compression(input, ALT_BN128_G2_COMPRESS_BE)
 }
 
 /// Decompress a G2 point on the BN254 curve.
@@ -78,10 +78,10 @@ pub fn alt_bn128_g2_compress(
 /// A `Result` containing the decompressed G2 point in big-endian (EIP-197) encoding,
 /// or an error if the input is not a valid compressed G2 point.
 #[inline(always)]
-pub fn alt_bn128_g2_decompress(
+pub fn alt_bn128_g2_decompress_be(
     input: &[u8; ALT_BN128_G2_COMPRESSED_POINT_SIZE],
 ) -> Result<[u8; ALT_BN128_G2_POINT_SIZE], ProgramError> {
-    alt_bn128_compression(input, ALT_BN128_G2_DECOMPRESS)
+    alt_bn128_compression(input, ALT_BN128_G2_DECOMPRESS_BE)
 }
 
 #[inline]
