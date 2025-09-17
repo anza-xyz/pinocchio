@@ -175,6 +175,10 @@ pub enum Argument {
     /// Number of decimal places to display for numbers.
     ///
     /// This is only applicable for numeric types.
+    ///
+    /// The precision cannot be equal to or greater than the maximum number
+    /// of digits for the type. If it is, it will be set to the maximum
+    /// number of digits minus one.
     Precision(u8),
 
     /// Truncate the output at the end when the specified maximum number of characters
@@ -262,7 +266,13 @@ macro_rules! impl_log_for_unsigned_integer {
                             .iter()
                             .find(|arg| matches!(arg, Argument::Precision(_)))
                         {
-                            *p as usize
+                            // Precision cannot be equal to or greater than the maximum number
+                            // of digits for the type..
+                            if (*p as usize) >= MAX_DIGITS {
+                                MAX_DIGITS - 1
+                            } else {
+                                *p as usize
+                            }
                         } else {
                             0
                         };
