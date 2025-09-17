@@ -26,35 +26,10 @@ const ALT_BN128_G2_DECOMPRESS: u64 = 3;
 ///
 /// A `Result` containing the compressed G1 point in big-endian (EIP-197) encoding,
 /// or an error if the input is not a valid G1 point.
-///
-/// Note: This function does **not** check if the input has the correct length.
-/// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_g1_compress(
-    input: &[u8],
+    input: &[u8; ALT_BN128_G1_POINT_SIZE],
 ) -> Result<[u8; ALT_BN128_G1_COMPRESSED_POINT_SIZE], ProgramError> {
-    alt_bn128_compression(input, ALT_BN128_G1_COMPRESS)
-}
-
-/// Compress a G1 point on the BN254 curve.
-///
-/// # Arguments
-///
-/// * `input` - A G1 point in big-endian (EIP-197) encoding.
-///
-/// # Returns
-///
-/// A `Result` containing the compressed G1 point in big-endian (EIP-197) encoding,
-/// or an error if the input is not a valid G1 point.
-///
-/// Note: This function checks if the input has the correct length,
-/// returning an error without incurring the cost of the syscall.
-pub fn checked_alt_bn128_g1_compress(
-    input: &[u8],
-) -> Result<[u8; ALT_BN128_G1_COMPRESSED_POINT_SIZE], ProgramError> {
-    if input.len() != ALT_BN128_G1_POINT_SIZE {
-        return Err(ProgramError::InvalidArgument);
-    }
     alt_bn128_compression(input, ALT_BN128_G1_COMPRESS)
 }
 
@@ -68,35 +43,10 @@ pub fn checked_alt_bn128_g1_compress(
 ///
 /// A `Result` containing the decompressed G1 point in big-endian (EIP-197) encoding,
 /// or an error if the input is not a valid compressed G1 point.
-///
-/// Note: This function does **not** check if the input has the correct length.
-/// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_g1_decompress(
-    input: &[u8],
+    input: &[u8; ALT_BN128_G1_COMPRESSED_POINT_SIZE],
 ) -> Result<[u8; ALT_BN128_G1_POINT_SIZE], ProgramError> {
-    alt_bn128_compression(input, ALT_BN128_G1_DECOMPRESS)
-}
-
-/// Decompress a G1 point on the BN254 curve.
-///
-/// # Arguments
-///
-/// * `input` - A compressed G1 point in big-endian (EIP-197) encoding.
-///
-/// # Returns
-///
-/// A `Result` containing the decompressed G1 point in big-endian (EIP-197) encoding,
-/// or an error if the input is not a valid compressed G1 point.
-///
-/// Note: This function checks if the input has the correct length,
-/// returning an error without incurring the cost of the syscall.
-pub fn checked_alt_bn128_g1_decompress(
-    input: &[u8],
-) -> Result<[u8; ALT_BN128_G1_POINT_SIZE], ProgramError> {
-    if input.len() != ALT_BN128_G1_COMPRESSED_POINT_SIZE {
-        return Err(ProgramError::InvalidArgument);
-    }
     alt_bn128_compression(input, ALT_BN128_G1_DECOMPRESS)
 }
 
@@ -110,35 +60,10 @@ pub fn checked_alt_bn128_g1_decompress(
 ///
 /// A `Result` containing the compressed G2 point in big-endian (EIP-197) encoding,
 /// or an error if the input is not a valid G2 point.
-///
-/// Note: This function does **not** check if the input has the correct length.
-/// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_g2_compress(
-    input: &[u8],
+    input: &[u8; ALT_BN128_G2_POINT_SIZE],
 ) -> Result<[u8; ALT_BN128_G2_COMPRESSED_POINT_SIZE], ProgramError> {
-    alt_bn128_compression(input, ALT_BN128_G2_COMPRESS)
-}
-
-/// Compress a G2 point on the BN254 curve.
-///
-/// # Arguments
-///
-/// * `input` - A G2 point in big-endian (EIP-197) encoding.
-///
-/// # Returns
-///
-/// A `Result` containing the compressed G2 point in big-endian (EIP-197) encoding,
-/// or an error if the input is not a valid G2 point.
-///
-/// Note: This function checks if the input has the correct length,
-/// returning an error without incurring the cost of the syscall.
-pub fn checked_alt_bn128_g2_compress(
-    input: &[u8],
-) -> Result<[u8; ALT_BN128_G2_COMPRESSED_POINT_SIZE], ProgramError> {
-    if input.len() != ALT_BN128_G2_POINT_SIZE {
-        return Err(ProgramError::InvalidArgument);
-    }
     alt_bn128_compression(input, ALT_BN128_G2_COMPRESS)
 }
 
@@ -152,35 +77,10 @@ pub fn checked_alt_bn128_g2_compress(
 ///
 /// A `Result` containing the decompressed G2 point in big-endian (EIP-197) encoding,
 /// or an error if the input is not a valid compressed G2 point.
-///
-/// Note: This function does **not** check if the input has the correct length.
-/// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_g2_decompress(
-    input: &[u8],
+    input: &[u8; ALT_BN128_G2_COMPRESSED_POINT_SIZE],
 ) -> Result<[u8; ALT_BN128_G2_POINT_SIZE], ProgramError> {
-    alt_bn128_compression(input, ALT_BN128_G2_DECOMPRESS)
-}
-
-/// Decompress a G2 point on the BN254 curve.
-///
-/// # Arguments
-///
-/// * `input` - A compressed G2 point in big-endian (EIP-197) encoding.
-///
-/// # Returns
-///
-/// A `Result` containing the decompressed G2 point in big-endian (EIP-197) encoding,
-/// or an error if the input is not a valid compressed G2 point.
-///
-/// Note: This function checks if the input has the correct length,
-/// returning an error without incurring the cost of the syscall.
-pub fn checked_alt_bn128_g2_decompress(
-    input: &[u8],
-) -> Result<[u8; ALT_BN128_G2_POINT_SIZE], ProgramError> {
-    if input.len() != ALT_BN128_G2_COMPRESSED_POINT_SIZE {
-        return Err(ProgramError::InvalidArgument);
-    }
     alt_bn128_compression(input, ALT_BN128_G2_DECOMPRESS)
 }
 

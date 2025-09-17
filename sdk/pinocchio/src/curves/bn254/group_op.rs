@@ -48,29 +48,6 @@ pub fn alt_bn128_addition(
     alt_bn128_group_op(input, ALT_BN128_ADD)
 }
 
-/// Add two G1 points on the BN254 curve in big-endian (EIP-197) encoding.
-///
-/// # Arguments
-///
-/// * `input` - Two consecutive G1 points in big-endian (EIP-197) encoding.
-///
-/// # Returns
-///
-/// A `Result` containing the result of the addition in big-endian (EIP-197) encoding,
-/// or an error if the input is invalid.
-///
-/// Note: This function checks if the input has the correct length,
-/// returning an error without incurring the cost of the syscall.
-#[inline(always)]
-pub fn checked_alt_bn128_addition(
-    input: &[u8],
-) -> Result<[u8; ALT_BN128_ADDITION_OUTPUT_LEN], ProgramError> {
-    if input.len() > ALT_BN128_ADDITION_INPUT_LEN {
-        return Err(ProgramError::InvalidArgument);
-    }
-    alt_bn128_group_op(input, ALT_BN128_ADD)
-}
-
 /// Multiply a G1 point by a scalar on the BN254 curve in big-endian (EIP-197) encoding.
 ///
 /// # Arguments
@@ -92,30 +69,6 @@ pub fn alt_bn128_multiplication(
     alt_bn128_group_op(input, ALT_BN128_MUL)
 }
 
-/// Multiply a G1 point by a scalar on the BN254 curve in big-endian (EIP-197) encoding.
-///
-/// # Arguments
-///
-/// * `input` - A G1 point in big-endian (EIP-197) encoding,
-///   followed by a scalar in big-endian (EIP-197) encoding.
-///
-/// # Returns
-///
-/// A `Result` containing the result of the multiplication in big-endian (EIP-197)
-/// encoding, or an error if the input is invalid.
-///
-/// Note: This function checks if the input has the correct length,
-/// returning an error without incurring the cost of the syscall.
-#[inline(always)]
-pub fn checked_alt_bn128_multiplication(
-    input: &[u8],
-) -> Result<[u8; ALT_BN128_MULTIPLICATION_OUTPUT_LEN], ProgramError> {
-    if input.len() > ALT_BN128_MULTIPLICATION_INPUT_LEN {
-        return Err(ProgramError::InvalidArgument);
-    }
-    alt_bn128_group_op(input, ALT_BN128_MUL)
-}
-
 /// Perform a pairing operation on the BN254 curve in big-endian (EIP-197) encoding.
 ///
 /// # Arguments
@@ -133,26 +86,6 @@ pub fn checked_alt_bn128_multiplication(
 /// incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_pairing(input: &[u8]) -> Result<u8, ProgramError> {
-    alt_bn128_group_op::<32>(input, ALT_BN128_PAIRING).map(|data| data[31])
-}
-
-/// Perform a pairing operation on the BN254 curve in big-endian (EIP-197) encoding.
-///
-/// # Arguments
-///
-/// * `input` - A sequence of pairs of G1 and G2 points in big-endian (EIP-197) encoding.
-///
-/// # Returns
-///
-/// A `Result` containing the result of the pairing operation, or an error if the input is invalid.
-///
-/// Note: This function checks if the input has the correct length,
-/// returning an error without incurring the cost of the syscall.
-#[inline(always)]
-pub fn checked_alt_bn128_pairing(input: &[u8]) -> Result<u8, ProgramError> {
-    if input.len() % ALT_BN128_PAIRING_ELEMENT_LEN != 0 {
-        return Err(ProgramError::InvalidArgument);
-    }
     alt_bn128_group_op::<32>(input, ALT_BN128_PAIRING).map(|data| data[31])
 }
 
