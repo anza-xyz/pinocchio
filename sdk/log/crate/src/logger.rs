@@ -1,4 +1,6 @@
-use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
+use core::{
+    cmp::min, mem::MaybeUninit, ops::Deref, ptr::copy_nonoverlapping, slice::from_raw_parts,
+};
 
 #[cfg(all(target_os = "solana", not(target_feature = "static-syscalls")))]
 mod syscalls {
@@ -252,7 +254,7 @@ macro_rules! impl_log_for_unsigned_integer {
                             value /= 10;
                             offset -= 1;
                             // SAFETY: the offset is always within the bounds of the array since
-                            // the `offset` is initialized with the maximum number of digits that
+                            // `offset` is initialized with the maximum number of digits that
                             // the type can have and decremented on each iteration; `remainder`
                             // is always less than 10.
                             unsafe {
@@ -266,47 +268,32 @@ macro_rules! impl_log_for_unsigned_integer {
                             .iter()
                             .find(|arg| matches!(arg, Argument::Precision(_)))
                         {
-                            // Precision cannot be equal to or greater than the maximum number
-                            // of digits for the type..
-                            if (*p as usize) >= MAX_DIGITS {
-                                MAX_DIGITS - 1
-                            } else {
-                                *p as usize
-                            }
+                            *p as usize
                         } else {
                             0
                         };
 
-                        // Number of digits written.
-                        let mut written = MAX_DIGITS - offset;
-
-                        if precision > 0 {
-                            while precision >= written {
-                                written += 1;
-                                offset -= 1;
-                                // SAFETY: the offset is always within the bounds of the array since
-                                // the `offset` is initialized with the maximum number of digits that
-                                // the type can have and decremented on each iteration.
-                                unsafe {
-                                    digits.get_unchecked_mut(offset).write(b'0');
-                                }
-                            }
-                            // Space for the decimal point.
-                            written += 1;
-                        }
-
-                        // Size of the buffer.
+                        let written = MAX_DIGITS - offset;
                         let length = buffer.len();
-                        // Determines if the value was truncated or not by calculating the
-                        // number of digits that can be written.
-                        let (overflow, written, fraction) = if written <= length {
-                            (false, written, precision)
-                        } else {
-                            (true, length, precision.saturating_sub(written - length))
+
+                        // Space required with the specified precision. We might need
+                        // to add leading zeros and a decimal point, but this is only
+                        // if the precision is greater than zero.
+                        let required = match precision {
+                            0 => written,
+                            // decimal point
+                            _precision if precision < written => written + 1,
+                            // decimal point + one leading zero
+                            _ => precision + 2,
                         };
+                        // Determines if the value will be truncated or not.
+                        let overflow = required > length;
+                        // Cap the number of digits to write to the buffer length.
+                        let written = min(MAX_DIGITS - offset, length);
+
                         // SAFETY: the length of both `digits` and `buffer` arrays are guaranteed
-                        // to be within bounds and the `written` value is always less than their
-                        // maximum length.
+                        // to be within bounds and the `written` value is capped to the length of
+                        // the `buffer`.
                         unsafe {
                             let source = digits.as_ptr().add(offset);
                             let ptr = buffer.as_mut_ptr();
@@ -319,23 +306,57 @@ macro_rules! impl_log_for_unsigned_integer {
                                         source as *const _,
                                         written as u64,
                                     );
-                                } else {
-                                    // Integer part of the number.
-                                    let integer_part = written - (fraction + 1);
-                                    syscalls::sol_memcpy_(
-                                        ptr as *mut _,
-                                        source as *const _,
-                                        integer_part as u64,
+                                }
+                                // If padding is needed to satisfy the precision, add leading zeros
+                                // and a decimal point.
+                                else if precision > written {
+                                    // Prefix and decimal point.
+                                    (ptr as *mut u8).write(b'0');
+                                    (ptr.add(1) as *mut u8).write(b'.');
+                                    // Precision padding (minus leading zero and decimal point).
+                                    let padding = min(length - 2, precision - written);
+                                    syscalls::sol_memset(
+                                        ptr.add(2) as *mut _,
+                                        b'0',
+                                        padding as u64,
                                     );
+                                    let current = 2 + padding;
+
+                                    // If there is still space, copy (part of) the number.
+                                    if current < length {
+                                        let remaining = min(written, length - current);
+                                        // Number part.
+                                        syscalls::sol_memcpy_(
+                                            ptr.add(current) as *mut _,
+                                            source as *const _,
+                                            remaining as u64,
+                                        );
+                                    }
+                                }
+                                // No padding is needed, just add a decimal point.
+                                else {
+                                    // Integer part of the number.
+                                    let (offset, source) = if written > precision {
+                                        let integer_part = written - precision;
+                                        syscalls::sol_memcpy_(
+                                            ptr as *mut _,
+                                            source as *const _,
+                                            integer_part as u64,
+                                        );
+                                        (integer_part, source.add(integer_part))
+                                    } else {
+                                        (ptr as *mut u8).write(b'0');
+                                        (1, source)
+                                    };
 
                                     // Decimal point.
-                                    (ptr.add(integer_part) as *mut u8).write(b'.');
+                                    (ptr.add(offset) as *mut u8).write(b'.');
 
                                     // Fractional part of the number.
                                     syscalls::sol_memcpy_(
-                                        ptr.add(integer_part + 1) as *mut _,
-                                        source.add(integer_part) as *const _,
-                                        fraction as u64,
+                                        ptr.add(offset + 1) as *mut _,
+                                        source as *const _,
+                                        precision as u64,
                                     );
                                 }
                             }
@@ -343,33 +364,57 @@ macro_rules! impl_log_for_unsigned_integer {
                             #[cfg(not(target_os = "solana"))]
                             {
                                 if precision == 0 {
-                                    core::ptr::copy_nonoverlapping(source, ptr, written);
-                                } else {
+                                    copy_nonoverlapping(source, ptr, written);
+                                }
+                                // If padding is needed to satisfy the precision, add leading zeros
+                                // and a decimal point.
+                                else if precision > written {
+                                    // Prefix and decimal point.
+                                    (ptr as *mut u8).write(b'0');
+                                    (ptr.add(1) as *mut u8).write(b'.');
+                                    // Precision padding.
+                                    let padding = min(length - 2, precision - written);
+                                    (ptr.add(2) as *mut u8).write_bytes(b'0', padding);
+                                    let current = 2 + padding;
+
+                                    // If there is still space, copy (part of) the number.
+                                    if current < length {
+                                        let remaining = min(written, length - current);
+                                        // Number part.
+                                        copy_nonoverlapping(source, ptr.add(current), remaining);
+                                    }
+                                }
+                                // No padding is needed, just add a decimal point.
+                                else {
                                     // Integer part of the number.
-                                    let integer_part = written - (fraction + 1);
-                                    core::ptr::copy_nonoverlapping(source, ptr, integer_part);
+                                    let (offset, source) = if written > precision {
+                                        let integer_part = written - precision;
+                                        copy_nonoverlapping(source, ptr, integer_part);
+                                        (integer_part, source.add(integer_part))
+                                    } else {
+                                        (ptr as *mut u8).write(b'0');
+                                        (1, source)
+                                    };
 
                                     // Decimal point.
-                                    (ptr.add(integer_part) as *mut u8).write(b'.');
+                                    (ptr.add(offset) as *mut u8).write(b'.');
 
                                     // Fractional part of the number.
-                                    core::ptr::copy_nonoverlapping(
-                                        source.add(integer_part),
-                                        ptr.add(integer_part + 1),
-                                        fraction,
-                                    );
+                                    copy_nonoverlapping(source, ptr.add(offset + 1), precision);
                                 }
                             }
                         }
 
-                        // There might not have been space for all the value.
+                        let written = min(required, length);
+
+                        // There might not have been space.
                         if overflow {
-                            // SAFETY: the buffer is checked to be within `written` bounds.
+                            // SAFETY: `written` is capped to the length of the buffer.
                             unsafe {
-                                let last = buffer.get_unchecked_mut(written - 1);
-                                last.write(TRUNCATED);
+                                buffer.get_unchecked_mut(written - 1).write(TRUNCATED);
                             }
                         }
+
                         written
                     }
                 }
@@ -409,6 +454,15 @@ macro_rules! impl_log_for_signed {
                         let mut prefix = 0;
 
                         if *self < 0 {
+                            if buffer.len() == 1 {
+                                // SAFETY: the buffer is checked to be non-empty.
+                                unsafe {
+                                    buffer.get_unchecked_mut(0).write(TRUNCATED);
+                                }
+                                // There is no space for the number, so just return.
+                                return 1;
+                            }
+
                             // SAFETY: the buffer is checked to be non-empty.
                             unsafe {
                                 buffer.get_unchecked_mut(0).write(b'-');
@@ -521,7 +575,7 @@ unsafe impl Log for &str {
             // No truncate arguments were provided, so the entire `str` is copied to the buffer
             // if it fits; otherwise indicates that the `str` was truncated.
             if truncate_end.is_none() {
-                let length = core::cmp::min(size, self.len());
+                let length = min(size, self.len());
                 (
                     buffer.as_mut_ptr(),
                     self.as_ptr(),
@@ -530,7 +584,7 @@ unsafe impl Log for &str {
                     length != self.len(),
                 )
             } else {
-                let max_length = core::cmp::min(size, buffer.len());
+                let max_length = min(size, buffer.len());
                 let ptr = buffer.as_mut_ptr();
 
                 // The buffer is large enough to hold the entire `str`, so no need to use the
@@ -556,7 +610,7 @@ unsafe impl Log for &str {
                             )
                         };
                         // Copy the truncated slice to the buffer.
-                        core::ptr::copy_nonoverlapping(
+                        copy_nonoverlapping(
                             TRUNCATED_SLICE.as_ptr(),
                             ptr.add(offset) as *mut _,
                             TRUNCATED_SLICE.len(),
@@ -574,7 +628,7 @@ unsafe impl Log for &str {
 
         // SAFETY: the `destination` is always within `length_to_write` bounds.
         unsafe {
-            core::ptr::copy_nonoverlapping(source, destination as *mut _, length_to_write);
+            copy_nonoverlapping(source, destination as *mut _, length_to_write);
         }
 
         // There might not have been space for all the value.
