@@ -41,8 +41,10 @@ pub enum BorrowState {
 
 /// Raw account data.
 ///
-/// This data is wrapped in an `AccountInfo` struct, which provides safe access
-/// to the data.
+/// This struct is wrapped by [`AccountInfo`], which provides safe access
+/// to account information. At runtime, the account's data is serialized
+/// directly after the `Account` struct in memory, with its size specified
+/// by [`Account::data_len`].
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Account {
@@ -112,9 +114,20 @@ pub(crate) struct Account {
 
 /// Wrapper struct for an `Account`.
 ///
-/// This struct provides safe access to the data in an `Account`. It is also
-/// used to track borrows of the account data and lamports, given that an
-/// account can be "shared" across multiple `AccountInfo` instances.
+/// This struct provides safe access to the data in an `Account`. It is
+/// also used to track borrows of the account data and lamports, given
+/// that an account can be "shared" across multiple `AccountInfo`
+/// instances.
+///
+/// # Invariants
+///
+/// - The `raw` pointer must be valid and point to memory containing an
+///   `Account` struct, immediately followed by the account's data region.
+/// - The length of the account data must exactly match the value stored in
+///   `Account::data_len`.
+///
+/// These conditions must always hold for any `AccountInfo` created from
+/// a raw pointer.
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct AccountInfo {
