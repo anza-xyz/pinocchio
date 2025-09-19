@@ -18,6 +18,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
+asm = []
 std = []
 
 [dev-dependencies]
