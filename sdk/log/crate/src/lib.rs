@@ -333,6 +333,46 @@ mod tests {
 
         logger.append_with_args("0123456789", &[Argument::TruncateStart(9)]);
         assert!(&*logger == "..@".as_bytes());
+
+        let mut logger = Logger::<1>::default();
+
+        logger.append_with_args("test", &[Argument::TruncateStart(0)]);
+        assert!(&*logger == "".as_bytes());
+
+        logger.clear();
+
+        logger.append_with_args("test", &[Argument::TruncateStart(1)]);
+        assert!(&*logger == "@".as_bytes());
+
+        let mut logger = Logger::<2>::default();
+
+        logger.append_with_args("test", &[Argument::TruncateStart(2)]);
+        assert!(&*logger == ".@".as_bytes());
+
+        let mut logger = Logger::<3>::default();
+
+        logger.append_with_args("test", &[Argument::TruncateStart(3)]);
+        assert!(&*logger == "..@".as_bytes());
+
+        let mut logger = Logger::<1>::default();
+
+        logger.append_with_args("test", &[Argument::TruncateEnd(0)]);
+        assert!(&*logger == "".as_bytes());
+
+        logger.clear();
+
+        logger.append_with_args("test", &[Argument::TruncateEnd(1)]);
+        assert!(&*logger == "@".as_bytes());
+
+        let mut logger = Logger::<2>::default();
+
+        logger.append_with_args("test", &[Argument::TruncateEnd(2)]);
+        assert!(&*logger == ".@".as_bytes());
+
+        let mut logger = Logger::<3>::default();
+
+        logger.append_with_args("test", &[Argument::TruncateEnd(3)]);
+        assert!(&*logger == "..@".as_bytes());
     }
 
     #[test]

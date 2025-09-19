@@ -616,17 +616,26 @@ unsafe impl Log for &str {
                 }
             };
 
-        // SAFETY: the `destination` is always within `length_to_write` bounds.
-        unsafe {
-            copy_nonoverlapping(source, destination as *mut _, length_to_write);
-        }
-
-        // There might not have been space for all the value.
-        if truncated {
+        if length_to_write > 0 {
             // SAFETY: the `destination` is always within `length_to_write` bounds.
             unsafe {
-                let last = buffer.get_unchecked_mut(length_to_write - 1);
-                last.write(TRUNCATED);
+                #[cfg(target_os = "solana")]
+                syscalls::sol_memcpy_(
+                    destination as *mut _,
+                    source as *const _,
+                    length_to_write as u64,
+                );
+                #[cfg(not(target_os = "solana"))]
+                copy_nonoverlapping(source, destination as *mut _, length_to_write);
+            }
+
+            // There might not have been space for all the value.
+            if truncated {
+                // SAFETY: the `destination` is always within `length_to_write` bounds.
+                unsafe {
+                    let last = buffer.get_unchecked_mut(length_to_write - 1);
+                    last.write(TRUNCATED);
+                }
             }
         }
 
