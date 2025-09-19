@@ -298,125 +298,91 @@ macro_rules! impl_log_for_unsigned_integer {
                             let source = digits.as_ptr().add(offset);
                             let ptr = buffer.as_mut_ptr();
 
-                            #[cfg(target_os = "solana")]
-                            {
-                                // Copy the number to the buffer if no precision is specified.
-                                if precision == 0 {
-                                    syscalls::sol_memcpy_(
-                                        ptr as *mut _,
-                                        source as *const _,
-                                        written as u64,
+                            // Copy the number to the buffer if no precision is specified.
+                            if precision == 0 {
+                                #[cfg(target_os = "solana")]
+                                syscalls::sol_memcpy_(
+                                    ptr as *mut _,
+                                    source as *const _,
+                                    written as u64,
+                                );
+                                #[cfg(not(target_os = "solana"))]
+                                copy_nonoverlapping(source, ptr, written);
+                            }
+                            // If padding is needed to satisfy the precision, add leading zeros
+                            // and a decimal point.
+                            else if precision >= written {
+                                // Prefix.
+                                (ptr as *mut u8).write(b'0');
+
+                                if length > 2 {
+                                    (ptr.add(1) as *mut u8).write(b'.');
+                                    let padding = min(length - 2, precision - written);
+
+                                    // Precision padding.
+                                    #[cfg(target_os = "solana")]
+                                    syscalls::sol_memset(
+                                        ptr.add(2) as *mut _,
+                                        b'0',
+                                        padding as u64,
                                     );
-                                }
-                                // If padding is needed to satisfy the precision, add leading zeros
-                                // and a decimal point.
-                                else if precision >= written {
-                                    // Prefix and decimal point.
-                                    (ptr as *mut u8).write(b'0');
+                                    #[cfg(not(target_os = "solana"))]
+                                    (ptr.add(2) as *mut u8).write_bytes(b'0', padding);
 
-                                    if length > 2 {
-                                        (ptr.add(1) as *mut u8).write(b'.');
-                                        // Precision padding.
-                                        let padding = min(length - 2, precision - written);
-                                        syscalls::sol_memset(
-                                            ptr.add(2) as *mut _,
-                                            b'0',
-                                            padding as u64,
-                                        );
-                                        let current = 2 + padding;
+                                    let current = 2 + padding;
 
-                                        // If there is still space, copy (part of) the number.
-                                        if current < length {
-                                            let remaining = min(written, length - current);
-                                            // Number part.
-                                            syscalls::sol_memcpy_(
-                                                ptr.add(current) as *mut _,
-                                                source as *const _,
-                                                remaining as u64,
-                                            );
-                                        }
-                                    }
-                                }
-                                // No padding is needed, calculate the integer and fractional
-                                // parts and add a decimal point.
-                                else {
-                                    // Integer part of the number.
-                                    let integer_part = written - precision;
-                                    syscalls::sol_memcpy_(
-                                        ptr as *mut _,
-                                        source as *const _,
-                                        integer_part as u64,
-                                    );
-
-                                    // Decimal point.
-                                    (ptr.add(integer_part) as *mut u8).write(b'.');
-                                    let current = integer_part + 1;
-
-                                    // If there is still space, copy (part of) the remaining.
+                                    // If there is still space, copy (part of) the number.
                                     if current < length {
-                                        let remaining = min(precision, length - current);
-                                        // Fractional part of the number.
+                                        let remaining = min(written, length - current);
+
+                                        // Number part.
+                                        #[cfg(target_os = "solana")]
                                         syscalls::sol_memcpy_(
                                             ptr.add(current) as *mut _,
-                                            source.add(integer_part) as *const _,
+                                            source as *const _,
                                             remaining as u64,
                                         );
+                                        #[cfg(not(target_os = "solana"))]
+                                        copy_nonoverlapping(source, ptr.add(current), remaining);
                                     }
                                 }
                             }
+                            // No padding is needed, calculate the integer and fractional
+                            // parts and add a decimal point.
+                            else {
+                                let integer_part = written - precision;
 
-                            #[cfg(not(target_os = "solana"))]
-                            {
-                                // Copy the number to the buffer if no precision is specified.
-                                if precision == 0 {
-                                    copy_nonoverlapping(source, ptr, written);
-                                }
-                                // If padding is needed to satisfy the precision, add leading zeros
-                                // and a decimal point.
-                                else if precision >= written {
-                                    // Prefix and decimal point.
-                                    (ptr as *mut u8).write(b'0');
+                                // Integer part of the number.
+                                #[cfg(target_os = "solana")]
+                                syscalls::sol_memcpy_(
+                                    ptr as *mut _,
+                                    source as *const _,
+                                    integer_part as u64,
+                                );
+                                #[cfg(not(target_os = "solana"))]
+                                copy_nonoverlapping(source, ptr, integer_part);
 
-                                    if length > 2 {
-                                        (ptr.add(1) as *mut u8).write(b'.');
-                                        // Precision padding.
-                                        let padding = min(length - 2, precision - written);
-                                        (ptr.add(2) as *mut u8).write_bytes(b'0', padding);
-                                        let current = 2 + padding;
+                                // Decimal point.
+                                (ptr.add(integer_part) as *mut u8).write(b'.');
+                                let current = integer_part + 1;
 
-                                        // If there is still space, copy (part of) the number.
-                                        if current < length {
-                                            let remaining = min(written, length - current);
-                                            // Number part.
-                                            copy_nonoverlapping(
-                                                source,
-                                                ptr.add(current),
-                                                remaining,
-                                            );
-                                        }
-                                    }
-                                }
-                                // No padding is needed, calculate the integer and fractional
-                                // parts and add a decimal point.
-                                else {
-                                    // Integer part of the number.
-                                    let integer_part = written - precision;
-                                    copy_nonoverlapping(source, ptr, integer_part);
+                                // If there is still space, copy (part of) the remaining.
+                                if current < length {
+                                    let remaining = min(precision, length - current);
 
-                                    // Decimal point.
-                                    (ptr.add(integer_part) as *mut u8).write(b'.');
-                                    let current = integer_part + 1;
-
-                                    // If there is still space, copy (part of) the remaining.
-                                    if current < length {
-                                        let remaining = min(precision, length - current);
-                                        // Fractional part of the number.
-                                        copy_nonoverlapping(
-                                            source.add(integer_part),
-                                            ptr.add(current),
-                                            remaining,
-                                        );
-                                    }
+                                    // Fractional part of the number.
+                                    #[cfg(target_os = "solana")]
+                                    syscalls::sol_memcpy_(
+                                        ptr.add(current) as *mut _,
+                                        source.add(integer_part) as *const _,
+                                        remaining as u64,
+                                    );
+                                    #[cfg(not(target_os = "solana"))]
+                                    copy_nonoverlapping(
+                                        source.add(integer_part),
+                                        ptr.add(current),
+                                        remaining,
+                                    );
                                 }
                             }
                         }
