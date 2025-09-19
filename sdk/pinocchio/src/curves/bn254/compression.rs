@@ -85,14 +85,14 @@ pub fn alt_bn128_g2_decompress_be(
 }
 
 #[inline]
-fn alt_bn128_compression<const OUTPUT_DATA_LEN: usize>(
+fn alt_bn128_compression<const OUTPUT_DATA_SIZE: usize>(
     input: &[u8],
     op: u64,
-) -> Result<[u8; OUTPUT_DATA_LEN], ProgramError> {
+) -> Result<[u8; OUTPUT_DATA_SIZE], ProgramError> {
     // Call via a system call to perform the calculation
     #[cfg(target_os = "solana")]
     {
-        let mut bytes = core::mem::MaybeUninit::<[u8; OUTPUT_DATA_LEN]>::uninit();
+        let mut bytes = core::mem::MaybeUninit::<[u8; OUTPUT_DATA_SIZE]>::uninit();
 
         let result = unsafe {
             sol_alt_bn128_compression(

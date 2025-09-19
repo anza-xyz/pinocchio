@@ -6,21 +6,21 @@ use crate::program_error::ProgramError;
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_alt_bn128_group_op;
 
-/// Input length for the add operation.
-pub const ALT_BN128_ADDITION_INPUT_LEN: usize = ALT_BN128_G1_POINT_SIZE * 2; // 128
+/// Input size for the add operation.
+pub const ALT_BN128_ADDITION_INPUT_SIZE: usize = ALT_BN128_G1_POINT_SIZE * 2; // 128
 
-/// Input length for the multiplication operation.
-pub const ALT_BN128_MULTIPLICATION_INPUT_LEN: usize =
+/// Input size for the multiplication operation.
+pub const ALT_BN128_MULTIPLICATION_INPUT_SIZE: usize =
     ALT_BN128_G1_POINT_SIZE + ALT_BN128_FIELD_SIZE; // 96
 
-/// Pair element length.
-pub const ALT_BN128_PAIRING_ELEMENT_LEN: usize = ALT_BN128_G1_POINT_SIZE + ALT_BN128_G2_POINT_SIZE; // 192
+/// Pair element size.
+pub const ALT_BN128_PAIRING_ELEMENT_SIZE: usize = ALT_BN128_G1_POINT_SIZE + ALT_BN128_G2_POINT_SIZE; // 192
 
-/// Output length for the add operation.
-pub const ALT_BN128_ADDITION_OUTPUT_LEN: usize = ALT_BN128_G1_POINT_SIZE; // 64
+/// Output size for the add operation.
+pub const ALT_BN128_ADDITION_OUTPUT_SIZE: usize = ALT_BN128_G1_POINT_SIZE; // 64
 
-/// Output length for the multiplication operation.
-pub const ALT_BN128_MULTIPLICATION_OUTPUT_LEN: usize = ALT_BN128_G1_POINT_SIZE; // 64
+/// Output size for the multiplication operation.
+pub const ALT_BN128_MULTIPLICATION_OUTPUT_SIZE: usize = ALT_BN128_G1_POINT_SIZE; // 64
 
 const ALT_BN128_G1_ADD_BE: u64 = 0;
 #[allow(dead_code)]
@@ -44,7 +44,7 @@ const ALT_BN128_PAIRING_BE: u64 = 3;
 #[inline(always)]
 pub fn alt_bn128_g1_addition_be(
     input: &[u8],
-) -> Result<[u8; ALT_BN128_ADDITION_OUTPUT_LEN], ProgramError> {
+) -> Result<[u8; ALT_BN128_ADDITION_OUTPUT_SIZE], ProgramError> {
     alt_bn128_group_op(input, ALT_BN128_G1_ADD_BE)
 }
 
@@ -65,7 +65,7 @@ pub fn alt_bn128_g1_addition_be(
 #[inline(always)]
 pub fn alt_bn128_g1_multiplication_be(
     input: &[u8],
-) -> Result<[u8; ALT_BN128_MULTIPLICATION_OUTPUT_LEN], ProgramError> {
+) -> Result<[u8; ALT_BN128_MULTIPLICATION_OUTPUT_SIZE], ProgramError> {
     alt_bn128_group_op(input, ALT_BN128_G1_MUL_BE)
 }
 
@@ -81,7 +81,7 @@ pub fn alt_bn128_g1_multiplication_be(
 ///
 /// Note: This function does **not** check if the input has the correct length.
 /// Currently, if the length is invalid, it will not return an error; instead it will use only
-/// multiples of [`ALT_BN128_PAIRING_ELEMENT_LEN`] bytes and discard the rest.
+/// multiples of [`ALT_BN128_PAIRING_ELEMENT_SIZE`] bytes and discard the rest.
 /// After SIMD-0334 is implemented, it will return an error if the length is invalid,
 /// incurring the cost of the syscall.
 #[inline(always)]
@@ -90,14 +90,14 @@ pub fn alt_bn128_pairing_be(input: &[u8]) -> Result<u8, ProgramError> {
 }
 
 #[inline]
-fn alt_bn128_group_op<const OUTPUT_DATA_LEN: usize>(
+fn alt_bn128_group_op<const OUTPUT_DATA_SIZE: usize>(
     input: &[u8],
     op: u64,
-) -> Result<[u8; OUTPUT_DATA_LEN], ProgramError> {
+) -> Result<[u8; OUTPUT_DATA_SIZE], ProgramError> {
     // Call via a system call to perform the calculation
     #[cfg(target_os = "solana")]
     {
-        let mut bytes = core::mem::MaybeUninit::<[u8; OUTPUT_DATA_LEN]>::uninit();
+        let mut bytes = core::mem::MaybeUninit::<[u8; OUTPUT_DATA_SIZE]>::uninit();
 
         let result = unsafe {
             sol_alt_bn128_group_op(
