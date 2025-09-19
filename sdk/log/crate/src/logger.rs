@@ -10,6 +10,8 @@ mod syscalls {
 
         pub fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64);
 
+        pub fn sol_memset_(s: *mut u8, c: u8, n: u64);
+
         pub fn sol_remaining_compute_units() -> u64;
     }
 }
@@ -26,6 +28,12 @@ mod syscalls {
         let syscall: extern "C" fn(*mut u8, *const u8, u64) =
             unsafe { core::mem::transmute(1904002211u64) }; // murmur32 hash of "sol_memcpy_"
         syscall(dest, src, n)
+    }
+
+    pub(crate) fn sol_memset_(s: *mut u8, c: u8, n: u64) {
+        let syscall: extern "C" fn(*mut u8, u8, u64) =
+            unsafe { core::mem::transmute(930151202u64) }; // murmur32 hash of "sol_memset_"
+        syscall(s, c, n)
     }
 
     pub(crate) fn sol_remaining_compute_units() -> u64 {
@@ -321,7 +329,7 @@ macro_rules! impl_log_for_unsigned_integer {
 
                                     // Precision padding.
                                     #[cfg(target_os = "solana")]
-                                    syscalls::sol_memset(
+                                    syscalls::sol_memset_(
                                         ptr.add(2) as *mut _,
                                         b'0',
                                         padding as u64,
