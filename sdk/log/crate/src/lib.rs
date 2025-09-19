@@ -252,6 +252,54 @@ mod tests {
 
         logger.append_with_args(u64::MAX, &[Argument::Precision(u8::MAX)]);
         assert!(&*logger == "0.00000000000000000@".as_bytes());
+
+        // 255 precision + leading 0 + decimal point
+        let mut logger = Logger::<257>::default();
+        logger.append_with_args(u64::MAX, &[Argument::Precision(u8::MAX)]);
+        assert!(logger.starts_with("0.00000000000000".as_bytes()));
+        assert!(logger.ends_with("18446744073709551615".as_bytes()));
+
+        logger.clear();
+
+        logger.append_with_args(u32::MAX, &[Argument::Precision(u8::MAX)]);
+        assert!(logger.starts_with("0.00000000000000".as_bytes()));
+        assert!(logger.ends_with("4294967295".as_bytes()));
+
+        logger.clear();
+
+        logger.append_with_args(u16::MAX, &[Argument::Precision(u8::MAX)]);
+        assert!(logger.starts_with("0.00000000000000".as_bytes()));
+        assert!(logger.ends_with("65535".as_bytes()));
+
+        logger.clear();
+
+        logger.append_with_args(u8::MAX, &[Argument::Precision(u8::MAX)]);
+        assert!(logger.starts_with("0.00000000000000".as_bytes()));
+        assert!(logger.ends_with("255".as_bytes()));
+
+        // 255 precision + sign + leading 0 + decimal point
+        let mut logger = Logger::<258>::default();
+        logger.append_with_args(i64::MIN, &[Argument::Precision(u8::MAX)]);
+        assert!(logger.starts_with("-0.00000000000000".as_bytes()));
+        assert!(logger.ends_with("9223372036854775808".as_bytes()));
+
+        logger.clear();
+
+        logger.append_with_args(i32::MIN, &[Argument::Precision(u8::MAX)]);
+        assert!(logger.starts_with("-0.00000000000000".as_bytes()));
+        assert!(logger.ends_with("2147483648".as_bytes()));
+
+        logger.clear();
+
+        logger.append_with_args(i16::MIN, &[Argument::Precision(u8::MAX)]);
+        assert!(logger.starts_with("-0.00000000000000".as_bytes()));
+        assert!(logger.ends_with("32768".as_bytes()));
+
+        logger.clear();
+
+        logger.append_with_args(i8::MIN, &[Argument::Precision(u8::MAX)]);
+        assert!(logger.starts_with("-0.00000000000000".as_bytes()));
+        assert!(logger.ends_with("128".as_bytes()));
     }
 
     #[test]
