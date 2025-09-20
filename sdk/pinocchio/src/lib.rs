@@ -225,6 +225,7 @@ extern crate std;
 
 pub mod account_info;
 pub mod cpi;
+pub mod curves;
 pub mod entrypoint;
 pub mod instruction;
 pub mod log;
