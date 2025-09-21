@@ -9,7 +9,6 @@ members = [
     "sdk/log/crate",
     "sdk/log/macro",
     "sdk/pinocchio",
-    "sdk/pubkey",
 ]
 
 [workspace.package]
@@ -22,10 +21,9 @@ rust-version = "1.84"
 five8_const = "0.1.4"
 pinocchio = { version = "0.9", path = "sdk/pinocchio" }
 pinocchio-log-macro = { version = "0.5", path = "sdk/log/macro" }
-pinocchio-pubkey = { version = "0.3", path = "sdk/pubkey" }
 quote = "1.0"
 regex = "1"
-solana-address = { version = "1.0", git = "https://github.com/anza-xyz/solana-sdk.git" }
+solana-address = { version = "1.0", git = "https://github.com/febo/solana-sdk.git", branch = "derive-address" }
 syn = "1.0"
 
 [workspace.metadata.cli]
