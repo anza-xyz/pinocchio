@@ -28,7 +28,7 @@ const ALT_BN128_G1_MUL_BE: u64 = 2;
 /// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_g1_multiplication_be(
-    input: &[u8],
+    input: &[u8; ALT_BN128_MULTIPLICATION_INPUT_SIZE],
 ) -> Result<[u8; ALT_BN128_MULTIPLICATION_OUTPUT_SIZE], ProgramError> {
     alt_bn128_group_op(input, ALT_BN128_G1_MUL_BE)
 }

@@ -28,7 +28,7 @@ const ALT_BN128_G1_SUB_BE: u64 = 1; // not implemented in the syscall
 /// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_g1_addition_be(
-    input: &[u8],
+    input: &[u8; ALT_BN128_ADDITION_INPUT_SIZE],
 ) -> Result<[u8; ALT_BN128_ADDITION_OUTPUT_SIZE], ProgramError> {
     alt_bn128_group_op(input, ALT_BN128_G1_ADD_BE)
 }
