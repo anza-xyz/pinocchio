@@ -3,9 +3,9 @@
 pub mod instructions;
 pub mod state;
 
-pinocchio_pubkey::declare_id!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-
 use core::mem::MaybeUninit;
+
+solana_address::declare_id!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
 const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
 

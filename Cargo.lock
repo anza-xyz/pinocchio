@@ -64,7 +64,7 @@ name = "pinocchio-associated-token-account"
 version = "0.2.0"
 dependencies = [
  "pinocchio",
- "pinocchio-pubkey",
+ "solana-address",
 ]
 
 [[package]]
@@ -88,16 +88,7 @@ name = "pinocchio-memo"
 version = "0.2.0"
 dependencies = [
  "pinocchio",
- "pinocchio-pubkey",
-]
-
-[[package]]
-name = "pinocchio-pubkey"
-version = "0.3.0"
-dependencies = [
- "five8_const 0.1.4",
- "pinocchio",
- "sha2-const-stable",
+ "solana-address",
 ]
 
 [[package]]
@@ -105,7 +96,7 @@ name = "pinocchio-system"
 version = "0.4.0"
 dependencies = [
  "pinocchio",
- "pinocchio-pubkey",
+ "solana-address",
 ]
 
 [[package]]
@@ -113,7 +104,7 @@ name = "pinocchio-token"
 version = "0.4.0"
 dependencies = [
  "pinocchio",
- "pinocchio-pubkey",
+ "solana-address",
 ]
 
 [[package]]
@@ -121,7 +112,7 @@ name = "pinocchio-token-2022"
 version = "0.1.0"
 dependencies = [
  "pinocchio",
- "pinocchio-pubkey",
+ "solana-address",
 ]
 
 [[package]]
@@ -172,26 +163,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
-name = "sha2-const-stable"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9"
-
-[[package]]
 name = "solana-address"
 version = "1.0.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#3707245e12d198bac1866ef2117fa444934d1405"
+source = "git+https://github.com/febo/solana-sdk.git?branch=derive-address#40bb1e2698d2d34feb87b22b960a17299fd11043"
 dependencies = [
  "five8",
  "five8_const 1.0.0",
  "solana-define-syscall",
- "solana-program-error 3.0.0 (git+https://github.com/anza-xyz/solana-sdk.git)",
+ "solana-program-error 3.0.0 (git+https://github.com/febo/solana-sdk.git?branch=derive-address)",
 ]
 
 [[package]]
 name = "solana-define-syscall"
 version = "3.0.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#3707245e12d198bac1866ef2117fa444934d1405"
+source = "git+https://github.com/febo/solana-sdk.git?branch=derive-address#40bb1e2698d2d34feb87b22b960a17299fd11043"
 
 [[package]]
 name = "solana-program-error"
@@ -202,7 +187,7 @@ checksum = "a1af32c995a7b692a915bb7414d5f8e838450cf7c70414e763d8abcae7b51f28"
 [[package]]
 name = "solana-program-error"
 version = "3.0.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#3707245e12d198bac1866ef2117fa444934d1405"
+source = "git+https://github.com/febo/solana-sdk.git?branch=derive-address#40bb1e2698d2d34feb87b22b960a17299fd11043"
 
 [[package]]
 name = "syn"
