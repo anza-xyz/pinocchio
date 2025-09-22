@@ -1,11 +1,11 @@
-use super::AccountState;
+use super::{AccountState, AccountType};
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     program_error::ProgramError,
     pubkey::Pubkey,
 };
 
-use crate::ID;
+use crate::{state::Multisig, ID};
 
 /// Token account data.
 #[repr(C)]
@@ -59,13 +59,23 @@ impl TokenAccount {
     pub fn from_account_info(
         account_info: &AccountInfo,
     ) -> Result<Ref<TokenAccount>, ProgramError> {
-        if account_info.data_len() < Self::BASE_LEN {
+        let len = account_info.data_len();
+        let data = account_info.try_borrow_data()?;
+
+        if len < Self::BASE_LEN || len == Multisig::LEN {
             return Err(ProgramError::InvalidAccountData);
+        }
+        if len > Self::BASE_LEN {
+            let byte = data[Self::BASE_LEN];
+            if byte != AccountType::TokenAccount.into() && byte != AccountType::Uninitialized.into()
+            {
+                return Err(ProgramError::InvalidAccountData);
+            }
         }
         if !account_info.is_owned_by(&ID) {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(data, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -83,15 +93,23 @@ impl TokenAccount {
     pub unsafe fn from_account_info_unchecked(
         account_info: &AccountInfo,
     ) -> Result<&TokenAccount, ProgramError> {
-        if account_info.data_len() < Self::BASE_LEN {
+        let len = account_info.data_len();
+        let data = account_info.borrow_data_unchecked();
+
+        if len < Self::BASE_LEN || len == Multisig::LEN {
             return Err(ProgramError::InvalidAccountData);
+        }
+        if len > Self::BASE_LEN {
+            let byte = data[Self::BASE_LEN];
+            if byte != AccountType::TokenAccount.into() && byte != AccountType::Uninitialized.into()
+            {
+                return Err(ProgramError::InvalidAccountData);
+            }
         }
         if account_info.owner() != &ID {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(data))
     }
 
     /// Return a `TokenAccount` from the given bytes.

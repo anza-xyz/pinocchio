@@ -1,10 +1,14 @@
+use super::AccountType;
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     program_error::ProgramError,
     pubkey::Pubkey,
 };
 
-use crate::ID;
+use crate::{
+    state::{Multisig, TokenAccount},
+    ID,
+};
 
 /// Mint data.
 #[repr(C)]
@@ -44,13 +48,26 @@ impl Mint {
     /// the account data.
     #[inline]
     pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Mint>, ProgramError> {
-        if account_info.data_len() < Self::BASE_LEN {
+        let len = account_info.data_len();
+        let data = account_info.try_borrow_data()?;
+
+        if len < Self::BASE_LEN || len == Multisig::LEN {
             return Err(ProgramError::InvalidAccountData);
+        }
+        if len > Self::BASE_LEN {
+            if len > TokenAccount::BASE_LEN {
+                let byte = data[Self::BASE_LEN];
+                if byte != AccountType::Mint.into() && byte != AccountType::Uninitialized.into() {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+            } else {
+                return Err(ProgramError::InvalidAccountData);
+            }
         }
         if !account_info.is_owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(data, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -68,15 +85,26 @@ impl Mint {
     pub unsafe fn from_account_info_unchecked(
         account_info: &AccountInfo,
     ) -> Result<&Self, ProgramError> {
-        if account_info.data_len() < Self::BASE_LEN {
+        let len = account_info.data_len();
+        let data = account_info.borrow_data_unchecked();
+
+        if len < Self::BASE_LEN || len == Multisig::LEN {
             return Err(ProgramError::InvalidAccountData);
+        }
+        if len > Self::BASE_LEN {
+            if len > TokenAccount::BASE_LEN {
+                let byte = data[Self::BASE_LEN];
+                if byte != AccountType::Mint.into() && byte != AccountType::Uninitialized.into() {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+            } else {
+                return Err(ProgramError::InvalidAccountData);
+            }
         }
         if account_info.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(data))
     }
 
     /// Return a `Mint` from the given bytes.
