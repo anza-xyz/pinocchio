@@ -299,7 +299,7 @@ impl AccountInfo {
         })
     }
 
-    /// Tries to get a read only reference to the lamport field, failing if the field
+    /// Tries to get a mutable reference to the lamport field, failing if the field
     /// is already borrowed in any form.
     pub fn try_borrow_mut_lamports(&self) -> Result<RefMut<u64>, ProgramError> {
         // check if the account lamports are already borrowed
