@@ -257,7 +257,7 @@ pub fn slice_invoke_signed(
 ///   1. It has at least as many accounts as the number of accounts expected by
 ///      the instruction.
 ///   2. The accounts match the expected accounts in the instruction, i.e., their
-///      `Address` matches the address in the `AccountMeta`.
+///      `Pubkey` matches the `pubkey` in the `AccountMeta`.
 ///   3. The borrow state of the accounts is compatible with the mutability of the
 ///      accounts in the instruction.
 ///
