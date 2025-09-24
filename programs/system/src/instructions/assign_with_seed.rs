@@ -38,8 +38,8 @@ impl AssignWithSeed<'_, '_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly_signer(self.base.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly_signer(self.base.address()),
         ];
 
         // instruction data
@@ -50,7 +50,7 @@ impl AssignWithSeed<'_, '_, '_> {
         // - [.. +32]: owner address
         let mut instruction_data = [0; 104];
         instruction_data[0] = 10;
-        instruction_data[4..36].copy_from_slice(self.base.key().as_array());
+        instruction_data[4..36].copy_from_slice(self.base.address().as_array());
         instruction_data[36..44].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
 
         let offset = 44 + self.seed.len();

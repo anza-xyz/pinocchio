@@ -51,13 +51,13 @@ impl RecoverNested<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 7] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::writable(self.destination_account.key()),
-            AccountMeta::readonly(self.owner_account.key()),
-            AccountMeta::readonly(self.owner_mint.key()),
-            AccountMeta::writable_signer(self.wallet.key()),
-            AccountMeta::readonly(self.token_program.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::writable(self.destination_account.address()),
+            AccountMeta::readonly(self.owner_account.address()),
+            AccountMeta::readonly(self.owner_mint.address()),
+            AccountMeta::writable_signer(self.wallet.address()),
+            AccountMeta::readonly(self.token_program.address()),
         ];
 
         // Instruction data:

@@ -3,7 +3,7 @@ extern crate std;
 use super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account_info};
 
 #[test]
-fn test_wrong_key_from_account_info() {
+fn test_wrong_key_from_account_view() {
     let bytes = raw_slot_hashes(0, &[]);
     let (info, _backing) = unsafe {
         make_account_info(
@@ -13,7 +13,7 @@ fn test_wrong_key_from_account_info() {
         )
     };
     assert!(matches!(
-        SlotHashes::from_account_info(&info),
+        SlotHashes::from_account_view(&info),
         Err(ProgramError::InvalidArgument)
     ));
 }
@@ -89,7 +89,7 @@ fn test_borrow_state_failure_from_account_info() {
     let bytes = raw_slot_hashes(0, &[]);
     let (info, _backing) = unsafe { make_account_info(SLOTHASHES_ID, &bytes, 0) };
     assert!(matches!(
-        SlotHashes::from_account_info(&info),
+        SlotHashes::from_account_view(&info),
         Err(ProgramError::AccountBorrowFailed)
     ));
 }

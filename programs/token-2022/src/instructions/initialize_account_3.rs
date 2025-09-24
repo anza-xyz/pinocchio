@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     Address, ProgramResult,
@@ -16,9 +16,9 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   1. `[]` The mint this account will be associated with.
 pub struct InitializeAccount3<'a, 'b> {
     /// New Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Owner of the new Account.
     pub owner: &'a Address,
     /// Token Program
@@ -30,8 +30,8 @@ impl InitializeAccount3<'_, '_> {
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.mint.address()),
         ];
 
         // instruction data

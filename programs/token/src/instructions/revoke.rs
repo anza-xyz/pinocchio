@@ -27,8 +27,8 @@ impl Revoke<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.source.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.source.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         let instruction = Instruction {

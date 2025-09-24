@@ -49,11 +49,11 @@ impl WithdrawNonceAccount<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 5] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.recipient.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::writable(self.recipient.address()),
+            AccountMeta::readonly(self.recent_blockhashes_sysvar.address()),
+            AccountMeta::readonly(self.rent_sysvar.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // instruction data

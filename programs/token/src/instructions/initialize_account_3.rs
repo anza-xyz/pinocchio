@@ -28,8 +28,8 @@ impl InitializeAccount3<'_> {
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.mint.address()),
         ];
 
         // instruction data

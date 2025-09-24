@@ -44,11 +44,11 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
 impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
     #[inline(always)]
     pub fn with_minimal_balance(
-        from: &'a AccountInfo,
-        to: &'a AccountInfo,
-        base: Option<&'a AccountInfo>,
+        from: &'a AccountView,
+        to: &'a AccountView,
+        base: Option<&'a AccountView>,
         seed: &'b str,
-        rent_sysvar: &'a AccountInfo,
+        rent_sysvar: &'a AccountView,
         space: u64,
         owner: &'c Address,
     ) -> Result<Self, ProgramError> {
@@ -75,9 +75,9 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable_signer(self.from.key()),
-            AccountMeta::writable(self.to.key()),
-            AccountMeta::readonly_signer(self.base.unwrap_or(self.from).key()),
+            AccountMeta::writable_signer(self.from.address()),
+            AccountMeta::writable(self.to.address()),
+            AccountMeta::readonly_signer(self.base.unwrap_or(self.from).address()),
         ];
 
         // instruction data
@@ -90,7 +90,8 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
         // - [.. +32]: owner address
         let mut instruction_data = [0; 120];
         instruction_data[0] = 3;
-        instruction_data[4..36].copy_from_slice(self.base.unwrap_or(self.from).key().as_array());
+        instruction_data[4..36]
+            .copy_from_slice(self.base.unwrap_or(self.from).address().as_array());
         instruction_data[36..44].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
 
         let offset = 44 + self.seed.len();
