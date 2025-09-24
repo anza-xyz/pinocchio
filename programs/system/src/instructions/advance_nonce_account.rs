@@ -32,9 +32,9 @@ impl AdvanceNonceAccount<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.recent_blockhashes_sysvar.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // instruction

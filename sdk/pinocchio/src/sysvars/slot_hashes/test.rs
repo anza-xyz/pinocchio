@@ -1,6 +1,6 @@
 use super::test_utils::*;
 use crate::{
-    account_info::{Account, AccountInfo},
+    account_view::{Account, AccountView},
     error::ProgramError,
     sysvars::{clock::Slot, slot_hashes::*},
 };
@@ -411,9 +411,7 @@ fn test_from_account_info_constructor() {
     let data = create_mock_data(&mock_entries);
 
     let mut aligned_backing: Vec<u64>;
-    let acct_ptr;
-
-    unsafe {
+    let acct_ptr = unsafe {
         let header_size = core::mem::size_of::<AccountLayout>();
         let total_size = header_size + data.len();
         let word_len = total_size.div_ceil(8);
@@ -438,12 +436,12 @@ fn test_from_account_info_constructor() {
 
         ptr::copy_nonoverlapping(data.as_ptr(), base_ptr.add(header_size), data.len());
 
-        acct_ptr = base_ptr as *mut Account;
-    }
+        base_ptr as *mut Account
+    };
 
-    let account_info = AccountInfo { raw: acct_ptr };
+    let account_view = unsafe { AccountView::new_unchecked(acct_ptr) };
 
-    let slot_hashes = SlotHashes::from_account_info(&account_info)
+    let slot_hashes = SlotHashes::from_account_view(&account_view)
         .expect("from_account_info should succeed with well-formed data");
 
     assert_eq!(slot_hashes.len(), NUM_ENTRIES);

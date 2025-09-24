@@ -2,7 +2,7 @@
 
 use core::{marker::PhantomData, ops::Deref};
 
-use crate::{account_info::AccountInfo, Address};
+use crate::{account_view::AccountView, Address};
 
 /// Information about a CPI instruction.
 #[derive(Debug, Clone)]
@@ -72,39 +72,18 @@ pub struct Account<'a> {
     /// `&'a AccountView` lives. Instead of holding a reference to the actual `AccountView`,
     /// which would increase the size of the type, we claim to hold a reference without
     /// actually holding one using a `PhantomData<&'a AccountInfo>`.
-    _account_info: PhantomData<&'a AccountInfo>,
-}
-
-/// Return a pointer to a type `U` given type `T` has a field of type `U` at the specified
-/// offset (in bytes) from the start of the `T` type.
-///
-/// # Safety
-///
-/// The caller must ensure that the `ptr` is a valid pointer to a type `T`, and `ptr + offset`
-/// points to bytes that are properly aligned for `U` and represent a bit pattern that is a
-/// valid instance of `U`.
-///
-/// If any of this requirements is not valid, this function leads to undefined behavior.
-#[inline(always)]
-const unsafe fn field_at_offset<T, U>(ptr: *const T, offset: usize) -> *const U {
-    // SAFETY: The caller ensures that the offset is valid for the type `T` and that
-    // the resulting pointer is valid for type `U`.
-    unsafe { (ptr as *const u8).add(offset) as *const U }
+    _account_info: PhantomData<&'a AccountView>,
 }
 
 impl<'a> From<&'a AccountView> for Account<'a> {
     fn from(account: &'a AccountView) -> Self {
         Account {
-            // SAFETY: offset `8` is the `key` field in the `Account` struct.
-            key: unsafe { field_at_offset(account.raw, 8) },
-            // SAFETY: offset `72` is the `lamports` field in the `Account` struct.
-            lamports: unsafe { field_at_offset(account.raw, 72) },
+            key: account.address(),
+            lamports: &account.lamports(),
             data_len: account.data_len() as u64,
-            // SAFETY: offset `88` is the start of the account data in the `Account` struct.
-            data: unsafe { field_at_offset(account.raw, 88) },
-            // SAFETY: offset `40` is the `owner` field in the `Account` struct.
-            owner: unsafe { field_at_offset(account.raw, 40) },
-            // The `rent_epoch` field is not present in the `AccountInfo` struct,
+            data: account.data_ptr(),
+            owner: unsafe { account.owner() },
+            // The `rent_epoch` field is not present in the `AccountView` struct,
             // since the value occurs after the variable data of the account in
             // the runtime input data.
             rent_epoch: 0,
@@ -178,7 +157,11 @@ impl<'a> AccountMeta<'a> {
 
 impl<'a> From<&'a AccountView> for AccountMeta<'a> {
     fn from(account: &'a AccountView) -> Self {
-        AccountMeta::new(account.key(), account.is_writable(), account.is_signer())
+        AccountMeta::new(
+            account.address(),
+            account.is_writable(),
+            account.is_signer(),
+        )
     }
 }
 

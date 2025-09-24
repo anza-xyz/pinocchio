@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -17,11 +17,11 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   2. `[SIGNER]` The source account owner.
 pub struct Approve<'a, 'b> {
     /// Source Account.
-    pub source: &'a AccountInfo,
+    pub source: &'a AccountView,
     /// Delegate Account
-    pub delegate: &'a AccountInfo,
+    pub delegate: &'a AccountView,
     /// Source Owner Account
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Amount
     pub amount: u64,
     /// Token Program
@@ -38,9 +38,9 @@ impl Approve<'_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.source.key()),
-            AccountMeta::readonly(self.delegate.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.source.address()),
+            AccountMeta::readonly(self.delegate.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data

@@ -4,8 +4,8 @@
 
 use super::*;
 extern crate std;
-use crate::account_info::{Account, AccountInfo};
-use core::{mem, ptr};
+use crate::account_view::{Account, AccountView};
+use core::ptr;
 use std::vec::Vec;
 
 /// Matches the pinocchio Account struct.
@@ -120,7 +120,7 @@ pub unsafe fn make_account_info(
     key: Address,
     data: &[u8],
     borrow_state: u8,
-) -> (AccountInfo, Vec<u64>) {
+) -> (AccountView, Vec<u64>) {
     let hdr_size = mem::size_of::<AccountLayout>();
     let total = hdr_size + data.len();
     let words = total.div_ceil(8);
@@ -152,12 +152,7 @@ pub unsafe fn make_account_info(
         data.len(),
     );
 
-    (
-        AccountInfo {
-            raw: hdr_ptr as *mut Account,
-        },
-        backing,
-    )
+    (AccountView::new_unchecked(hdr_ptr as *mut Account), backing)
 }
 
 #[cfg(test)]

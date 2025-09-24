@@ -36,9 +36,9 @@ impl Transfer<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::writable(self.to.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.from.address()),
+            AccountMeta::writable(self.to.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data layout:

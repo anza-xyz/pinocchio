@@ -28,7 +28,7 @@ impl InitializeMint2<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.mint.key())];
+        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.mint.address())];
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)

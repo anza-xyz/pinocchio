@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     Address, ProgramResult,
@@ -13,7 +13,7 @@ use pinocchio::{
 ///      lamports.
 pub struct SyncNative<'a, 'b> {
     /// Native Token Account
-    pub native_token: &'a AccountInfo,
+    pub native_token: &'a AccountView,
     /// Token Program
     pub token_program: &'b Address,
 }
@@ -22,7 +22,7 @@ impl SyncNative<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.native_token.key())];
+        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.native_token.address())];
 
         let instruction = Instruction {
             program_id: self.token_program,
