@@ -9,7 +9,6 @@ use crate::{
     instruction::{Account, Instruction, Signer},
     Address, ProgramResult,
 };
-use solana_account_view::AccountView;
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.
 pub const MAX_CPI_ACCOUNTS: usize = 64;
@@ -395,7 +394,7 @@ pub unsafe fn invoke_signed_unchecked(
         /// discarded immediately after.
         #[repr(C)]
         struct CInstruction<'a> {
-            /// Address of the program.
+            /// Public key of the program.
             program_id: *const Address,
 
             /// Accounts expected by the program instruction.
@@ -496,7 +495,7 @@ pub fn get_return_data() -> Option<ReturnData> {
             crate::syscalls::sol_get_return_data(
                 data.as_mut_ptr() as *mut u8,
                 data.len() as u64,
-                program_id.as_mut_ptr() as *mut Address as *mut u8,
+                program_id.as_mut_ptr() as *mut _ as *mut u8,
             )
         };
 
