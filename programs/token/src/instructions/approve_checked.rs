@@ -41,10 +41,10 @@ impl ApproveChecked<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.source.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::readonly(self.delegate.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.source.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::readonly(self.delegate.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data

@@ -45,9 +45,9 @@ impl TransferWithSeed<'_, '_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::readonly_signer(self.base.key()),
-            AccountMeta::writable(self.to.key()),
+            AccountMeta::writable(self.from.address()),
+            AccountMeta::readonly_signer(self.base.address()),
+            AccountMeta::writable(self.to.address()),
         ];
 
         // instruction data

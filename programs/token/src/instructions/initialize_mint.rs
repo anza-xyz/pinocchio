@@ -32,8 +32,8 @@ impl InitializeMint<'_> {
     pub fn invoke(&self) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.mint.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
+            AccountMeta::writable(self.mint.address()),
+            AccountMeta::readonly(self.rent_sysvar.address()),
         ];
 
         // Instruction data layout:

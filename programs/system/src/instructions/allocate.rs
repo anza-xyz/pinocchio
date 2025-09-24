@@ -26,7 +26,8 @@ impl Allocate<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable_signer(self.account.key())];
+        let account_metas: [AccountMeta; 1] =
+            [AccountMeta::writable_signer(self.account.address())];
 
         // instruction data
         // -  [0..4 ]: instruction discriminator

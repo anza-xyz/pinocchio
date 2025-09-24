@@ -18,11 +18,9 @@ use core::{
 };
 
 use crate::{
-    account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
+    account_view::{Account, AccountView, MAX_PERMITTED_DATA_INCREASE},
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
-
-use crate::{BPF_ALIGN_OF_U128, NON_DUP_MARKER};
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
@@ -241,7 +239,7 @@ macro_rules! process_n_accounts {
         if (*account).borrow_state != NON_DUP_MARKER {
             clone_account_info($accounts, $accounts_slice, (*account).borrow_state);
         } else {
-            $accounts.write(AccountInfo { raw: account });
+            $accounts.write(AccountView::new_unchecked(account));
 
             $input = $input.add(STATIC_ACCOUNT_DATA);
             $input = $input.add((*account).data_len as usize);
@@ -286,13 +284,11 @@ macro_rules! process_accounts {
 #[cold]
 #[inline(always)]
 unsafe fn clone_account_info(
-    accounts: *mut AccountInfo,
-    accounts_slice: *const AccountInfo,
+    accounts: *mut AccountView,
+    accounts_slice: *const AccountView,
     index: u8,
 ) {
-    accounts.write(AccountInfo {
-        raw: (*accounts_slice.add(index as usize)).raw,
-    });
+    accounts.write(*accounts_slice.add(index as usize));
 }
 
 /// Parse the arguments from the runtime input buffer.
@@ -310,7 +306,7 @@ unsafe fn clone_account_info(
 #[inline(always)]
 pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
-    accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
+    accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
 ) -> (&'static Address, usize, &'static [u8]) {
     // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of accounts
     // (MAX_TX_ACCOUNTS) that can be processed in a transaction.
@@ -327,14 +323,14 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     input = input.add(size_of::<u64>());
 
     if processed > 0 {
-        let mut accounts = accounts.as_mut_ptr() as *mut AccountInfo;
+        let mut accounts = accounts.as_mut_ptr() as *mut AccountView;
         // Represents the beginning of the accounts slice.
         let accounts_slice = accounts;
 
         // The first account is always non-duplicated, so process
         // it directly as such.
         let account: *mut Account = input as *mut Account;
-        accounts.write(AccountInfo { raw: account });
+        accounts.write(AccountView::new_unchecked(account));
 
         input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
         input = input.add((*account).data_len as usize);
@@ -712,8 +708,8 @@ mod tests {
     /// The mock program ID used for testing.
     const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
 
-    /// An uninitialized account info.
-    const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
+    /// An uninitialized account view.
+    const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
 
     /// Struct representing a memory region with a specific alignment.
     struct AlignedMemory {
@@ -863,7 +859,7 @@ mod tests {
 
     /// Asserts that the accounts slice contains the expected number of accounts and that each
     /// account's data length matches its index.
-    fn assert_accounts(accounts: &[MaybeUninit<AccountInfo>]) {
+    fn assert_accounts(accounts: &[MaybeUninit<AccountView>]) {
         for (i, account) in accounts.iter().enumerate() {
             let account_info = unsafe { account.assume_init_ref() };
             assert_eq!(account_info.data_len(), i);
@@ -872,7 +868,7 @@ mod tests {
 
     /// Asserts that the accounts slice contains the expected number of accounts and all accounts
     /// are duplicated, apart from the first one.
-    fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountInfo>], duplicated: usize) {
+    fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountView>], duplicated: usize) {
         assert!(accounts.len() > duplicated);
 
         let unique = accounts.len() - duplicated;
@@ -886,26 +882,26 @@ mod tests {
         // Last unique account.
         let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
         // No mutable borrow active at this point.
-        assert!(duplicated.try_borrow_mut_data().is_ok());
+        assert!(duplicated.try_borrow_data_mut().is_ok());
 
         // Duplicated accounts should reference (share) the account pointer
         // to the last unique account.
         for account in accounts[unique..].iter() {
             let account_info = unsafe { account.assume_init_ref() };
 
-            assert_eq!(account_info.raw, duplicated.raw);
+            assert_eq!(account_info, duplicated);
             assert_eq!(account_info.data_len(), duplicated.data_len());
 
-            let borrowed = account_info.try_borrow_mut_data().unwrap();
+            let borrowed = account_info.try_borrow_data_mut().unwrap();
             // Only one mutable borrow at the same time should be allowed
             // on the duplicated account.
-            assert!(duplicated.try_borrow_mut_data().is_err());
+            assert!(duplicated.try_borrow_data_mut().is_err());
             drop(borrowed);
         }
 
         // There should not be any mutable borrow on the duplicated account
         // at this point.
-        assert!(duplicated.try_borrow_mut_data().is_ok());
+        assert!(duplicated.try_borrow_data_mut().is_ok());
     }
 
     #[test]
