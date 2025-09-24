@@ -9,8 +9,6 @@ use crate::{
     instruction::{Account, Instruction, Signer},
     Address, ProgramResult,
 };
-use solana_account_view::AccountView;
-use solana_address::Address;
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.
 pub const MAX_CPI_ACCOUNTS: usize = 64;
