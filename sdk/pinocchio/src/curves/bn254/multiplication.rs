@@ -23,9 +23,6 @@ const ALT_BN128_G1_MUL_BE: u64 = 2;
 ///
 /// A `Result` containing the result of the multiplication in big-endian (EIP-197)
 /// encoding, or an error if the input is invalid.
-///
-/// Note: This function does **not** check if the input has the correct length.
-/// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_g1_multiplication_be(
     input: &[u8; ALT_BN128_MULTIPLICATION_INPUT_SIZE],

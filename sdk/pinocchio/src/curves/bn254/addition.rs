@@ -23,9 +23,6 @@ const ALT_BN128_G1_SUB_BE: u64 = 1; // not implemented in the syscall
 ///
 /// A `Result` containing the result of the addition in big-endian (EIP-197) encoding,
 /// or an error if the input is invalid.
-///
-/// Note: This function does **not** check if the input has the correct length.
-/// It will return an error if the length is invalid, incurring the cost of the syscall.
 #[inline(always)]
 pub fn alt_bn128_g1_addition_be(
     input: &[u8; ALT_BN128_ADDITION_INPUT_SIZE],
