@@ -30,9 +30,9 @@ impl FreezeAccount<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::readonly_signer(self.freeze_authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::readonly_signer(self.freeze_authority.address()),
         ];
 
         let instruction = Instruction {

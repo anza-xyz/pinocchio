@@ -37,9 +37,9 @@ impl InitializeNonceAccount<'_, '_> {
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.recent_blockhashes_sysvar.address()),
+            AccountMeta::readonly(self.rent_sysvar.address()),
         ];
 
         // instruction data

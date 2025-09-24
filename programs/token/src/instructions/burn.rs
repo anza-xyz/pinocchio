@@ -36,9 +36,9 @@ impl Burn<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.mint.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::writable(self.mint.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data

@@ -47,7 +47,7 @@ impl Mint {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if !account_info.is_owned_by(&ID) {
+        if !account_info.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {

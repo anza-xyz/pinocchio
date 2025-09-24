@@ -41,10 +41,10 @@ impl TransferChecked<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::writable(self.to.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.from.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::writable(self.to.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data layout:

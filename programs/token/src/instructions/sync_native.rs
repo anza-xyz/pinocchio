@@ -20,7 +20,7 @@ impl SyncNative<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.native_token.key())];
+        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.native_token.address())];
 
         let instruction = Instruction {
             program_id: &crate::ID,

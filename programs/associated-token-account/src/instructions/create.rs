@@ -40,12 +40,12 @@ impl Create<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 6] = [
-            AccountMeta::writable_signer(self.funding_account.key()),
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.wallet.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::readonly(self.system_program.key()),
-            AccountMeta::readonly(self.token_program.key()),
+            AccountMeta::writable_signer(self.funding_account.address()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.wallet.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::readonly(self.system_program.address()),
+            AccountMeta::readonly(self.token_program.address()),
         ];
 
         // Instruction data:

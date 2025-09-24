@@ -1,10 +1,9 @@
 use crate::{
-    account_info::{AccountInfo, Ref},
+    account_view::{AccountView, Ref},
     address::{Address, ADDRESS_BYTES},
     error::ProgramError,
     instruction::AccountMeta,
 };
-
 use core::{marker::PhantomData, mem::size_of, ops::Deref};
 
 /// Instructions sysvar ID `Sysvar1nstructions1111111111111111111111111`.
@@ -110,17 +109,17 @@ where
     }
 }
 
-impl<'a> TryFrom<&'a AccountInfo> for Instructions<Ref<'a, [u8]>> {
+impl<'a> TryFrom<&'a AccountView> for Instructions<Ref<'a, [u8]>> {
     type Error = ProgramError;
 
     #[inline(always)]
-    fn try_from(account_info: &'a AccountInfo) -> Result<Self, Self::Error> {
-        if account_info.key() != &INSTRUCTIONS_ID {
+    fn try_from(account_view: &'a AccountView) -> Result<Self, Self::Error> {
+        if account_view.address() != &INSTRUCTIONS_ID {
             return Err(ProgramError::UnsupportedSysvar);
         }
 
         Ok(Instructions {
-            data: account_info.try_borrow_data()?,
+            data: account_view.try_borrow_data()?,
         })
     }
 }

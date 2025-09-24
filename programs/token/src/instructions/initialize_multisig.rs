@@ -1,7 +1,7 @@
 use core::{mem::MaybeUninit, slice};
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account_view::AccountView,
     cpi::invoke_with_bounds,
     error::ProgramError,
     instruction::{AccountMeta, Instruction},
@@ -22,11 +22,11 @@ where
     'a: 'b,
 {
     /// Multisig Account.
-    pub multisig: &'a AccountInfo,
+    pub multisig: &'a AccountView,
     /// Rent sysvar Account.
-    pub rent_sysvar: &'a AccountInfo,
+    pub rent_sysvar: &'a AccountView,
     /// Signer Accounts
-    pub signers: &'b [&'a AccountInfo],
+    pub signers: &'b [&'a AccountView],
     /// The number of signers (M) required to validate this multisignature
     /// account.
     pub m: u8,
@@ -58,14 +58,14 @@ impl InitializeMultisig<'_, '_> {
             // - Index 0 and 1 are always present
             acc_metas
                 .get_unchecked_mut(0)
-                .write(AccountMeta::writable(multisig.key()));
+                .write(AccountMeta::writable(multisig.address()));
             acc_metas
                 .get_unchecked_mut(1)
-                .write(AccountMeta::readonly(rent_sysvar.key()));
+                .write(AccountMeta::readonly(rent_sysvar.address()));
         }
 
         for (account_meta, signer) in acc_metas[2..].iter_mut().zip(signers.iter()) {
-            account_meta.write(AccountMeta::readonly(signer.key()));
+            account_meta.write(AccountMeta::readonly(signer.address()));
         }
 
         // Instruction data layout:
@@ -80,7 +80,7 @@ impl InitializeMultisig<'_, '_> {
         };
 
         // Account info array
-        const UNINIT_INFO: MaybeUninit<&AccountInfo> = MaybeUninit::uninit();
+        const UNINIT_INFO: MaybeUninit<&AccountView> = MaybeUninit::uninit();
         let mut acc_infos = [UNINIT_INFO; 2 + MAX_MULTISIG_SIGNERS];
 
         unsafe {

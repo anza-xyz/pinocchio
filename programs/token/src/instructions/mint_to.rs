@@ -36,9 +36,9 @@ impl MintTo<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.mint.key()),
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly_signer(self.mint_authority.key()),
+            AccountMeta::writable(self.mint.address()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly_signer(self.mint_authority.address()),
         ];
 
         // Instruction data layout:

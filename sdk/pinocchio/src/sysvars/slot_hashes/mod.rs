@@ -14,7 +14,7 @@ mod test_raw;
 mod test_utils;
 
 use crate::{
-    account_info::{AccountInfo, Ref},
+    account_view::{AccountView, Ref},
     error::ProgramError,
     hint::unlikely,
     sysvars::clock::Slot,
@@ -269,7 +269,7 @@ impl<'a, T: Deref<Target = [u8]>> IntoIterator for &'a SlotHashes<T> {
 }
 
 impl<'a> SlotHashes<Ref<'a, [u8]>> {
-    /// Creates a `SlotHashes` instance by safely borrowing data from an `AccountInfo`.
+    /// Creates a `SlotHashes` instance by safely borrowing data from an `AccountView`.
     ///
     /// This function verifies that:
     /// - The account key matches the `SLOTHASHES_ID`
@@ -282,12 +282,12 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
     /// - `ProgramError::InvalidArgument` if the account key doesn't match the `SlotHashes` sysvar ID
     /// - `ProgramError::AccountBorrowFailed` if the account data is already mutably borrowed
     #[inline(always)]
-    pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
-        if unlikely(account_info.key() != &SLOTHASHES_ID) {
+    pub fn from_account_view(account_view: &'a AccountView) -> Result<Self, ProgramError> {
+        if unlikely(account_view.address() != &SLOTHASHES_ID) {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let data_ref = account_info.try_borrow_data()?;
+        let data_ref = account_view.try_borrow_data()?;
 
         // SAFETY: The account was validated to be the `SlotHashes` sysvar.
         Ok(unsafe { SlotHashes::new_unchecked(data_ref) })

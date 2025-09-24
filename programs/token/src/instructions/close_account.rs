@@ -30,9 +30,9 @@ impl CloseAccount<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.destination.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::writable(self.destination.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         let instruction = Instruction {
