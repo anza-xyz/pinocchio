@@ -9,8 +9,6 @@ use crate::{
 };
 use solana_address::Address;
 
-use crate::{program_error::ProgramError, BPF_ALIGN_OF_U128, NON_DUP_MARKER};
-
 /// Declare the lazy program entrypoint.
 ///
 /// Use the `lazy_program_entrypoint!` macro instead.
