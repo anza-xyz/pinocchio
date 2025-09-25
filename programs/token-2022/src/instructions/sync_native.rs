@@ -1,9 +1,7 @@
-use pinocchio::{
-    account::AccountView,
-    cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    Address, ProgramResult,
-};
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{cpi::invoke, AccountRole, InstructionView};
+use solana_program_error::ProgramResult;
 
 /// Given a native token account updates its amount field based
 /// on the account's underlying `lamports`.
@@ -22,9 +20,9 @@ impl SyncNative<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.native_token.address())];
+        let account_metas: [AccountRole; 1] = [AccountRole::writable(self.native_token.address())];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: self.token_program,
             accounts: &account_metas,
             data: &[17],

@@ -121,8 +121,10 @@ dependencies = [
 name = "pinocchio-associated-token-account"
 version = "0.2.0"
 dependencies = [
- "pinocchio",
+ "solana-account-view",
  "solana-address",
+ "solana-instruction-view",
+ "solana-program-error",
 ]
 
 [[package]]
@@ -145,8 +147,10 @@ dependencies = [
 name = "pinocchio-memo"
 version = "0.2.0"
 dependencies = [
- "pinocchio",
+ "solana-account-view",
  "solana-address",
+ "solana-instruction-view",
+ "solana-program-error",
 ]
 
 [[package]]
@@ -154,22 +158,27 @@ name = "pinocchio-system"
 version = "0.4.0"
 dependencies = [
  "pinocchio",
+ "solana-account-view",
  "solana-address",
+ "solana-instruction-view",
+ "solana-program-error",
 ]
 
 [[package]]
 name = "pinocchio-token"
 version = "0.4.0"
 dependencies = [
- "pinocchio",
+ "solana-account-view",
  "solana-address",
+ "solana-instruction-view",
+ "solana-program-error",
 ]
 
 [[package]]
 name = "pinocchio-token-2022"
 version = "0.1.0"
 dependencies = [
- "pinocchio",
+ "solana-account-view",
  "solana-address",
 ]
 

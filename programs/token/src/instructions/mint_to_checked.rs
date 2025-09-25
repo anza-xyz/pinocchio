@@ -3,7 +3,7 @@ use core::slice::from_raw_parts;
 use solana_account_view::AccountView;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
-    AccountMeta, InstructionView,
+    AccountRole, InstructionView,
 };
 use solana_program_error::ProgramResult;
 
@@ -37,10 +37,10 @@ impl MintToChecked<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.mint.address()),
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly_signer(self.mint_authority.address()),
+        let account_metas: [AccountRole; 3] = [
+            AccountRole::writable(self.mint.address()),
+            AccountRole::writable(self.account.address()),
+            AccountRole::readonly_signer(self.mint_authority.address()),
         ];
 
         // Instruction data layout:

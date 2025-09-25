@@ -1,9 +1,6 @@
-use super::AccountState;
-use pinocchio::{
-    account::{AccountView, Ref},
-    error::ProgramError,
-    Address,
-};
+use solana_account_view::{AccountView, Ref};
+use solana_address::Address;
+use solana_program_error::ProgramError;
 
 use crate::{state::AccountState, ID};
 
@@ -51,12 +48,12 @@ pub struct TokenAccount {
 impl TokenAccount {
     pub const LEN: usize = core::mem::size_of::<TokenAccount>();
 
-    /// Return a `TokenAccount` from the given account info.
+    /// Return a `TokenAccount` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, safe borrowing
     /// the account data.
     #[inline]
-    pub fn from_account_info(
+    pub fn from_account_view(
         account_info: &AccountView,
     ) -> Result<Ref<TokenAccount>, ProgramError> {
         if account_info.data_len() != Self::LEN {

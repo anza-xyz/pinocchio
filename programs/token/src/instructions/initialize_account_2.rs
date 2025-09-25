@@ -1,11 +1,9 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account::AccountView,
-    cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    Address, ProgramResult,
-};
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{cpi::invoke, AccountRole, InstructionView};
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -30,10 +28,10 @@ impl InitializeAccount2<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly(self.mint.address()),
-            AccountMeta::readonly(self.rent_sysvar.address()),
+        let account_metas: [AccountRole; 3] = [
+            AccountRole::writable(self.account.address()),
+            AccountRole::readonly(self.mint.address()),
+            AccountRole::readonly(self.rent_sysvar.address()),
         ];
 
         // instruction data

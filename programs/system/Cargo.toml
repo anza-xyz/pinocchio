@@ -13,4 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 pinocchio = { workspace = true }
+solana-account-view = { workspace = true }
 solana-address = { workspace = true, features = ["decode"] }
+solana-instruction-view = { workspace = true, features = ["cpi"] }
+solana-program-error = { workspace = true }
