@@ -1,7 +1,7 @@
 use solana_account_view::AccountView;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
-    AccountMeta, InstructionView,
+    AccountRole, InstructionView,
 };
 use solana_program_error::ProgramResult;
 
@@ -40,13 +40,13 @@ impl CreateIdempotent<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 6] = [
-            AccountMeta::writable_signer(self.funding_account.address()),
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly(self.wallet.address()),
-            AccountMeta::readonly(self.mint.address()),
-            AccountMeta::readonly(self.system_program.address()),
-            AccountMeta::readonly(self.token_program.address()),
+        let account_metas: [AccountRole; 6] = [
+            AccountRole::writable_signer(self.funding_account.address()),
+            AccountRole::writable(self.account.address()),
+            AccountRole::readonly(self.wallet.address()),
+            AccountRole::readonly(self.mint.address()),
+            AccountRole::readonly(self.system_program.address()),
+            AccountRole::readonly(self.token_program.address()),
         ];
 
         // Instruction data:

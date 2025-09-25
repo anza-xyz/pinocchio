@@ -1,7 +1,7 @@
 use solana_account_view::AccountView;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
-    AccountMeta, InstructionView,
+    AccountRole, InstructionView,
 };
 use solana_program_error::ProgramResult;
 
@@ -29,10 +29,10 @@ impl CloseAccount<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::writable(self.destination.address()),
-            AccountMeta::readonly_signer(self.authority.address()),
+        let account_metas: [AccountRole; 3] = [
+            AccountRole::writable(self.account.address()),
+            AccountRole::writable(self.destination.address()),
+            AccountRole::readonly_signer(self.authority.address()),
         ];
 
         let instruction = InstructionView {

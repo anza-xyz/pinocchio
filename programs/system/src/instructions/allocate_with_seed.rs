@@ -1,9 +1,10 @@
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    Address, ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountRole, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Allocate space for and assign an account at an address derived
 /// from a base address and a seed.
@@ -41,9 +42,9 @@ impl AllocateWithSeed<'_, '_, '_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly_signer(self.base.address()),
+        let account_metas: [AccountRole; 2] = [
+            AccountRole::writable(self.account.address()),
+            AccountRole::readonly_signer(self.base.address()),
         ];
 
         // instruction data

@@ -1,7 +1,7 @@
 use solana_account_view::AccountView;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
-    AccountMeta, InstructionView,
+    AccountRole, InstructionView,
 };
 use solana_program_error::ProgramResult;
 
@@ -48,12 +48,12 @@ impl WithdrawNonceAccount<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 5] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::writable(self.recipient.address()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.address()),
-            AccountMeta::readonly(self.rent_sysvar.address()),
-            AccountMeta::readonly_signer(self.authority.address()),
+        let account_metas: [AccountRole; 5] = [
+            AccountRole::writable(self.account.address()),
+            AccountRole::writable(self.recipient.address()),
+            AccountRole::readonly(self.recent_blockhashes_sysvar.address()),
+            AccountRole::readonly(self.rent_sysvar.address()),
+            AccountRole::readonly_signer(self.authority.address()),
         ];
 
         // instruction data
