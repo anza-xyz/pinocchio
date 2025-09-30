@@ -176,7 +176,7 @@ pub fn process_instruction(
 
 By default, `pinocchio` is a `no_std` crate. This means that it does not use any code from the standard (`std`) library. While this does not affect how `pinocchio` is used, there is one particular apparent difference. In a `no_std` environment, the `msg!` macro does not provide any formatting options since the `format!` macro requires the `std` library. In order to use `msg!` with formatting, the `std` feature should be enabled when adding `pinocchio` as a dependency:
 ```
-pinocchio = { version = "0.7.0", features = ["std"] }
+pinocchio = { version = "0.9.2", features = ["std"] }
 ```
 
 Instead of enabling the `std` feature to be able to format log messages with `msg!`, it is recommended to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log) crate. This crate provides a lightweight `log!` macro with better compute units consumption than the standard `format!` macro without requiring the `std` library.
