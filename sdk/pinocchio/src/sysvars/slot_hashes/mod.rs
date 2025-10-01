@@ -48,7 +48,8 @@ pub const MAX_SIZE: usize = NUM_ENTRIES_SIZE + MAX_ENTRIES * ENTRY_SIZE;
 pub type Hash = [u8; HASH_BYTES];
 
 /// A single entry in the `SlotHashes` sysvar.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Eq, Debug, PartialEq)]
 #[repr(C)]
 pub struct SlotHashEntry {
     /// The slot number stored as little-endian bytes.

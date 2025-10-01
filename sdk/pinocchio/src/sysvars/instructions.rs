@@ -13,7 +13,7 @@ pub const INSTRUCTIONS_ID: Address = Address::new_from_array([
     0xc1, 0x24, 0xc6, 0x8f, 0x21, 0x56, 0x75, 0xa5, 0xdb, 0xba, 0xcb, 0x5f, 0x08, 0x00, 0x00, 0x00,
 ]);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Instructions<T>
 where
     T: Deref<Target = [u8]>,
@@ -126,6 +126,7 @@ impl<'a> TryFrom<&'a AccountInfo> for Instructions<Ref<'a, [u8]>> {
 }
 
 #[repr(C)]
+#[cfg_attr(feature = "copy", derive(Copy))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IntrospectedInstruction<'a> {
     pub raw: *const u8,
@@ -213,7 +214,8 @@ const IS_SIGNER: u8 = 0b00000001;
 const IS_WRITABLE: u8 = 0b00000010;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IntrospectedAccountMeta {
     /// Account flags:
     ///   * bit `0`: signer
