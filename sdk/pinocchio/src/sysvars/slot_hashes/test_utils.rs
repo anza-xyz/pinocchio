@@ -12,7 +12,8 @@ use std::vec::Vec;
 /// Account fields are private, so this struct allows more readable
 /// use of them in tests.
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone)]
 pub struct AccountLayout {
     pub borrow_state: u8,
     pub is_signer: u8,
