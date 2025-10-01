@@ -18,6 +18,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
+copy = ["solana-address/copy"]
 std = ["solana-address/std"]
 
 [dependencies]
