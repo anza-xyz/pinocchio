@@ -277,7 +277,8 @@ impl InstructionContext {
 }
 
 /// Wrapper type around an [`AccountInfo`] that may be a duplicate.
-#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Debug, Clone)]
 pub enum MaybeAccount {
     /// An [`AccountInfo`] that is not a duplicate.
     Account(AccountInfo),

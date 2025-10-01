@@ -53,7 +53,8 @@ pub const ACCOUNT_STORAGE_OVERHEAD: u64 = 128;
 
 /// Rent sysvar data
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub struct Rent {
     /// Rental rate in lamports per byte-year
     pub lamports_per_byte_year: u64,
@@ -211,7 +212,8 @@ impl Sysvar for Rent {
 }
 
 /// The return value of [`Rent::due`].
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RentDue {
     /// Used to indicate the account is rent exempt.
     Exempt,

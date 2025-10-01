@@ -23,7 +23,8 @@ where
 /// Use to query and convey information about the sibling instruction components
 /// when calling the `sol_get_processed_sibling_instruction` syscall.
 #[repr(C)]
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ProcessedSiblingInstruction {
     /// Length of the instruction data
     pub data_len: u64,
@@ -37,7 +38,8 @@ pub struct ProcessedSiblingInstruction {
 /// This struct contains the same information as an [`AccountInfo`], but has
 /// the memory layout as expected by `sol_invoke_signed_c` syscall.
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub struct Account<'a> {
     // Address of the account.
     key: *const Address,

@@ -638,7 +638,8 @@ mod alloc {
     };
 
     /// The bump allocator used as the default rust heap when running programs.
-    #[derive(Clone, Copy, Debug)]
+    #[cfg_attr(feature = "copy", derive(Copy))]
+    #[derive(Clone, Debug)]
     pub struct BumpAllocator {
         pub start: usize,
         pub len: usize,
@@ -677,7 +678,8 @@ mod alloc {
 
 #[cfg(not(feature = "std"))]
 /// An allocator that does not allocate memory.
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub struct NoAllocator;
 
 #[cfg(not(feature = "std"))]
