@@ -286,7 +286,7 @@ checksum = "a1af32c995a7b692a915bb7414d5f8e838450cf7c70414e763d8abcae7b51f28"
 [[package]]
 name = "solana-program-error"
 version = "3.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=derive-address#40bb1e2698d2d34feb87b22b960a17299fd11043"
+source = "git+https://github.com/febo/solana-sdk.git?branch=copy-feature#c77dbbdecb014b586b24e8a6955419d9b29c3a45"
 
 [[package]]
 name = "syn"
