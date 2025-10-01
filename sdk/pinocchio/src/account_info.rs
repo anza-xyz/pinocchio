@@ -18,7 +18,8 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
 /// Represents masks for borrow state of an account.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub enum BorrowState {
     /// Mask to check whether an account is already borrowed.
     ///
@@ -42,7 +43,8 @@ pub enum BorrowState {
 /// directly after the `Account` struct in memory, with its size specified
 /// by [`Account::data_len`].
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Default)]
 pub(crate) struct Account {
     /// Borrow state for lamports and account data.
     ///
@@ -125,7 +127,8 @@ pub(crate) struct Account {
 /// These conditions must always hold for any `AccountInfo` created from
 /// a raw pointer.
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AccountInfo {
     /// Raw (pointer to) account data.
     ///
@@ -210,7 +213,10 @@ impl AccountInfo {
     /// to the `owner` returned by [`Self::owner`].
     #[inline(always)]
     pub unsafe fn assign(&self, new_owner: &Address) {
+        #[cfg(feature = "copy")]
         write(&mut (*self.raw).owner, *new_owner);
+        #[cfg(not(feature = "copy"))]
+        write(&mut (*self.raw).owner, new_owner.clone());
     }
 
     /// Return true if the account borrow state is set to the given state.
