@@ -281,6 +281,7 @@ macro_rules! process_accounts {
 //
 // Note: The function is marked as `cold` to stop the compiler from optimizing the parsing of
 // duplicated accounts, which leads to an overall increase in CU consumption.
+#[allow(clippy::clone_on_copy)]
 #[cold]
 #[inline(always)]
 unsafe fn clone_account_info(
@@ -288,7 +289,7 @@ unsafe fn clone_account_info(
     accounts_slice: *const AccountView,
     index: u8,
 ) {
-    accounts.write(*accounts_slice.add(index as usize));
+    accounts.write((*accounts_slice.add(index as usize)).clone());
 }
 
 /// Parse the arguments from the runtime input buffer.
