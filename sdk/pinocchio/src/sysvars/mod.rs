@@ -51,7 +51,10 @@ macro_rules! impl_sysvar_get {
             #[cfg(target_os = "solana")]
             let result = unsafe { $crate::syscalls::$syscall_name(var_addr) };
 
-            #[cfg(not(target_os = "solana"))]
+            #[cfg(all(not(target_os = "solana"), feature = "syscalls-stubs"))]
+            let result = $crate::syscalls_stubs::$syscall_name(var_addr);
+
+            #[cfg(all(not(target_os = "solana"), not(feature = "syscalls-stubs")))]
             let result = core::hint::black_box(var_addr as *const _ as u64);
 
             match result {
