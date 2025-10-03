@@ -185,10 +185,6 @@ pub enum Argument {
     /// Number of decimal places to display for numbers.
     ///
     /// This is only applicable for numeric types.
-    ///
-    /// The precision cannot be equal to or greater than the maximum number
-    /// of digits for the type. If it is, it will be set to the maximum
-    /// number of digits minus one.
     Precision(u8),
 
     /// Truncate the output at the end when the specified maximum number of characters
@@ -294,14 +290,14 @@ macro_rules! impl_log_for_unsigned_integer {
                             // decimal point + one leading zero
                             _ => precision + 2,
                         };
-                        // Determines if the value will be truncated or not.
-                        let overflow = required > length;
+                        // Determines whether the value will be truncated or not.
+                        let is_truncated = required > length;
                         // Cap the number of digits to write to the buffer length.
-                        let written = min(MAX_DIGITS - offset, length);
+                        let digits_to_write = min(MAX_DIGITS - offset, length);
 
                         // SAFETY: the length of both `digits` and `buffer` arrays are guaranteed
-                        // to be within bounds and the `written` value is capped to the length of
-                        // the `buffer`.
+                        // to be within bounds and the `digits_to_write` value is capped to the
+                        // length of the `buffer`.
                         unsafe {
                             let source = digits.as_ptr().add(offset);
                             let ptr = buffer.as_mut_ptr();
@@ -312,20 +308,20 @@ macro_rules! impl_log_for_unsigned_integer {
                                 syscalls::sol_memcpy_(
                                     ptr as *mut _,
                                     source as *const _,
-                                    written as u64,
+                                    digits_to_write as u64,
                                 );
                                 #[cfg(not(target_os = "solana"))]
-                                copy_nonoverlapping(source, ptr, written);
+                                copy_nonoverlapping(source, ptr, digits_to_write);
                             }
                             // If padding is needed to satisfy the precision, add leading zeros
                             // and a decimal point.
-                            else if precision >= written {
+                            else if precision >= digits_to_write {
                                 // Prefix.
                                 (ptr as *mut u8).write(b'0');
 
                                 if length > 2 {
                                     (ptr.add(1) as *mut u8).write(b'.');
-                                    let padding = min(length - 2, precision - written);
+                                    let padding = min(length - 2, precision - digits_to_write);
 
                                     // Precision padding.
                                     #[cfg(target_os = "solana")]
@@ -341,7 +337,7 @@ macro_rules! impl_log_for_unsigned_integer {
 
                                     // If there is still space, copy (part of) the number.
                                     if current < length {
-                                        let remaining = min(written, length - current);
+                                        let remaining = min(digits_to_write, length - current);
 
                                         // Number part.
                                         #[cfg(target_os = "solana")]
@@ -358,7 +354,7 @@ macro_rules! impl_log_for_unsigned_integer {
                             // No padding is needed, calculate the integer and fractional
                             // parts and add a decimal point.
                             else {
-                                let integer_part = written - precision;
+                                let integer_part = digits_to_write - precision;
 
                                 // Integer part of the number.
                                 #[cfg(target_os = "solana")]
@@ -398,8 +394,10 @@ macro_rules! impl_log_for_unsigned_integer {
                         let written = min(required, length);
 
                         // There might not have been space.
-                        if overflow {
-                            // SAFETY: `written` is capped to the length of the buffer.
+                        if is_truncated {
+                            // SAFETY: `written` is capped to the length of the buffer and
+                            // the required length (`required` is always greater than zero);
+                            // `buffer` is guaranteed  to have a length of at least 1.
                             unsafe {
                                 buffer.get_unchecked_mut(written - 1).write(TRUNCATED);
                             }
