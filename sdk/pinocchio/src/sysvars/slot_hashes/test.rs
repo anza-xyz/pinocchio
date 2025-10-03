@@ -416,7 +416,7 @@ fn test_from_account_info_constructor() {
     unsafe {
         let header_size = core::mem::size_of::<AccountLayout>();
         let total_size = header_size + data.len();
-        let word_len = (total_size + 7) / 8;
+        let word_len = total_size.div_ceil(8);
         aligned_backing = std::vec![0u64; word_len];
         let base_ptr = aligned_backing.as_mut_ptr() as *mut u8;
 

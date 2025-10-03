@@ -13,6 +13,7 @@ pub use alloc::BumpAllocator;
 use core::{
     cmp::min,
     mem::{size_of, MaybeUninit},
+    ptr::with_exposed_provenance_mut,
     slice::from_raw_parts,
 };
 
@@ -195,9 +196,14 @@ macro_rules! program_entrypoint {
 /// Align a pointer to the BPF alignment of [`u128`].
 macro_rules! align_pointer {
     ($ptr:ident) => {
-        // integer-to-pointer cast: the resulting pointer will have the same provenance as
-        // the original pointer and it follows the alignment requirement for the input.
-        (($ptr as usize + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1)) as *mut u8
+        // Integer-to-pointer cast: first compute the aligned address as a `usize`,
+        // since this is more CU-efficient than using `ptr::align_offset()` or the
+        // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
+        // back to a pointer. The resulting pointer is guaranteed to be valid
+        // becauseit follows the layout serialized by the runtime.
+        with_exposed_provenance_mut(
+            ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
+        )
     };
 }
 
