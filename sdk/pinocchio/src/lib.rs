@@ -172,7 +172,7 @@
 //! requires the `std` library. In order to use [`msg!`] with formatting, the `std`
 //! feature should be enable when adding Pinocchio as a dependency:
 //! ```ignore
-//! pinocchio = { version = "0.7.0", features = ["std"] }
+//! pinocchio = { version = "0.9.2", features = ["std"] }
 //! ```
 //!
 //! Instead of enabling the `std` feature to be able to format log messages with [`msg!`],
