@@ -244,7 +244,7 @@ impl IntrospectedAccountRole {
 
     /// Convert the `IntrospectedAccountRole` to an `AccountRole`.
     #[inline(always)]
-    pub fn to_account_meta(&self) -> AccountRole {
+    pub fn to_account_role(&self) -> AccountRole {
         AccountRole::new(&self.key, self.is_writable(), self.is_signer())
     }
 }
