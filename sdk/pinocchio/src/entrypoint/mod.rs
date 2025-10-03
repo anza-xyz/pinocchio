@@ -5,6 +5,8 @@ pub mod lazy;
 
 pub use lazy::{InstructionContext, MaybeAccount};
 
+pub mod middleware;
+
 #[cfg(not(feature = "std"))]
 use core::alloc::{GlobalAlloc, Layout};
 
