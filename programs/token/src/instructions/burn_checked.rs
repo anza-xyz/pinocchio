@@ -2,7 +2,7 @@ use core::slice::from_raw_parts;
 
 use crate::{write_bytes, UNINIT_BYTE};
 use pinocchio::{
-    account_view::AccountView,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,

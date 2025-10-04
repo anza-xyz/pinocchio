@@ -2,7 +2,7 @@
 //! input buffer.
 
 use crate::{
-    account_view::{Account, AccountView},
+    account::{Account, AccountView},
     entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
     error::ProgramError,
     Address, BPF_ALIGN_OF_U128,

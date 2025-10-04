@@ -3,7 +3,7 @@
 //! This is required for the rent sysvar implementation.
 
 use crate::{
-    account_view::{AccountView, Ref},
+    account::{AccountView, Ref},
     error::ProgramError,
     hint::unlikely,
     impl_sysvar_get,

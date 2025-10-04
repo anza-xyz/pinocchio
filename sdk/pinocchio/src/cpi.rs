@@ -3,7 +3,7 @@
 use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
 use crate::{
-    account_view::AccountView,
+    account::AccountView,
     error::ProgramError,
     hint::unlikely,
     instruction::{Account, Instruction, Signer},

@@ -4,7 +4,7 @@
 
 use super::*;
 extern crate std;
-use crate::account_view::{Account, AccountView};
+use crate::account::{Account, AccountView};
 use core::ptr;
 use std::vec::Vec;
 
