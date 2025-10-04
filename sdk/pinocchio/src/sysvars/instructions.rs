@@ -1,7 +1,7 @@
 use crate::{
     account_info::{AccountInfo, Ref},
-    instruction::AccountMeta,
     error::ProgramError,
+    instruction::AccountMeta,
     pubkey::{Pubkey, PUBKEY_BYTES},
 };
 
