@@ -62,7 +62,6 @@ macro_rules! lazy_entrypoint {
 ///         default_panic_handler,
 ///         entrypoint::InstructionContext,
 ///         lazy_program_entrypoint,
-///         msg,
 ///         ProgramResult
 ///     };
 ///
@@ -73,7 +72,6 @@ macro_rules! lazy_entrypoint {
 ///     pub fn process_instruction(
 ///         mut context: InstructionContext,
 ///     ) -> ProgramResult {
-///         msg!("Hello from my `lazy` program!");
 ///         Ok(())
 ///     }
 ///
