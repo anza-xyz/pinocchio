@@ -4,7 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     cpi::{slice_invoke_signed, MAX_CPI_ACCOUNTS},
     instruction::{AccountMeta, Instruction, Signer},
-    program_error::ProgramError,
+    error::ProgramError,
     ProgramResult,
 };
 

@@ -4,7 +4,7 @@
 use crate::{
     account_info::{Account, AccountInfo},
     entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
-    program_error::ProgramError,
+    error::ProgramError,
     pubkey::Pubkey,
     BPF_ALIGN_OF_U128,
 };
