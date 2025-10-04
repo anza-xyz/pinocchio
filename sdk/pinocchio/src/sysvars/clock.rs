@@ -5,7 +5,7 @@ use crate::{
     account_info::{AccountInfo, Ref},
     hint::unlikely,
     impl_sysvar_get,
-    program_error::ProgramError,
+    error::ProgramError,
     pubkey::{pubkey_eq, Pubkey},
 };
 

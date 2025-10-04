@@ -1,7 +1,7 @@
 use core::mem::size_of;
 use pinocchio::{
     account_info::{AccountInfo, Ref},
-    program_error::ProgramError,
+    error::ProgramError,
     pubkey::Pubkey,
 };
 

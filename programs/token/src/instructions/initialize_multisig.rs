@@ -4,7 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke_with_bounds,
     instruction::{AccountMeta, Instruction},
-    program_error::ProgramError,
+    error::ProgramError,
     ProgramResult,
 };
 
