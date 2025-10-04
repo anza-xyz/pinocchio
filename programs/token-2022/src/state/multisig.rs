@@ -1,8 +1,8 @@
 use core::mem::size_of;
 use pinocchio::{
     account_info::{AccountInfo, Ref},
-    Address,
     error::ProgramError,
+    Address,
 };
 
 use crate::{instructions::MAX_MULTISIG_SIGNERS, ID};

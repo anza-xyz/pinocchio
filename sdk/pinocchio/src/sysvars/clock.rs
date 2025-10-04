@@ -3,10 +3,9 @@
 use super::Sysvar;
 use crate::{
     account_info::{AccountInfo, Ref},
-    Address,
     error::ProgramError,
     hint::unlikely,
-    impl_sysvar_get,
+    impl_sysvar_get, Address,
 };
 
 /// The ID of the clock sysvar.

@@ -1,9 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
-    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Assign account to a program based on a seed.
