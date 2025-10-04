@@ -3,8 +3,8 @@ use core::mem::MaybeUninit;
 use pinocchio::{
     account_info::AccountInfo,
     cpi::{slice_invoke_signed, MAX_CPI_ACCOUNTS},
+    error::ProgramError,
     instruction::{AccountMeta, Instruction, Signer},
-    program_error::ProgramError,
     ProgramResult,
 };
 
