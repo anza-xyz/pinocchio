@@ -4,11 +4,10 @@ use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
 use crate::{
     account_info::{AccountInfo, BorrowState},
-    Address,
     error::ProgramError,
     hint::unlikely,
     instruction::{Account, Instruction, Signer},
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.

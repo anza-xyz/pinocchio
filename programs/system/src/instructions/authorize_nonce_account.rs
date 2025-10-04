@@ -1,9 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
-    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Change the entity authorized to execute nonce instructions on the account.

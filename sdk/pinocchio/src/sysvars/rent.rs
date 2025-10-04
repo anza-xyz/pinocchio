@@ -4,11 +4,11 @@
 
 use crate::{
     account_info::{AccountInfo, Ref},
-    Address,
     error::ProgramError,
     hint::unlikely,
     impl_sysvar_get,
     sysvars::Sysvar,
+    Address,
 };
 
 /// The ID of the rent sysvar.
