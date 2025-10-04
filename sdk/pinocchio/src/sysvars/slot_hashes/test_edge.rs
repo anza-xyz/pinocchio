@@ -1,4 +1,4 @@
-use crate::{program_error::ProgramError, sysvars::slot_hashes::*};
+use crate::{error::ProgramError, sysvars::slot_hashes::*};
 extern crate std;
 use super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account_info};
 

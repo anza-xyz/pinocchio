@@ -239,7 +239,7 @@ pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
 pub use entrypoint::lazy as lazy_entrypoint;
-pub use solana_program_error as program_error;
+pub use solana_program_error as error;
 pub use solana_program_error::ProgramResult;
 
 /// Maximum number of accounts that a transaction may process.

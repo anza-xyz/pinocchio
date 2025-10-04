@@ -2,7 +2,7 @@
 
 use core::ptr::read_unaligned;
 
-use crate::program_error::ProgramError;
+use crate::error::ProgramError;
 
 /// Number of bytes in a pubkey.
 pub const PUBKEY_BYTES: usize = 32;
