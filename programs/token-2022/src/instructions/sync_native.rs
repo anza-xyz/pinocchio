@@ -1,9 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
-    Address,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Given a native token account updates its amount field based

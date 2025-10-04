@@ -5,7 +5,7 @@ use core::hint::black_box;
 
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_get_sysvar;
-use crate::{Address, error::ProgramError};
+use crate::{error::ProgramError, Address};
 
 pub mod clock;
 pub mod fees;

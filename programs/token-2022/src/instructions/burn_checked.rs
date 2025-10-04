@@ -3,10 +3,9 @@ use core::slice::from_raw_parts;
 use crate::{write_bytes, UNINIT_BYTE};
 use pinocchio::{
     account_info::AccountInfo,
-    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Burns tokens by removing them from an account.

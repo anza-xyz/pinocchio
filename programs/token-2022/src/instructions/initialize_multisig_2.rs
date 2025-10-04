@@ -2,11 +2,10 @@ use core::{mem::MaybeUninit, slice};
 
 use pinocchio::{
     account_info::AccountInfo,
-    Address,
     cpi::invoke_with_bounds,
     error::ProgramError,
     instruction::{AccountMeta, Instruction},
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::instructions::MAX_MULTISIG_SIGNERS;
