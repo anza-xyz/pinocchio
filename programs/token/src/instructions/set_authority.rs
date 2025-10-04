@@ -4,8 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};
@@ -32,7 +31,7 @@ pub struct SetAuthority<'a> {
     /// The type of authority to update.
     pub authority_type: AuthorityType,
     /// The new authority
-    pub new_authority: Option<&'a Pubkey>,
+    pub new_authority: Option<&'a Address>,
 }
 
 impl SetAuthority<'_> {
@@ -53,7 +52,7 @@ impl SetAuthority<'_> {
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: authority_type (1 byte, u8)
         // -  [2]: new_authority presence flag (1 byte, AuthorityType)
-        // -  [3..35] new_authority (optional, 32 bytes, Pubkey)
+        // -  [3..35] new_authority (optional, 32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 35];
         let mut length = instruction_data.len();
 
@@ -65,7 +64,7 @@ impl SetAuthority<'_> {
         if let Some(new_authority) = self.new_authority {
             // Set new_authority as [u8; 32] at offset [2..35]
             write_bytes(&mut instruction_data[2..3], &[1]);
-            write_bytes(&mut instruction_data[3..], new_authority);
+            write_bytes(&mut instruction_data[3..], new_authority.as_array());
         } else {
             write_bytes(&mut instruction_data[2..3], &[0]);
             // Adjust length if no new authority

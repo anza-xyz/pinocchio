@@ -4,8 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};
@@ -21,7 +20,7 @@ pub struct InitializeAccount3<'a> {
     /// Mint Account.
     pub mint: &'a AccountInfo,
     /// Owner of the new Account.
-    pub owner: &'a Pubkey,
+    pub owner: &'a Address,
 }
 
 impl InitializeAccount3<'_> {
@@ -35,13 +34,13 @@ impl InitializeAccount3<'_> {
 
         // instruction data
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..33]: owner (32 bytes, Pubkey)
+        // -  [1..33]: owner (32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 33];
 
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[18]);
         // Set owner as [u8; 32] at offset [1..33]
-        write_bytes(&mut instruction_data[1..], self.owner);
+        write_bytes(&mut instruction_data[1..], self.owner.as_array());
 
         let instruction = Instruction {
             program_id: &crate::ID,

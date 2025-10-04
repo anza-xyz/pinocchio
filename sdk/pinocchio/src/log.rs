@@ -27,13 +27,12 @@
 //! [`env_logger`]: https://docs.rs/env_logger
 //! [`RpcClient::get_transaction`]: https://docs.rs/solana-rpc-client/latest/solana_rpc_client/rpc_client/struct.RpcClient.html#method.get_transaction
 //!
-//! While most logging functions are defined in this module, [`Pubkey`]s can
-//! also be efficiently logged with the [`pubkey::log`] function.
+//! While most logging functions are defined in this module, [`Address`]es can
+//! also be efficiently logged with the [`solana_address::Address::log`] function.
 //!
-//! [`Pubkey`]: crate::pubkey::Pubkey
-//! [`pubkey::log`]: crate::pubkey::log
+//! [`Address`]: solana_address
 
-use crate::{account_info::AccountInfo, pubkey};
+use crate::account_info::AccountInfo;
 
 /// Print a message to the log.
 ///
@@ -138,22 +137,28 @@ pub fn sol_log_slice(slice: &[u8]) {
 /// - `accounts` - A slice of [`AccountInfo`].
 /// - `data` - The instruction data.
 pub fn sol_log_params(accounts: &[AccountInfo], data: &[u8]) {
-    for (i, account) in accounts.iter().enumerate() {
-        msg!("AccountInfo");
-        sol_log_64(0, 0, 0, 0, i as u64);
-        msg!("- Is signer");
-        sol_log_64(0, 0, 0, 0, account.is_signer() as u64);
-        msg!("- Key");
-        pubkey::log(account.key());
-        msg!("- Lamports");
-        sol_log_64(0, 0, 0, 0, account.lamports());
-        msg!("- Account data length");
-        sol_log_64(0, 0, 0, 0, account.data_len() as u64);
-        msg!("- Owner");
-        pubkey::log(account.owner());
+    #[cfg(target_os = "solana")]
+    {
+        for (i, account) in accounts.iter().enumerate() {
+            msg!("AccountInfo");
+            sol_log_64(0, 0, 0, 0, i as u64);
+            msg!("- Is signer");
+            sol_log_64(0, 0, 0, 0, account.is_signer() as u64);
+            msg!("- Key");
+            account.key().log();
+            msg!("- Lamports");
+            sol_log_64(0, 0, 0, 0, account.lamports());
+            msg!("- Account data length");
+            sol_log_64(0, 0, 0, 0, account.data_len() as u64);
+            msg!("- Owner");
+            account.owner().log();
+        }
+        msg!("Instruction data");
+        sol_log_slice(data);
     }
-    msg!("Instruction data");
-    sol_log_slice(data);
+
+    #[cfg(not(target_os = "solana"))]
+    core::hint::black_box((accounts, data));
 }
 
 /// Print the remaining compute units available to the program.

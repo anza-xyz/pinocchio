@@ -10,11 +10,7 @@ use core::{
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_memset_;
 
-use crate::{
-    error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
-    ProgramResult,
-};
+use crate::{error::ProgramError, Address, ProgramResult};
 
 /// Maximum number of bytes a program may add to an account during a
 /// single top-level instruction.
@@ -22,7 +18,8 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
 
 /// Represents masks for borrow state of an account.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub enum BorrowState {
     /// Mask to check whether an account is already borrowed.
     ///
@@ -44,7 +41,8 @@ pub enum BorrowState {
 /// This data is wrapped in an `AccountInfo` struct, which provides safe access
 /// to the data.
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Default)]
 pub(crate) struct Account {
     /// Borrow state for lamports and account data.
     ///
@@ -97,11 +95,11 @@ pub(crate) struct Account {
     /// value is zero at the start of the instruction.
     resize_delta: i32,
 
-    /// Public key of the account.
-    key: Pubkey,
+    /// Address of the account.
+    key: Address,
 
     /// Program that owns this account. Modifiable by programs.
-    owner: Pubkey,
+    owner: Address,
 
     /// The lamports in the account. Modifiable by programs.
     lamports: u64,
@@ -116,7 +114,8 @@ pub(crate) struct Account {
 /// used to track borrows of the account data and lamports, given that an
 /// account can be "shared" across multiple `AccountInfo` instances.
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AccountInfo {
     /// Raw (pointer to) account data.
     ///
@@ -125,15 +124,15 @@ pub struct AccountInfo {
 }
 
 impl AccountInfo {
-    /// Public key of the account.
+    /// Address of the account.
     #[inline(always)]
-    pub fn key(&self) -> &Pubkey {
+    pub fn key(&self) -> &Address {
         unsafe { &(*self.raw).key }
     }
 
     /// Program that owns this account.
     #[inline(always)]
-    pub fn owner(&self) -> &Pubkey {
+    pub fn owner(&self) -> &Address {
         unsafe { &(*self.raw).owner }
     }
 
@@ -189,8 +188,8 @@ impl AccountInfo {
 
     /// Checks if the account is owned by the given program.
     #[inline(always)]
-    pub fn is_owned_by(&self, program: &Pubkey) -> bool {
-        pubkey_eq(self.owner(), program)
+    pub fn is_owned_by(&self, program: &Address) -> bool {
+        self.owner() == program
     }
 
     /// Changes the owner of the account.
@@ -200,8 +199,11 @@ impl AccountInfo {
     /// It is undefined behavior to use this method while there is an active reference
     /// to the `owner` returned by [`Self::owner`].
     #[inline(always)]
-    pub unsafe fn assign(&self, new_owner: &Pubkey) {
+    pub unsafe fn assign(&self, new_owner: &Address) {
+        #[cfg(feature = "copy")]
         write(&mut (*self.raw).owner, *new_owner);
+        #[cfg(not(feature = "copy"))]
+        write(&mut (*self.raw).owner, new_owner.clone());
     }
 
     /// Return true if the account borrow state is set to the given state.

@@ -3,17 +3,16 @@ use pinocchio::{
     error::ProgramError,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
     sysvars::rent::Rent,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
-/// Create a new account at an address derived from a base pubkey and a seed.
+/// Create a new account at an address derived from a base address and a seed.
 ///
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` Funding account
 ///   1. `[WRITE]` Created account
-///   2. `[SIGNER]` (optional) Base account; the account matching the base Pubkey below must be
+///   2. `[SIGNER]` (optional) Base account; the account matching the base address below must be
 ///      provided as a signer, but may be the same as the funding account
 pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     /// Funding account.
@@ -24,12 +23,12 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
 
     /// Base account.
     ///
-    /// The account matching the base Pubkey below must be provided as
+    /// The account matching the base [`Address`] below must be provided as
     /// a signer, but may be the same as the funding account and provided
     /// as account 0.
     pub base: Option<&'a AccountInfo>,
 
-    /// String of ASCII chars, no longer than `Pubkey::MAX_SEED_LEN`.
+    /// String of ASCII chars, no longer than [`MAX_SEED_LEN`](https://docs.rs/solana-address/latest/solana_address/constant.MAX_SEED_LEN.html).
     pub seed: &'b str,
 
     /// Number of lamports to transfer to the new account.
@@ -39,7 +38,7 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     pub space: u64,
 
     /// Address of program that will own the new account.
-    pub owner: &'c Pubkey,
+    pub owner: &'c Address,
 }
 
 impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
@@ -51,7 +50,7 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
         seed: &'b str,
         rent_sysvar: &'a AccountInfo,
         space: u64,
-        owner: &'c Pubkey,
+        owner: &'c Address,
     ) -> Result<Self, ProgramError> {
         let rent = Rent::from_account_info(rent_sysvar)?;
         let lamports = rent.minimum_balance(space as usize);
@@ -83,15 +82,15 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
 
         // instruction data
         // - [0..4  ]: instruction discriminator
-        // - [4..36 ]: base pubkey
+        // - [4..36 ]: base address
         // - [36..44]: seed length
         // - [44..  ]: seed (max 32)
         // - [..  +8]: lamports
         // - [..  +8]: account space
-        // - [.. +32]: owner pubkey
+        // - [.. +32]: owner address
         let mut instruction_data = [0; 120];
         instruction_data[0] = 3;
-        instruction_data[4..36].copy_from_slice(self.base.unwrap_or(self.from).key());
+        instruction_data[4..36].copy_from_slice(self.base.unwrap_or(self.from).key().as_array());
         instruction_data[36..44].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
 
         let offset = 44 + self.seed.len();
