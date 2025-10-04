@@ -28,9 +28,9 @@
 //! [`RpcClient::get_transaction`]: https://docs.rs/solana-rpc-client/latest/solana_rpc_client/rpc_client/struct.RpcClient.html#method.get_transaction
 //!
 //! While most logging functions are defined in this module, [`Address`]es can
-//! also be efficiently logged with the [`solana_address::log`] function.
+//! also be efficiently logged with the [`solana_address::Address::log`] function.
 //!
-//! [`Address`]: solana_Address
+//! [`Address`]: solana_address
 
 use crate::account_info::AccountInfo;
 
