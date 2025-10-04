@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -13,11 +13,11 @@ use pinocchio::{
 ///   2. `[SIGNER]` The account's owner.
 pub struct CloseAccount<'a, 'b> {
     /// Token Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Destination Account
-    pub destination: &'a AccountInfo,
+    pub destination: &'a AccountView,
     /// Owner Account
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Token Program
     pub token_program: &'b Address,
 }
@@ -32,9 +32,9 @@ impl CloseAccount<'_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.destination.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::writable(self.destination.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         let instruction = Instruction {

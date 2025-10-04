@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -13,11 +13,11 @@ use pinocchio::{
 ///   2. `[SIGNER]` The mint freeze authority.
 pub struct ThawAccount<'a, 'b> {
     /// Token Account to thaw.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Mint Freeze Authority Account
-    pub freeze_authority: &'a AccountInfo,
+    pub freeze_authority: &'a AccountView,
     /// Token Program
     pub token_program: &'b Address,
 }
@@ -32,9 +32,9 @@ impl ThawAccount<'_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::readonly_signer(self.freeze_authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::readonly_signer(self.freeze_authority.address()),
         ];
 
         let instruction = Instruction {

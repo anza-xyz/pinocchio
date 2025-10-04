@@ -3,7 +3,7 @@
 //! This is required for the rent sysvar implementation.
 
 use crate::{
-    account_info::{AccountInfo, Ref},
+    account::{AccountView, Ref},
     error::ProgramError,
     hint::unlikely,
     impl_sysvar_get,
@@ -74,11 +74,11 @@ impl Rent {
     ///
     /// This method performs a check on the account info key.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Rent>, ProgramError> {
-        if unlikely(account_info.key() != &RENT_ID) {
+    pub fn from_account_info(account_view: &AccountView) -> Result<Ref<Rent>, ProgramError> {
+        if unlikely(account_view.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow_data()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -94,9 +94,9 @@ impl Rent {
     /// no mutable borrows of the account data.
     #[inline]
     pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+        account_info: &AccountView,
     ) -> Result<&Self, ProgramError> {
-        if unlikely(account_info.key() != &RENT_ID) {
+        if unlikely(account_info.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
         Ok(Self::from_bytes_unchecked(

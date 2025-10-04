@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -13,17 +13,17 @@ use pinocchio::{
 ///   2. `[WRITE]` Recipient account
 pub struct TransferWithSeed<'a, 'b, 'c> {
     /// Funding account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
 
     /// Base account.
     ///
     /// The account matching the base [`Address`] below must be provided as
     /// a signer, but may be the same as the funding account and provided
     /// as account 0.
-    pub base: &'a AccountInfo,
+    pub base: &'a AccountView,
 
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
 
     /// Amount of lamports to transfer.
     pub lamports: u64,
@@ -45,9 +45,9 @@ impl TransferWithSeed<'_, '_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::readonly_signer(self.base.key()),
-            AccountMeta::writable(self.to.key()),
+            AccountMeta::writable(self.from.address()),
+            AccountMeta::readonly_signer(self.base.address()),
+            AccountMeta::writable(self.to.address()),
         ];
 
         // instruction data

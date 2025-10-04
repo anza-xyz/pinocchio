@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -12,10 +12,10 @@ use pinocchio::{
 ///   1. `[WRITE]` Recipient account
 pub struct Transfer<'a> {
     /// Funding account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
 
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
 
     /// Amount of lamports to transfer.
     pub lamports: u64,
@@ -31,8 +31,8 @@ impl Transfer<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable_signer(self.from.key()),
-            AccountMeta::writable(self.to.key()),
+            AccountMeta::writable_signer(self.from.address()),
+            AccountMeta::writable(self.to.address()),
         ];
 
         // instruction data

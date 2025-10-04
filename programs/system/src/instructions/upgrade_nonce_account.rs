@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     ProgramResult,
@@ -12,14 +12,14 @@ use pinocchio::{
 ///   0. `[WRITE]` Nonce account
 pub struct UpgradeNonceAccount<'a> {
     /// Nonce account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 }
 
 impl UpgradeNonceAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.account.key())];
+        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.account.address())];
 
         // instruction
         let instruction = Instruction {
