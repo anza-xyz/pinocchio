@@ -1,6 +1,6 @@
 use super::AccountState;
 use pinocchio::{
-    account_view::{AccountView, Ref},
+    account::{AccountView, Ref},
     error::ProgramError,
     Address,
 };

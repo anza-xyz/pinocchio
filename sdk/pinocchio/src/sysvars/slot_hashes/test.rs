@@ -1,6 +1,6 @@
 use super::test_utils::*;
 use crate::{
-    account_view::{Account, AccountView},
+    account::{Account, AccountView},
     error::ProgramError,
     sysvars::{clock::Slot, slot_hashes::*},
 };

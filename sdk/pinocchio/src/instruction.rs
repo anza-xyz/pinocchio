@@ -2,7 +2,7 @@
 
 use core::{marker::PhantomData, ops::Deref};
 
-use crate::{account_view::AccountView, Address};
+use crate::{account::AccountView, Address};
 
 /// Information about a CPI instruction.
 #[derive(Debug, Clone)]
