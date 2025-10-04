@@ -5,9 +5,9 @@
 use super::Sysvar;
 use crate::{
     account_info::{AccountInfo, Ref},
+    error::ProgramError,
     hint::unlikely,
     impl_sysvar_get,
-    error::ProgramError,
     pubkey::{pubkey_eq, Pubkey},
 };
 
