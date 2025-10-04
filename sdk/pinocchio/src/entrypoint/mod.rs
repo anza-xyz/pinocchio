@@ -94,7 +94,6 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 ///     use pinocchio::{
 ///         AccountView,
 ///         entrypoint,
-///         msg,
 ///         Address,
 ///         ProgramResult
 ///     };
@@ -106,7 +105,6 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 ///         accounts: &[AccountView],
 ///         instruction_data: &[u8],
 ///     ) -> ProgramResult {
-///         msg!("Hello from my program!");
 ///         Ok(())
 ///     }
 ///
