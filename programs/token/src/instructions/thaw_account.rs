@@ -1,9 +1,9 @@
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountRole, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Thaw a frozen account using the Mint's freeze authority.
 ///
@@ -29,13 +29,13 @@ impl ThawAccount<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly(self.mint.address()),
-            AccountMeta::readonly_signer(self.freeze_authority.address()),
+        let account_metas: [AccountRole; 3] = [
+            AccountRole::writable(self.account.address()),
+            AccountRole::readonly(self.mint.address()),
+            AccountRole::readonly_signer(self.freeze_authority.address()),
         ];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &[11],

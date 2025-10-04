@@ -1,9 +1,9 @@
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountRole, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Transfers from and closes a nested associated token account: an
 /// associated token account owned by an associated token account.
@@ -50,14 +50,14 @@ impl RecoverNested<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 7] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly(self.mint.address()),
-            AccountMeta::writable(self.destination_account.address()),
-            AccountMeta::readonly(self.owner_account.address()),
-            AccountMeta::readonly(self.owner_mint.address()),
-            AccountMeta::writable_signer(self.wallet.address()),
-            AccountMeta::readonly(self.token_program.address()),
+        let account_metas: [AccountRole; 7] = [
+            AccountRole::writable(self.account.address()),
+            AccountRole::readonly(self.mint.address()),
+            AccountRole::writable(self.destination_account.address()),
+            AccountRole::readonly(self.owner_account.address()),
+            AccountRole::readonly(self.owner_mint.address()),
+            AccountRole::writable_signer(self.wallet.address()),
+            AccountRole::readonly(self.token_program.address()),
         ];
 
         // Instruction data:
@@ -65,7 +65,7 @@ impl RecoverNested<'_> {
 
         let instruction_data = [2u8];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data,
