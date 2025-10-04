@@ -5,7 +5,7 @@ use pinocchio::{
     cpi::invoke_with_bounds,
     error::ProgramError,
     instruction::{AccountMeta, Instruction},
-    Address, Address, ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Maximum number of multisignature signers.

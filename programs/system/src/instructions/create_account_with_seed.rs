@@ -4,7 +4,7 @@ use pinocchio::{
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     sysvars::rent::Rent,
-    Address, Address, ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Create a new account at an address derived from a base address and a seed.

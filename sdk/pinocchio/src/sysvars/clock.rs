@@ -5,7 +5,7 @@ use crate::{
     account_info::{AccountInfo, Ref},
     error::ProgramError,
     hint::unlikely,
-    impl_sysvar_get, Address, Address,
+    impl_sysvar_get, Address,
 };
 
 /// The ID of the clock sysvar.

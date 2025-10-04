@@ -2,7 +2,7 @@ use core::mem::size_of;
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     error::ProgramError,
-    Address, Address,
+    Address,
 };
 
 use crate::{instructions::MAX_MULTISIG_SIGNERS, ID};

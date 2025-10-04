@@ -8,7 +8,7 @@ use crate::{
     hint::unlikely,
     impl_sysvar_get,
     sysvars::Sysvar,
-    Address, Address,
+    Address,
 };
 
 /// The ID of the rent sysvar.

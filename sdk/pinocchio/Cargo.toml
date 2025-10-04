@@ -25,9 +25,5 @@ std = ["solana-address/std"]
 solana-address = { workspace = true, features = ["syscalls"] }
 solana-program-error = "3.0"
 
-[dependencies]
-solana-address = { workspace = true, features = ["syscalls"] }
-solana-program-error = "3.0"
-
 [dev-dependencies]
 five8_const = { workspace = true }

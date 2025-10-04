@@ -7,7 +7,7 @@ use crate::{
     error::ProgramError,
     hint::unlikely,
     instruction::{Account, Instruction, Signer},
-    Address, Address, ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Maximum number of accounts that can be passed to a cross-program invocation.

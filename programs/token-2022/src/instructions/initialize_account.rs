@@ -2,7 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    Address, Address, ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Initialize a new Token Account.

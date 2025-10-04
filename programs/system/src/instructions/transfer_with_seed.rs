@@ -2,7 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    Address, Address, ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Transfer lamports from a derived address.
