@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_view::AccountView,
+    account::AccountView,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     Address, ProgramResult,

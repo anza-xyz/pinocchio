@@ -14,7 +14,7 @@ mod test_raw;
 mod test_utils;
 
 use crate::{
-    account_view::{AccountView, Ref},
+    account::{AccountView, Ref},
     error::ProgramError,
     hint::unlikely,
     sysvars::clock::Slot,

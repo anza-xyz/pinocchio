@@ -1,7 +1,7 @@
 use core::mem::MaybeUninit;
 
 use pinocchio::{
-    account_view::AccountView,
+    account::AccountView,
     cpi::{slice_invoke_signed, MAX_CPI_ACCOUNTS},
     error::ProgramError,
     instruction::{AccountMeta, Instruction, Signer},
