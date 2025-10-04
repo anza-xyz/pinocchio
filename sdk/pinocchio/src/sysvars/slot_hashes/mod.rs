@@ -15,10 +15,10 @@ mod test_utils;
 
 use crate::{
     account_info::{AccountInfo, Ref},
-    Address,
     error::ProgramError,
     hint::unlikely,
     sysvars::clock::Slot,
+    Address,
 };
 use core::{mem, ops::Deref, slice::from_raw_parts};
 #[cfg(feature = "std")]

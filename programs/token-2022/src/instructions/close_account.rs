@@ -1,9 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
-    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Close an account by transferring all its SOL to the destination account.

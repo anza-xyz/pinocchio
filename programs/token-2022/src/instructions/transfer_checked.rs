@@ -2,10 +2,9 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
-    Address,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};

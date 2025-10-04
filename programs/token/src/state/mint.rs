@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::{AccountInfo, Ref},
-    Address,
     error::ProgramError,
+    Address,
 };
 
 use crate::ID;
