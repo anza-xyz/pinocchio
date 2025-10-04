@@ -54,15 +54,10 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 name = "pinocchio"
 version = "0.9.1"
 dependencies = [
-<<<<<<< HEAD
  "five8_const 0.1.4",
  "solana-account-view",
  "solana-address",
  "solana-instruction-view",
-=======
- "solana-account-view",
- "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
->>>>>>> 46dd140 (Use solana-account-view)
  "solana-program-error",
 ]
 
@@ -96,15 +91,10 @@ dependencies = [
 name = "pinocchio-memo"
 version = "0.2.0"
 dependencies = [
-<<<<<<< HEAD
  "solana-account-view",
  "solana-address",
  "solana-instruction-view",
  "solana-program-error",
-=======
- "five8_const",
- "solana-address 0.0.0 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
->>>>>>> 46dd140 (Use solana-account-view)
 ]
 
 [[package]]
@@ -187,28 +177,9 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "solana-account-view"
-<<<<<<< HEAD
-=======
-version = "0.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=instruction-view#ede330efc009fcb39b28fc3a09a974d5614279cb"
-dependencies = [
- "solana-address",
- "solana-define-syscall",
- "solana-program-error",
-]
-
-[[package]]
-name = "solana-address"
-version = "0.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=account-view#67740223b05b3146d03eb8b1d4c57a22380366b0"
-
-[[package]]
-name = "solana-address"
->>>>>>> 46dd140 (Use solana-account-view)
 version = "0.0.0"
 source = "git+https://github.com/febo/solana-sdk.git?branch=solana-instruction-view#88a90e9c5144dbab669d670c158277326dce118d"
 dependencies = [
-<<<<<<< HEAD
  "solana-address",
  "solana-program-error",
 ]
@@ -221,15 +192,11 @@ dependencies = [
  "five8",
  "five8_const 1.0.0",
  "solana-define-syscall",
-=======
- "solana-define-syscall 2.2.1 (git+https://github.com/febo/solana-sdk.git?branch=solana-address)",
->>>>>>> 46dd140 (Use solana-account-view)
  "solana-program-error",
 ]
 
 [[package]]
 name = "solana-define-syscall"
-<<<<<<< HEAD
 version = "3.0.0"
 source = "git+https://github.com/febo/solana-sdk.git?branch=solana-instruction-view#88a90e9c5144dbab669d670c158277326dce118d"
 
@@ -243,15 +210,6 @@ dependencies = [
  "solana-define-syscall",
  "solana-program-error",
 ]
-=======
-version = "2.2.1"
-source = "git+https://github.com/febo/solana-sdk.git?branch=instruction-view#ede330efc009fcb39b28fc3a09a974d5614279cb"
-
-[[package]]
-name = "solana-define-syscall"
-version = "2.2.1"
-source = "git+https://github.com/febo/solana-sdk.git?branch=solana-address#626d9c0d25da15cd2b0a53a37edf510d4e5ea430"
->>>>>>> 46dd140 (Use solana-account-view)
 
 [[package]]
 name = "solana-program-error"
