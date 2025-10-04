@@ -299,8 +299,7 @@ macro_rules! signer {
 ///
 /// Creating seeds array and signer for a PDA with a single seed and bump value:
 /// ```
-/// use pinocchio::{seeds, instruction::Signer};
-/// use solana_Address;
+/// use pinocchio::{seeds, instruction::Signer, Address};
 ///
 /// let pda_bump = 0xffu8;
 /// let pda_ref = &[pda_bump];  // prevent temporary value being freed
