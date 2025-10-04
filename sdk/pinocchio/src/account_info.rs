@@ -11,7 +11,7 @@ use core::{
 use crate::syscalls::sol_memset_;
 
 use crate::{
-    program_error::ProgramError,
+    error::ProgramError,
     pubkey::{pubkey_eq, Pubkey},
     ProgramResult,
 };
