@@ -1,7 +1,7 @@
 //! Information about the network's clock, ticks, slots, etc.
 
 use crate::{
-    account_view::{AccountView, Ref},
+    account::{AccountView, Ref},
     error::ProgramError,
     hint::unlikely,
     impl_sysvar_get,

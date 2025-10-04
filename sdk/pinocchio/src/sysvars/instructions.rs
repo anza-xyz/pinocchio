@@ -1,5 +1,5 @@
 use crate::{
-    account_view::{AccountView, Ref},
+    account::{AccountView, Ref},
     address::{Address, ADDRESS_BYTES},
     error::ProgramError,
     instruction::AccountMeta,

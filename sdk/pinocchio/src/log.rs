@@ -32,7 +32,7 @@
 //!
 //! [`Address`]: solana_address
 
-use crate::account_view::AccountView;
+use crate::account::AccountView;
 
 /// Print a message to the log.
 ///

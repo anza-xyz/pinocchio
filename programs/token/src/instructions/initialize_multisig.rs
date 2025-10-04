@@ -1,7 +1,7 @@
 use core::{mem::MaybeUninit, slice};
 
 use pinocchio::{
-    account_view::AccountView,
+    account::AccountView,
     cpi::invoke_with_bounds,
     error::ProgramError,
     instruction::{AccountMeta, Instruction},

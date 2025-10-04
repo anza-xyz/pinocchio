@@ -18,7 +18,7 @@ use core::{
 };
 
 use crate::{
-    account_view::{Account, AccountView, MAX_PERMITTED_DATA_INCREASE},
+    account::{Account, AccountView, MAX_PERMITTED_DATA_INCREASE},
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
@@ -170,8 +170,8 @@ macro_rules! program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account_view::AccountView> =
-                core::mem::MaybeUninit::<$crate::account_view::AccountView>::uninit();
+            const UNINIT: core::mem::MaybeUninit<$crate::account::AccountView> =
+                core::mem::MaybeUninit::<$crate::account::AccountView>::uninit();
             // Create an array of uninitialized account infos.
             let mut accounts = [UNINIT; $maximum];
 
