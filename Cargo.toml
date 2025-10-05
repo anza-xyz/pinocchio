@@ -25,6 +25,7 @@ quote = "1.0"
 regex = "1"
 solana-account-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
 solana-address = { version = "1.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
+solana-define-syscall = { version = "3.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
 solana-instruction-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
 solana-program-error = { version = "3.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
 syn = "1.0"

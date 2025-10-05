@@ -2,6 +2,8 @@
 //!
 //! This is required for the rent sysvar implementation.
 
+#![allow(deprecated)]
+
 use crate::{
     account::{AccountView, Ref},
     error::ProgramError,
