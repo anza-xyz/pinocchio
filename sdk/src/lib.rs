@@ -1,18 +1,10 @@
-//! # Pinocchio
+//! # A library to create Solana programs in Rust
 //!
-//! Pinocchio is a "no-external" dependencies library to create Solana programs
-//! in Rust, which means that the only dependencies are from the Solana SDK. This
-//! reduces the chance of dependency conflicts when compiling the program.
-//!
-//! It takes advantage of the way SVM loaders serialize the program input
-//! parameters into a byte array that is then passed to the program's entrypoint
-//! to use zero-copy types to read the input - these types are defined in an efficient
-//! way taking into consideration that they will be used in on-chain programs.
-//!
-//! It is intended to be used by on-chain programs only; for off-chain programs,
-//! use instead [`solana-sdk`] crates.
-//!
-//! [`solana-sdk`]: https://docs.rs/solana-sdk/latest/solana_sdk/
+//! Pinocchio is a *no-external* dependencies library to create Solana programs
+//! in Rust. The only dependencies are types from the Solana SDK specifically
+//! designed for on-chain programs. This mitigates dependency issues and offers
+//! an efficient zero-copy library to write programs, optimized in terms of both
+//! compute units consumption and binary size.
 //!
 //! ## Defining the program entrypoint
 //!
@@ -23,17 +15,23 @@
 //! and [panic handler](https://doc.rust-lang.org/nomicon/panic-handler.html) using
 //! the [`default_allocator!`] and [`default_panic_handler!`] macros.
 //!
-//! The [`entrypoint!`] is a convenience macro that invokes three other macros to set
-//! all symbols required for a program execution:
+//! The [`entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.entrypoint.html)
+//! is a convenience macro that invokes three other macros to set all components
+//! required for a program execution:
 //!
 //! * [`program_entrypoint!`]: declares the program entrypoint
 //! * [`default_allocator!`]: declares the default (bump) global allocator
 //! * [`default_panic_handler!`]: declares the default panic handler
 //!
+//! When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
+//! instead of `default_panic_handler!` to declare a rust runtime panic handler.
+//! There's no need to do this when any dependency is `std` since rust compiler will
+//! emit a panic handler.
+//!
 //! To use the `entrypoint!` macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   AccountView,
+//!   account::AccountView,
 //!   Address,
 //!   entrypoint,
 //!   ProgramResult
@@ -58,18 +56,16 @@
 //! * `accounts`: the accounts received
 //! * `instruction_data`: data for the instruction
 //!
-//! Pinocchio also offers variations of the program entrypoint
-//! ([`lazy_program_entrypoint`]) and global allocator ([`no_allocator`]). In
-//! order to use these, the program needs to specify the program entrypoint,
-//! global allocator and panic handler individually. The [`entrypoint!`] macro
-//! is equivalent to writing:
+//! `pinocchio` also offers variations of the program entrypoint (`lazy_program_entrypoint`)
+//! and global allocator (`no_allocator`). In order to use these, the program needs to
+//! specify the program entrypoint, global allocator and panic handler individually. The
+//! `entrypoint!` macro is equivalent to writing:
 //! ```ignore
 //! program_entrypoint!(process_instruction);
 //! default_allocator!();
 //! default_panic_handler!();
 //! ```
-//! Any of these macros can be replaced by other implementations and Pinocchio
-//! offers a couple of variants for this.
+//! Any of these macros can be replaced by alternative implementations.
 //!
 //! ### [`lazy_program_entrypoint!`]
 //!
@@ -162,16 +158,44 @@
 //! 💡 The [`no_allocator!`] macro can also be used in combination with the
 //! [`lazy_program_entrypoint!`].
 //!
-//! ## `alloc` crate feature
-//!
-//! By default, Pinocchio is a `no_std` crate. This means that it does not use any
-//! code from the standard (`std`) library. While this does not affect how Pinocchio
-//! is used, there is a one particular apparent difference. Helpers that need to
-//! allocate memory, such as fetching `SlotHashes` sysvar, are not available. To
-//! enable these helpers, the `alloc` feature must be enabled when adding Pinocchio
-//! as a dependency:
+//! Since the `no_allocator!` macro does not allocate memory, the `32kb` memory region
+//! reserved for the heap remains unused. To take advantage of this, the `no_allocator!`
+//! macro emits an `allocate_unchecked` helper function that allows you to manually
+//! reserve memory for a type at compile time.
 //! ```ignore
-//! pinocchio = { version = "0.10.0", features = ["alloc"] }
+//! /// static allocation:
+//! ///    - 0 is the offset when the type will be allocated
+//! ///    - `allocate_unchecked` returns a mutable reference to the allocated type
+//! let lamports = allocate_unchecked::<u64>(0);
+//! *lamports = 1_000_000_000;
+//! ```
+//!
+//! Note that it is the developer's responsibility to ensure that types do not overlap
+//! in memory - the `offset + <size of type>` of different types must not overlap.
+//!
+//! ## Crate features
+//!
+//! ### `alloc`
+//!
+//! The `alloc` feature is enabled by default and it uses the [`alloc`](https://doc.rust-lang.org/alloc/)
+//! crate. This provides access to dynamic memory allocation in combination with the
+//! [`default_allocator!`], e.g., required to use `String` and `Vec` in a program.
+//! Helpers that need to allocate memory, such as fetching [`crate::sysvars::slot_hashes::SlotHashes::fetch`]
+//! sysvar data, are also available.
+//!
+//! When no allocation is needed or desired, the feature can be disabled:
+//!
+//! ```ignore
+//! pinocchio = { version = "0.10.0", default-features = false }
+//! ```
+//!
+//! ### `cpi`
+//!
+//! The `cpi` feature enables the cross-program invocation helpers, as well as types
+//! to define instructions and signer information.
+//!
+//! ```ignore
+//! pinocchio = { version = "0.10.0", features = ["cpi"] }
 //! ```
 //!
 //! ## Advanced entrypoint configuration
@@ -187,7 +211,7 @@
 //! #[cfg(feature = "bpf-entrypoint")]
 //! mod entrypoint {
 //!   use pinocchio::{
-//!     AccountView,
+//!     account::AccountView,
 //!     Address,
 //!     entrypoint,
 //!     ProgramResult
@@ -211,6 +235,7 @@
 //! ```
 
 #![no_std]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
