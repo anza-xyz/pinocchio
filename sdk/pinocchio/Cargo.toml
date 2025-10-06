@@ -20,7 +20,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 [features]
 copy = ["solana-account-view/copy", "solana-address/copy"]
 cpi = ["dep:solana-instruction-view"]
-std = ["solana-address/std"]
+alloc = []
 
 [dependencies]
 solana-account-view = { workspace = true }
