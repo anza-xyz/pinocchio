@@ -459,7 +459,6 @@ fn test_from_account_view_constructor() {
 /// `SlotHashes` getters to make sure the view itself works.  We do not verify
 /// that the syscall populated real on-chain bytes, as doing so requires an
 /// environment outside the scope of host `cargo test`.
-#[cfg(feature = "alloc")]
 #[test]
 fn test_fetch_allocates_buffer_host() {
     const START_SLOT: u64 = 500;
