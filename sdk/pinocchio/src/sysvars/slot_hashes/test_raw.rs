@@ -2,7 +2,6 @@
 
 use super::raw;
 use super::*;
-extern crate std;
 
 #[test]
 fn test_validate_buffer_size() {

@@ -5,7 +5,7 @@ pub mod lazy;
 
 pub use lazy::{InstructionContext, MaybeAccount};
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "alloc"))]
 use core::alloc::{GlobalAlloc, Layout};
 
 #[cfg(target_os = "solana")]
@@ -459,8 +459,8 @@ macro_rules! default_panic_handler {
 /// This macro sets up a default panic handler that logs the location (file, line and column) where
 /// the panic occurred and then calls the syscall `abort()`.
 ///
-/// This macro can only be used when all crates are `no_std` and the `"std"` feature is disabled.
-#[cfg(not(feature = "std"))]
+/// This macro can only be used when all crates are `no_std` and the `"alloc"` feature is disabled.
+#[cfg(not(feature = "alloc"))]
 #[macro_export]
 macro_rules! nostd_panic_handler {
     () => {
@@ -525,12 +525,12 @@ macro_rules! default_allocator {
 
 /// A global allocator that does not allocate memory.
 ///
-/// Using this macro with the `"std"` feature enabled will result in a compile error.
-#[cfg(feature = "std")]
+/// Using this macro with the `"alloc"` feature enabled will result in a compile error.
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! no_allocator {
     () => {
-        compile_error!("Feature 'std' cannot be enabled.");
+        compile_error!("Feature 'alloc' cannot be enabled.");
     };
 }
 
@@ -542,8 +542,8 @@ macro_rules! no_allocator {
 ///
 /// The program will panic if it tries to dynamically allocate memory.
 ///
-/// This is used when the `"std"` feature is disabled.
-#[cfg(not(feature = "std"))]
+/// This is used when the `"alloc"` feature is disabled.
+#[cfg(not(feature = "alloc"))]
 #[macro_export]
 macro_rules! no_allocator {
     () => {
@@ -653,13 +653,13 @@ mod alloc {
     }
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "alloc"))]
 /// An allocator that does not allocate memory.
 #[cfg_attr(feature = "copy", derive(Copy))]
 #[derive(Clone, Debug)]
 pub struct NoAllocator;
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "alloc"))]
 unsafe impl GlobalAlloc for NoAllocator {
     #[inline]
     unsafe fn alloc(&self, _: Layout) -> *mut u8 {
@@ -674,13 +674,13 @@ unsafe impl GlobalAlloc for NoAllocator {
 
 #[cfg(all(test, not(target_os = "solana")))]
 mod tests {
-    extern crate std;
+    extern crate alloc;
 
-    use core::{alloc::Layout, ptr::copy_nonoverlapping};
-    use std::{
+    use alloc::{
         alloc::{alloc, dealloc},
         vec,
     };
+    use core::{alloc::Layout, ptr::copy_nonoverlapping};
 
     use super::*;
 
@@ -703,7 +703,7 @@ mod tests {
             unsafe {
                 let ptr = alloc(layout);
                 if ptr.is_null() {
-                    std::alloc::handle_alloc_error(layout);
+                    alloc::alloc::handle_alloc_error(layout);
                 }
                 AlignedMemory { ptr, layout }
             }

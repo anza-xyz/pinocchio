@@ -23,8 +23,8 @@ use crate::{
     Address,
 };
 
-#[cfg(feature = "std")]
-use std::boxed::Box;
+#[cfg(feature = "alloc")]
+use alloc::{boxed::Box, vec::Vec};
 
 /// `SysvarS1otHashes111111111111111111111111111`
 pub const SLOTHASHES_ID: Address = Address::new_from_array([
@@ -299,7 +299,7 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl SlotHashes<Box<[u8]>> {
     /// Fills the provided buffer with the full `SlotHashes` sysvar data.
     ///
@@ -320,7 +320,7 @@ impl SlotHashes<Box<[u8]>> {
     /// Allocates an optimal buffer for the sysvar data based on available features.
     #[inline(always)]
     fn allocate_and_fetch() -> Result<Box<[u8]>, ProgramError> {
-        let mut buf = std::vec::Vec::with_capacity(MAX_SIZE);
+        let mut buf = Vec::with_capacity(MAX_SIZE);
         unsafe {
             // SAFETY: `buf` was allocated with capacity `MAX_SIZE` so its
             // pointer is valid for exactly that many bytes. `fill_from_sysvar`
