@@ -1,10 +1,11 @@
 use core::{marker::PhantomData, mem::size_of, ops::Deref};
 
+#[cfg(feature = "cpi")]
+use crate::instruction::AccountRole;
 use crate::{
     account::{AccountView, Ref},
     address::ADDRESS_BYTES,
     error::ProgramError,
-    instruction::AccountRole,
     Address,
 };
 
@@ -242,6 +243,7 @@ impl IntrospectedAccountRole {
         (self.flags & IS_SIGNER) != 0
     }
 
+    #[cfg(feature = "cpi")]
     /// Convert the `IntrospectedAccountRole` to an `AccountRole`.
     #[inline(always)]
     pub fn to_account_role(&self) -> AccountRole {
