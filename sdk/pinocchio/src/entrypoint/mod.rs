@@ -7,9 +7,6 @@ pub use lazy::{InstructionContext, MaybeAccount};
 
 #[cfg(not(feature = "alloc"))]
 use core::alloc::{GlobalAlloc, Layout};
-
-#[cfg(target_os = "solana")]
-pub use alloc::BumpAllocator;
 use core::{
     cmp::min,
     mem::{size_of, MaybeUninit},
@@ -21,6 +18,9 @@ use crate::{
     account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
+
+#[cfg(all(target_os = "solana", feature = "alloc"))]
+pub use alloc::BumpAllocator;
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
@@ -125,6 +125,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// manually.
 ///
 /// [`crate::nostd_panic_handler`]: https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:expr ) => {
@@ -459,14 +460,12 @@ macro_rules! default_panic_handler {
 /// This macro sets up a default panic handler that logs the location (file, line and column) where
 /// the panic occurred and then calls the syscall `abort()`.
 ///
-/// This macro can only be used when all crates are `no_std` and the `"alloc"` feature is disabled.
-#[cfg(not(feature = "alloc"))]
+/// This macro should be used when all crates are `no_std`.
 #[macro_export]
 macro_rules! nostd_panic_handler {
     () => {
         /// A panic handler for `no_std`.
         #[cfg(target_os = "solana")]
-        #[no_mangle]
         #[panic_handler]
         fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
             if let Some(location) = info.location() {
@@ -502,6 +501,7 @@ macro_rules! nostd_panic_handler {
 /// Default global allocator.
 ///
 /// This macro sets up a default global allocator that uses a bump allocator to allocate memory.
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! default_allocator {
     () => {
@@ -602,12 +602,27 @@ macro_rules! no_allocator {
     };
 }
 
-#[cfg(target_os = "solana")]
+#[cfg(not(feature = "alloc"))]
+/// An allocator that does not allocate memory.
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
+pub struct NoAllocator;
+
+#[cfg(not(feature = "alloc"))]
+unsafe impl GlobalAlloc for NoAllocator {
+    #[inline]
+    unsafe fn alloc(&self, _: Layout) -> *mut u8 {
+        panic!("** NO ALLOCATOR **");
+    }
+
+    #[inline]
+    unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
+        // I deny all allocations, so I don't need to free.
+    }
+}
+
+#[cfg(all(target_os = "solana", feature = "alloc"))]
 mod alloc {
-    //! The bump allocator used as the default rust heap when running programs.
-
-    extern crate alloc;
-
     use core::{
         alloc::{GlobalAlloc, Layout},
         mem::size_of,
@@ -650,25 +665,6 @@ mod alloc {
         unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
             // I'm a bump allocator, I don't free.
         }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-/// An allocator that does not allocate memory.
-#[cfg_attr(feature = "copy", derive(Copy))]
-#[derive(Clone, Debug)]
-pub struct NoAllocator;
-
-#[cfg(not(feature = "alloc"))]
-unsafe impl GlobalAlloc for NoAllocator {
-    #[inline]
-    unsafe fn alloc(&self, _: Layout) -> *mut u8 {
-        panic!("** NO ALLOCATOR **");
-    }
-
-    #[inline]
-    unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
-        // I deny all allocations, so I don't need to free.
     }
 }
 
