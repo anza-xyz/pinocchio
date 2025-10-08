@@ -171,11 +171,12 @@ pub fn process_instruction(
 By default, Pinocchio is a `no_std` crate. This means that it does not use any code from the
 standard (`std`) library. While this does not affect how Pinocchio is used, there is a one
 particular apparent difference. Helpers that need to allocate memory, such as fetching `SlotHashes`
-sysvar data, are not available. To enable these helpers, the `std` feature must be enabled when adding
-Pinocchio as a dependency:
+sysvar data, are not available. To enable these helpers, the `alloc` feature must be enabled when
+adding Pinocchio as a dependency:
 ```
-pinocchio = { version = "0.10.0", features = ["std"] }
+pinocchio = { version = "0.10.0", features = ["alloc"] }
 ```
+The `alloc` feature uses the `alloc` crate.
 
 ## Advance entrypoint configuration
 
