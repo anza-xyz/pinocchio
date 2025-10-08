@@ -33,5 +33,4 @@ solana-program-error = { workspace = true }
 solana-define-syscall = { workspace = true }
 
 [dev-dependencies]
-pinocchio = { path = ".", features = ["alloc"] }
 five8_const = { workspace = true }
