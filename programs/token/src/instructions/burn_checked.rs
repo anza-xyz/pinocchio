@@ -1,12 +1,13 @@
 use core::slice::from_raw_parts;
 
-use crate::{write_bytes, UNINIT_BYTE};
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountRole, InstructionView,
 };
+use solana_program_error::ProgramResult;
+
+use crate::{write_bytes, UNINIT_BYTE};
 
 /// Burns tokens by removing them from an account.
 ///
@@ -36,10 +37,10 @@ impl BurnChecked<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::writable(self.mint.address()),
-            AccountMeta::readonly_signer(self.authority.address()),
+        let account_metas: [AccountRole; 3] = [
+            AccountRole::writable(self.account.address()),
+            AccountRole::writable(self.mint.address()),
+            AccountRole::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data
@@ -55,7 +56,7 @@ impl BurnChecked<'_> {
         // Set decimals as u8 at offset [9]
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },

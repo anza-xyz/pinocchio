@@ -1,9 +1,9 @@
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    AccountRole, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Transfer lamports.
 ///
@@ -30,9 +30,9 @@ impl Transfer<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable_signer(self.from.address()),
-            AccountMeta::writable(self.to.address()),
+        let account_metas: [AccountRole; 2] = [
+            AccountRole::writable_signer(self.from.address()),
+            AccountRole::writable(self.to.address()),
         ];
 
         // instruction data
@@ -42,7 +42,7 @@ impl Transfer<'_> {
         instruction_data[0] = 2;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data,
