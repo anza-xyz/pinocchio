@@ -250,7 +250,8 @@ pub use solana_address as address;
 pub use solana_address::Address;
 
 // Re-export the `solana_instruction_view` for downstream use.
-pub use solana_instruction_view as instruction;
+#[cfg(feature = "cpi")]
+pub use {solana_instruction_view as instruction, solana_instruction_view::cpi};
 
 // Re-export the `solana_program_error` for downstream use.
 pub use solana_program_error as error;
