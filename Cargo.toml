@@ -6,7 +6,7 @@ members = [
     "programs/system",
     "programs/token",
     "programs/token-2022",
-    "sdk/pinocchio",
+    "sdk",
 ]
 
 [workspace.package]
@@ -17,7 +17,7 @@ rust-version = "1.84"
 
 [workspace.dependencies]
 five8_const = "0.1.4"
-pinocchio = { version = "0.9", default-features = false, path = "sdk/pinocchio" }
+pinocchio = { version = "0.9", default-features = false, path = "sdk" }
 solana-account-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
 solana-address = { version = "1.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
 solana-define-syscall = { version = "3.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
