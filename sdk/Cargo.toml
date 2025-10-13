@@ -36,5 +36,8 @@ solana-program-error = { workspace = true }
 [target.'cfg(target_os = "solana")'.dependencies]
 solana-define-syscall = { workspace = true }
 
+[target.'cfg(target_arch = "bpf")'.dependencies]
+solana-define-syscall = { workspace = true }
+
 [dev-dependencies]
 five8_const = { workspace = true }

@@ -1,9 +1,9 @@
 //! Provides access to cluster system accounts.
 
-#[cfg(not(target_os = "solana"))]
+#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
 use core::hint::black_box;
 
-#[cfg(target_os = "solana")]
+#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 use crate::syscalls::sol_get_sysvar;
 use crate::{error::ProgramError, Address};
 
@@ -17,13 +17,13 @@ pub mod slot_hashes;
 /// the sysvar data.
 //
 // Defined in the bpf loader as [`OFFSET_LENGTH_EXCEEDS_SYSVAR`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L172).
-#[cfg(target_os = "solana")]
+#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 const OFFSET_LENGTH_EXCEEDS_SYSVAR: u64 = 1;
 
 /// Return value indicating that the sysvar was not found.
 //
 // Defined in the bpf loader as [`SYSVAR_NOT_FOUND`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L171).
-#[cfg(target_os = "solana")]
+#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 const SYSVAR_NOT_FOUND: u64 = 2;
 
 /// A type that holds sysvar data.
@@ -49,10 +49,10 @@ macro_rules! impl_sysvar_get {
             let mut var = core::mem::MaybeUninit::<Self>::uninit();
             let var_addr = var.as_mut_ptr() as *mut _ as *mut u8;
 
-            #[cfg(target_os = "solana")]
+            #[cfg(any(target_os = "solana", target_arch = "bpf"))]
             let result = unsafe { $crate::syscalls::$syscall_name(var_addr) };
 
-            #[cfg(not(target_os = "solana"))]
+            #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
             let result = core::hint::black_box(var_addr as *const _ as u64);
 
             match result {
@@ -81,7 +81,7 @@ pub unsafe fn get_sysvar_unchecked(
     offset: usize,
     len: usize,
 ) -> Result<(), ProgramError> {
-    #[cfg(target_os = "solana")]
+    #[cfg(any(target_os = "solana", target_arch = "bpf"))]
     {
         let result = unsafe {
             sol_get_sysvar(
@@ -101,7 +101,7 @@ pub unsafe fn get_sysvar_unchecked(
         }
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
     {
         black_box((dst, sysvar_id, offset, len));
         Ok(())

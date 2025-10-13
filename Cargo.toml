@@ -18,11 +18,11 @@ rust-version = "1.84"
 [workspace.dependencies]
 five8_const = "0.1.4"
 pinocchio = { version = "0.9", default-features = false, path = "sdk" }
-solana-account-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
-solana-address = { version = "1.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
-solana-define-syscall = { version = "3.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
-solana-instruction-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
-solana-program-error = { version = "3.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-instruction-view" }
+solana-account-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "upstream-bpf" }
+solana-address = { version = "1.0", git = "https://github.com/febo/solana-sdk.git", branch = "upstream-bpf" }
+solana-define-syscall = { version = "3.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "upstream-bpf" }
+solana-instruction-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "upstream-bpf" }
+solana-program-error = { version = "3.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "upstream-bpf" }
 
 [workspace.metadata.cli]
 solana = "2.3.0"
