@@ -6,7 +6,7 @@ on:
       crate:
         description: Crate
         required: true
-        default: sdk/pinocchio
+        default: sdk
         type: choice
         options:
           - programs/associated-token-account
@@ -14,10 +14,7 @@ on:
           - programs/system
           - programs/token
           - programs/token-2022
-          - sdk/log/crate
-          - sdk/log/macro
-          - sdk/pinocchio
-          - sdk/pubkey
+          - sdk
       level:
         description: Level
         required: true
