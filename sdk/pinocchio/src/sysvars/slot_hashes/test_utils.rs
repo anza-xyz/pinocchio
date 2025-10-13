@@ -3,7 +3,6 @@
 //! freely while production code remains `#![no_std]`.
 
 use super::*;
-extern crate std;
 use crate::account::{Account, AccountView};
 use core::ptr;
 use std::vec::Vec;
