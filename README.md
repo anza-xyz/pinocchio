@@ -189,7 +189,6 @@ pinocchio = { version = "0.10.0", default-features = false }
 > ⚠️ **Note:**
 > The `default_allocator` macro is not available when disabling the `alloc` feature.
 
-
 ### `cpi`
 
 The `cpi` feature enables the cross-program invocation helpers, as well as types to define instructions and signer information.
