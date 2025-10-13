@@ -5,9 +5,8 @@ pub mod lazy;
 
 pub use lazy::{InstructionContext, MaybeAccount};
 
-#[cfg(not(feature = "alloc"))]
-use core::alloc::{GlobalAlloc, Layout};
 use core::{
+    alloc::{GlobalAlloc, Layout},
     cmp::min,
     mem::{size_of, MaybeUninit},
     ptr::with_exposed_provenance_mut,
@@ -523,17 +522,6 @@ macro_rules! default_allocator {
     };
 }
 
-/// A global allocator that does not allocate memory.
-///
-/// Using this macro with the `"alloc"` feature enabled will result in a compile error.
-#[cfg(feature = "alloc")]
-#[macro_export]
-macro_rules! no_allocator {
-    () => {
-        compile_error!("Feature 'alloc' cannot be enabled.");
-    };
-}
-
 /// A global allocator that does not dynamically allocate memory.
 ///
 /// This macro sets up a global allocator that denies all dynamic allocations, while allowing static
@@ -543,7 +531,6 @@ macro_rules! no_allocator {
 /// The program will panic if it tries to dynamically allocate memory.
 ///
 /// This is used when the `"alloc"` feature is disabled.
-#[cfg(not(feature = "alloc"))]
 #[macro_export]
 macro_rules! no_allocator {
     () => {
@@ -602,17 +589,15 @@ macro_rules! no_allocator {
     };
 }
 
-#[cfg(not(feature = "alloc"))]
 /// An allocator that does not allocate memory.
 #[cfg_attr(feature = "copy", derive(Copy))]
 #[derive(Clone, Debug)]
 pub struct NoAllocator;
 
-#[cfg(not(feature = "alloc"))]
 unsafe impl GlobalAlloc for NoAllocator {
     #[inline]
     unsafe fn alloc(&self, _: Layout) -> *mut u8 {
-        panic!("** NO ALLOCATOR **");
+        panic!("** NoAllocator::alloc() does not allocate memory **");
     }
 
     #[inline]
