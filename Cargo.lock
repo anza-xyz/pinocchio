@@ -105,6 +105,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pinocchio_err"
+version = "0.1.0"
+dependencies = [
+ "pinocchio",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
