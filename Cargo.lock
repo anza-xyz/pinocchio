@@ -101,7 +101,7 @@ dependencies = [
 [[package]]
 name = "solana-account-view"
 version = "0.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#92969f75cf8db5b764fd4555a21651e6550e678c"
+source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#1e5e65da4be52cf57a1cf05a18d8f663c7f7c559"
 dependencies = [
  "solana-address",
  "solana-program-error",
@@ -110,7 +110,7 @@ dependencies = [
 [[package]]
 name = "solana-address"
 version = "1.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#92969f75cf8db5b764fd4555a21651e6550e678c"
+source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#1e5e65da4be52cf57a1cf05a18d8f663c7f7c559"
 dependencies = [
  "five8",
  "five8_const 1.0.0",
@@ -121,12 +121,12 @@ dependencies = [
 [[package]]
 name = "solana-define-syscall"
 version = "3.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#92969f75cf8db5b764fd4555a21651e6550e678c"
+source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#1e5e65da4be52cf57a1cf05a18d8f663c7f7c559"
 
 [[package]]
 name = "solana-instruction-view"
 version = "0.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#92969f75cf8db5b764fd4555a21651e6550e678c"
+source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#1e5e65da4be52cf57a1cf05a18d8f663c7f7c559"
 dependencies = [
  "solana-account-view",
  "solana-address",
@@ -137,4 +137,4 @@ dependencies = [
 [[package]]
 name = "solana-program-error"
 version = "3.0.0"
-source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#92969f75cf8db5b764fd4555a21651e6550e678c"
+source = "git+https://github.com/febo/solana-sdk.git?branch=upstream-bpf#1e5e65da4be52cf57a1cf05a18d8f663c7f7c559"
