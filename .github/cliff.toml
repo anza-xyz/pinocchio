@@ -23,7 +23,8 @@ body = """
 trim = true
 footer = """
 """
-postprocessors = [ ]
+postprocessors = []
+
 [git]
 # parse the commits based on https://www.conventionalcommits.org
 conventional_commits = true
@@ -35,10 +36,10 @@ split_commits = false
 commit_preprocessors = []
 # regex for parsing and grouping commits
 commit_parsers = [
-    { message = "^build\\(deps\\)", skip = true },
-    { message = "^build\\(deps-dev\\)", skip = true },
-    { message = "^ci", skip = true },
-    { body = ".*", group = "Changes" },
+  { message = "^build\\(deps\\)", skip = true },
+  { message = "^build\\(deps-dev\\)", skip = true },
+  { message = "^ci", skip = true },
+  { body = ".*", group = "Changes" },
 ]
 # protect breaking changes from being skipped due to matching a skipping commit_parser
 protect_breaking_commits = false

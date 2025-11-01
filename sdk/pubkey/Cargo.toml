@@ -1,26 +1,26 @@
 [package]
 name = "pinocchio-pubkey"
-description = "Companion pubkey helpers for Pinocchio"
 version = "0.3.0"
 edition = { workspace = true }
-license = { workspace = true }
+rust-version = { workspace = true }
+description = "Companion pubkey helpers for Pinocchio"
 readme = "./README.md"
 repository = { workspace = true }
-rust-version = { workspace = true }
+license = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = [
-    'cfg(target_os, values("solana"))',
-] }
+[dependencies]
+five8_const = { workspace = true, optional = true }
+pinocchio = { workspace = true }
+sha2-const-stable = { version = "0.1.0", optional = true }
 
 [features]
 default = ["const"]
 const = ["dep:five8_const", "dep:sha2-const-stable"]
 
-[dependencies]
-five8_const = { workspace = true, optional = true }
-sha2-const-stable = { version = "0.1.0", optional = true }
-pinocchio = { workspace = true }
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(target_os, values("solana"))',
+] }

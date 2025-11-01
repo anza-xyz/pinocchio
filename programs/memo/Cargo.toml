@@ -1,12 +1,12 @@
 [package]
 name = "pinocchio-memo"
-description = "Pinocchio helpers to invoke Memo program instructions"
 version = "0.2.0"
 edition = { workspace = true }
-license = { workspace = true }
+rust-version = { workspace = true }
+description = "Pinocchio helpers to invoke Memo program instructions"
 readme = "./README.md"
 repository = { workspace = true }
-rust-version = { workspace = true }
+license = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]
