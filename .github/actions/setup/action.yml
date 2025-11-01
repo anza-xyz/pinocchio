@@ -10,6 +10,10 @@ inputs:
   components:
     description: Cargo components to install. Comma-separated string of [`audit`, `hack``, `release`, `semver-checks].
     required: false
+  tombi:
+    description: >
+      Install `tombi` - TOML formatter/linter, if `true`.  Defaults to `false.
+    required: false
   solana:
     description: Install Solana if `true`. Defaults to `false`.
     required: false
@@ -46,6 +50,10 @@ runs:
       with:
         toolchain: ${{ env.TOOLCHAIN_FORMAT }}
         components: rustfmt
+
+    - name: Install Toml formatter and linter tombi
+      if: ${{ inputs.tombi == 'true' }}
+      uses: tombi-toml/setup-tombi@v1
 
     - name: Install Rust 'lint' Toolchain
       if: ${{ contains(inputs.toolchain, 'lint') }}

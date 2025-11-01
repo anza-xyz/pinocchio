@@ -68,6 +68,7 @@ jobs:
           cargo-cache-key: cargo-${{ matrix.member }}
           toolchain: build, format, lint, test
           components: hack
+          tombi: true
           solana: true
 
       - name: fmt
