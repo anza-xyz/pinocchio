@@ -1,3 +1,5 @@
+pub mod memo_transfer;
+
 #[repr(u8)]
 pub enum ExtensionDiscriminator {
     /// Default Account State extension
