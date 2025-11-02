@@ -31,7 +31,7 @@ use {
 /// 0. `[writable]` The token account to disable memo transfer.
 /// 1. `[readonly]` The multisig account that owns the token account.
 /// 2. `[signer]` M signer accounts (as required by the multisig).
-pub struct Disable<'a> {
+pub struct Disable<'a, 'b> {
     /// The token account to disable with the MemoTransfer extension.
     pub token_account: &'a AccountInfo,
     /// The owner of the token account (single or multisig).
@@ -39,10 +39,10 @@ pub struct Disable<'a> {
     /// Signer accounts if the authority is a multisig.
     pub signers: &'a [AccountInfo],
     /// Token program (Token-2022).
-    pub token_program: &'a Pubkey,
+    pub token_program: &'b Pubkey,
 }
 
-impl Disable<'_> {
+impl Disable<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         let &Self {
