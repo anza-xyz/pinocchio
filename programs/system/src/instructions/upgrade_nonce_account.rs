@@ -21,11 +21,11 @@ impl UpgradeNonceAccount<'_> {
         // account metadata
         let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.account.key())];
 
-        // instruction
+        // instruction data uses 4-byte LE discriminator expected by the system program
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &[12],
+            data: &[12, 0, 0, 0],
         };
 
         invoke(&instruction, &[self.account])

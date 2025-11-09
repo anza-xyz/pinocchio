@@ -38,11 +38,10 @@ impl AdvanceNonceAccount<'_> {
         ];
 
         // instruction data uses 4-byte LE discriminator expected by the system program
-        const DATA: [u8; 4] = [4, 0, 0, 0];
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &DATA,
+            data: &[4, 0, 0, 0],
         };
 
         invoke_signed(
