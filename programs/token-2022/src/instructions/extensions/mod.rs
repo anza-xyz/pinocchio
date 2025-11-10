@@ -1,7 +1,7 @@
 pub mod memo_transfer;
 
 #[repr(u8)]
-pub enum ExtensionDiscriminator {
+pub(crate) enum ExtensionDiscriminator {
     /// Default Account State extension
     DefaultAccountState = 28,
     /// Memo Transfer extension

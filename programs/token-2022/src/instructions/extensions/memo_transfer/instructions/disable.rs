@@ -121,7 +121,8 @@ impl Disable<'_, '_> {
     }
 }
 
-pub fn disable_instruction_data<'a>(buffer: &'a mut [u8]) -> &'a [u8] {
+#[inline(always)]
+fn disable_instruction_data<'a>(buffer: &'a mut [u8]) -> &'a [u8] {
     let offset = OFFSET::START as usize;
 
     // Encode discriminators (MemoTransfer + Disable)
