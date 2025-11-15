@@ -37,7 +37,7 @@ impl AdvanceNonceAccount<'_> {
             AccountMeta::readonly_signer(self.authority.key()),
         ];
 
-        // instruction data uses 4-byte LE discriminator expected by the system program
+        // instruction
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
