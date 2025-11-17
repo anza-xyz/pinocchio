@@ -41,7 +41,7 @@ impl AdvanceNonceAccount<'_> {
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &[4],
+            data: &[4, 0, 0, 0],
         };
 
         invoke_signed(

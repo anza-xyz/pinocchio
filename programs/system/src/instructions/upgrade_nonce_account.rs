@@ -25,7 +25,7 @@ impl UpgradeNonceAccount<'_> {
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: &account_metas,
-            data: &[12],
+            data: &[12, 0, 0, 0],
         };
 
         invoke(&instruction, &[self.account])
