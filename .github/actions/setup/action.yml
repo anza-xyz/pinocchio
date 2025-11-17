@@ -71,7 +71,7 @@ runs:
       if: ${{ contains(inputs.components, 'audit') }}
       uses: taiki-e/cache-cargo-install-action@v2
       with:
-        tool: cargo-audit
+        tool: cargo-audit@0.21.2
 
     - name: Install 'cargo-hack'
       if: ${{ contains(inputs.components, 'hack') }}
