@@ -35,6 +35,7 @@ pub fn create_account_with_minimal_balance(
     };
 
     if account.lamports() == 0 {
+        // Create the account if it does not exist.
         CreateAccount {
             from: payer,
             to: account,
@@ -56,9 +57,10 @@ pub fn create_account_with_minimal_balance(
             .invoke()?;
         }
 
+        // Assign the account to the specified owner.
         Assign { account, owner }.invoke_signed(signers)?;
 
-        // Allocates the required space for the account.
+        // Allocate the required space for the account.
         //
         // SAFETY: There are no active borrows of the `account`.
         // This was checked by the `Assign` CPI above.
