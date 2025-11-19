@@ -14,12 +14,17 @@ pub mod instructions;
 
 pinocchio_pubkey::declare_id!("11111111111111111111111111111111");
 
-/// Create an account with a minimal balance to be rent-exempt.
+/// Create an account with a minimum balance to be rent-exempt.
+///
+/// When creating a PDA `account`, the PDA signer seeds must be provided
+/// via the `signers`.
 ///
 /// The account will be funded by the `payer` if its current lamports
-/// are insufficient for rent-exemption.
+/// are insufficient for rent-exemption. The payer can be a PDA signer
+/// owned by the system program and its signer seeds can be provided
+/// via the `signers`.
 #[inline(always)]
-pub fn create_account_with_minimal_balance(
+pub fn create_account_with_minimum_balance(
     account: &AccountInfo,
     space: usize,
     owner: &Pubkey,
@@ -54,7 +59,7 @@ pub fn create_account_with_minimal_balance(
                 to: account,
                 lamports: required_lamports,
             }
-            .invoke()?;
+            .invoke_signed(signers)?;
         }
 
         // Assign the account to the specified owner.
