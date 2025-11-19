@@ -15,6 +15,18 @@ pub mod instructions;
 pinocchio_pubkey::declare_id!("11111111111111111111111111111111");
 
 /// Create an account with a minimum balance to be rent-exempt.
+#[inline(always)]
+pub fn create_account_with_minimum_balance(
+    account: &AccountInfo,
+    space: usize,
+    owner: &Pubkey,
+    payer: &AccountInfo,
+    rent_sysvar: Option<&AccountInfo>,
+) -> ProgramResult {
+    create_account_with_minimum_balance_signed(account, space, owner, payer, rent_sysvar, &[])
+}
+
+/// Create an account with a minimum balance to be rent-exempt.
 ///
 /// When creating a PDA `account`, the PDA signer seeds must be provided
 /// via the `signers`.
@@ -24,13 +36,13 @@ pinocchio_pubkey::declare_id!("11111111111111111111111111111111");
 /// owned by the system program and its signer seeds can be provided
 /// via the `signers`.
 #[inline(always)]
-pub fn create_account_with_minimum_balance(
+pub fn create_account_with_minimum_balance_signed(
     account: &AccountInfo,
     space: usize,
     owner: &Pubkey,
     payer: &AccountInfo,
-    signers: &[Signer],
     rent_sysvar: Option<&AccountInfo>,
+    signers: &[Signer],
 ) -> ProgramResult {
     let lamports = if let Some(rent_sysvar) = rent_sysvar {
         let rent = Rent::from_account_info(rent_sysvar)?;
