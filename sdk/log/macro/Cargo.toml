@@ -1,12 +1,12 @@
 [package]
 name = "pinocchio-log-macro"
-description = "Macro for pinocchio log utility"
 version = "0.5.0"
 edition = { workspace = true }
-license = { workspace = true }
+rust-version = { workspace = true }
+description = "Macro for pinocchio log utility"
 readme = "./README.md"
 repository = { workspace = true }
-rust-version = { workspace = true }
+license = { workspace = true }
 
 [lib]
 proc-macro = true

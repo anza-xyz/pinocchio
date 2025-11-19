@@ -6,4 +6,5 @@ await Promise.all([
   $`tsx ./scripts/clippy.mts ${args}`,
   $`tsx ./scripts/doc.mts ${args}`,
   $`tsx ./scripts/hack.mts ${args}`,
+  $`tsx ./scripts/lint-toml.mts ${args}`,
 ]);
