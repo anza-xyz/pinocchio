@@ -69,8 +69,6 @@ pub fn create_account_with_minimum_balance(
         //
         // SAFETY: There are no active borrows of the `account`.
         // This was checked by the `Assign` CPI above.
-        unsafe { account.resize_unchecked(space)? };
-
-        Ok(())
+        unsafe { account.resize_unchecked(space) }
     }
 }
