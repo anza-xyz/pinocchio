@@ -8,7 +8,7 @@ use pinocchio::{
 };
 
 use crate::state::StakeAuthorize;
-use crate::{write_bytes, UNINIT_BYTE, UNINIT_META, UNINIT_INFO};
+use crate::{write_bytes, UNINIT_BYTE, UNINIT_INFO, UNINIT_META};
 
 /// Change the authority of a specific type of a stake account.
 ///
@@ -58,7 +58,7 @@ impl AuthorizeChecked<'_> {
             account_metas
                 .get_unchecked_mut(3)
                 .write(AccountMeta::readonly_signer(self.new_authority.key()));
-            
+
             // Write the 4th account if lockup_authority is present
             if let Some(lockup_authority) = self.lockup_authority {
                 account_metas
@@ -67,7 +67,11 @@ impl AuthorizeChecked<'_> {
             }
         }
 
-        let num_accounts = if self.lockup_authority.is_some() { 5 } else { 4 };
+        let num_accounts = if self.lockup_authority.is_some() {
+            5
+        } else {
+            4
+        };
 
         // Instruction data
         // -  [0]   : instruction discriminator (1 byte, u8)
@@ -94,7 +98,7 @@ impl AuthorizeChecked<'_> {
             account_infos.get_unchecked_mut(1).write(self.clock_sysvar);
             account_infos.get_unchecked_mut(2).write(self.authority);
             account_infos.get_unchecked_mut(3).write(self.new_authority);
-            
+
             // Write the 4th account if lockup_authority is present
             if let Some(lockup_authority) = self.lockup_authority {
                 account_infos.get_unchecked_mut(4).write(lockup_authority);

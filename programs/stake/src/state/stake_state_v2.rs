@@ -63,7 +63,7 @@ impl From<StakeStateV2Type> for u8 {
 /// Zero-copy view over an Initialized stake account (V2).
 pub struct StakeAccountV2Initialized<'a>(&'a [u8]);
 
-impl<'a> StakeAccountV2Initialized<'a> {
+impl StakeAccountV2Initialized<'_> {
     /// Returns a reference to the meta data.
     #[inline(always)]
     pub fn meta(&self) -> &Meta {
@@ -74,7 +74,7 @@ impl<'a> StakeAccountV2Initialized<'a> {
 /// Zero-copy view over a delegated Stake account (V2).
 pub struct StakeAccountV2Stake<'a>(&'a [u8]);
 
-impl<'a> StakeAccountV2Stake<'a> {
+impl StakeAccountV2Stake<'_> {
     /// Returns a reference to the meta data.
     #[inline(always)]
     pub fn meta(&self) -> &Meta {

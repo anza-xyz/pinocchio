@@ -26,10 +26,6 @@ impl GetMinimumDelegation {
             data: &instruction_data,
         };
 
-        invoke_signed(
-            &instruction,
-            &[],
-            signers,
-        )
+        invoke_signed(&instruction, &[], signers)
     }
 }

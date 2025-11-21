@@ -1,7 +1,7 @@
 use pinocchio::{
-    cpi::invoke_signed,
-    instruction::{Instruction, Signer, AccountMeta},
     account_info::AccountInfo,
+    cpi::invoke_signed,
+    instruction::{AccountMeta, Instruction, Signer},
     ProgramResult,
 };
 
@@ -9,7 +9,7 @@ use core::mem::size_of;
 use core::slice::from_raw_parts;
 
 use crate::state::{Authorized, Lockup};
-use crate::{write_bytes,UNINIT_BYTE};
+use crate::{write_bytes, UNINIT_BYTE};
 
 /// Initialize a stake account.
 ///
@@ -42,22 +42,27 @@ impl Initialize<'_> {
         ];
 
         // Instruction data
+        // -  [0]   : instruction discriminator (1 byte, u8)
+        // -  [1..1+size_of::<Authorized>()]: authorized (Authorized)
+        // -  [1+size_of::<Authorized>()..1+size_of::<Authorized>()+size_of::<Lockup>()]: lockup (Lockup)
         let mut instruction_data = [UNINIT_BYTE; 1 + size_of::<Authorized>() + size_of::<Lockup>()];
 
+        // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[13]);
+        // Set authorized as Authorized at offset [1..1+size_of::<Authorized>()]
         write_bytes(&mut instruction_data[1..], &self.authorized.to_bytes());
-        write_bytes(&mut instruction_data[1 + size_of::<Authorized>()..], &self.lockup.to_bytes());
+        // Set lockup as Lockup at offset [1+size_of::<Authorized>()..1+size_of::<Authorized>()+size_of::<Lockup>()]
+        write_bytes(
+            &mut instruction_data[1 + size_of::<Authorized>()..],
+            &self.lockup.to_bytes(),
+        );
 
         let instruction = Instruction {
             program_id: &crate::ID,
-            accounts: &[],
+            accounts: &account_metas,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
         };
 
-        invoke_signed(
-            &instruction,
-            &[self.stake, self.rent_sysvar],
-            signers,
-        )
+        invoke_signed(&instruction, &[self.stake, self.rent_sysvar], signers)
     }
 }

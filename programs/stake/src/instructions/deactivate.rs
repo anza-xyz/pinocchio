@@ -11,7 +11,7 @@ use pinocchio::{
 ///   0. `[WRITE]` The stake account.
 ///   1. `[]` The clock sysvar.
 ///   2. `[SIGNER]` The stake authority of the stake account.
-pub struct Authorize<'a> {
+pub struct Deactivate<'a> {
     /// Stake Account.
     pub stake: &'a AccountInfo,
     /// Clock Sysvar Account.
@@ -20,7 +20,7 @@ pub struct Authorize<'a> {
     pub stake_authority: &'a AccountInfo,
 }
 
-impl Authorize<'_> {
+impl Deactivate<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

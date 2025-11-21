@@ -5,31 +5,28 @@ use pinocchio::{
     ProgramResult,
 };
 
-/// Delegate a stake account to a specific validator (or vote account).
+/// Merge two stake accounts.
 ///
 /// ### Accounts:
-///   0. `[WRITE]` The stake account.
-///   1. `[]` The vote account wich the stake account will be delegated to.
+///   0. `[WRITE]` Destination stake account.
+///   1. `[WRITE]` Source stake account.
 ///   2. `[]` Clock sysvar.
 ///   3. `[]` Stake History sysvar.
-///   4. `[]` Unused account, formerly the stake config sysvar.
-///   5. `[SIGNER]` Stake Authority of the Stake Account.
-pub struct DelegateStake<'a> {
-    /// Stake Account.
-    pub stake: &'a AccountInfo,
-    /// Vote Account wich the stake account will be delegated to.
-    pub vote: &'a AccountInfo,
-    /// Clock Sysvar.
+///   4. `[SIGNER]` Stake Authority.
+pub struct Merge<'a> {
+    /// Destination stake account.
+    pub destination_stake: &'a AccountInfo,
+    /// Source stake account.
+    pub source_stake: &'a AccountInfo,
+    /// Clock sysvar.
     pub clock_sysvar: &'a AccountInfo,
-    /// Stake History Sysvar.
+    /// Stake History sysvar.
     pub stake_history_sysvar: &'a AccountInfo,
-    /// Unused account, formerly the stake config sysvar.
-    pub unused_account: &'a AccountInfo,
-    /// Stake Authority of the Stake Account.
+    /// Stake Authority.
     pub stake_authority: &'a AccountInfo,
 }
 
-impl DelegateStake<'_> {
+impl Merge<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -38,17 +35,16 @@ impl DelegateStake<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Account metadata
-        let account_metas: [AccountMeta; 6] = [
-            AccountMeta::writable(self.stake.key()),
-            AccountMeta::readonly(self.vote.key()),
+        let account_metas: [AccountMeta; 5] = [
+            AccountMeta::writable(self.destination_stake.key()),
+            AccountMeta::writable(self.source_stake.key()),
             AccountMeta::readonly(self.clock_sysvar.key()),
             AccountMeta::readonly(self.stake_history_sysvar.key()),
-            AccountMeta::readonly(self.unused_account.key()),
             AccountMeta::readonly_signer(self.stake_authority.key()),
         ];
 
         // Instruction data
-        let instruction_data = [2u8; 1];
+        let instruction_data = [7u8; 1];
 
         let instruction = Instruction {
             program_id: &crate::ID,
@@ -59,11 +55,10 @@ impl DelegateStake<'_> {
         invoke_signed(
             &instruction,
             &[
-                self.stake,
-                self.vote,
+                self.destination_stake,
+                self.source_stake,
                 self.clock_sysvar,
                 self.stake_history_sysvar,
-                self.unused_account,
                 self.stake_authority,
             ],
             signers,

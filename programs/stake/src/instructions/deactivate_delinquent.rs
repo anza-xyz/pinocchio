@@ -1,5 +1,8 @@
 use pinocchio::{
-    ProgramResult, account_info::AccountInfo, cpi::invoke_signed, instruction::{AccountMeta, Instruction, Signer}
+    account_info::AccountInfo,
+    cpi::invoke_signed,
+    instruction::{AccountMeta, Instruction, Signer},
+    ProgramResult,
 };
 
 /// Deactivate a stake account from a delinquent vote account.
@@ -43,7 +46,11 @@ impl DeactivateDelinquent<'_> {
 
         invoke_signed(
             &instruction,
-            &[self.stake, self.delinquent_vote_account, self.reference_vote_account],
+            &[
+                self.stake,
+                self.delinquent_vote_account,
+                self.reference_vote_account,
+            ],
             signers,
         )
     }
