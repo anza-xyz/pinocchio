@@ -15,8 +15,8 @@ mod test_utils;
 
 use crate::{
     account_info::{AccountInfo, Ref},
+    error::ProgramError,
     hint::unlikely,
-    program_error::ProgramError,
     pubkey::{pubkey_eq, Pubkey},
     sysvars::clock::Slot,
 };

@@ -3,8 +3,8 @@ use core::{mem::MaybeUninit, slice};
 use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke_with_bounds,
+    error::ProgramError,
     instruction::{AccountMeta, Instruction},
-    program_error::ProgramError,
     ProgramResult,
 };
 

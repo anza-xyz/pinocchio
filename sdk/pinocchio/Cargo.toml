@@ -20,5 +20,8 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 [features]
 std = []
 
+[dependencies]
+solana-program-error = "3.0"
+
 [dev-dependencies]
 five8_const = { workspace = true }

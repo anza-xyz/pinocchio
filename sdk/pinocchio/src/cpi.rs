@@ -4,9 +4,9 @@ use core::{mem::MaybeUninit, ops::Deref, slice::from_raw_parts};
 
 use crate::{
     account_info::{AccountInfo, BorrowState},
+    error::ProgramError,
     hint::unlikely,
     instruction::{Account, Instruction, Signer},
-    program_error::ProgramError,
     pubkey::{pubkey_eq, Pubkey},
     ProgramResult,
 };

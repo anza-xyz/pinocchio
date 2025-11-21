@@ -233,13 +233,14 @@ pub mod memory;
 pub mod program {
     pub use crate::cpi::*;
 }
-pub mod program_error;
 pub mod pubkey;
 pub mod syscalls;
 pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
 pub use entrypoint::lazy as lazy_entrypoint;
+pub use solana_program_error as error;
+pub use solana_program_error::ProgramResult;
 
 /// Maximum number of accounts that a transaction may process.
 ///
@@ -258,9 +259,6 @@ const BPF_ALIGN_OF_U128: usize = 8;
 
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = 0;
-
-/// The result of a program execution.
-pub type ProgramResult = Result<(), program_error::ProgramError>;
 
 /// Module with functions to provide hints to the compiler about how code
 /// should be optimized.
