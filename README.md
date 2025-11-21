@@ -172,6 +172,48 @@ pub fn process_instruction(
 > ⚠️ **Note:**
 > The `no_allocator!` macro can also be used in combination with the `lazy_program_entrypoint!`.
 
+📌 [`middleware_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.middleware_program_entrypoint.html)
+
+The `middleware_program_entrypoint!` macro defines a dual entrypoint implementation consisting of a `hot` path which bypasses entrypoint deserialization, and a `cold` path with behaves like a regular pinocchio entrypoint that has undergone `program_entrypoint!` deserialization. This gives the user flexibility to implement extreme CU optimizations against the most critical paths in their proggram with the convenience of being able to fallback to a regular pinocchio program to manage the fail case and other instructions that do not require such optimizations.
+
+To use the `middleware_program_entrypoint!` macro, use the following in your entrypoint definition:
+
+```rust
+#![cfg_attr(target_os = "solana", no_std)]
+use pinocchio::{
+    ProgramResult,
+    account_info::AccountInfo,
+    middleware_program_entrypoint,
+    msg,
+    no_allocator,
+    nostd_panic_handler,
+    pubkey::Pubkey
+};
+
+nostd_panic_handler!();
+no_allocator!();
+
+middleware_program_entrypoint!(hot,cold);
+
+// This uses 4 CUs
+#[inline(always)]
+pub fn hot(input: *mut u8) -> u64 {
+    unsafe { *input as u64 }
+}
+
+// This uses 113 CUs
+#[cold]
+#[inline(always)]
+pub fn cold(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    _instruction_data: &[u8],
+) -> ProgramResult {
+    msg!("Hello from Pinocchio!");
+    Ok(())
+}
+```
+
 ## Crate feature: `std`
 
 By default, `pinocchio` is a `no_std` crate. This means that it does not use any code from the standard (`std`) library. While this does not affect how `pinocchio` is used, there is one particular apparent difference. In a `no_std` environment, the `msg!` macro does not provide any formatting options since the `format!` macro requires the `std` library. In order to use `msg!` with formatting, the `std` feature should be enabled when adding `pinocchio` as a dependency:
