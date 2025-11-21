@@ -2,20 +2,19 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Assign account to a program
 ///
 /// ### Accounts:
-///   0. `[WRITE, SIGNER]` Assigned account public key
+///   0. `[WRITE, SIGNER]` Assigned account address
 pub struct Assign<'a, 'b> {
     /// Account to be assigned.
     pub account: &'a AccountInfo,
 
     /// Program account to assign as owner.
-    pub owner: &'b Pubkey,
+    pub owner: &'b Address,
 }
 
 impl Assign<'_, '_> {
@@ -31,7 +30,7 @@ impl Assign<'_, '_> {
 
         // instruction data
         // -  [0..4 ]: instruction discriminator
-        // -  [4..36]: owner pubkey
+        // -  [4..36]: owner address
         let mut instruction_data = [0; 36];
         instruction_data[0] = 1;
         instruction_data[4..36].copy_from_slice(self.owner.as_ref());

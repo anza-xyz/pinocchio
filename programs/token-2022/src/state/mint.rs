@@ -1,7 +1,7 @@
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     error::ProgramError,
-    pubkey::Pubkey,
+    Address,
 };
 
 use crate::ID;
@@ -16,7 +16,7 @@ pub struct Mint {
     /// be provided during mint creation. If no mint authority is present
     /// then the mint has a fixed supply and no further tokens may be
     /// minted.
-    mint_authority: Pubkey,
+    mint_authority: Address,
 
     /// Total supply of tokens.
     supply: [u8; 8],
@@ -31,7 +31,7 @@ pub struct Mint {
     freeze_authority_flag: [u8; 4],
 
     /// Optional authority to freeze token accounts.
-    freeze_authority: Pubkey,
+    freeze_authority: Address,
 }
 
 impl Mint {
@@ -97,7 +97,7 @@ impl Mint {
         self.mint_authority_flag[0] == 1
     }
 
-    pub fn mint_authority(&self) -> Option<&Pubkey> {
+    pub fn mint_authority(&self) -> Option<&Address> {
         if self.has_mint_authority() {
             Some(self.mint_authority_unchecked())
         } else {
@@ -110,7 +110,7 @@ impl Mint {
     /// This method should be used when the caller knows that the mint will have a mint
     /// authority set since it skips the `Option` check.
     #[inline(always)]
-    pub fn mint_authority_unchecked(&self) -> &Pubkey {
+    pub fn mint_authority_unchecked(&self) -> &Address {
         &self.mint_authority
     }
 
@@ -131,7 +131,7 @@ impl Mint {
         self.freeze_authority_flag[0] == 1
     }
 
-    pub fn freeze_authority(&self) -> Option<&Pubkey> {
+    pub fn freeze_authority(&self) -> Option<&Address> {
         if self.has_freeze_authority() {
             Some(self.freeze_authority_unchecked())
         } else {
@@ -144,7 +144,7 @@ impl Mint {
     /// This method should be used when the caller knows that the mint will have a freeze
     /// authority set since it skips the `Option` check.
     #[inline(always)]
-    pub fn freeze_authority_unchecked(&self) -> &Pubkey {
+    pub fn freeze_authority_unchecked(&self) -> &Address {
         &self.freeze_authority
     }
 }

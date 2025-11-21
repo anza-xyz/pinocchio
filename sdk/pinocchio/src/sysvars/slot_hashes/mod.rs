@@ -17,18 +17,18 @@ use crate::{
     account_info::{AccountInfo, Ref},
     error::ProgramError,
     hint::unlikely,
-    pubkey::{pubkey_eq, Pubkey},
     sysvars::clock::Slot,
+    Address,
 };
 use core::{mem, ops::Deref, slice::from_raw_parts};
 #[cfg(feature = "std")]
 use std::boxed::Box;
 
 /// `SysvarS1otHashes111111111111111111111111111`
-pub const SLOTHASHES_ID: Pubkey = [
+pub const SLOTHASHES_ID: Address = Address::new_from_array([
     6, 167, 213, 23, 25, 47, 10, 175, 198, 242, 101, 227, 251, 119, 204, 122, 218, 130, 197, 41,
     208, 190, 59, 19, 110, 45, 0, 85, 32, 0, 0, 0,
-];
+]);
 /// Number of bytes in a hash.
 pub const HASH_BYTES: usize = 32;
 /// Sysvar data is:
@@ -48,7 +48,8 @@ pub const MAX_SIZE: usize = NUM_ENTRIES_SIZE + MAX_ENTRIES * ENTRY_SIZE;
 pub type Hash = [u8; HASH_BYTES];
 
 /// A single entry in the `SlotHashes` sysvar.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Eq, Debug, PartialEq)]
 #[repr(C)]
 pub struct SlotHashEntry {
     /// The slot number stored as little-endian bytes.
@@ -68,7 +69,14 @@ pub struct SlotHashes<T: Deref<Target = [u8]>> {
 
 /// Log a `Hash` from a program.
 pub fn log(hash: &Hash) {
-    crate::pubkey::log(hash);
+    #[cfg(target_os = "solana")]
+    // SAFETY: `sol_log_pubkey` expects a valid pointer to a 32-byte array.
+    unsafe {
+        solana_address::syscalls::sol_log_pubkey(hash.as_ptr())
+    };
+
+    #[cfg(not(target_os = "solana"))]
+    core::hint::black_box(hash);
 }
 
 /// Reads the entry count from the first 8 bytes of data.
@@ -278,7 +286,7 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
     /// - `ProgramError::AccountBorrowFailed` if the account data is already mutably borrowed
     #[inline(always)]
     pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &SLOTHASHES_ID)) {
+        if unlikely(account_info.key() != &SLOTHASHES_ID) {
             return Err(ProgramError::InvalidArgument);
         }
 

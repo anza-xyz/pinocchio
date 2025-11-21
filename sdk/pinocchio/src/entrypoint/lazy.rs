@@ -5,8 +5,7 @@ use crate::{
     account_info::{Account, AccountInfo},
     entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
     error::ProgramError,
-    pubkey::Pubkey,
-    BPF_ALIGN_OF_U128,
+    Address, BPF_ALIGN_OF_U128,
 };
 
 /// Declare the lazy program entrypoint.
@@ -230,7 +229,7 @@ impl InstructionContext {
     /// This method can only be used after all accounts have been read; otherwise, it will
     /// return a [`ProgramError::InvalidInstructionData`] error.
     #[inline(always)]
-    pub fn program_id(&self) -> Result<&Pubkey, ProgramError> {
+    pub fn program_id(&self) -> Result<&Address, ProgramError> {
         if self.remaining > 0 {
             return Err(ProgramError::InvalidInstructionData);
         }
@@ -245,9 +244,9 @@ impl InstructionContext {
     /// It is up to the caller to guarantee that all accounts have been read; calling this method
     /// before reading all accounts will result in undefined behavior.
     #[inline(always)]
-    pub unsafe fn program_id_unchecked(&self) -> &Pubkey {
+    pub unsafe fn program_id_unchecked(&self) -> &Address {
         let data_len = *(self.buffer as *const usize);
-        &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Pubkey)
+        &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Address)
     }
 
     /// Read an account from the input buffer.
@@ -277,7 +276,8 @@ impl InstructionContext {
 }
 
 /// Wrapper type around an [`AccountInfo`] that may be a duplicate.
-#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Debug, Clone)]
 pub enum MaybeAccount {
     /// An [`AccountInfo`] that is not a duplicate.
     Account(AccountInfo),

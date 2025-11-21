@@ -2,24 +2,24 @@
 
 use pinocchio::{
     account_info::AccountInfo,
+    address::declare_id,
     instruction::Signer,
-    pubkey::Pubkey,
     sysvars::{rent::Rent, Sysvar},
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::instructions::{Assign, CreateAccount, Transfer};
 
 pub mod instructions;
 
-pinocchio_pubkey::declare_id!("11111111111111111111111111111111");
+declare_id!("11111111111111111111111111111111");
 
 /// Create an account with a minimum balance to be rent-exempt.
 #[inline(always)]
 pub fn create_account_with_minimum_balance(
     account: &AccountInfo,
     space: usize,
-    owner: &Pubkey,
+    owner: &Address,
     payer: &AccountInfo,
     rent_sysvar: Option<&AccountInfo>,
 ) -> ProgramResult {
@@ -39,7 +39,7 @@ pub fn create_account_with_minimum_balance(
 pub fn create_account_with_minimum_balance_signed(
     account: &AccountInfo,
     space: usize,
-    owner: &Pubkey,
+    owner: &Address,
     payer: &AccountInfo,
     rent_sysvar: Option<&AccountInfo>,
     signers: &[Signer],

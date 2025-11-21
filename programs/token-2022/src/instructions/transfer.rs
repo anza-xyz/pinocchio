@@ -4,8 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};
@@ -26,7 +25,7 @@ pub struct Transfer<'a, 'b> {
     /// Amount of micro-tokens to transfer.
     pub amount: u64,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl Transfer<'_, '_> {

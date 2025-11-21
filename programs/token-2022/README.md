@@ -27,7 +27,7 @@ Initializing a mint account:
 
 ```rust
 // This example assumes that the instruction receives a writable `mint`
-// account; `authority` is a `Pubkey`.
+// account; `authority` is an `Address`.
 // The SPL Token program is being invoked.
 InitializeMint {
     mint,
@@ -35,7 +35,7 @@ InitializeMint {
     decimals: 9,
     mint_authority: authority,
     freeze_authority: Some(authority),
-    token_program: Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+    token_program: Address::from_str_const("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
 }.invoke()?;
 ```
 
@@ -50,7 +50,7 @@ Transfer {
     to,
     authority,
     amount: 10,
-    token_program: Pubkey::from_str("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
+    token_program: Address::from_str_const("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 }.invoke()?;
 ```
 
