@@ -29,7 +29,7 @@ pub struct Withdraw<'a> {
     /// Withdraw authority.
     pub withdraw_authority: &'a AccountInfo,
     /// Lockup authority.
-    pub lockup_authority: &'a Option<AccountInfo>,
+    pub lockup_authority: Option<&'a AccountInfo>,
     /// Amount to withdraw.
     pub amount: u64,
 }
@@ -45,7 +45,10 @@ impl Withdraw<'_> {
         // Account metadata
         let mut account_metas = [UNINIT_META; 6];
 
-        unsafe {
+        // Account infos
+        let mut account_infos = [UNINIT_INFO; 6];
+
+        let num_accounts = unsafe {
             // SAFETY: Always write the first 5 accounts
             account_metas
                 .get_unchecked_mut(0)
@@ -63,18 +66,26 @@ impl Withdraw<'_> {
                 .get_unchecked_mut(4)
                 .write(AccountMeta::readonly_signer(self.withdraw_authority.key()));
 
+            account_infos.get_unchecked_mut(0).write(self.stake);
+            account_infos.get_unchecked_mut(1).write(self.recipient);
+            account_infos.get_unchecked_mut(2).write(self.clock_sysvar);
+            account_infos
+                .get_unchecked_mut(3)
+                .write(self.stake_history_sysvar);
+            account_infos
+                .get_unchecked_mut(4)
+                .write(self.withdraw_authority);
+
             // Write the 6th account if lockup_authority is present
             if let Some(lockup_authority) = self.lockup_authority {
                 account_metas
                     .get_unchecked_mut(5)
                     .write(AccountMeta::readonly_signer(lockup_authority.key()));
+                account_infos.get_unchecked_mut(5).write(lockup_authority);
+                6
+            } else {
+                5
             }
-        }
-
-        let num_accounts = if self.lockup_authority.is_some() {
-            6
-        } else {
-            5
         };
 
         // Instruction data layout (LockupArgs with Option encoding):
@@ -92,24 +103,6 @@ impl Withdraw<'_> {
             accounts: unsafe { from_raw_parts(account_metas.as_ptr() as _, num_accounts) },
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
         };
-
-        // Account infos
-        let mut account_infos = [UNINIT_INFO; 6];
-
-        unsafe {
-            account_infos.get_unchecked_mut(0).write(self.stake);
-            account_infos.get_unchecked_mut(1).write(self.recipient);
-            account_infos.get_unchecked_mut(2).write(self.clock_sysvar);
-            account_infos
-                .get_unchecked_mut(3)
-                .write(self.stake_history_sysvar);
-            account_infos
-                .get_unchecked_mut(4)
-                .write(self.withdraw_authority);
-            if let Some(lockup_authority) = self.lockup_authority {
-                account_infos.get_unchecked_mut(5).write(lockup_authority);
-            }
-        }
 
         invoke_signed_with_bounds::<6>(
             &instruction,

@@ -1,3 +1,4 @@
+use core::mem::MaybeUninit;
 use pinocchio::pubkey::Pubkey;
 
 /// Lockup data.
@@ -33,13 +34,27 @@ impl Lockup {
         &self.custodian
     }
 
+    /// Writes the byte representation of the lockup data to the given slice.
+    #[inline(always)]
+    pub fn write_bytes(&self, dest: &mut [MaybeUninit<u8>]) {
+        assert_eq!(dest.len(), Self::LEN);
+
+        crate::write_bytes(&mut dest[..8], &self.unix_timestamp);
+        crate::write_bytes(&mut dest[8..16], &self.epoch);
+        crate::write_bytes(&mut dest[16..], self.custodian.as_ref());
+    }
+
     /// Returns the byte representation of the lockup data.
     #[inline(always)]
     pub fn to_bytes(&self) -> [u8; Self::LEN] {
-        let mut bytes = [0u8; Self::LEN];
-        bytes[..8].copy_from_slice(&self.unix_timestamp);
-        bytes[8..16].copy_from_slice(&self.epoch);
-        bytes[16..].copy_from_slice(self.custodian.as_ref());
-        bytes
+        let mut bytes = core::mem::MaybeUninit::<[u8; Self::LEN]>::uninit();
+        // SAFETY: We're writing to all Self::LEN bytes before reading.
+        unsafe {
+            let ptr = bytes.as_mut_ptr() as *mut u8;
+            core::ptr::copy_nonoverlapping(self.unix_timestamp.as_ptr(), ptr, 8);
+            core::ptr::copy_nonoverlapping(self.epoch.as_ptr(), ptr.add(8), 8);
+            core::ptr::copy_nonoverlapping(self.custodian.as_ref().as_ptr(), ptr.add(16), 32);
+            bytes.assume_init()
+        }
     }
 }

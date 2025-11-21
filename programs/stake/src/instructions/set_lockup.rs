@@ -14,7 +14,7 @@ use core::slice::from_raw_parts;
 /// ### Accounts:
 ///   0. `[WRITE]` Stake account.
 ///   1. `[SIGNER]` Lockup authority or Withdraw authority.
-pub struct SetLockup<'a> {
+pub struct SetLockup<'a, 'b> {
     /// Stake account.
     pub stake: &'a AccountInfo,
     /// Lockup authority or Withdraw authority.
@@ -24,10 +24,10 @@ pub struct SetLockup<'a> {
     /// Epoch at which the lockup expires.
     pub epoch: Option<u64>,
     /// The custodian pubkey that can modify the lockup.
-    pub custodian: Option<&'a Pubkey>,
+    pub custodian: Option<&'b Pubkey>,
 }
 
-impl SetLockup<'_> {
+impl SetLockup<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

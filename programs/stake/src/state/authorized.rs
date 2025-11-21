@@ -1,3 +1,4 @@
+use core::mem::MaybeUninit;
 use pinocchio::pubkey::Pubkey;
 
 /// Authorized data.
@@ -26,12 +27,25 @@ impl Authorized {
         &self.withdrawer
     }
 
+    /// Writes the byte representation of the authorized data to the given slice.
+    #[inline(always)]
+    pub fn write_bytes(&self, dest: &mut [MaybeUninit<u8>]) {
+        assert_eq!(dest.len(), Self::LEN);
+
+        crate::write_bytes(&mut dest[..32], self.staker.as_ref());
+        crate::write_bytes(&mut dest[32..], self.withdrawer.as_ref());
+    }
+
     /// Returns the byte representation of the authorized data.
     #[inline(always)]
     pub fn to_bytes(&self) -> [u8; Self::LEN] {
-        let mut bytes = [0u8; Self::LEN];
-        bytes[..32].copy_from_slice(self.staker.as_ref());
-        bytes[32..].copy_from_slice(self.withdrawer.as_ref());
-        bytes
+        let mut bytes = core::mem::MaybeUninit::<[u8; Self::LEN]>::uninit();
+        // SAFETY: We're writing to all Self::LEN bytes before reading.
+        unsafe {
+            let ptr = bytes.as_mut_ptr() as *mut u8;
+            core::ptr::copy_nonoverlapping(self.staker.as_ref().as_ptr(), ptr, 32);
+            core::ptr::copy_nonoverlapping(self.withdrawer.as_ref().as_ptr(), ptr.add(32), 32);
+            bytes.assume_init()
+        }
     }
 }

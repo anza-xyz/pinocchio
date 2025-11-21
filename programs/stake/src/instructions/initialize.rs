@@ -48,14 +48,13 @@ impl Initialize<'_> {
         let mut instruction_data = [UNINIT_BYTE; 1 + size_of::<Authorized>() + size_of::<Lockup>()];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[13]);
+        write_bytes(&mut instruction_data, &[0]);
         // Set authorized as Authorized at offset [1..1+size_of::<Authorized>()]
-        write_bytes(&mut instruction_data[1..], &self.authorized.to_bytes());
+        self.authorized
+            .write_bytes(&mut instruction_data[1..1 + size_of::<Authorized>()]);
         // Set lockup as Lockup at offset [1+size_of::<Authorized>()..1+size_of::<Authorized>()+size_of::<Lockup>()]
-        write_bytes(
-            &mut instruction_data[1 + size_of::<Authorized>()..],
-            &self.lockup.to_bytes(),
-        );
+        self.lockup
+            .write_bytes(&mut instruction_data[1 + size_of::<Authorized>()..]);
 
         let instruction = Instruction {
             program_id: &crate::ID,

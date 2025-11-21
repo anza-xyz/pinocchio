@@ -28,7 +28,7 @@ pub struct AuthorizeChecked<'a> {
     /// New Authority of the Stake Account.
     pub new_authority: &'a AccountInfo,
     /// Lockup Authority (or Custodian) Account.
-    pub lockup_authority: &'a Option<AccountInfo>,
+    pub lockup_authority: Option<&'a AccountInfo>,
     /// Stake Authorize.
     pub authority_type: StakeAuthorize,
 }
@@ -44,8 +44,11 @@ impl AuthorizeChecked<'_> {
         // Account metadata
         let mut account_metas = [UNINIT_META; 5];
 
-        unsafe {
-            // SAFETY: Always write the first 3 accounts
+        // Account infos
+        let mut account_infos = [UNINIT_INFO; 5];
+
+        let num_accounts = unsafe {
+            // SAFETY: Always write the first 4 accounts
             account_metas
                 .get_unchecked_mut(0)
                 .write(AccountMeta::writable(self.stake.key()));
@@ -59,18 +62,21 @@ impl AuthorizeChecked<'_> {
                 .get_unchecked_mut(3)
                 .write(AccountMeta::readonly_signer(self.new_authority.key()));
 
-            // Write the 4th account if lockup_authority is present
+            account_infos.get_unchecked_mut(0).write(self.stake);
+            account_infos.get_unchecked_mut(1).write(self.clock_sysvar);
+            account_infos.get_unchecked_mut(2).write(self.authority);
+            account_infos.get_unchecked_mut(3).write(self.new_authority);
+
+            // Write the 5th account if lockup_authority is present
             if let Some(lockup_authority) = self.lockup_authority {
                 account_metas
                     .get_unchecked_mut(4)
                     .write(AccountMeta::readonly_signer(lockup_authority.key()));
+                account_infos.get_unchecked_mut(4).write(lockup_authority);
+                5
+            } else {
+                4
             }
-        }
-
-        let num_accounts = if self.lockup_authority.is_some() {
-            5
-        } else {
-            4
         };
 
         // Instruction data
@@ -88,22 +94,6 @@ impl AuthorizeChecked<'_> {
             accounts: unsafe { slice::from_raw_parts(account_metas.as_ptr() as _, num_accounts) },
             data: unsafe { slice::from_raw_parts(instruction_data.as_ptr() as _, 2) },
         };
-
-        // Account infos
-        let mut account_infos = [UNINIT_INFO; 5];
-
-        unsafe {
-            // SAFETY: Always write the first 3 accounts
-            account_infos.get_unchecked_mut(0).write(self.stake);
-            account_infos.get_unchecked_mut(1).write(self.clock_sysvar);
-            account_infos.get_unchecked_mut(2).write(self.authority);
-            account_infos.get_unchecked_mut(3).write(self.new_authority);
-
-            // Write the 4th account if lockup_authority is present
-            if let Some(lockup_authority) = self.lockup_authority {
-                account_infos.get_unchecked_mut(4).write(lockup_authority);
-            }
-        }
 
         invoke_signed_with_bounds::<5>(
             &instruction,

@@ -18,7 +18,7 @@ use crate::{write_bytes, UNINIT_BYTE, UNINIT_INFO, UNINIT_META};
 ///   1. `[]` The clock sysvar.
 ///   2. `[SIGNER]` The current authority of the stake account.
 ///   3. `[SIGNER, OPTIONAL]` The lockup authority (or custodian) of the stake account.
-pub struct Authorize<'a> {
+pub struct Authorize<'a, 'b> {
     /// Stake Account.
     pub stake: &'a AccountInfo,
     /// Clock Sysvar Account.
@@ -26,14 +26,14 @@ pub struct Authorize<'a> {
     /// Current Authority of the Stake Account Authority Type.
     pub authority: &'a AccountInfo,
     /// Lockup Authority (or Custodian) Account.
-    pub lockup_authority: &'a Option<AccountInfo>,
+    pub lockup_authority: Option<&'a AccountInfo>,
     /// New Authority.
-    pub new_authority: &'a Pubkey,
+    pub new_authority: &'b Pubkey,
     /// Stake Authorize.
     pub authority_type: StakeAuthorize,
 }
 
-impl Authorize<'_> {
+impl Authorize<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -44,7 +44,10 @@ impl Authorize<'_> {
         // Account metadata
         let mut account_metas = [UNINIT_META; 4];
 
-        unsafe {
+        // Account infos
+        let mut account_infos = [UNINIT_INFO; 4];
+
+        let num_accounts = unsafe {
             // SAFETY: Always write the first 3 accounts
             account_metas
                 .get_unchecked_mut(0)
@@ -56,18 +59,20 @@ impl Authorize<'_> {
                 .get_unchecked_mut(2)
                 .write(AccountMeta::readonly_signer(self.authority.key()));
 
+            account_infos.get_unchecked_mut(0).write(self.stake);
+            account_infos.get_unchecked_mut(1).write(self.clock_sysvar);
+            account_infos.get_unchecked_mut(2).write(self.authority);
+
             // Write the 4th account if lockup_authority is present
             if let Some(lockup_authority) = self.lockup_authority {
                 account_metas
                     .get_unchecked_mut(3)
                     .write(AccountMeta::readonly_signer(lockup_authority.key()));
+                account_infos.get_unchecked_mut(3).write(lockup_authority);
+                4
+            } else {
+                3
             }
-        }
-
-        let num_accounts = if self.lockup_authority.is_some() {
-            4
-        } else {
-            3
         };
 
         // Instruction data
@@ -88,21 +93,6 @@ impl Authorize<'_> {
             accounts: unsafe { slice::from_raw_parts(account_metas.as_ptr() as _, num_accounts) },
             data: unsafe { slice::from_raw_parts(instruction_data.as_ptr() as _, 34) },
         };
-
-        // Account infos
-        let mut account_infos = [UNINIT_INFO; 4];
-
-        unsafe {
-            // SAFETY: Always write the first 3 accounts
-            account_infos.get_unchecked_mut(0).write(self.stake);
-            account_infos.get_unchecked_mut(1).write(self.clock_sysvar);
-            account_infos.get_unchecked_mut(2).write(self.authority);
-
-            // Write the 4th account if lockup_authority is present
-            if let Some(lockup_authority) = self.lockup_authority {
-                account_infos.get_unchecked_mut(3).write(lockup_authority);
-            }
-        }
 
         invoke_signed_with_bounds::<4>(
             &instruction,

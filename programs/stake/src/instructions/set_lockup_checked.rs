@@ -38,8 +38,11 @@ impl SetLockupChecked<'_> {
         // Account metadata
         let mut account_metas = [UNINIT_META; 3];
 
-        unsafe {
-            // SAFETY: Always write the first 3 accounts
+        // Account infos
+        let mut account_infos = [UNINIT_INFO; 3];
+
+        let num_accounts = unsafe {
+            // SAFETY: Always write the first 2 accounts
             account_metas
                 .get_unchecked_mut(0)
                 .write(AccountMeta::writable(self.stake.key()));
@@ -47,15 +50,20 @@ impl SetLockupChecked<'_> {
                 .get_unchecked_mut(1)
                 .write(AccountMeta::readonly_signer(self.authority.key()));
 
-            // Write the 4th account if new_authority is present
+            account_infos.get_unchecked_mut(0).write(self.stake);
+            account_infos.get_unchecked_mut(1).write(self.authority);
+
+            // Write the 3rd account if new_authority is present
             if let Some(new_authority) = self.new_authority {
                 account_metas
                     .get_unchecked_mut(2)
                     .write(AccountMeta::readonly_signer(new_authority.key()));
+                account_infos.get_unchecked_mut(2).write(new_authority);
+                3
+            } else {
+                2
             }
-        }
-
-        let num_accounts = if self.new_authority.is_some() { 3 } else { 2 };
+        };
 
         // Instruction data layout (LockupArgs with Option encoding):
         // - [0]: instruction discriminator (u8) = 6
@@ -112,16 +120,6 @@ impl SetLockupChecked<'_> {
             accounts: unsafe { from_raw_parts(account_metas.as_ptr() as _, num_accounts) },
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, offset) },
         };
-
-        let mut account_infos = [UNINIT_INFO; 3];
-
-        unsafe {
-            account_infos.get_unchecked_mut(0).write(self.stake);
-            account_infos.get_unchecked_mut(1).write(self.authority);
-            if let Some(new_authority) = self.new_authority {
-                account_infos.get_unchecked_mut(2).write(new_authority);
-            }
-        }
 
         invoke_signed_with_bounds::<3>(
             &instruction,
