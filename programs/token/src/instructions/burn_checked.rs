@@ -1,8 +1,8 @@
 use core::slice::from_raw_parts;
 
-use crate::{write_bytes, UNINIT_BYTE};
 use pinocchio::{
     account_info::AccountInfo,
+    bytes::{write_bytes, UNINIT_BYTE},
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,

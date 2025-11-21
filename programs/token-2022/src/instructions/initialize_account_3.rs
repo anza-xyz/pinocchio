@@ -2,13 +2,12 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
+    bytes::{write_bytes, UNINIT_BYTE},
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     ProgramResult,
 };
-
-use crate::{write_bytes, UNINIT_BYTE};
 
 /// Initialize a new Token Account.
 ///

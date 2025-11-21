@@ -488,8 +488,7 @@ pub fn set_return_data(data: &[u8]) {
 pub fn get_return_data() -> Option<ReturnData> {
     #[cfg(target_os = "solana")]
     {
-        const UNINIT_BYTE: core::mem::MaybeUninit<u8> = core::mem::MaybeUninit::<u8>::uninit();
-        let mut data = [UNINIT_BYTE; MAX_RETURN_DATA];
+        let mut data = [crate::bytes::UNINIT_BYTE; MAX_RETURN_DATA];
         let mut program_id = MaybeUninit::<Pubkey>::uninit();
 
         let size = unsafe {
