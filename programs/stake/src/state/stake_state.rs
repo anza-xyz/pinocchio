@@ -1,4 +1,7 @@
-use pinocchio::{account_info::AccountInfo, program_error::ProgramError};
+use pinocchio::{
+    account_info::{AccountInfo, Ref},
+    program_error::ProgramError,
+};
 
 use crate::{
     state::{Meta, Stake},
@@ -34,14 +37,16 @@ pub enum StakeStateType {
     RewardsPool = 3,
 }
 
-impl From<u8> for StakeStateType {
-    fn from(value: u8) -> Self {
+impl TryFrom<u8> for StakeStateType {
+    type Error = ProgramError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => StakeStateType::Uninitialized,
-            1 => StakeStateType::Initialized,
-            2 => StakeStateType::Stake,
-            3 => StakeStateType::RewardsPool,
-            _ => panic!("invalid stake state value: {value}"),
+            0 => Ok(StakeStateType::Uninitialized),
+            1 => Ok(StakeStateType::Initialized),
+            2 => Ok(StakeStateType::Stake),
+            3 => Ok(StakeStateType::RewardsPool),
+            _ => Err(ProgramError::InvalidAccountData),
         }
     }
 }
@@ -57,55 +62,22 @@ impl From<StakeStateType> for u8 {
     }
 }
 
-/// Zero-copy view over an Initialized stake account.
-pub struct StakeAccountInitialized<'a>(&'a [u8]);
-
-impl StakeAccountInitialized<'_> {
-    /// Returns a reference to the meta data.
-    #[inline(always)]
-    pub fn meta(&self) -> &Meta {
-        unsafe { &*(self.0.as_ptr().add(META_OFFSET) as *const Meta) }
-    }
-}
-
-/// Zero-copy view over a delegated Stake account.
-pub struct StakeAccountStake<'a>(&'a [u8]);
-
-impl StakeAccountStake<'_> {
-    /// Returns a reference to the meta data.
-    #[inline(always)]
-    pub fn meta(&self) -> &Meta {
-        unsafe { &*(self.0.as_ptr().add(META_OFFSET) as *const Meta) }
-    }
-
-    /// Returns a reference to the stake data.
-    #[inline(always)]
-    pub fn stake(&self) -> &Stake {
-        unsafe { &*(self.0.as_ptr().add(STAKE_OFFSET) as *const Stake) }
-    }
-}
-
-/// Zero-copy stake state representation.
-pub enum StakeState<'a> {
-    /// Account is not yet initialized.
-    Uninitialized,
-    /// Stake account is initialized but not delegated.
-    Initialized(StakeAccountInitialized<'a>),
-    /// Stake account is delegated.
-    Stake(StakeAccountStake<'a>),
-    /// Account is a rewards pool.
-    RewardsPool,
+/// Zero-copy stake state wrapper that keeps the borrow alive.
+///
+/// This struct holds a `Ref` to the account data, ensuring the borrow
+/// remains valid for the lifetime of the struct.
+pub struct StakeState<'a> {
+    data: Ref<'a, [u8]>,
+    state_type: StakeStateType,
 }
 
 impl<'a> StakeState<'a> {
     /// Return a `StakeState` from the given account info.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
-    /// the account data.
+    /// This method performs owner and length validation on `AccountInfo`, safely borrowing
+    /// the account data and keeping the borrow alive.
     #[inline]
-    pub fn from_account_info(
-        account_info: &'a AccountInfo,
-    ) -> Result<StakeState<'a>, ProgramError> {
+    pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
         if !account_info.is_owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
@@ -116,41 +88,67 @@ impl<'a> StakeState<'a> {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let state_type = data[0];
-
-        match state_type {
-            0 => Ok(StakeState::Uninitialized),
+        let state_type = match data[0] {
+            0 => StakeStateType::Uninitialized,
             1 => {
                 if data.len() < INITIALIZED_LEN {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                // SAFETY: We need to extend the lifetime of the borrowed data to 'a.
-                // This is safe because:
-                // 1. The account_info has lifetime 'a
-                // 2. We've validated ownership and length
-                // 3. The borrow is released but the underlying data remains valid for 'a
-                let data_ptr = data.as_ptr();
-                let data_len = data.len();
-                drop(data);
-                let slice = unsafe { core::slice::from_raw_parts(data_ptr, data_len) };
-                Ok(StakeState::Initialized(StakeAccountInitialized(slice)))
+                StakeStateType::Initialized
             }
             2 => {
                 if data.len() < STAKE_LEN {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let data_ptr = data.as_ptr();
-                let data_len = data.len();
-                drop(data);
-                let slice = unsafe { core::slice::from_raw_parts(data_ptr, data_len) };
-                Ok(StakeState::Stake(StakeAccountStake(slice)))
+                StakeStateType::Stake
             }
-            3 => Ok(StakeState::RewardsPool),
-            _ => Err(ProgramError::InvalidAccountData),
+            3 => StakeStateType::RewardsPool,
+            _ => return Err(ProgramError::InvalidAccountData),
+        };
+
+        Ok(Self { data, state_type })
+    }
+
+    /// Returns the stake state type.
+    #[inline(always)]
+    pub fn state_type(&self) -> StakeStateType {
+        self.state_type
+    }
+
+    /// Returns a reference to the meta data if the account is Initialized or Stake.
+    #[inline(always)]
+    pub fn meta(&self) -> Option<&Meta> {
+        match self.state_type {
+            StakeStateType::Initialized | StakeStateType::Stake => {
+                Some(unsafe { &*(self.data.as_ptr().add(META_OFFSET) as *const Meta) })
+            }
+            _ => None,
         }
     }
 
-    /// Return a `StakeState` from the given account info.
+    /// Returns a reference to the stake data if the account is in Stake state.
+    #[inline(always)]
+    pub fn stake(&self) -> Option<&Stake> {
+        match self.state_type {
+            StakeStateType::Stake => {
+                Some(unsafe { &*(self.data.as_ptr().add(STAKE_OFFSET) as *const Stake) })
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Zero-copy stake state for unchecked access.
+///
+/// This struct provides direct access to stake account data without holding a borrow guard.
+/// Use this when you need pattern matching or when working with raw bytes.
+pub struct StakeStateUnchecked<'a> {
+    data: &'a [u8],
+    state_type: StakeStateType,
+}
+
+impl<'a> StakeStateUnchecked<'a> {
+    /// Return a `StakeStateUnchecked` from the given account info.
     ///
     /// This method performs owner and length validation on `AccountInfo`, but does not
     /// perform the borrow check.
@@ -162,80 +160,73 @@ impl<'a> StakeState<'a> {
     #[inline]
     pub unsafe fn from_account_info_unchecked(
         account_info: &'a AccountInfo,
-    ) -> Result<StakeState<'a>, ProgramError> {
+    ) -> Result<Self, ProgramError> {
         if account_info.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
-        let data = account_info.borrow_data_unchecked();
-
-        if data.len() < TYPE_LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
-
-        let state_type = data[0];
-
-        match state_type {
-            0 => Ok(StakeState::Uninitialized),
-            1 => {
-                if data.len() < INITIALIZED_LEN {
-                    return Err(ProgramError::InvalidAccountData);
-                }
-                Ok(StakeState::Initialized(StakeAccountInitialized(data)))
-            }
-            2 => {
-                if data.len() < STAKE_LEN {
-                    return Err(ProgramError::InvalidAccountData);
-                }
-                Ok(StakeState::Stake(StakeAccountStake(data)))
-            }
-            3 => Ok(StakeState::RewardsPool),
-            _ => Err(ProgramError::InvalidAccountData),
-        }
+        Self::from_bytes(account_info.borrow_data_unchecked())
     }
 
-    /// Return a `StakeState` from the given bytes.
+    /// Return a `StakeStateUnchecked` from the given bytes.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure that `bytes` contains a valid representation of a stake account,
-    /// and it is properly aligned. This method performs length validation based on the
-    /// state type but does not validate ownership.
+    /// This method performs length validation based on the state type but does not
+    /// validate ownership.
     #[inline]
-    pub unsafe fn from_bytes_unchecked(bytes: &'a [u8]) -> Result<StakeState<'a>, ProgramError> {
+    pub fn from_bytes(bytes: &'a [u8]) -> Result<Self, ProgramError> {
         if bytes.len() < TYPE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let state_type = bytes[0];
-
-        match state_type {
-            0 => Ok(StakeState::Uninitialized),
+        let state_type = match bytes[0] {
+            0 => StakeStateType::Uninitialized,
             1 => {
                 if bytes.len() < INITIALIZED_LEN {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                Ok(StakeState::Initialized(StakeAccountInitialized(bytes)))
+                StakeStateType::Initialized
             }
             2 => {
                 if bytes.len() < STAKE_LEN {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                Ok(StakeState::Stake(StakeAccountStake(bytes)))
+                StakeStateType::Stake
             }
-            3 => Ok(StakeState::RewardsPool),
-            _ => Err(ProgramError::InvalidAccountData),
-        }
+            3 => StakeStateType::RewardsPool,
+            _ => return Err(ProgramError::InvalidAccountData),
+        };
+
+        Ok(Self {
+            data: bytes,
+            state_type,
+        })
     }
 
     /// Returns the stake state type.
     #[inline(always)]
     pub fn state_type(&self) -> StakeStateType {
-        match self {
-            StakeState::Uninitialized => StakeStateType::Uninitialized,
-            StakeState::Initialized(_) => StakeStateType::Initialized,
-            StakeState::Stake(_) => StakeStateType::Stake,
-            StakeState::RewardsPool => StakeStateType::RewardsPool,
+        self.state_type
+    }
+
+    /// Returns a reference to the meta data if the account is Initialized or Stake.
+    #[inline(always)]
+    pub fn meta(&self) -> Option<&Meta> {
+        match self.state_type {
+            StakeStateType::Initialized | StakeStateType::Stake => {
+                Some(unsafe { &*(self.data.as_ptr().add(META_OFFSET) as *const Meta) })
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to the stake data if the account is in Stake state.
+    #[inline(always)]
+    pub fn stake(&self) -> Option<&Stake> {
+        match self.state_type {
+            StakeStateType::Stake => {
+                Some(unsafe { &*(self.data.as_ptr().add(STAKE_OFFSET) as *const Stake) })
+            }
+            _ => None,
         }
     }
 }
