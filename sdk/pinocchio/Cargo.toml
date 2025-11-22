@@ -18,10 +18,11 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
-copy = ["solana-address/copy"]
+copy = ["solana-account-view/copy", "solana-address/copy"]
 std = ["solana-address/std"]
 
 [dependencies]
+solana-account-view = { workspace = true }
 solana-address = { workspace = true, features = ["syscalls"] }
 solana-program-error = "3.0"
 

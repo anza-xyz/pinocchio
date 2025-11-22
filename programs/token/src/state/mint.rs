@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::{AccountInfo, Ref},
+    account::{AccountView, Ref},
     error::ProgramError,
     Address,
 };
@@ -40,24 +40,24 @@ impl Mint {
 
     /// Return a `Mint` from the given account info.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// This method performs owner and length validation on `AccountView`, safe borrowing
     /// the account data.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Mint>, ProgramError> {
+    pub fn from_account_info(account_info: &AccountView) -> Result<Ref<Mint>, ProgramError> {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if !account_info.is_owned_by(&ID) {
+        if !account_info.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_info.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
 
     /// Return a `Mint` from the given account info.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, but does not
+    /// This method performs owner and length validation on `AccountView`, but does not
     /// perform the borrow check.
     ///
     /// # Safety
@@ -66,7 +66,7 @@ impl Mint {
     /// no mutable borrows of the account data).
     #[inline]
     pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+        account_info: &AccountView,
     ) -> Result<&Self, ProgramError> {
         if account_info.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
@@ -74,9 +74,7 @@ impl Mint {
         if account_info.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_info.borrow_unchecked()))
     }
 
     /// Return a `Mint` from the given bytes.
