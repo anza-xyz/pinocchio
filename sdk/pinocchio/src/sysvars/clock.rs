@@ -85,7 +85,7 @@ impl Clock {
 
     /// Return a `Clock` from the given account view.
     ///
-    /// This method performs a check on the account view key.
+    /// This method performs a check on the account view address.
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Clock>, ProgramError> {
         if unlikely(account_view.address() != &CLOCK_ID) {
@@ -98,7 +98,7 @@ impl Clock {
 
     /// Return a `Clock` from the given account view.
     ///
-    /// This method performs a check on the account view key, but does not
+    /// This method performs a check on the account view address, but does not
     /// perform the borrow check.
     ///
     /// # Safety
