@@ -1,7 +1,8 @@
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{cpi::invoke, AccountRole, InstructionView};
-use solana_program_error::ProgramResult;
+use pinocchio::{
+    cpi::invoke,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, Address, ProgramResult,
+};
 
 /// Drive state of Uninitialized nonce account to Initialized, setting the nonce value.
 ///
@@ -33,11 +34,11 @@ pub struct InitializeNonceAccount<'a, 'b> {
 impl InitializeNonceAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountRole; 3] = [
-            AccountRole::writable(self.account.address()),
-            AccountRole::readonly(self.recent_blockhashes_sysvar.address()),
-            AccountRole::readonly(self.rent_sysvar.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.recent_blockhashes_sysvar.address()),
+            InstructionAccount::readonly(self.rent_sysvar.address()),
         ];
 
         // instruction data
@@ -49,7 +50,7 @@ impl InitializeNonceAccount<'_, '_> {
 
         let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

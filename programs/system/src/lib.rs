@@ -1,14 +1,12 @@
 #![no_std]
 
-use pinocchio::{
-    account::AccountView,
-    address::declare_id,
-    instruction::Signer,
-    sysvars::{rent::Rent, Sysvar},
-    Address, ProgramResult,
-};
-
 use crate::instructions::{Assign, CreateAccount, Transfer};
+use pinocchio::{
+    address::declare_id,
+    cpi::Signer,
+    sysvars::{rent::Rent, Sysvar},
+    AccountView, Address, ProgramResult,
+};
 
 pub mod instructions;
 

@@ -3,7 +3,7 @@ use core::slice::from_raw_parts;
 use solana_account_view::AccountView;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    InstructionAccount, InstructionView,
 };
 use solana_program_error::ProgramResult;
 
@@ -39,12 +39,12 @@ impl ApproveChecked<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // Account metadata
-        let account_metas: [AccountRole; 4] = [
-            AccountRole::writable(self.source.address()),
-            AccountRole::readonly(self.mint.address()),
-            AccountRole::readonly(self.delegate.address()),
-            AccountRole::readonly_signer(self.authority.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 4] = [
+            InstructionAccount::writable(self.source.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::readonly(self.delegate.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data
@@ -62,7 +62,7 @@ impl ApproveChecked<'_> {
 
         let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };
 

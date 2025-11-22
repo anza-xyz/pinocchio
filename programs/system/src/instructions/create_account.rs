@@ -1,11 +1,10 @@
-use pinocchio::sysvars::rent::Rent;
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{
+use pinocchio::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    error::ProgramError,
+    instruction::{InstructionAccount, InstructionView},
+    sysvars::rent::Rent,
+    AccountView, Address, ProgramResult,
 };
-use solana_program_error::{ProgramError, ProgramResult};
 
 /// Create a new account.
 ///
@@ -57,10 +56,10 @@ impl<'a> CreateAccount<'a> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountRole; 2] = [
-            AccountRole::writable_signer(self.from.address()),
-            AccountRole::writable_signer(self.to.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 2] = [
+            InstructionAccount::writable_signer(self.from.address()),
+            InstructionAccount::writable_signer(self.to.address()),
         ];
 
         // instruction data
@@ -76,7 +75,7 @@ impl<'a> CreateAccount<'a> {
 
         let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

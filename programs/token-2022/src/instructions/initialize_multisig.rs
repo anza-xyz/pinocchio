@@ -2,7 +2,7 @@ use core::{mem::MaybeUninit, slice};
 
 use solana_account_view::AccountView;
 use solana_address::Address;
-use solana_instruction_view::{cpi::invoke_with_bounds, AccountRole, InstructionView};
+use solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView};
 use solana_program_error::{ProgramError, ProgramResult};
 
 /// Maximum number of multisignature signers.
@@ -49,24 +49,27 @@ impl InitializeMultisig<'_, '_, '_> {
 
         let num_accounts = 2 + signers.len();
 
-        // Account metadata
-        const UNINIT_META: MaybeUninit<AccountRole> = MaybeUninit::<AccountRole>::uninit();
-        let mut acc_metas = [UNINIT_META; 2 + MAX_MULTISIG_SIGNERS];
+        // Instruction accounts
+        const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
+            MaybeUninit::<InstructionAccount>::uninit();
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 2 + MAX_MULTISIG_SIGNERS];
 
         unsafe {
             // SAFETY:
-            // - `account_metas` is sized to 2 + MAX_MULTISIG_SIGNERS
+            // - `instruction_accounts` is sized to 2 + MAX_MULTISIG_SIGNERS
             // - Index 0 and 1 are always present
-            acc_metas
+            instruction_accounts
                 .get_unchecked_mut(0)
-                .write(AccountRole::writable(multisig.address()));
-            acc_metas
+                .write(InstructionAccount::writable(multisig.address()));
+            instruction_accounts
                 .get_unchecked_mut(1)
-                .write(AccountRole::readonly(rent_sysvar.address()));
+                .write(InstructionAccount::readonly(rent_sysvar.address()));
         }
 
-        for (account_meta, signer) in acc_metas[2..].iter_mut().zip(signers.iter()) {
-            account_meta.write(AccountRole::readonly(signer.address()));
+        for (instruction_account, signer) in
+            instruction_accounts[2..].iter_mut().zip(signers.iter())
+        {
+            instruction_account.write(InstructionAccount::readonly(signer.address()));
         }
 
         // Instruction data layout:
@@ -76,7 +79,9 @@ impl InitializeMultisig<'_, '_, '_> {
 
         let instruction = InstructionView {
             program_id: token_program,
-            accounts: unsafe { slice::from_raw_parts(acc_metas.as_ptr() as _, num_accounts) },
+            accounts: unsafe {
+                slice::from_raw_parts(instruction_accounts.as_ptr() as _, num_accounts)
+            },
             data,
         };
 

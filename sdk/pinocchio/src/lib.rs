@@ -236,12 +236,6 @@ pub mod sysvars;
 pub use entrypoint::lazy as lazy_entrypoint;
 
 // Re-export the `solana_account_view` for downstream use.
-pub use solana_account_view as account_view;
-
-// Re-export the `solana_account_view` for downstream use.
-pub use solana_account_view as account_view;
-
-// Re-export the `solana_account_view` for downstream use.
 pub use solana_account_view as account;
 pub use solana_account_view::AccountView;
 

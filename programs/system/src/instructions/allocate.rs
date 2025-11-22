@@ -1,9 +1,8 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{
+use pinocchio::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
 /// Allocate space in a (possibly new) account without funding.
 ///
@@ -25,9 +24,9 @@ impl Allocate<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountRole; 1] =
-            [AccountRole::writable_signer(self.account.address())];
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 1] =
+            [InstructionAccount::writable_signer(self.account.address())];
 
         // instruction data
         // -  [0..4 ]: instruction discriminator
@@ -38,7 +37,7 @@ impl Allocate<'_> {
 
         let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

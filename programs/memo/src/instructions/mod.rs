@@ -2,8 +2,8 @@ use core::mem::MaybeUninit;
 
 use solana_account_view::AccountView;
 use solana_instruction_view::{
-    cpi::{slice_invoke_signed, Signer, MAX_CPI_ACCOUNTS},
-    AccountRole, InstructionView,
+    cpi::{invoke_signed_with_bounds, Signer, MAX_STATIC_CPI_ACCOUNTS},
+    InstructionAccount, InstructionView,
 };
 use solana_program_error::{ProgramError, ProgramResult};
 
@@ -26,37 +26,40 @@ impl Memo<'_, '_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers_seeds: &[Signer]) -> ProgramResult {
-        const UNINIT_META: MaybeUninit<AccountRole> = MaybeUninit::<AccountRole>::uninit();
+        const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
+            MaybeUninit::<InstructionAccount>::uninit();
 
-        // We don't know num_accounts at compile time, so we use MAX_CPI_ACCOUNTS
-        let mut account_metas = [UNINIT_META; MAX_CPI_ACCOUNTS];
+        // We don't know num_accounts at compile time, so we use
+        // `MAX_STATIC_CPI_ACCOUNTS`.
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_STATIC_CPI_ACCOUNTS];
 
         let num_accounts = self.signers.len();
-        if num_accounts > MAX_CPI_ACCOUNTS {
+        if num_accounts > MAX_STATIC_CPI_ACCOUNTS {
             return Err(ProgramError::InvalidArgument);
         }
 
         for i in 0..num_accounts {
             unsafe {
-                // SAFETY: num_accounts is less than MAX_CPI_ACCOUNTS
-                // SAFETY: i is less than len(self.signers)
-                account_metas
-                    .get_unchecked_mut(i)
-                    .write(AccountRole::readonly_signer(
-                        self.signers.get_unchecked(i).address(),
-                    ));
+                // SAFETY: `num_accounts` is less than MAX_STATIC_CPI_ACCOUNTS.
+                instruction_accounts.get_unchecked_mut(i).write(
+                    InstructionAccount::readonly_signer(self.signers.get_unchecked(i).address()),
+                );
             }
         }
 
-        // SAFETY: len(account_metas) <= MAX_CPI_ACCOUNTS
+        // SAFETY: len(instruction_accounts) <= MAX_CPI_ACCOUNTS
         let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: unsafe {
-                core::slice::from_raw_parts(account_metas.as_ptr() as _, num_accounts)
+                core::slice::from_raw_parts(instruction_accounts.as_ptr() as _, num_accounts)
             },
             data: self.memo.as_bytes(),
         };
 
-        slice_invoke_signed(&instruction, self.signers, signers_seeds)
+        invoke_signed_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(
+            &instruction,
+            self.signers,
+            signers_seeds,
+        )
     }
 }
