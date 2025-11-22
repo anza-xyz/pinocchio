@@ -50,7 +50,7 @@ impl Mint {
         if !account_info.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_info.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -74,9 +74,7 @@ impl Mint {
         if account_info.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_info.borrow_unchecked()))
     }
 
     /// Return a `Mint` from the given bytes.

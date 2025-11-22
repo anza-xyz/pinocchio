@@ -1,6 +1,6 @@
 use super::test_utils::*;
 use crate::{
-    account::{Account, AccountView},
+    account::{AccountView, RuntimeAccount},
     error::ProgramError,
     sysvars::{clock::Slot, slot_hashes::*},
 };
@@ -436,7 +436,7 @@ fn test_from_account_info_constructor() {
 
         ptr::copy_nonoverlapping(data.as_ptr(), base_ptr.add(header_size), data.len());
 
-        base_ptr as *mut Account
+        base_ptr as *mut RuntimeAccount
     };
 
     let account_view = unsafe { AccountView::new_unchecked(acct_ptr) };

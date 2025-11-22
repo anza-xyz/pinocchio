@@ -100,7 +100,7 @@ impl Rent {
         if unlikely(account_view.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Ref::map(account_view.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -121,9 +121,7 @@ impl Rent {
         if unlikely(account_info.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_info.borrow_unchecked()))
     }
 
     /// Return a `Rent` from the given bytes.

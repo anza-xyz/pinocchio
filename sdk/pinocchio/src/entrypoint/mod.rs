@@ -18,7 +18,7 @@ use core::{
 };
 
 use crate::{
-    account::{Account, AccountView, MAX_PERMITTED_DATA_INCREASE},
+    account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
@@ -45,7 +45,7 @@ pub const NON_DUP_MARKER: u8 = u8::MAX;
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data increase.
-const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -230,7 +230,7 @@ macro_rules! process_n_accounts {
         $accounts = $accounts.add(1);
 
         // Read the next account.
-        let account: *mut Account = $input as *mut Account;
+        let account: *mut RuntimeAccount = $input as *mut RuntimeAccount;
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicated account
         //   - duplicated marker + 7 bytes of padding in case of a duplicated account
@@ -330,7 +330,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
 
         // The first account is always non-duplicated, so process
         // it directly as such.
-        let account: *mut Account = input as *mut Account;
+        let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
         accounts.write(AccountView::new_unchecked(account));
 
         input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
@@ -405,7 +405,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     to_skip -= 1;
 
                     // Read the next account.
-                    let account: *mut Account = input as *mut Account;
+                    let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
                     // Adds an 8-bytes offset for:
                     //   - rent epoch in case of a non-duplicated account
                     //   - duplicated marker + 7 bytes of padding in case of a duplicated account
@@ -883,7 +883,7 @@ mod tests {
         // Last unique account.
         let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
         // No mutable borrow active at this point.
-        assert!(duplicated.try_borrow_data_mut().is_ok());
+        assert!(duplicated.try_borrow_mut().is_ok());
 
         // Duplicated accounts should reference (share) the account pointer
         // to the last unique account.
@@ -893,16 +893,16 @@ mod tests {
             assert_eq!(account_info, duplicated);
             assert_eq!(account_info.data_len(), duplicated.data_len());
 
-            let borrowed = account_info.try_borrow_data_mut().unwrap();
+            let borrowed = account_info.try_borrow_mut().unwrap();
             // Only one mutable borrow at the same time should be allowed
             // on the duplicated account.
-            assert!(duplicated.try_borrow_data_mut().is_err());
+            assert!(duplicated.try_borrow_mut().is_err());
             drop(borrowed);
         }
 
         // There should not be any mutable borrow on the duplicated account
         // at this point.
-        assert!(duplicated.try_borrow_data_mut().is_ok());
+        assert!(duplicated.try_borrow_mut().is_ok());
     }
 
     #[test]

@@ -24,7 +24,7 @@ std = ["solana-address/std"]
 [dependencies]
 solana-account-view = { workspace = true }
 solana-address = { workspace = true, features = ["syscalls"] }
-solana-program-error = { version = "3.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-account-view" }
+solana-program-error = "3.0"
 
 [dev-dependencies]
 five8_const = { workspace = true }

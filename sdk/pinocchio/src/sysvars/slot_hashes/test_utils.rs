@@ -4,7 +4,7 @@
 
 use super::*;
 extern crate std;
-use crate::account::{Account, AccountView};
+use crate::account::{AccountView, RuntimeAccount};
 use core::ptr;
 use std::vec::Vec;
 
@@ -152,7 +152,10 @@ pub unsafe fn make_account_info(
         data.len(),
     );
 
-    (AccountView::new_unchecked(hdr_ptr as *mut Account), backing)
+    (
+        AccountView::new_unchecked(hdr_ptr as *mut RuntimeAccount),
+        backing,
+    )
 }
 
 #[cfg(test)]
@@ -160,12 +163,12 @@ pub unsafe fn make_account_info(
 fn test_account_layout_compatibility() {
     assert_eq!(
         mem::size_of::<AccountLayout>(),
-        mem::size_of::<Account>(),
+        mem::size_of::<RuntimeAccount>(),
         "Header size must match Account size"
     );
     assert_eq!(
         mem::align_of::<AccountLayout>(),
-        mem::align_of::<Account>(),
+        mem::align_of::<RuntimeAccount>(),
         "Header alignment must match Account alignment"
     );
 
@@ -182,7 +185,7 @@ fn test_account_layout_compatibility() {
             data_len: 256,
         };
 
-        let account_ptr = &test_header as *const AccountLayout as *const Account;
+        let account_ptr = &test_header as *const AccountLayout as *const RuntimeAccount;
         let account_ref = &*account_ptr;
         assert_eq!(
             account_ref.borrow_state, 42,

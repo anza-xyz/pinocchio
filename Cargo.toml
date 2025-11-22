@@ -23,7 +23,7 @@ pinocchio = { version = "0.9", path = "sdk/pinocchio" }
 pinocchio-log-macro = { version = "0.5", path = "sdk/log/macro" }
 quote = "1.0"
 regex = "1"
-solana-account-view = { version = "0.0.0", git = "https://github.com/febo/solana-sdk.git", branch = "solana-account-view" }
+solana-account-view = "1.0"
 solana-address = "2.0"
 syn = "1.0"
 
