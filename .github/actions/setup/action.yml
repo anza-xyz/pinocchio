@@ -69,27 +69,27 @@ runs:
 
     - name: Install 'cargo-audit'
       if: ${{ contains(inputs.components, 'audit') }}
-      uses: taiki-e/cache-cargo-install-action@v2
+      uses: taiki-e/install-action@v2
       with:
-        tool: cargo-audit@0.21.2
+        tool: cargo-audit
 
     - name: Install 'cargo-hack'
       if: ${{ contains(inputs.components, 'hack') }}
-      uses: taiki-e/cache-cargo-install-action@v2
+      uses: taiki-e/install-action@v2
       with:
         tool: cargo-hack
 
     - name: Install 'cargo-release'
       if: ${{ contains(inputs.components, 'release') }}
-      uses: taiki-e/cache-cargo-install-action@v2
+      uses: taiki-e/install-action@v2
       with:
-        tool: cargo-release@0.25.15
+        tool: cargo-release
 
     - name: Install 'cargo-semver-checks'
       if: ${{ contains(inputs.components, 'semver-checks') }}
-      uses: taiki-e/cache-cargo-install-action@v2
+      uses: taiki-e/install-action@v2
       with:
-        tool: cargo-semver-checks@0.39.0
+        tool: cargo-semver-checks
 
     - name: Install 'cargo-miri'
       if: ${{ contains(inputs.toolchain, 'lint') }}
