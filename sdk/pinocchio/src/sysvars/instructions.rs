@@ -119,7 +119,7 @@ impl<'a> TryFrom<&'a AccountView> for Instructions<Ref<'a, [u8]>> {
         }
 
         Ok(Instructions {
-            data: account_view.try_borrow_data()?,
+            data: account_view.try_borrow()?,
         })
     }
 }

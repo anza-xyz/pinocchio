@@ -36,7 +36,7 @@ impl Multisig {
         if !account_view.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Ref::map(account_view.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -60,9 +60,7 @@ impl Multisig {
         if account_view.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_view.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
 
     /// Return a `Multisig` from the given bytes.

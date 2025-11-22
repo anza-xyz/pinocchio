@@ -65,7 +65,7 @@ impl TokenAccount {
         if !account_info.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_info.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -89,9 +89,7 @@ impl TokenAccount {
         if account_info.owner() != &ID {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_info.borrow_unchecked()))
     }
 
     /// Return a `TokenAccount` from the given bytes.
