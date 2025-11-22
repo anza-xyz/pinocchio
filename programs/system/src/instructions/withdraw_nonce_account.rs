@@ -1,9 +1,8 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{
+use pinocchio::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
 /// Withdraw funds from a nonce account.
 ///
@@ -48,12 +47,12 @@ impl WithdrawNonceAccount<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountRole; 5] = [
-            AccountRole::writable(self.account.address()),
-            AccountRole::writable(self.recipient.address()),
-            AccountRole::readonly(self.recent_blockhashes_sysvar.address()),
-            AccountRole::readonly(self.rent_sysvar.address()),
-            AccountRole::readonly_signer(self.authority.address()),
+        let account_metas: [InstructionAccount; 5] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::writable(self.recipient.address()),
+            InstructionAccount::readonly(self.recent_blockhashes_sysvar.address()),
+            InstructionAccount::readonly(self.rent_sysvar.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // instruction data

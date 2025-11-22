@@ -2,7 +2,7 @@ use core::slice::from_raw_parts;
 
 use solana_account_view::AccountView;
 use solana_address::Address;
-use solana_instruction_view::{cpi::invoke, AccountRole, InstructionView};
+use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
 use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
@@ -26,7 +26,7 @@ impl InitializeMint2<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Account metadata
-        let account_metas: [AccountRole; 1] = [AccountRole::writable(self.mint.address())];
+        let account_metas: [InstructionAccount; 1] = [InstructionAccount::writable(self.mint.address())];
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)

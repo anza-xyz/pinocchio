@@ -2,7 +2,7 @@ use core::{mem::MaybeUninit, slice};
 
 use solana_account_view::AccountView;
 use solana_address::Address;
-use solana_instruction_view::{cpi::invoke_with_bounds, AccountRole, InstructionView};
+use solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView};
 use solana_program_error::{ProgramError, ProgramResult};
 
 use crate::instructions::MAX_MULTISIG_SIGNERS;
@@ -45,7 +45,8 @@ impl InitializeMultisig2<'_, '_, '_> {
         let num_accounts = 1 + signers.len();
 
         // Account metadata
-        const UNINIT_META: MaybeUninit<AccountRole> = MaybeUninit::<AccountRole>::uninit();
+        const UNINIT_META: MaybeUninit<InstructionAccount> =
+            MaybeUninit::<InstructionAccount>::uninit();
         let mut acc_metas = [UNINIT_META; 1 + MAX_MULTISIG_SIGNERS];
 
         unsafe {
@@ -54,11 +55,11 @@ impl InitializeMultisig2<'_, '_, '_> {
             // - Index 0 is always present
             acc_metas
                 .get_unchecked_mut(0)
-                .write(AccountRole::writable(multisig.address()));
+                .write(InstructionAccount::writable(multisig.address()));
         }
 
         for (account_meta, signer) in acc_metas[1..].iter_mut().zip(signers.iter()) {
-            account_meta.write(AccountRole::readonly(signer.address()));
+            account_meta.write(InstructionAccount::readonly(signer.address()));
         }
 
         // Instruction data layout:

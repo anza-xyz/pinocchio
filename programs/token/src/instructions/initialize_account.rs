@@ -1,5 +1,5 @@
 use solana_account_view::AccountView;
-use solana_instruction_view::{cpi::invoke, AccountRole, InstructionView};
+use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
 use solana_program_error::ProgramResult;
 
 /// Initialize a new Token Account.
@@ -24,11 +24,11 @@ impl InitializeAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountRole; 4] = [
-            AccountRole::writable(self.account.address()),
-            AccountRole::readonly(self.mint.address()),
-            AccountRole::readonly(self.owner.address()),
-            AccountRole::readonly(self.rent_sysvar.address()),
+        let account_metas: [InstructionAccount; 4] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::readonly(self.owner.address()),
+            InstructionAccount::readonly(self.rent_sysvar.address()),
         ];
 
         let instruction = InstructionView {

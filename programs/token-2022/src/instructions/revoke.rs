@@ -2,7 +2,7 @@ use solana_account_view::AccountView;
 use solana_address::Address;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    InstructionAccount, InstructionView,
 };
 use solana_program_error::ProgramResult;
 
@@ -29,9 +29,9 @@ impl Revoke<'_, '_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountRole; 2] = [
-            AccountRole::writable(self.source.address()),
-            AccountRole::readonly_signer(self.authority.address()),
+        let account_metas: [InstructionAccount; 2] = [
+            InstructionAccount::writable(self.source.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         let instruction = InstructionView {

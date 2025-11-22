@@ -1,10 +1,8 @@
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{
+use pinocchio::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, Address, ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
 /// Assign account to a program
 ///
@@ -27,8 +25,8 @@ impl Assign<'_, '_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountRole; 1] =
-            [AccountRole::writable_signer(self.account.address())];
+        let account_metas: [InstructionAccount; 1] =
+            [InstructionAccount::writable_signer(self.account.address())];
 
         // instruction data
         // -  [0..4 ]: instruction discriminator

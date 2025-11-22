@@ -1,6 +1,8 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{cpi::invoke, AccountRole, InstructionView};
-use solana_program_error::ProgramResult;
+use pinocchio::{
+    cpi::invoke,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, ProgramResult,
+};
 
 /// One-time idempotent upgrade of legacy nonce versions in order to bump
 /// them out of chain blockhash domain.
@@ -16,7 +18,8 @@ impl UpgradeNonceAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountRole; 1] = [AccountRole::writable(self.account.address())];
+        let account_metas: [InstructionAccount; 1] =
+            [InstructionAccount::writable(self.account.address())];
 
         // instruction
         let instruction = InstructionView {
