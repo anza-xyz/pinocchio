@@ -1,8 +1,7 @@
 use pinocchio::{
-    account::AccountView,
     cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    ProgramResult,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, ProgramResult,
 };
 
 /// One-time idempotent upgrade of legacy nonce versions in order to bump
@@ -19,10 +18,11 @@ impl UpgradeNonceAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.account.address())];
+        let account_metas: [InstructionAccount; 1] =
+            [InstructionAccount::writable(self.account.address())];
 
         // instruction
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &[12, 0, 0, 0],

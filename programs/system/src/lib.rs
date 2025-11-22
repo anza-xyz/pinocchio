@@ -1,12 +1,11 @@
 #![no_std]
 
 use pinocchio::{
-    account::AccountView,
-    address::declare_id,
-    instruction::Signer,
+    cpi::Signer,
     sysvars::{rent::Rent, Sysvar},
-    Address, ProgramResult,
+    AccountView, Address, ProgramResult,
 };
+use solana_address::declare_id;
 
 use crate::instructions::{Assign, CreateAccount, Transfer};
 

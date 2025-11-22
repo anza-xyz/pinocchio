@@ -1,8 +1,7 @@
 use pinocchio::{
-    account::AccountView,
     cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    Address, ProgramResult,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, Address, ProgramResult,
 };
 
 /// Drive state of Uninitialized nonce account to Initialized, setting the nonce value.
@@ -36,10 +35,10 @@ impl InitializeNonceAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.address()),
-            AccountMeta::readonly(self.rent_sysvar.address()),
+        let account_metas: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.recent_blockhashes_sysvar.address()),
+            InstructionAccount::readonly(self.rent_sysvar.address()),
         ];
 
         // instruction data
@@ -49,7 +48,7 @@ impl InitializeNonceAccount<'_, '_> {
         instruction_data[0] = 6;
         instruction_data[4..36].copy_from_slice(self.authority.as_array());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &account_metas,
             data: &instruction_data,

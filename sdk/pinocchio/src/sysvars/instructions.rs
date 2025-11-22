@@ -1,10 +1,15 @@
+use core::{marker::PhantomData, mem::size_of, ops::Deref};
+
+#[cfg(feature = "cpi")]
+use crate::instruction::InstructionAccount;
+
+#[cfg(feature = "cpi")]
 use crate::{
     account::{AccountView, Ref},
-    address::{Address, ADDRESS_BYTES},
+    address::ADDRESS_BYTES,
     error::ProgramError,
-    instruction::AccountMeta,
+    Address,
 };
-use core::{marker::PhantomData, mem::size_of, ops::Deref};
 
 /// Instructions sysvar ID `Sysvar1nstructions1111111111111111111111111`.
 pub const INSTRUCTIONS_ID: Address = Address::new_from_array([
@@ -143,9 +148,12 @@ impl IntrospectedInstruction<'_> {
     /// performs the necessary index verification. However, to optimize performance for users
     /// who are sure that the index is in bounds, we have exposed it as an unsafe function.
     #[inline(always)]
-    pub unsafe fn get_account_meta_at_unchecked(&self, index: usize) -> &IntrospectedAccountMeta {
-        let offset = core::mem::size_of::<u16>() + (index * IntrospectedAccountMeta::LEN);
-        &*(self.raw.add(offset) as *const IntrospectedAccountMeta)
+    pub unsafe fn get_account_meta_at_unchecked(
+        &self,
+        index: usize,
+    ) -> &IntrospectedInstructionAccount {
+        let offset = core::mem::size_of::<u16>() + (index * IntrospectedInstructionAccount::LEN);
+        &*(self.raw.add(offset) as *const IntrospectedInstructionAccount)
     }
 
     /// Get the account meta at the specified index.
@@ -157,7 +165,7 @@ impl IntrospectedInstruction<'_> {
     pub fn get_account_meta_at(
         &self,
         index: usize,
-    ) -> Result<&IntrospectedAccountMeta, ProgramError> {
+    ) -> Result<&IntrospectedInstructionAccount, ProgramError> {
         // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
         let num_accounts = u16::from_le_bytes(unsafe { *(self.raw as *const [u8; 2]) });
 
@@ -178,7 +186,8 @@ impl IntrospectedInstruction<'_> {
         // SAFETY: The program ID is located after the account metas.
         unsafe {
             &*(self.raw.add(
-                size_of::<u16>() + num_accounts as usize * size_of::<IntrospectedAccountMeta>(),
+                size_of::<u16>()
+                    + num_accounts as usize * size_of::<IntrospectedInstructionAccount>(),
             ) as *const Address)
         }
     }
@@ -188,7 +197,7 @@ impl IntrospectedInstruction<'_> {
     pub fn get_instruction_data(&self) -> &[u8] {
         // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
         let offset = u16::from_le_bytes(unsafe { *(self.raw as *const [u8; 2]) }) as usize
-            * size_of::<IntrospectedAccountMeta>()
+            * size_of::<IntrospectedInstructionAccount>()
             + ADDRESS_BYTES;
 
         // SAFETY: The instruction data length is located after the program ID.
@@ -206,16 +215,16 @@ impl IntrospectedInstruction<'_> {
     }
 }
 
-/// The bit positions for the signer flags in the `AccountMeta`.
+/// The bit positions for the signer flags in the `InstructionAccount`.
 const IS_SIGNER: u8 = 0b00000001;
 
-/// The bit positions for the writable flags in the `AccountMeta`.
+/// The bit positions for the writable flags in the `InstructionAccount`.
 const IS_WRITABLE: u8 = 0b00000010;
 
 #[repr(C)]
 #[cfg_attr(feature = "copy", derive(Copy))]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IntrospectedAccountMeta {
+pub struct IntrospectedInstructionAccount {
     /// Account flags:
     ///   * bit `0`: signer
     ///   * bit `1`: writable
@@ -225,7 +234,7 @@ pub struct IntrospectedAccountMeta {
     pub key: Address,
 }
 
-impl IntrospectedAccountMeta {
+impl IntrospectedInstructionAccount {
     const LEN: usize = core::mem::size_of::<Self>();
 
     /// Indicate whether the account is writable or not.
@@ -240,9 +249,10 @@ impl IntrospectedAccountMeta {
         (self.flags & IS_SIGNER) != 0
     }
 
-    /// Convert the `IntrospectedAccountMeta` to an `AccountMeta`.
+    #[cfg(feature = "cpi")]
+    /// Convert the `IntrospectedInstructionAccount` to an `InstructionAccount`.
     #[inline(always)]
-    pub fn to_account_meta(&self) -> AccountMeta {
-        AccountMeta::new(&self.key, self.is_writable(), self.is_signer())
+    pub fn to_instruction_account(&self) -> InstructionAccount {
+        InstructionAccount::new(&self.key, self.is_writable(), self.is_signer())
     }
 }
