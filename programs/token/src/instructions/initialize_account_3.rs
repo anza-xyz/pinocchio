@@ -2,7 +2,7 @@ use core::slice::from_raw_parts;
 
 use solana_account_view::AccountView;
 use solana_address::Address;
-use solana_instruction_view::{cpi::invoke, AccountRole, InstructionView};
+use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
 use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
@@ -24,10 +24,10 @@ pub struct InitializeAccount3<'a> {
 impl InitializeAccount3<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountRole; 2] = [
-            AccountRole::writable(self.account.address()),
-            AccountRole::readonly(self.mint.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 2] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.mint.address()),
         ];
 
         // instruction data
@@ -42,7 +42,7 @@ impl InitializeAccount3<'_> {
 
         let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },
         };
 

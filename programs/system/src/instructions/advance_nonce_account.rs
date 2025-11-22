@@ -1,9 +1,8 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{
+use pinocchio::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
 /// Consumes a stored nonce, replacing it with a successor.
 ///
@@ -30,17 +29,17 @@ impl AdvanceNonceAccount<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountRole; 3] = [
-            AccountRole::writable(self.account.address()),
-            AccountRole::readonly(self.recent_blockhashes_sysvar.address()),
-            AccountRole::readonly_signer(self.authority.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.recent_blockhashes_sysvar.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // instruction
         let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &[4, 0, 0, 0],
         };
 

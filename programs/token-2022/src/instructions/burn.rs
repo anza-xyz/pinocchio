@@ -4,7 +4,7 @@ use solana_account_view::AccountView;
 use solana_address::Address;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    InstructionAccount, InstructionView,
 };
 use solana_program_error::ProgramResult;
 
@@ -37,11 +37,11 @@ impl Burn<'_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // Account metadata
-        let account_metas: [AccountRole; 3] = [
-            AccountRole::writable(self.account.address()),
-            AccountRole::writable(self.mint.address()),
-            AccountRole::readonly_signer(self.authority.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::writable(self.mint.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data
@@ -56,7 +56,7 @@ impl Burn<'_, '_> {
 
         let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
         };
 

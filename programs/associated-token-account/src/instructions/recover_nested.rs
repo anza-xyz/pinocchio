@@ -1,7 +1,7 @@
 use solana_account_view::AccountView;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
-    AccountRole, InstructionView,
+    InstructionAccount, InstructionView,
 };
 use solana_program_error::ProgramResult;
 
@@ -49,15 +49,15 @@ impl RecoverNested<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountRole; 7] = [
-            AccountRole::writable(self.account.address()),
-            AccountRole::readonly(self.mint.address()),
-            AccountRole::writable(self.destination_account.address()),
-            AccountRole::readonly(self.owner_account.address()),
-            AccountRole::readonly(self.owner_mint.address()),
-            AccountRole::writable_signer(self.wallet.address()),
-            AccountRole::readonly(self.token_program.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 7] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::writable(self.destination_account.address()),
+            InstructionAccount::readonly(self.owner_account.address()),
+            InstructionAccount::readonly(self.owner_mint.address()),
+            InstructionAccount::writable_signer(self.wallet.address()),
+            InstructionAccount::readonly(self.token_program.address()),
         ];
 
         // Instruction data:
@@ -67,7 +67,7 @@ impl RecoverNested<'_> {
 
         let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 
