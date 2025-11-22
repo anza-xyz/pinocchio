@@ -394,7 +394,7 @@ pub unsafe fn invoke_signed_unchecked(
         /// discarded immediately after.
         #[repr(C)]
         struct CInstruction<'a> {
-            /// Public key of the program.
+            /// Address of the program.
             program_id: *const Address,
 
             /// Accounts expected by the program instruction.
