@@ -234,6 +234,8 @@ pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
 pub use entrypoint::lazy as lazy_entrypoint;
+// Re-export the `solana_account_view` for downstream use.
+pub use solana_account_view as account_view;
 
 // Re-export the `solana_account_view` for downstream use.
 pub use solana_account_view as account;
