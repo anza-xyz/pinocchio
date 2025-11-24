@@ -24,24 +24,24 @@ impl Multisig {
     /// The length of the `Multisig` account data.
     pub const LEN: usize = size_of::<Multisig>();
 
-    /// Return a `Multisig` from the given account info.
+    /// Return a `Multisig` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, safe borrowing
     /// the account data.
     #[inline]
-    pub fn from_account_info(account_info: &AccountView) -> Result<Ref<Multisig>, ProgramError> {
-        if account_info.data_len() != Self::LEN {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Multisig>, ProgramError> {
+        if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if !account_info.owned_by(&ID) {
+        if !account_view.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Ref::map(account_info.try_borrow()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
 
-    /// Return a `Multisig` from the given account info.
+    /// Return a `Multisig` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, but does not
     /// perform the borrow check.
@@ -51,16 +51,16 @@ impl Multisig {
     /// The caller must ensure that it is safe to borrow the account data (e.g., there are
     /// no mutable borrows of the account data).
     #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountView,
+    pub unsafe fn from_account_view_unchecked(
+        account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
-        if account_info.data_len() != Self::LEN {
+        if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner() != &ID {
+        if account_view.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Self::from_bytes_unchecked(account_info.borrow_unchecked()))
+        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
 
     /// Return a `Multisig` from the given bytes.

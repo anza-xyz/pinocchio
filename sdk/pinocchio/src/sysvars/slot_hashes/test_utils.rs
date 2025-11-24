@@ -105,18 +105,18 @@ pub fn create_mock_data(entries: &[(u64, Hash)]) -> Vec<u8> {
     build_slot_hashes_bytes(entries.len() as u64, entries)
 }
 
-/// Allocate a heap-backed `AccountInfo` whose data region is initialized with
+/// Allocate a heap-backed `AccountView` whose data region is initialized with
 /// `data` and whose key is `key`.
 ///
 /// The function also returns the backing `Vec<u64>` so the caller can keep it
 /// alive for the duration of the test (otherwise the memory would be freed and
-/// the raw pointer inside `AccountInfo` would dangle).
+/// the raw pointer inside `AccountView` would dangle).
 ///
 /// # Safety
-/// The caller must ensure the returned `AccountInfo` is used only for reading
+/// The caller must ensure the returned `AccountView` is used only for reading
 /// or according to borrow rules because the Solana runtime invariants are not
 /// fully enforced in this hand-rolled representation.
-pub unsafe fn make_account_info(
+pub unsafe fn make_account_view(
     key: Address,
     data: &[u8],
     borrow_state: u8,

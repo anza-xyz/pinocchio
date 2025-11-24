@@ -258,7 +258,7 @@ pub use solana_program_error::ProgramResult;
 /// value (`255`) is reserved to indicate non-duplicated accounts.
 ///
 /// The `MAX_TX_ACCOUNTS` is used to statically initialize the array of
-/// `AccountInfo`s when parsing accounts in an instruction.
+/// `AccountView`s when parsing accounts in an instruction.
 pub const MAX_TX_ACCOUNTS: usize = (u8::MAX - 1) as usize;
 
 /// `assert_eq(core::mem::align_of::<u128>(), 8)` is true for BPF but not

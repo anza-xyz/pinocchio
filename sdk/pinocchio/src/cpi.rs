@@ -298,7 +298,7 @@ unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
         .try_for_each(|((account_view, account_meta), account)| {
             // In order to check whether the borrow state is compatible
             // with the invocation, we need to check that we have the
-            // correct account info and meta pair.
+            // correct account view and meta pair.
             if unlikely(account_view.address() != account_meta.address) {
                 return Err(ProgramError::InvalidArgument);
             }
@@ -324,7 +324,7 @@ unsafe fn inner_invoke_signed_with_bounds<const MAX_ACCOUNTS: usize>(
             Ok(())
         })?;
 
-    // SAFETY: At this point it is guaranteed that account infos are borrowable
+    // SAFETY: At this point it is guaranteed that account views are borrowable
     // according to their mutability on the instruction.
     unsafe {
         invoke_signed_unchecked(

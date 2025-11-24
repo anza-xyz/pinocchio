@@ -24,7 +24,7 @@ impl Multisig {
     /// The length of the `Multisig` account data.
     pub const LEN: usize = size_of::<Multisig>();
 
-    /// Return a `Multisig` from the given account info.
+    /// Return a `Multisig` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, safe borrowing
     /// the account data.
@@ -41,7 +41,7 @@ impl Multisig {
         }))
     }
 
-    /// Return a `Multisig` from the given account info.
+    /// Return a `Multisig` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, but does not
     /// perform the borrow check.

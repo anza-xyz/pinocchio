@@ -28,7 +28,7 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     /// as account 0.
     pub base: Option<&'a AccountView>,
 
-    /// String of ASCII chars, no longer than `solana_address::MAX_SEED_LEN`.
+    /// String of ASCII chars, no longer than [`solana_address::MAX_SEED_LEN`].
     pub seed: &'b str,
 
     /// Number of lamports to transfer to the new account.
@@ -52,7 +52,7 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
         space: u64,
         owner: &'c Address,
     ) -> Result<Self, ProgramError> {
-        let rent = Rent::from_account_info(rent_sysvar)?;
+        let rent = Rent::from_account_view(rent_sysvar)?;
         let lamports = rent.minimum_balance(space as usize);
 
         Ok(Self {

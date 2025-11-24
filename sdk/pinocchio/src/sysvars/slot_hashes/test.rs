@@ -401,7 +401,7 @@ fn test_log_function() {
 }
 
 #[test]
-fn test_from_account_info_constructor() {
+fn test_from_account_view_constructor() {
     std::io::stderr().flush().unwrap();
 
     const NUM_ENTRIES: usize = 3;
@@ -442,7 +442,7 @@ fn test_from_account_info_constructor() {
     let account_view = unsafe { AccountView::new_unchecked(acct_ptr) };
 
     let slot_hashes = SlotHashes::from_account_view(&account_view)
-        .expect("from_account_info should succeed with well-formed data");
+        .expect("from_account_view should succeed with well-formed data");
 
     assert_eq!(slot_hashes.len(), NUM_ENTRIES);
     for (i, entry) in slot_hashes.into_iter().enumerate() {

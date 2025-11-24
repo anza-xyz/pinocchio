@@ -71,8 +71,8 @@ pub struct Account<'a> {
     /// The pointers to the `AccountView` data are only valid for as long as the
     /// `&'a AccountView` lives. Instead of holding a reference to the actual `AccountView`,
     /// which would increase the size of the type, we claim to hold a reference without
-    /// actually holding one using a `PhantomData<&'a AccountInfo>`.
-    _account_info: PhantomData<&'a AccountView>,
+    /// actually holding one using a `PhantomData<&'a AccountView>`.
+    _account_view: PhantomData<&'a AccountView>,
 }
 
 impl<'a> From<&'a AccountView> for Account<'a> {
@@ -90,7 +90,7 @@ impl<'a> From<&'a AccountView> for Account<'a> {
             is_signer: account.is_signer(),
             is_writable: account.is_writable(),
             executable: account.executable(),
-            _account_info: PhantomData::<&'a AccountView>,
+            _account_view: PhantomData::<&'a AccountView>,
         }
     }
 }
