@@ -61,7 +61,7 @@ define_syscall!(fn sol_memset_(s: *mut u8, c: u8, n: u64));
 define_syscall!(fn sol_invoke_signed_c(instruction_addr: *const u8, account_infos_addr: *const u8, account_infos_len: u64, signers_seeds_addr: *const u8, signers_seeds_len: u64) -> u64);
 define_syscall!(fn sol_invoke_signed_rust(instruction_addr: *const u8, account_infos_addr: *const u8, account_infos_len: u64, signers_seeds_addr: *const u8, signers_seeds_len: u64) -> u64);
 define_syscall!(fn sol_set_return_data(data: *const u8, length: u64));
-define_syscall!(fn sol_get_return_data(data: *mut u8, length: u64, program_id: *mut u8) -> u64);
+define_syscall!(fn sol_get_return_data(data: *mut u8, length: u64, program_id: *mut Address) -> u64);
 define_syscall!(fn sol_log_data(data: *const u8, data_len: u64));
 define_syscall!(fn sol_get_processed_sibling_instruction(index: u64, meta: *mut ProcessedSiblingInstruction, program_id: *mut Address, data: *mut u8, accounts: *mut AccountMeta) -> u64);
 define_syscall!(fn sol_get_stack_height() -> u64);

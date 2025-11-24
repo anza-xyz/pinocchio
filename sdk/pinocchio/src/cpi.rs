@@ -495,7 +495,7 @@ pub fn get_return_data() -> Option<ReturnData> {
             crate::syscalls::sol_get_return_data(
                 data.as_mut_ptr() as *mut u8,
                 data.len() as u64,
-                program_id.as_mut_ptr() as *mut Address as *mut u8,
+                program_id.as_mut_ptr() as *mut Address,
             )
         };
 
