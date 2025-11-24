@@ -1,6 +1,9 @@
 //! Syscall functions.
 
-use crate::instruction::{AccountMeta, ProcessedSiblingInstruction};
+use crate::{
+    instruction::{AccountMeta, ProcessedSiblingInstruction},
+    Address,
+};
 
 #[cfg(target_feature = "static-syscalls")]
 macro_rules! define_syscall {
