@@ -211,11 +211,9 @@ impl AccountInfo {
     ///
     /// It is undefined behavior to use this method while there is an active reference
     /// to the `owner` returned by [`Self::owner`].
+    #[allow(clippy::clone_on_copy)]
     #[inline(always)]
     pub unsafe fn assign(&self, new_owner: &Address) {
-        #[cfg(feature = "copy")]
-        write(&mut (*self.raw).owner, *new_owner);
-        #[cfg(not(feature = "copy"))]
         write(&mut (*self.raw).owner, new_owner.clone());
     }
 
