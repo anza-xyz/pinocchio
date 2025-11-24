@@ -140,7 +140,7 @@ pub fn sol_log_params(accounts: &[AccountView], data: &[u8]) {
     #[cfg(target_os = "solana")]
     {
         for (i, account) in accounts.iter().enumerate() {
-            msg!("AccountInfo");
+            msg!("AccountView");
             sol_log_64(0, 0, 0, 0, i as u64);
             msg!("- Is signer");
             sol_log_64(0, 0, 0, 0, account.is_signer() as u64);

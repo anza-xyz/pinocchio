@@ -71,24 +71,24 @@ impl InitializeMultisig2<'_, '_> {
             data,
         };
 
-        // Account info array
-        const UNINIT_INFO: MaybeUninit<&AccountView> = MaybeUninit::uninit();
-        let mut acc_infos = [UNINIT_INFO; 1 + MAX_MULTISIG_SIGNERS];
+        // Account view array
+        const UNINIT_VIEW: MaybeUninit<&AccountView> = MaybeUninit::uninit();
+        let mut acc_views = [UNINIT_VIEW; 1 + MAX_MULTISIG_SIGNERS];
 
         unsafe {
             // SAFETY:
-            // - `account_infos` is sized to 1 + MAX_MULTISIG_SIGNERS
+            // - `account_views` is sized to 1 + MAX_MULTISIG_SIGNERS
             // - Index 0 is always present
-            acc_infos.get_unchecked_mut(0).write(multisig);
+            acc_views.get_unchecked_mut(0).write(multisig);
         }
 
         // Fill signer accounts
-        for (account_info, signer) in acc_infos[1..].iter_mut().zip(signers.iter()) {
-            account_info.write(signer);
+        for (account_view, signer) in acc_views[1..].iter_mut().zip(signers.iter()) {
+            account_view.write(signer);
         }
 
         invoke_with_bounds::<{ 1 + MAX_MULTISIG_SIGNERS }>(&instruction, unsafe {
-            slice::from_raw_parts(acc_infos.as_ptr() as _, num_accounts)
+            slice::from_raw_parts(acc_views.as_ptr() as _, num_accounts)
         })
     }
 }

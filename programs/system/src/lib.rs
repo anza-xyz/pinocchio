@@ -45,7 +45,7 @@ pub fn create_account_with_minimum_balance_signed(
     signers: &[Signer],
 ) -> ProgramResult {
     let lamports = if let Some(rent_sysvar) = rent_sysvar {
-        let rent = Rent::from_account_info(rent_sysvar)?;
+        let rent = Rent::from_account_view(rent_sysvar)?;
         rent.minimum_balance(space)
     } else {
         Rent::get()?.minimum_balance(space)

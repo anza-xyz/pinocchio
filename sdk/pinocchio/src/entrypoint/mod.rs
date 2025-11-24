@@ -150,7 +150,7 @@ macro_rules! entrypoint {
 /// ```ignore
 /// fn process_instruction(
 ///     program_id: &Address,     // Address of the account the program was loaded into
-///     accounts: &[AccountInfo], // All accounts required to process the instruction
+///     accounts: &[AccountView], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
@@ -172,13 +172,13 @@ macro_rules! program_entrypoint {
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
             const UNINIT: core::mem::MaybeUninit<$crate::account::AccountView> =
                 core::mem::MaybeUninit::<$crate::account::AccountView>::uninit();
-            // Create an array of uninitialized account infos.
+            // Create an array of uninitialized account views.
             let mut accounts = [UNINIT; $maximum];
 
             let (program_id, count, instruction_data) =
                 $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
 
-            // Call the program's entrypoint passing `count` account infos; we know that
+            // Call the program's entrypoint passing `count` account views; we know that
             // they are initialized so we cast the pointer to a slice of `[AccountView]`.
             match $process_instruction(
                 &program_id,
@@ -237,7 +237,7 @@ macro_rules! process_n_accounts {
         $input = $input.add(size_of::<u64>());
 
         if (*account).borrow_state != NON_DUP_MARKER {
-            clone_account_info($accounts, $accounts_slice, (*account).borrow_state);
+            clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
             $accounts.write(AccountView::new_unchecked(account));
 
@@ -268,15 +268,15 @@ macro_rules! process_accounts {
     };
 }
 
-/// Create an [`AccountInfo`] referencing the same account referenced by the [`AccountInfo`] at the
+/// Create an [`AccountView`] referencing the same account referenced by the [`AccountView`] at the
 /// specified `index`.
 ///
 /// # Safety
 ///
 /// The caller must ensure that:
-///   - `accounts` pointer must point to an array of [`AccountInfo`]s where the new [`AccountInfo`]
+///   - `accounts` pointer must point to an array of [`AccountView`]s where the new [`AccountView`]
 ///     will be written.
-///   - `accounts_slice` pointer must point to a slice of [`AccountInfo`]s already initialized.
+///   - `accounts_slice` pointer must point to a slice of [`AccountView`]s already initialized.
 ///   - `index` is a valid index in the `accounts_slice`.
 //
 // Note: The function is marked as `cold` to stop the compiler from optimizing the parsing of
@@ -284,7 +284,7 @@ macro_rules! process_accounts {
 #[allow(clippy::clone_on_copy)]
 #[cold]
 #[inline(always)]
-unsafe fn clone_account_info(
+unsafe fn clone_account_view(
     accounts: *mut AccountView,
     accounts_slice: *const AccountView,
     index: u8,
@@ -862,8 +862,8 @@ mod tests {
     /// account's data length matches its index.
     fn assert_accounts(accounts: &[MaybeUninit<AccountView>]) {
         for (i, account) in accounts.iter().enumerate() {
-            let account_info = unsafe { account.assume_init_ref() };
-            assert_eq!(account_info.data_len(), i);
+            let account_view = unsafe { account.assume_init_ref() };
+            assert_eq!(account_view.data_len(), i);
         }
     }
 
@@ -876,8 +876,8 @@ mod tests {
 
         // Unique accounts should have `data_len` equal to their index.
         for (i, account) in accounts[..unique].iter().enumerate() {
-            let account_info = unsafe { account.assume_init_ref() };
-            assert_eq!(account_info.data_len(), i);
+            let account_view = unsafe { account.assume_init_ref() };
+            assert_eq!(account_view.data_len(), i);
         }
 
         // Last unique account.
@@ -888,12 +888,12 @@ mod tests {
         // Duplicated accounts should reference (share) the account pointer
         // to the last unique account.
         for account in accounts[unique..].iter() {
-            let account_info = unsafe { account.assume_init_ref() };
+            let account_view = unsafe { account.assume_init_ref() };
 
-            assert_eq!(account_info, duplicated);
-            assert_eq!(account_info.data_len(), duplicated.data_len());
+            assert_eq!(account_view, duplicated);
+            assert_eq!(account_view.data_len(), duplicated.data_len());
 
-            let borrowed = account_info.try_borrow_mut().unwrap();
+            let borrowed = account_view.try_borrow_mut().unwrap();
             // Only one mutable borrow at the same time should be allowed
             // on the duplicated account.
             assert!(duplicated.try_borrow_mut().is_err());

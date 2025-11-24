@@ -58,15 +58,12 @@ define_syscall!(fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64));
 define_syscall!(fn sol_memmove_(dst: *mut u8, src: *const u8, n: u64));
 define_syscall!(fn sol_memcmp_(s1: *const u8, s2: *const u8, n: u64, result: *mut i32));
 define_syscall!(fn sol_memset_(s: *mut u8, c: u8, n: u64));
-define_syscall!(fn sol_invoke_signed_c(instruction_addr: *const u8, account_infos_addr: *const u8, account_infos_len: u64, signers_seeds_addr: *const u8, signers_seeds_len: u64) -> u64);
-define_syscall!(fn sol_invoke_signed_rust(instruction_addr: *const u8, account_infos_addr: *const u8, account_infos_len: u64, signers_seeds_addr: *const u8, signers_seeds_len: u64) -> u64);
+define_syscall!(fn sol_invoke_signed_c(instruction_addr: *const u8, account_views_addr: *const u8, account_views_len: u64, signers_seeds_addr: *const u8, signers_seeds_len: u64) -> u64);
+define_syscall!(fn sol_invoke_signed_rust(instruction_addr: *const u8, account_views_addr: *const u8, account_views_len: u64, signers_seeds_addr: *const u8, signers_seeds_len: u64) -> u64);
 define_syscall!(fn sol_set_return_data(data: *const u8, length: u64));
 define_syscall!(fn sol_get_return_data(data: *mut u8, length: u64, program_id: *mut Address) -> u64);
 define_syscall!(fn sol_log_data(data: *const u8, data_len: u64));
-// Set the return data for the current program.
-//
-// The `program_id` is a pointer to a [u8; 32] array.
-define_syscall!(fn sol_get_processed_sibling_instruction(index: u64, meta: *mut ProcessedSiblingInstruction, program_id: *mut u8, data: *mut u8, accounts: *mut AccountMeta) -> u64);
+define_syscall!(fn sol_get_processed_sibling_instruction(index: u64, meta: *mut ProcessedSiblingInstruction, program_id: *mut Address, data: *mut u8, accounts: *mut AccountMeta) -> u64);
 define_syscall!(fn sol_get_stack_height() -> u64);
 define_syscall!(fn sol_curve_validate_point(curve_id: u64, point_addr: *const u8, result: *mut u8) -> u64);
 define_syscall!(fn sol_curve_group_op(curve_id: u64, group_op: u64, left_input_addr: *const u8, right_input_addr: *const u8, result_point_addr: *mut u8) -> u64);
