@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "programs/associated-token-account",
+    "programs/compute-budget",
     "programs/memo",
     "programs/system",
     "programs/token",

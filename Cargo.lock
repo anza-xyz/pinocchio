@@ -48,6 +48,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pinocchio-compute-budget"
+version = "0.1.0"
+dependencies = [
+ "pinocchio",
+ "pinocchio-pubkey",
+]
+
+[[package]]
 name = "pinocchio-log"
 version = "0.5.1"
 dependencies = [
