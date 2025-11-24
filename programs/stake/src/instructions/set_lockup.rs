@@ -42,17 +42,17 @@ impl SetLockup<'_, '_> {
         ];
 
         // Instruction data layout (LockupArgs with Option encoding):
-        // - [0]: instruction discriminator (u8) = 6
+        // - [0..4]: instruction discriminator (u32) = 6
         // - Option<i64> unix_timestamp: 1 byte tag + 8 bytes if Some
         // - Option<u64> epoch: 1 byte tag + 8 bytes if Some
         // - Option<Pubkey> custodian: 1 byte tag + 32 bytes if Some
-        // Max size: 1 + (1+8) + (1+8) + (1+32) = 52 bytes
-        let mut instruction_data = [UNINIT_BYTE; 52];
+        // Max size: 4 + (1+8) + (1+8) + (1+32) = 55 bytes
+        let mut instruction_data = [UNINIT_BYTE; 55];
         let mut offset = 0;
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data[offset..], &[6]);
-        offset += 1;
+        // Set discriminator as u32 at offset [0..4]
+        write_bytes(&mut instruction_data[offset..], &6u32.to_le_bytes());
+        offset += 4;
 
         // Write unix_timestamp Option<i64>
         match self.unix_timestamp {

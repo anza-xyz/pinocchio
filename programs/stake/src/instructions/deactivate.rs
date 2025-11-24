@@ -36,7 +36,7 @@ impl Deactivate<'_> {
         ];
 
         // Instruction data
-        let instruction_data = [5u8; 1];
+        let instruction_data = 5u32.to_le_bytes();
 
         let instruction = Instruction {
             program_id: &crate::ID,

@@ -40,7 +40,7 @@ impl InitializeChecked<'_> {
         ];
 
         // Instruction data
-        let instruction_data = [9u8; 1];
+        let instruction_data = 9u32.to_le_bytes();
 
         let instruction = Instruction {
             program_id: &crate::ID,

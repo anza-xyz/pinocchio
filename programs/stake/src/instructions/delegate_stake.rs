@@ -48,7 +48,7 @@ impl DelegateStake<'_> {
         ];
 
         // Instruction data
-        let instruction_data = [2u8; 1];
+        let instruction_data = 2u32.to_le_bytes();
 
         let instruction = Instruction {
             program_id: &crate::ID,

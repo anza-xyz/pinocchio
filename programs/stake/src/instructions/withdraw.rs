@@ -88,15 +88,15 @@ impl Withdraw<'_> {
             }
         };
 
-        // Instruction data layout (LockupArgs with Option encoding):
-        // - [0]: instruction discriminator (u8) = 6
-        // - [1..9]: amount (8 bytes, u64)
-        let mut instruction_data = [UNINIT_BYTE; 9];
+        // Instruction data layout:
+        // - [0..4]: instruction discriminator (u32) = 4
+        // - [4..12]: amount (8 bytes, u64)
+        let mut instruction_data = [UNINIT_BYTE; 12];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[4]);
-        // Set amount as u64 at offset [1..9]
-        write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
+        // Set discriminator as u32 at offset [0..4]
+        write_bytes(&mut instruction_data, &4u32.to_le_bytes());
+        // Set amount as u64 at offset [4..12]
+        write_bytes(&mut instruction_data[4..12], &self.amount.to_le_bytes());
 
         let instruction = Instruction {
             program_id: &crate::ID,

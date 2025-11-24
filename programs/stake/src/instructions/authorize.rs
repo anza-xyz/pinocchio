@@ -76,22 +76,22 @@ impl Authorize<'_, '_> {
         };
 
         // Instruction data
-        // -  [0]   : instruction discriminator (1 byte, u8)
-        // -  [1..33]: new_authority (32 bytes, Pubkey)
-        // -  [33]  : authority_type (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 34];
+        // -  [0..4]  : instruction discriminator (4 bytes, u32)
+        // -  [4..36]: new_authority (32 bytes, Pubkey)
+        // -  [36]  : authority_type (1 byte, u8)
+        let mut instruction_data = [UNINIT_BYTE; 37];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[1]);
-        // Set new_authority as [u8; 32] at offset [1..33]
-        write_bytes(&mut instruction_data[1..33], self.new_authority);
-        // Set authority_type as u8 at offset [33]
-        write_bytes(&mut instruction_data[33..34], &[self.authority_type.into()]);
+        // Set discriminator as u32 at offset [0..4]
+        write_bytes(&mut instruction_data, &1u32.to_le_bytes());
+        // Set new_authority as [u8; 32] at offset [4..36]
+        write_bytes(&mut instruction_data[4..36], self.new_authority);
+        // Set authority_type as u8 at offset [36]
+        write_bytes(&mut instruction_data[36..37], &[self.authority_type.into()]);
 
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: unsafe { slice::from_raw_parts(account_metas.as_ptr() as _, num_accounts) },
-            data: unsafe { slice::from_raw_parts(instruction_data.as_ptr() as _, 34) },
+            data: unsafe { slice::from_raw_parts(instruction_data.as_ptr() as _, 37) },
         };
 
         invoke_signed_with_bounds::<4>(

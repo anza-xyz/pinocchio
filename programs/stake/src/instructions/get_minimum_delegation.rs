@@ -18,7 +18,7 @@ impl GetMinimumDelegation {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction data
-        let instruction_data = [13u8; 1];
+        let instruction_data = 13u32.to_le_bytes();
 
         let instruction = Instruction {
             program_id: &crate::ID,

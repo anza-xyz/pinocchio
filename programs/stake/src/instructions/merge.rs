@@ -44,7 +44,7 @@ impl Merge<'_> {
         ];
 
         // Instruction data
-        let instruction_data = [7u8; 1];
+        let instruction_data = 7u32.to_le_bytes();
 
         let instruction = Instruction {
             program_id: &crate::ID,

@@ -1,3 +1,4 @@
+use core::ops::Deref;
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     program_error::ProgramError,
@@ -26,232 +27,162 @@ const INITIALIZED_LEN: usize = TYPE_LEN + Meta::LEN;
 /// Minimum length for a Stake (delegated) stake account (V2).
 const STAKE_LEN: usize = TYPE_LEN + Meta::LEN + Stake::LEN + StakeFlags::LEN;
 
-/// Stake state type (V2).
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum StakeStateV2Type {
+/// Generic stake state enum that works with both borrowed and owned data (V2 with StakeFlags).
+///
+/// This enum can hold either a `Ref<[u8]>` (safe, checked borrow) or `&[u8]`
+/// (unchecked raw slice) depending on the type parameter.
+#[repr(C)]
+pub enum StakeStateV2<T>
+where
+    T: Deref<Target = [u8]>,
+{
     /// Account is not yet initialized.
-    Uninitialized = 0,
+    Uninitialized,
     /// Stake account is initialized but not delegated.
-    Initialized = 1,
+    Initialized(T),
     /// Stake account is delegated.
-    Stake = 2,
+    Stake(T),
     /// Account is a rewards pool.
-    RewardsPool = 3,
+    RewardsPool,
 }
 
-impl TryFrom<u8> for StakeStateV2Type {
+impl<T> StakeStateV2<T>
+where
+    T: Deref<Target = [u8]>,
+{
+    /// Returns a reference to the meta data if the account is Initialized or Stake.
+    #[inline(always)]
+    pub fn meta(&self) -> Option<&Meta> {
+        match self {
+            StakeStateV2::Initialized(data) | StakeStateV2::Stake(data) => {
+                Some(unsafe { &*(data.as_ptr().add(META_OFFSET) as *const Meta) })
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to the stake data if the account is in Stake state.
+    #[inline(always)]
+    pub fn stake(&self) -> Option<&Stake> {
+        match self {
+            StakeStateV2::Stake(data) => {
+                Some(unsafe { &*(data.as_ptr().add(STAKE_OFFSET) as *const Stake) })
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to the stake flags if the account is in Stake state.
+    #[inline(always)]
+    pub fn stake_flags(&self) -> Option<&StakeFlags> {
+        match self {
+            StakeStateV2::Stake(data) => {
+                Some(unsafe { &*(data.as_ptr().add(STAKE_FLAGS_OFFSET) as *const StakeFlags) })
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Safe implementation that borrows the account data and keeps the borrow alive.
+impl<'a> TryFrom<&'a AccountInfo> for StakeStateV2<Ref<'a, [u8]>> {
     type Error = ProgramError;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(StakeStateV2Type::Uninitialized),
-            1 => Ok(StakeStateV2Type::Initialized),
-            2 => Ok(StakeStateV2Type::Stake),
-            3 => Ok(StakeStateV2Type::RewardsPool),
-            _ => Err(ProgramError::InvalidAccountData),
-        }
-    }
-}
-
-impl From<StakeStateV2Type> for u8 {
-    fn from(value: StakeStateV2Type) -> Self {
-        match value {
-            StakeStateV2Type::Uninitialized => 0,
-            StakeStateV2Type::Initialized => 1,
-            StakeStateV2Type::Stake => 2,
-            StakeStateV2Type::RewardsPool => 3,
-        }
-    }
-}
-
-/// Zero-copy stake state wrapper that keeps the borrow alive (V2 with StakeFlags).
-///
-/// This struct holds a `Ref` to the account data, ensuring the borrow
-/// remains valid for the lifetime of the struct.
-pub struct StakeStateV2<'a> {
-    data: Ref<'a, [u8]>,
-    state_type: StakeStateV2Type,
-}
-
-impl<'a> StakeStateV2<'a> {
-    /// Return a `StakeStateV2` from the given account info.
-    ///
-    /// This method performs owner and length validation on `AccountInfo`, safely borrowing
-    /// the account data and keeping the borrow alive.
-    #[inline]
-    pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
+    fn try_from(account_info: &'a AccountInfo) -> Result<Self, Self::Error> {
+        // Validate owner
         if !account_info.is_owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
+        // Borrow the account data
         let data = account_info.try_borrow_data()?;
 
+        // Validate minimum length for type discriminator
         if data.len() < TYPE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let state_type = match data[0] {
-            0 => StakeStateV2Type::Uninitialized,
+        // Parse the state type and validate length
+        match data[0] {
+            0 => Ok(StakeStateV2::Uninitialized),
             1 => {
                 if data.len() < INITIALIZED_LEN {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                StakeStateV2Type::Initialized
+                // Validate alignment for Meta struct
+                if (data.as_ptr() as usize + META_OFFSET) % core::mem::align_of::<Meta>() != 0 {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                Ok(StakeStateV2::Initialized(data))
             }
             2 => {
                 if data.len() < STAKE_LEN {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                StakeStateV2Type::Stake
+                // Validate alignment for Meta, Stake, and StakeFlags structs
+                if (data.as_ptr() as usize + META_OFFSET) % core::mem::align_of::<Meta>() != 0
+                    || (data.as_ptr() as usize + STAKE_OFFSET) % core::mem::align_of::<Stake>()
+                        != 0
+                    || (data.as_ptr() as usize + STAKE_FLAGS_OFFSET)
+                        % core::mem::align_of::<StakeFlags>()
+                        != 0
+                {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                Ok(StakeStateV2::Stake(data))
             }
-            3 => StakeStateV2Type::RewardsPool,
-            _ => return Err(ProgramError::InvalidAccountData),
-        };
-
-        Ok(Self { data, state_type })
-    }
-
-    /// Returns the stake state type.
-    #[inline(always)]
-    pub fn state_type(&self) -> StakeStateV2Type {
-        self.state_type
-    }
-
-    /// Returns a reference to the meta data if the account is Initialized or Stake.
-    #[inline(always)]
-    pub fn meta(&self) -> Option<&Meta> {
-        match self.state_type {
-            StakeStateV2Type::Initialized | StakeStateV2Type::Stake => {
-                Some(unsafe { &*(self.data.as_ptr().add(META_OFFSET) as *const Meta) })
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the stake data if the account is in Stake state.
-    #[inline(always)]
-    pub fn stake(&self) -> Option<&Stake> {
-        match self.state_type {
-            StakeStateV2Type::Stake => {
-                Some(unsafe { &*(self.data.as_ptr().add(STAKE_OFFSET) as *const Stake) })
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the stake flags if the account is in Stake state.
-    #[inline(always)]
-    pub fn stake_flags(&self) -> Option<&StakeFlags> {
-        match self.state_type {
-            StakeStateV2Type::Stake => {
-                Some(unsafe { &*(self.data.as_ptr().add(STAKE_FLAGS_OFFSET) as *const StakeFlags) })
-            }
-            _ => None,
+            3 => Ok(StakeStateV2::RewardsPool),
+            _ => Err(ProgramError::InvalidAccountData),
         }
     }
 }
 
-/// Zero-copy stake state for unchecked access (V2 with StakeFlags).
+/// Unchecked implementation that works with raw byte slices.
 ///
-/// This struct provides direct access to stake account data without holding a borrow guard.
-/// Use this when you need pattern matching or when working with raw bytes.
-pub struct StakeStateV2Unchecked<'a> {
-    data: &'a [u8],
-    state_type: StakeStateV2Type,
-}
+/// # Safety
+///
+/// The caller must ensure that it is safe to access the data (e.g., there are
+/// no mutable borrows of the account data).
+impl<'a> TryFrom<&'a [u8]> for StakeStateV2<&'a [u8]> {
+    type Error = ProgramError;
 
-impl<'a> StakeStateV2Unchecked<'a> {
-    /// Return a `StakeStateV2Unchecked` from the given account info.
-    ///
-    /// This method performs owner and length validation on `AccountInfo`, but does not
-    /// perform the borrow check.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that it is safe to borrow the account data (e.g., there are
-    /// no mutable borrows of the account data).
-    #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &'a AccountInfo,
-    ) -> Result<Self, ProgramError> {
-        if account_info.owner() != &ID {
-            return Err(ProgramError::InvalidAccountOwner);
-        }
-
-        Self::from_bytes(account_info.borrow_data_unchecked())
-    }
-
-    /// Return a `StakeStateV2Unchecked` from the given bytes.
-    ///
-    /// This method performs length validation based on the state type but does not
-    /// validate ownership.
-    #[inline]
-    pub fn from_bytes(bytes: &'a [u8]) -> Result<Self, ProgramError> {
+    fn try_from(bytes: &'a [u8]) -> Result<Self, Self::Error> {
+        // Validate minimum length for type discriminator
         if bytes.len() < TYPE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let state_type = match bytes[0] {
-            0 => StakeStateV2Type::Uninitialized,
+        // Parse the state type and validate length
+        match bytes[0] {
+            0 => Ok(StakeStateV2::Uninitialized),
             1 => {
                 if bytes.len() < INITIALIZED_LEN {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                StakeStateV2Type::Initialized
+                // Validate alignment for Meta struct
+                if (bytes.as_ptr() as usize + META_OFFSET) % core::mem::align_of::<Meta>() != 0 {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                Ok(StakeStateV2::Initialized(bytes))
             }
             2 => {
                 if bytes.len() < STAKE_LEN {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                StakeStateV2Type::Stake
+                // Validate alignment for Meta, Stake, and StakeFlags structs
+                if (bytes.as_ptr() as usize + META_OFFSET) % core::mem::align_of::<Meta>() != 0
+                    || (bytes.as_ptr() as usize + STAKE_OFFSET) % core::mem::align_of::<Stake>()
+                        != 0
+                    || (bytes.as_ptr() as usize + STAKE_FLAGS_OFFSET)
+                        % core::mem::align_of::<StakeFlags>()
+                        != 0
+                {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                Ok(StakeStateV2::Stake(bytes))
             }
-            3 => StakeStateV2Type::RewardsPool,
-            _ => return Err(ProgramError::InvalidAccountData),
-        };
-
-        Ok(Self {
-            data: bytes,
-            state_type,
-        })
-    }
-
-    /// Returns the stake state type.
-    #[inline(always)]
-    pub fn state_type(&self) -> StakeStateV2Type {
-        self.state_type
-    }
-
-    /// Returns a reference to the meta data if the account is Initialized or Stake.
-    #[inline(always)]
-    pub fn meta(&self) -> Option<&Meta> {
-        match self.state_type {
-            StakeStateV2Type::Initialized | StakeStateV2Type::Stake => {
-                Some(unsafe { &*(self.data.as_ptr().add(META_OFFSET) as *const Meta) })
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the stake data if the account is in Stake state.
-    #[inline(always)]
-    pub fn stake(&self) -> Option<&Stake> {
-        match self.state_type {
-            StakeStateV2Type::Stake => {
-                Some(unsafe { &*(self.data.as_ptr().add(STAKE_OFFSET) as *const Stake) })
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the stake flags if the account is in Stake state.
-    #[inline(always)]
-    pub fn stake_flags(&self) -> Option<&StakeFlags> {
-        match self.state_type {
-            StakeStateV2Type::Stake => {
-                Some(unsafe { &*(self.data.as_ptr().add(STAKE_FLAGS_OFFSET) as *const StakeFlags) })
-            }
-            _ => None,
+            3 => Ok(StakeStateV2::RewardsPool),
+            _ => Err(ProgramError::InvalidAccountData),
         }
     }
 }

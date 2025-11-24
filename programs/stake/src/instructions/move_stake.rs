@@ -41,13 +41,13 @@ impl MoveStake<'_> {
         ];
 
         // Instruction data
-        // -  [0]   : instruction discriminator (1 byte, u8)
-        // -  [1..9]: stake amount
-        let mut instruction_data = [UNINIT_BYTE; 9];
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[16]);
-        // Set stake amount as u64 at offset [1..9]
-        write_bytes(&mut instruction_data[1..9], &self.stake.to_le_bytes());
+        // -  [0..4]   : instruction discriminator (4 bytes, u32)
+        // -  [4..12]: stake amount
+        let mut instruction_data = [UNINIT_BYTE; 12];
+        // Set discriminator as u32 at offset [0..4]
+        write_bytes(&mut instruction_data, &16u32.to_le_bytes());
+        // Set stake amount as u64 at offset [4..12]
+        write_bytes(&mut instruction_data[4..12], &self.stake.to_le_bytes());
 
         let instruction = Instruction {
             program_id: &crate::ID,

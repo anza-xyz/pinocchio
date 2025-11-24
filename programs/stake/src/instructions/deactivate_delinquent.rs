@@ -36,7 +36,7 @@ impl DeactivateDelinquent<'_> {
         ];
 
         // Instruction data
-        let instruction_data = [14u8; 1];
+        let instruction_data = 14u32.to_le_bytes();
 
         let instruction = Instruction {
             program_id: &crate::ID,

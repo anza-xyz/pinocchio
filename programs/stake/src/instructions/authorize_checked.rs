@@ -80,19 +80,19 @@ impl AuthorizeChecked<'_> {
         };
 
         // Instruction data
-        // -  [0]   : instruction discriminator (1 byte, u8)
-        // -  [1]  : authority_type (1 byte, u8)
-        let mut instruction_data = [UNINIT_BYTE; 2];
+        // -  [0..4]  : instruction discriminator (4 bytes, u32)
+        // -  [4]  : authority_type (1 byte, u8)
+        let mut instruction_data = [UNINIT_BYTE; 5];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[10]);
-        // Set authority_type as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[self.authority_type.into()]);
+        // Set discriminator as u32 at offset [0..4]
+        write_bytes(&mut instruction_data, &10u32.to_le_bytes());
+        // Set authority_type as u8 at offset [4]
+        write_bytes(&mut instruction_data[4..5], &[self.authority_type.into()]);
 
         let instruction = Instruction {
             program_id: &crate::ID,
             accounts: unsafe { slice::from_raw_parts(account_metas.as_ptr() as _, num_accounts) },
-            data: unsafe { slice::from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            data: unsafe { slice::from_raw_parts(instruction_data.as_ptr() as _, 5) },
         };
 
         invoke_signed_with_bounds::<5>(

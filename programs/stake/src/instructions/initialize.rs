@@ -42,19 +42,19 @@ impl Initialize<'_> {
         ];
 
         // Instruction data
-        // -  [0]   : instruction discriminator (1 byte, u8)
-        // -  [1..1+size_of::<Authorized>()]: authorized (Authorized)
-        // -  [1+size_of::<Authorized>()..1+size_of::<Authorized>()+size_of::<Lockup>()]: lockup (Lockup)
-        let mut instruction_data = [UNINIT_BYTE; 1 + size_of::<Authorized>() + size_of::<Lockup>()];
+        // -  [0..4]   : instruction discriminator (4 bytes, u32)
+        // -  [4..4+size_of::<Authorized>()]: authorized (Authorized)
+        // -  [4+size_of::<Authorized>()..4+size_of::<Authorized>()+size_of::<Lockup>()]: lockup (Lockup)
+        let mut instruction_data = [UNINIT_BYTE; 4 + size_of::<Authorized>() + size_of::<Lockup>()];
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[0]);
-        // Set authorized as Authorized at offset [1..1+size_of::<Authorized>()]
+        // Set discriminator as u32 at offset [0..4]
+        write_bytes(&mut instruction_data, &0u32.to_le_bytes());
+        // Set authorized as Authorized at offset [4..4+size_of::<Authorized>()]
         self.authorized
-            .write_bytes(&mut instruction_data[1..1 + size_of::<Authorized>()]);
-        // Set lockup as Lockup at offset [1+size_of::<Authorized>()..1+size_of::<Authorized>()+size_of::<Lockup>()]
+            .write_bytes(&mut instruction_data[4..4 + size_of::<Authorized>()]);
+        // Set lockup as Lockup at offset [4+size_of::<Authorized>()..4+size_of::<Authorized>()+size_of::<Lockup>()]
         self.lockup
-            .write_bytes(&mut instruction_data[1 + size_of::<Authorized>()..]);
+            .write_bytes(&mut instruction_data[4 + size_of::<Authorized>()..]);
 
         let instruction = Instruction {
             program_id: &crate::ID,
