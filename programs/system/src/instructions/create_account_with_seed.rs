@@ -28,7 +28,7 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     /// as account 0.
     pub base: Option<&'a AccountView>,
 
-    /// String of ASCII chars, no longer than `solana_address::MAX_SEED_LEN`.
+    /// String of ASCII chars, no longer than [`solana_address::MAX_SEED_LEN`].
     pub seed: &'b str,
 
     /// Number of lamports to transfer to the new account.
