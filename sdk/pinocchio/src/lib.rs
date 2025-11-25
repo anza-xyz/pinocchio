@@ -216,7 +216,6 @@
 extern crate std;
 
 pub mod entrypoint;
-pub mod syscalls;
 pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
@@ -229,6 +228,10 @@ pub use solana_account_view::AccountView;
 // Re-export the `solana_address` for downstream use.
 pub use solana_address as address;
 pub use solana_address::Address;
+
+// Re-export the `solana_define_syscall` for downstream use.
+#[cfg(target_os = "solana")]
+pub use solana_define_syscall::definitions as syscalls;
 
 // Re-export the `solana_instruction_view` for downstream use.
 #[cfg(feature = "cpi")]

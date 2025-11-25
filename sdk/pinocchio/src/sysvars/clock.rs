@@ -1,5 +1,7 @@
 //! Information about the network's clock, ticks, slots, etc.
 
+#![allow(deprecated)]
+
 use crate::{
     account::{AccountView, Ref},
     error::ProgramError,
