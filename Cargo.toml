@@ -18,14 +18,11 @@ rust-version = "1.84"
 [workspace.dependencies]
 five8_const = "0.1.4"
 pinocchio = { version = "0.9", default-features = false, path = "sdk" }
-quote = "1.0"
-regex = "1"
 solana-account-view = "1.0"
 solana-address = "2.0"
 solana-define-syscall = "4.0"
 solana-instruction-view = "1.0"
 solana-program-error = "3.0"
-syn = "1.0"
 
 [workspace.metadata.cli]
 solana = "2.3.0"
