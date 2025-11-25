@@ -18,7 +18,7 @@ use crate::{
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
-#[cfg(all(target_os = "solana", feature = "alloc"))]
+#[cfg(all(any(target_os = "solana", target_arch = "bpf"), feature = "alloc"))]
 pub use alloc::BumpAllocator;
 
 /// Start address of the memory region used for program heap.
@@ -440,7 +440,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
 macro_rules! default_panic_handler {
     () => {
         /// Default panic handler.
-        #[cfg(target_os = "solana")]
+        #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[no_mangle]
         fn custom_panic(info: &core::panic::PanicInfo<'_>) {
             if let Some(location) = info.location() {
@@ -464,7 +464,7 @@ macro_rules! default_panic_handler {
 macro_rules! nostd_panic_handler {
     () => {
         /// A panic handler for `no_std`.
-        #[cfg(target_os = "solana")]
+        #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[panic_handler]
         fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
             if let Some(location) = info.location() {
@@ -490,7 +490,7 @@ macro_rules! nostd_panic_handler {
         /// `"solana"`.
         ///
         /// This links the `std` library, which will set up a default panic handler.
-        #[cfg(not(target_os = "solana"))]
+        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
         mod __private_panic_handler {
             extern crate std as __std;
         }
@@ -504,7 +504,7 @@ macro_rules! nostd_panic_handler {
 #[macro_export]
 macro_rules! default_allocator {
     () => {
-        #[cfg(target_os = "solana")]
+        #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[global_allocator]
         static A: $crate::entrypoint::BumpAllocator = $crate::entrypoint::BumpAllocator {
             start: $crate::entrypoint::HEAP_START_ADDRESS as usize,
@@ -515,7 +515,7 @@ macro_rules! default_allocator {
         /// `"solana"`.
         ///
         /// This links the `std` library, which will set up a default global allocator.
-        #[cfg(not(target_os = "solana"))]
+        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
         mod __private_alloc {
             extern crate std as __std;
         }
@@ -534,7 +534,7 @@ macro_rules! default_allocator {
 #[macro_export]
 macro_rules! no_allocator {
     () => {
-        #[cfg(target_os = "solana")]
+        #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[global_allocator]
         static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
 
@@ -582,7 +582,7 @@ macro_rules! no_allocator {
         /// `"solana"`.
         ///
         /// This links the `std` library, which will set up a default global allocator.
-        #[cfg(not(target_os = "solana"))]
+        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
         mod __private_alloc {
             extern crate std as __std;
         }
@@ -606,7 +606,7 @@ unsafe impl GlobalAlloc for NoAllocator {
     }
 }
 
-#[cfg(all(target_os = "solana", feature = "alloc"))]
+#[cfg(all(any(target_os = "solana", target_arch = "bpf"), feature = "alloc"))]
 mod alloc {
     use core::{
         alloc::{GlobalAlloc, Layout},
