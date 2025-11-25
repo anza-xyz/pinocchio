@@ -119,6 +119,12 @@ dependencies = [
 
 [[package]]
 name = "solana-define-syscall"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9697086a4e102d28a156b8d6b521730335d6951bd39a5e766512bbe09007cee"
+
+[[package]]
+name = "solana-define-syscall"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57e5b1c0bc1d4a4d10c88a4100499d954c09d3fecfae4912c1a074dff68b1738"
@@ -131,7 +137,7 @@ checksum = "60147e4d0a4620013df40bf30a86dd299203ff12fcb8b593cd51014fce0875d8"
 dependencies = [
  "solana-account-view",
  "solana-address",
- "solana-define-syscall",
+ "solana-define-syscall 4.0.1",
  "solana-program-error",
 ]
 

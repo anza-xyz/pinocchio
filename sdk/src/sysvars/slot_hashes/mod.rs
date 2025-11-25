@@ -71,13 +71,13 @@ pub struct SlotHashes<T: Deref<Target = [u8]>> {
 
 /// Log a `Hash` from a program.
 pub fn log(hash: &Hash) {
-    #[cfg(target_os = "solana")]
+    #[cfg(any(target_os = "solana", target_arch = "bpf"))]
     // SAFETY: `sol_log_pubkey` expects a valid pointer to a 32-byte array.
     unsafe {
         solana_address::syscalls::sol_log_pubkey(hash.as_ptr());
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
     core::hint::black_box(hash);
 }
 
@@ -311,7 +311,7 @@ impl SlotHashes<Box<[u8]>> {
         crate::sysvars::get_sysvar_unchecked(buffer_ptr, &SLOTHASHES_ID, 0, MAX_SIZE)?;
 
         // For tests on builds that don't actually fill the buffer.
-        #[cfg(not(target_os = "solana"))]
+        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
         core::ptr::write_bytes(buffer_ptr, 0, NUM_ENTRIES_SIZE);
 
         Ok(())
