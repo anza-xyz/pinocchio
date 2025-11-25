@@ -176,6 +176,9 @@ When no allocation is needed or desired, the feature can be disabled:
 pinocchio = { version = "0.10.0", default-features = false }
 ```
 
+> ⚠️ **Note:**
+> The `default_allocator` macro is not available when disabling the `alloc` feature.
+
 ## Advance entrypoint configuration
 
 The symbols emitted by the entrypoint macros &mdash; program entrypoint, global allocator and default panic handler &mdash; can only be defined once globally. If the program crate is also intended to be used as a library, it is common practice to define a Cargo [feature](https://doc.rust-lang.org/cargo/reference/features.html) in your program crate to conditionally enable the module that includes the `entrypoint!` macro invocation. The convention is to name the feature `bpf-entrypoint`.

@@ -191,15 +191,9 @@ checksum = "e37320fd2945c5d654b2c6210624a52d66c3f1f73b653ed211ab91a703b35bdd"
 dependencies = [
  "five8",
  "five8_const 1.0.0",
- "solana-define-syscall 4.0.1",
+ "solana-define-syscall",
  "solana-program-error",
 ]
-
-[[package]]
-name = "solana-define-syscall"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9697086a4e102d28a156b8d6b521730335d6951bd39a5e766512bbe09007cee"
 
 [[package]]
 name = "solana-define-syscall"
@@ -215,7 +209,7 @@ checksum = "60147e4d0a4620013df40bf30a86dd299203ff12fcb8b593cd51014fce0875d8"
 dependencies = [
  "solana-account-view",
  "solana-address",
- "solana-define-syscall 4.0.1",
+ "solana-define-syscall",
  "solana-program-error",
 ]
 

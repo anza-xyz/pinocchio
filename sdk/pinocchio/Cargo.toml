@@ -18,7 +18,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
-alloc = []
+alloc = ["solana-instruction-view?/slice-cpi"]
 copy = ["solana-account-view/copy", "solana-address/copy"]
 cpi = ["dep:solana-instruction-view"]
 default = ["alloc"]
