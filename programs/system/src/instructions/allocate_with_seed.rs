@@ -22,7 +22,7 @@ pub struct AllocateWithSeed<'a, 'b, 'c> {
     /// as account 0.
     pub base: &'a AccountView,
 
-    /// String of ASCII chars, no longer than [`solana_address::MAX_SEED_LEN`].
+    /// String of ASCII chars, no longer than [`MAX_SEED_LEN`](https://docs.rs/solana-address/latest/solana_address/constant.MAX_SEED_LEN.html).
     pub seed: &'b str,
 
     /// Number of bytes of memory to allocate.
