@@ -199,7 +199,7 @@ The `cpi` feature enables the cross-program invocation helpers, as well as types
 pinocchio = { version = "0.10.0", features = ["cpi"] }
 ```
 
-## Advance entrypoint configuration
+## Advanced entrypoint configuration
 
 The components emitted by the entrypoint macros &mdash; program entrypoint, global allocator and default panic handler &mdash; can only be defined once globally. If the program crate is also intended to be used as a library, it is common practice to define a Cargo [feature](https://doc.rust-lang.org/cargo/reference/features.html) in your program crate to conditionally enable the module that includes the `entrypoint!` macro invocation. The convention is to name the feature `bpf-entrypoint`.
 
