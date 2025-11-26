@@ -162,7 +162,7 @@
 //! 💡 The [`no_allocator!`] macro can also be used in combination with the
 //! [`lazy_program_entrypoint!`].
 //!
-//! ## `std` crate feature
+//! ## `alloc` crate feature
 //!
 //! By default, Pinocchio is a `no_std` crate. This means that it does not use any
 //! code from the standard (`std`) library. While this does not affect how Pinocchio
