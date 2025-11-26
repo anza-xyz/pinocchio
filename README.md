@@ -232,8 +232,3 @@ cargo build-sbf --features bpf-entrypoint
 ## License
 
 The code is licensed under the [Apache License Version 2.0](LICENSE)
-
-The library in this repository is based/includes code from:
-* [`nitrate`](https://github.com/nifty-oss/nitrate)
-* [`solana-nostd-entrypoint`](https://github.com/cavemanloverboy/solana-nostd-entrypoint/tree/main)
-* [`solana-sdk`](https://github.com/anza-xyz/solana-sdk)
