@@ -230,7 +230,7 @@ pub use solana_address as address;
 pub use solana_address::Address;
 
 // Re-export the `solana_define_syscall` for downstream use.
-#[cfg(target_os = "solana")]
+#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 pub use solana_define_syscall::definitions as syscalls;
 
 // Re-export the `solana_instruction_view` for downstream use.
