@@ -31,7 +31,7 @@
 //! To use the `entrypoint!` macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account::AccountView,
+//!   AccountView,
 //!   Address,
 //!   entrypoint,
 //!   ProgramResult
@@ -211,7 +211,7 @@
 //! #[cfg(feature = "bpf-entrypoint")]
 //! mod entrypoint {
 //!   use pinocchio::{
-//!     account::AccountView,
+//!     AccountView,
 //!     Address,
 //!     entrypoint,
 //!     ProgramResult

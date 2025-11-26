@@ -64,7 +64,7 @@ When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](http
 To use the `entrypoint!` macro, use the following in your entrypoint definition:
 ```rust
 use pinocchio::{
-  account::AccountView,
+  AccountView,
   Address,
   entrypoint,
   ProgramResult
@@ -141,7 +141,7 @@ When writing programs, it can be useful to make sure the program does not attemp
 To use the `no_allocator!` macro, use the following in your entrypoint definition:
 ```rust
 use pinocchio::{
-  account::AccountView,
+  AccountView,
   default_panic_handler,
   no_allocator,
   program_entrypoint,
@@ -207,7 +207,7 @@ The components emitted by the entrypoint macros &mdash; program entrypoint, glob
 #[cfg(feature = "bpf-entrypoint")]
 mod entrypoint {
   use pinocchio::{
-    account::AccountView,
+    AccountView,
     entrypoint,
     ProgramResult,
     Address
