@@ -1,7 +1,7 @@
 [package]
 name = "pinocchio"
 description = "Create Solana programs with no dependencies attached"
-version = "0.10.0-rc"
+version = "0.10.0-rc.1"
 edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"
