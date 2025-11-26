@@ -89,7 +89,7 @@ runs:
       if: ${{ contains(inputs.components, 'semver-checks') }}
       uses: taiki-e/install-action@v2
       with:
-        tool: cargo-semver-checks
+        tool: cargo-semver-checks@0.41.0
 
     - name: Install 'cargo-miri'
       if: ${{ contains(inputs.toolchain, 'lint') }}
