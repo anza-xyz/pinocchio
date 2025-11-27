@@ -123,7 +123,7 @@ pub unsafe fn make_account_info(
 ) -> (AccountInfo, Vec<u64>) {
     let hdr_size = mem::size_of::<AccountLayout>();
     let total = hdr_size + data.len();
-    let words = (total + 7) / 8;
+    let words = total.div_ceil(8);
     let mut backing: Vec<u64> = std::vec![0u64; words];
     assert!(
         mem::align_of::<u64>() >= mem::align_of::<AccountLayout>(),

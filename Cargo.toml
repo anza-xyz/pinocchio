@@ -16,7 +16,7 @@ members = [
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/anza-xyz/pinocchio"
-rust-version = "1.79"
+rust-version = "1.84"
 
 [workspace.dependencies]
 five8_const = "0.1.4"
@@ -28,12 +28,12 @@ regex = "1"
 syn = "1.0"
 
 [workspace.metadata.cli]
-solana = "2.2.0"
+solana = "2.3.0"
 
 [workspace.metadata.toolchains]
 build = "1.84.1"
-format = "nightly-2024-11-22"
-lint = "nightly-2024-11-22"
+format = "nightly-2025-02-16"
+lint = "nightly-2025-02-16"
 test = "1.84.1"
 
 [workspace.metadata.release]
