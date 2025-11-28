@@ -2,13 +2,12 @@ use core::slice::from_raw_parts;
 
 use pinocchio::{
     account_info::AccountInfo,
+    bytes::{write_bytes, UNINIT_BYTE},
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     pubkey::Pubkey,
     ProgramResult,
 };
-
-use crate::{write_bytes, UNINIT_BYTE};
 
 /// Mints new tokens to an account.
 ///

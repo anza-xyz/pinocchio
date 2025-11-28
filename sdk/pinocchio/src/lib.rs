@@ -297,3 +297,15 @@ pub mod hint {
         }
     }
 }
+
+/// Module with utilities to work with byte arrays.
+pub mod bytes {
+    pub const UNINIT_BYTE: core::mem::MaybeUninit<u8> = core::mem::MaybeUninit::<u8>::uninit();
+
+    #[inline(always)]
+    pub fn write_bytes(destination: &mut [core::mem::MaybeUninit<u8>], source: &[u8]) {
+        for (d, s) in destination.iter_mut().zip(source.iter()) {
+            d.write(*s);
+        }
+    }
+}
