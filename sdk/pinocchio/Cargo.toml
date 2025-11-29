@@ -19,6 +19,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [features]
 std = []
+syscalls-stubs = ["std"]
 
 [dev-dependencies]
 five8_const = { workspace = true }
