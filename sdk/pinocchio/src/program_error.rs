@@ -284,6 +284,38 @@ impl ToStr for ProgramError {
     }
 }
 
+/// Require function to check for invariants and error out using custom errors defined in the pinocchio-err crate
+/// Logs the message defined in the msg attribute of the custom error's variants before erroring out
+///
+/// *Arguments* :
+///
+/// `invariant`: The invariant that shouldn't be false
+///
+/// `error`: A variant of the custom error defined in your program, which derives the ErrorCode trait
+///
+/// **`Note`**: **This function cannot be used with the ProgramError enum, as it's only optimized for custom errors for now**
+#[macro_export]
+macro_rules! require {
+    ($invariant:expr, $error:expr $(,)?) => {
+        if !$invariant {
+            // If the error type has a `message()` function, call it.
+            // Otherwise, do nothing.
+            #[allow(unused_variables)]
+            {
+                if false {
+                    // just to scope-check type
+                } else {
+                    #[allow(unused_unsafe)]
+                    unsafe {
+                        $crate::msg!($error.message());
+                    }
+                }
+            }
+            return Err($error.into());
+        }
+    };
+}
+
 #[cfg(feature = "std")]
 impl core::fmt::Display for ProgramError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
