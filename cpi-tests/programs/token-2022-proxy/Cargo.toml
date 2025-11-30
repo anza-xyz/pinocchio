@@ -1,0 +1,25 @@
+[package]
+name = "token-2022-proxy"
+version = "1.0.0"
+description = "A program to test Token-2022 Pinocchio CPI"
+repository = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+std = []
+
+[dependencies]
+pinocchio = { workspace = true }
+pinocchio-log-macro = { workspace = true }
+pinocchio-pubkey = { workspace = true }
+pinocchio-token-2022 = { workspace = true }
+spl-token-group-interface = "0.7.1"
+spl-token-2022-interface = "2.0.0"
+solana-program-option = "3.0.0"
+solana-address = "1.0.0"
+spl-pod = "0.7.1"
