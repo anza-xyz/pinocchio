@@ -72,13 +72,13 @@ use pinocchio::{
   entrypoint,
   msg,
   ProgramResult,
-  pubkey::Pubkey
+  Address
 };
 
 entrypoint!(process_instruction);
 
 pub fn process_instruction(
-  program_id: &Pubkey,
+  program_id: &Address,
   accounts: &[AccountInfo],
   instruction_data: &[u8],
 ) -> ProgramResult {
@@ -153,7 +153,7 @@ use pinocchio::{
   no_allocator,
   program_entrypoint,
   ProgramResult,
-  pubkey::Pubkey
+  Address
 };
 
 program_entrypoint!(process_instruction);
@@ -161,7 +161,7 @@ default_panic_handler!();
 no_allocator!();
 
 pub fn process_instruction(
-  program_id: &Pubkey,
+  program_id: &Address,
   accounts: &[AccountInfo],
   instruction_data: &[u8],
 ) -> ProgramResult {
@@ -193,13 +193,13 @@ mod entrypoint {
     entrypoint,
     msg,
     ProgramResult,
-    pubkey::Pubkey
+    Address
   };
 
   entrypoint!(process_instruction);
 
   pub fn process_instruction(
-    program_id: &Pubkey,
+    program_id: &Address,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
   ) -> ProgramResult {

@@ -2,8 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Revokes the delegate's authority.
@@ -17,7 +16,7 @@ pub struct Revoke<'a, 'b> {
     ///  Source Owner Account.
     pub authority: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl Revoke<'_, '_> {

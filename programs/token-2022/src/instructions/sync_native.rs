@@ -2,8 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Given a native token account updates its amount field based
@@ -16,7 +15,7 @@ pub struct SyncNative<'a, 'b> {
     /// Native Token Account
     pub native_token: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl SyncNative<'_, '_> {

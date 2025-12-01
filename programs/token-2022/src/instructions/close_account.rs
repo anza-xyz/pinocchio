@@ -2,8 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Close an account by transferring all its SOL to the destination account.
@@ -20,7 +19,7 @@ pub struct CloseAccount<'a, 'b> {
     /// Owner Account
     pub authority: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl CloseAccount<'_, '_> {

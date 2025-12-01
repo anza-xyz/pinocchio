@@ -5,8 +5,7 @@ use pinocchio::{
     cpi::invoke_with_bounds,
     error::ProgramError,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::instructions::MAX_MULTISIG_SIGNERS;
@@ -29,7 +28,7 @@ where
     /// account.
     pub m: u8,
     /// Token Program.
-    pub token_program: &'c Pubkey,
+    pub token_program: &'c Address,
 }
 
 impl InitializeMultisig2<'_, '_, '_> {

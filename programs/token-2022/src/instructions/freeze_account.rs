@@ -2,8 +2,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Freeze an Initialized account using the Mint's freeze authority
@@ -20,7 +19,7 @@ pub struct FreezeAccount<'a, 'b> {
     /// Mint Freeze Authority Account
     pub freeze_authority: &'a AccountInfo,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl FreezeAccount<'_, '_> {

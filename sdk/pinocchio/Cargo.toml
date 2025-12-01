@@ -18,9 +18,11 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
-std = []
+copy = ["solana-address/copy"]
+std = ["solana-address/std"]
 
 [dependencies]
+solana-address = { workspace = true, features = ["syscalls"] }
 solana-program-error = "3.0"
 
 [dev-dependencies]

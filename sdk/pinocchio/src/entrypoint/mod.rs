@@ -19,8 +19,7 @@ use core::{
 
 use crate::{
     account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
-    pubkey::Pubkey,
-    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
+    Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
 /// Start address of the memory region used for program heap.
@@ -66,7 +65,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 ///
 /// ```ignore
 /// fn process_instruction(
-///     program_id: &Pubkey,      // Public key of the account the program was loaded into
+///     program_id: &Address,      // Address of the account the program was loaded into
 ///     accounts: &[AccountInfo], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
@@ -96,14 +95,14 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 ///         account_info::AccountInfo,
 ///         entrypoint,
 ///         msg,
-///         pubkey::Pubkey,
+///         Address,
 ///         ProgramResult
 ///     };
 ///
 ///     entrypoint!(process_instruction);
 ///
 ///     pub fn process_instruction(
-///         program_id: &Pubkey,
+///         program_id: &Address,
 ///         accounts: &[AccountInfo],
 ///         instruction_data: &[u8],
 ///     ) -> ProgramResult {
@@ -150,7 +149,7 @@ macro_rules! entrypoint {
 ///
 /// ```ignore
 /// fn process_instruction(
-///     program_id: &Pubkey,      // Public key of the account the program was loaded into
+///     program_id: &Address,     // Address of the account the program was loaded into
 ///     accounts: &[AccountInfo], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
@@ -310,7 +309,7 @@ unsafe fn clone_account_info(
 pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
     accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
-) -> (&'static Pubkey, usize, &'static [u8]) {
+) -> (&'static Address, usize, &'static [u8]) {
     // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of accounts
     // (MAX_TX_ACCOUNTS) that can be processed in a transaction.
     const {
@@ -431,7 +430,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     let input = input.add(instruction_data_len);
 
     // program id
-    let program_id: &Pubkey = &*(input as *const Pubkey);
+    let program_id: &Address = &*(input as *const Address);
 
     (program_id, processed, instruction_data)
 }
@@ -639,7 +638,8 @@ mod alloc {
     };
 
     /// The bump allocator used as the default rust heap when running programs.
-    #[derive(Clone, Copy, Debug)]
+    #[cfg_attr(feature = "copy", derive(Copy))]
+    #[derive(Clone, Debug)]
     pub struct BumpAllocator {
         pub start: usize,
         pub len: usize,
@@ -678,7 +678,8 @@ mod alloc {
 
 #[cfg(not(feature = "std"))]
 /// An allocator that does not allocate memory.
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub struct NoAllocator;
 
 #[cfg(not(feature = "std"))]
@@ -707,7 +708,7 @@ mod tests {
     use super::*;
 
     /// The mock program ID used for testing.
-    const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
+    const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
 
     /// An uninitialized account info.
     const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
@@ -790,7 +791,7 @@ mod tests {
         input.write(instruction_data, offset);
         offset += instruction_data.len();
         // Program ID (mock).
-        input.write(&MOCK_PROGRAM_ID, offset);
+        input.write(MOCK_PROGRAM_ID.as_array(), offset);
 
         input
     }
@@ -853,7 +854,7 @@ mod tests {
         input.write(instruction_data, offset);
         offset += instruction_data.len();
         // Program ID (mock).
-        input.write(&MOCK_PROGRAM_ID, offset);
+        input.write(MOCK_PROGRAM_ID.as_array(), offset);
 
         input
     }
@@ -918,7 +919,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 0);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
 
         // Input with 3 accounts but the accounts array has only space
@@ -931,7 +932,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 1);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_accounts(&accounts[..count]);
 
@@ -945,7 +946,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 64);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_accounts(&accounts);
     }
@@ -963,7 +964,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 0);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
 
         // Input with 3 (1 + 2 duplicated) accounts but the accounts array has only space for 2. The
@@ -977,7 +978,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 2);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_duplicated_accounts(&accounts[..count], 1);
 
@@ -994,7 +995,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 64);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_duplicated_accounts(&accounts, 32);
     }

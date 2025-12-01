@@ -5,8 +5,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 /// Burns tokens by removing them from an account.
@@ -27,7 +26,7 @@ pub struct BurnChecked<'a, 'b> {
     /// Decimals
     pub decimals: u8,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl BurnChecked<'_, '_> {

@@ -13,4 +13,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 pinocchio = { workspace = true }
-pinocchio-pubkey = { workspace = true }
+solana-address = { workspace = true, features = ["decode"] }

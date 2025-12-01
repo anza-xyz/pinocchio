@@ -2,7 +2,7 @@ use core::mem::size_of;
 use pinocchio::{
     account_info::{AccountInfo, Ref},
     error::ProgramError,
-    pubkey::Pubkey,
+    Address,
 };
 
 use crate::{instructions::MAX_MULTISIG_SIGNERS, ID};
@@ -17,7 +17,7 @@ pub struct Multisig {
     /// Is `true` if this structure has been initialized
     is_initialized: u8,
     /// Signer public keys
-    signers: [Pubkey; MAX_MULTISIG_SIGNERS],
+    signers: [Address; MAX_MULTISIG_SIGNERS],
 }
 
 impl Multisig {
@@ -90,8 +90,8 @@ impl Multisig {
 
     /// Return the signer addresses of the `Multisig`.
     #[inline(always)]
-    pub fn signers(&self) -> &[Pubkey] {
-        // SAFETY: `self.signers` is an array of `Pubkey` with a fixed size of
+    pub fn signers(&self) -> &[Address] {
+        // SAFETY: `self.signers` is an array of `Address` with a fixed size of
         // `MAX_MULTISIG_SIGNERS`; `self.signers_len` is always `<= MAX_MULTISIG_SIGNERS`
         // and indicates how many of these signers are valid.
         unsafe { self.signers.get_unchecked(..self.signers_len()) }

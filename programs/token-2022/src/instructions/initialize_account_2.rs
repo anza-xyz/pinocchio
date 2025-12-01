@@ -4,8 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    ProgramResult,
+    Address, ProgramResult,
 };
 
 use crate::{write_bytes, UNINIT_BYTE};
@@ -24,9 +23,9 @@ pub struct InitializeAccount2<'a, 'b> {
     /// Rent Sysvar Account
     pub rent_sysvar: &'a AccountInfo,
     /// Owner of the new Account.
-    pub owner: &'a Pubkey,
+    pub owner: &'a Address,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl InitializeAccount2<'_, '_> {
@@ -41,13 +40,13 @@ impl InitializeAccount2<'_, '_> {
 
         // instruction data
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..33]: owner (32 bytes, Pubkey)
+        // -  [1..33]: owner (32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 33];
 
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[16]);
         // Set owner as [u8; 32] at offset [1..33]
-        write_bytes(&mut instruction_data[1..], self.owner);
+        write_bytes(&mut instruction_data[1..], self.owner.as_array());
 
         let instruction = Instruction {
             program_id: self.token_program,
