@@ -1,11 +1,12 @@
 //! Information about the network's clock, ticks, slots, etc.
 
-use super::Sysvar;
 use crate::{
-    account_info::{AccountInfo, Ref},
+    account::{AccountView, Ref},
     error::ProgramError,
     hint::unlikely,
-    impl_sysvar_get, Address,
+    impl_sysvar_get,
+    sysvars::Sysvar,
+    Address,
 };
 
 /// The ID of the clock sysvar.
@@ -82,22 +83,22 @@ impl Clock {
     /// The length of the `Clock` sysvar account data.
     pub const LEN: usize = 8 + 8 + 8 + 8 + 8;
 
-    /// Return a `Clock` from the given account info.
+    /// Return a `Clock` from the given account view.
     ///
-    /// This method performs a check on the account info key.
+    /// This method performs a check on the account view address.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Clock>, ProgramError> {
-        if unlikely(account_info.key() != &CLOCK_ID) {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Clock>, ProgramError> {
+        if unlikely(account_view.address() != &CLOCK_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
 
-    /// Return a `Clock` from the given account info.
+    /// Return a `Clock` from the given account view.
     ///
-    /// This method performs a check on the account info key, but does not
+    /// This method performs a check on the account view address, but does not
     /// perform the borrow check.
     ///
     /// # Safety
@@ -105,15 +106,13 @@ impl Clock {
     /// The caller must ensure that it is safe to borrow the account data - e.g., there are
     /// no mutable borrows of the account data.
     #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+    pub unsafe fn from_account_view_unchecked(
+        account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
-        if unlikely(account_info.key() != &CLOCK_ID) {
+        if unlikely(account_view.address() != &CLOCK_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
 
     /// Return a `Clock` from the given bytes.

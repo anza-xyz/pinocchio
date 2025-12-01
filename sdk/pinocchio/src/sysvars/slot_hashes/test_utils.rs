@@ -4,8 +4,8 @@
 
 use super::*;
 extern crate std;
-use crate::account_info::{Account, AccountInfo};
-use core::{mem, ptr};
+use crate::account::{AccountView, RuntimeAccount};
+use core::ptr;
 use std::vec::Vec;
 
 /// Matches the pinocchio Account struct.
@@ -105,22 +105,22 @@ pub fn create_mock_data(entries: &[(u64, Hash)]) -> Vec<u8> {
     build_slot_hashes_bytes(entries.len() as u64, entries)
 }
 
-/// Allocate a heap-backed `AccountInfo` whose data region is initialized with
+/// Allocate a heap-backed `AccountView` whose data region is initialized with
 /// `data` and whose key is `key`.
 ///
 /// The function also returns the backing `Vec<u64>` so the caller can keep it
 /// alive for the duration of the test (otherwise the memory would be freed and
-/// the raw pointer inside `AccountInfo` would dangle).
+/// the raw pointer inside `AccountView` would dangle).
 ///
 /// # Safety
-/// The caller must ensure the returned `AccountInfo` is used only for reading
+/// The caller must ensure the returned `AccountView` is used only for reading
 /// or according to borrow rules because the Solana runtime invariants are not
 /// fully enforced in this hand-rolled representation.
-pub unsafe fn make_account_info(
+pub unsafe fn make_account_view(
     key: Address,
     data: &[u8],
     borrow_state: u8,
-) -> (AccountInfo, Vec<u64>) {
+) -> (AccountView, Vec<u64>) {
     let hdr_size = mem::size_of::<AccountLayout>();
     let total = hdr_size + data.len();
     let words = total.div_ceil(8);
@@ -153,9 +153,7 @@ pub unsafe fn make_account_info(
     );
 
     (
-        AccountInfo {
-            raw: hdr_ptr as *mut Account,
-        },
+        AccountView::new_unchecked(hdr_ptr as *mut RuntimeAccount),
         backing,
     )
 }
@@ -165,12 +163,12 @@ pub unsafe fn make_account_info(
 fn test_account_layout_compatibility() {
     assert_eq!(
         mem::size_of::<AccountLayout>(),
-        mem::size_of::<Account>(),
+        mem::size_of::<RuntimeAccount>(),
         "Header size must match Account size"
     );
     assert_eq!(
         mem::align_of::<AccountLayout>(),
-        mem::align_of::<Account>(),
+        mem::align_of::<RuntimeAccount>(),
         "Header alignment must match Account alignment"
     );
 
@@ -187,7 +185,7 @@ fn test_account_layout_compatibility() {
             data_len: 256,
         };
 
-        let account_ptr = &test_header as *const AccountLayout as *const Account;
+        let account_ptr = &test_header as *const AccountLayout as *const RuntimeAccount;
         let account_ref = &*account_ptr;
         assert_eq!(
             account_ref.borrow_state, 42,

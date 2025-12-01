@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -18,17 +18,17 @@ use pinocchio::{
 ///   5. `[]` SPL Token program
 pub struct CreateIdempotent<'a> {
     /// Funding account (must be a system account)
-    pub funding_account: &'a AccountInfo,
+    pub funding_account: &'a AccountView,
     /// Associated token account address to be created
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Wallet address for the new associated token account
-    pub wallet: &'a AccountInfo,
+    pub wallet: &'a AccountView,
     /// The token mint for the new associated token account
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// System program
-    pub system_program: &'a AccountInfo,
+    pub system_program: &'a AccountView,
     /// SPL Token program
-    pub token_program: &'a AccountInfo,
+    pub token_program: &'a AccountView,
 }
 
 impl CreateIdempotent<'_> {
@@ -41,12 +41,12 @@ impl CreateIdempotent<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 6] = [
-            AccountMeta::writable_signer(self.funding_account.key()),
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.wallet.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::readonly(self.system_program.key()),
-            AccountMeta::readonly(self.token_program.key()),
+            AccountMeta::writable_signer(self.funding_account.address()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.wallet.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::readonly(self.system_program.address()),
+            AccountMeta::readonly(self.token_program.address()),
         ];
 
         // Instruction data:

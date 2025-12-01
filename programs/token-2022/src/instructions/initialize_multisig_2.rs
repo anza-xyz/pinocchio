@@ -1,7 +1,7 @@
 use core::{mem::MaybeUninit, slice};
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     cpi::invoke_with_bounds,
     error::ProgramError,
     instruction::{AccountMeta, Instruction},
@@ -21,9 +21,9 @@ where
     'a: 'b,
 {
     /// Multisig Account.
-    pub multisig: &'a AccountInfo,
+    pub multisig: &'a AccountView,
     /// Signer Accounts
-    pub signers: &'b [&'a AccountInfo],
+    pub signers: &'b [&'a AccountView],
     /// The number of signers (M) required to validate this multisignature
     /// account.
     pub m: u8,
@@ -57,11 +57,11 @@ impl InitializeMultisig2<'_, '_, '_> {
             // - Index 0 is always present
             acc_metas
                 .get_unchecked_mut(0)
-                .write(AccountMeta::writable(multisig.key()));
+                .write(AccountMeta::writable(multisig.address()));
         }
 
         for (account_meta, signer) in acc_metas[1..].iter_mut().zip(signers.iter()) {
-            account_meta.write(AccountMeta::readonly(signer.key()));
+            account_meta.write(AccountMeta::readonly(signer.address()));
         }
 
         // Instruction data layout:
@@ -75,24 +75,24 @@ impl InitializeMultisig2<'_, '_, '_> {
             data,
         };
 
-        // Account info array
-        const UNINIT_INFO: MaybeUninit<&AccountInfo> = MaybeUninit::uninit();
-        let mut acc_infos = [UNINIT_INFO; 1 + MAX_MULTISIG_SIGNERS];
+        // Account view array
+        const UNINIT_VIEW: MaybeUninit<&AccountView> = MaybeUninit::uninit();
+        let mut acc_views = [UNINIT_VIEW; 1 + MAX_MULTISIG_SIGNERS];
 
         unsafe {
             // SAFETY:
-            // - `account_infos` is sized to 1 + MAX_MULTISIG_SIGNERS
+            // - `account_views` is sized to 1 + MAX_MULTISIG_SIGNERS
             // - Index 0 is always present
-            acc_infos.get_unchecked_mut(0).write(multisig);
+            acc_views.get_unchecked_mut(0).write(multisig);
         }
 
         // Fill signer accounts
-        for (account_info, signer) in acc_infos[1..].iter_mut().zip(signers.iter()) {
-            account_info.write(signer);
+        for (account_view, signer) in acc_views[1..].iter_mut().zip(signers.iter()) {
+            account_view.write(signer);
         }
 
         invoke_with_bounds::<{ 1 + MAX_MULTISIG_SIGNERS }>(&instruction, unsafe {
-            slice::from_raw_parts(acc_infos.as_ptr() as _, num_accounts)
+            slice::from_raw_parts(acc_views.as_ptr() as _, num_accounts)
         })
     }
 }

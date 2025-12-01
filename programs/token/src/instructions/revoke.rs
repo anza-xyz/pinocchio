@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -12,9 +12,9 @@ use pinocchio::{
 ///   1. `[SIGNER]` The source account owner.
 pub struct Revoke<'a> {
     /// Source Account.
-    pub source: &'a AccountInfo,
+    pub source: &'a AccountView,
     ///  Source Owner Account.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
 }
 
 impl Revoke<'_> {
@@ -27,8 +27,8 @@ impl Revoke<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.source.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.source.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         let instruction = Instruction {

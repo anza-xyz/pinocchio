@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     ProgramResult,
@@ -13,13 +13,13 @@ use pinocchio::{
 ///   2. `[SIGNER]` Nonce authority
 pub struct AdvanceNonceAccount<'a> {
     /// Nonce account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Recent blockhashes sysvar.
-    pub recent_blockhashes_sysvar: &'a AccountInfo,
+    pub recent_blockhashes_sysvar: &'a AccountView,
 
     /// Nonce authority.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
 }
 
 impl AdvanceNonceAccount<'_> {
@@ -32,9 +32,9 @@ impl AdvanceNonceAccount<'_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.recent_blockhashes_sysvar.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // instruction

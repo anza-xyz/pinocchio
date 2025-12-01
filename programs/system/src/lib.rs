@@ -1,7 +1,7 @@
 #![no_std]
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     address::declare_id,
     instruction::Signer,
     sysvars::{rent::Rent, Sysvar},
@@ -17,11 +17,11 @@ declare_id!("11111111111111111111111111111111");
 /// Create an account with a minimum balance to be rent-exempt.
 #[inline(always)]
 pub fn create_account_with_minimum_balance(
-    account: &AccountInfo,
+    account: &AccountView,
     space: usize,
     owner: &Address,
-    payer: &AccountInfo,
-    rent_sysvar: Option<&AccountInfo>,
+    payer: &AccountView,
+    rent_sysvar: Option<&AccountView>,
 ) -> ProgramResult {
     create_account_with_minimum_balance_signed(account, space, owner, payer, rent_sysvar, &[])
 }
@@ -37,15 +37,15 @@ pub fn create_account_with_minimum_balance(
 /// via the `signers`.
 #[inline(always)]
 pub fn create_account_with_minimum_balance_signed(
-    account: &AccountInfo,
+    account: &AccountView,
     space: usize,
     owner: &Address,
-    payer: &AccountInfo,
-    rent_sysvar: Option<&AccountInfo>,
+    payer: &AccountView,
+    rent_sysvar: Option<&AccountView>,
     signers: &[Signer],
 ) -> ProgramResult {
     let lamports = if let Some(rent_sysvar) = rent_sysvar {
-        let rent = Rent::from_account_info(rent_sysvar)?;
+        let rent = Rent::from_account_view(rent_sysvar)?;
         rent.minimum_balance(space)
     } else {
         Rent::get()?.minimum_balance(space)

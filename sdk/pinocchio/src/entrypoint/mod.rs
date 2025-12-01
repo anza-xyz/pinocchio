@@ -18,7 +18,7 @@ use core::{
 };
 
 use crate::{
-    account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
+    account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
@@ -45,7 +45,7 @@ pub const NON_DUP_MARKER: u8 = u8::MAX;
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data increase.
-const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -66,7 +66,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 /// ```ignore
 /// fn process_instruction(
 ///     program_id: &Address,      // Address of the account the program was loaded into
-///     accounts: &[AccountInfo], // All accounts required to process the instruction
+///     accounts: &[AccountView], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
@@ -92,7 +92,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 /// pub mod entrypoint {
 ///
 ///     use pinocchio::{
-///         account_info::AccountInfo,
+///         AccountView,
 ///         entrypoint,
 ///         msg,
 ///         Address,
@@ -103,7 +103,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 ///
 ///     pub fn process_instruction(
 ///         program_id: &Address,
-///         accounts: &[AccountInfo],
+///         accounts: &[AccountView],
 ///         instruction_data: &[u8],
 ///     ) -> ProgramResult {
 ///         msg!("Hello from my program!");
@@ -150,7 +150,7 @@ macro_rules! entrypoint {
 /// ```ignore
 /// fn process_instruction(
 ///     program_id: &Address,     // Address of the account the program was loaded into
-///     accounts: &[AccountInfo], // All accounts required to process the instruction
+///     accounts: &[AccountView], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
@@ -170,16 +170,16 @@ macro_rules! program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account_info::AccountInfo> =
-                core::mem::MaybeUninit::<$crate::account_info::AccountInfo>::uninit();
-            // Create an array of uninitialized account infos.
+            const UNINIT: core::mem::MaybeUninit<$crate::account::AccountView> =
+                core::mem::MaybeUninit::<$crate::account::AccountView>::uninit();
+            // Create an array of uninitialized account views.
             let mut accounts = [UNINIT; $maximum];
 
             let (program_id, count, instruction_data) =
                 $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
 
-            // Call the program's entrypoint passing `count` account infos; we know that
-            // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
+            // Call the program's entrypoint passing `count` account views; we know that
+            // they are initialized so we cast the pointer to a slice of `[AccountView]`.
             match $process_instruction(
                 &program_id,
                 core::slice::from_raw_parts(accounts.as_ptr() as _, count),
@@ -230,16 +230,16 @@ macro_rules! process_n_accounts {
         $accounts = $accounts.add(1);
 
         // Read the next account.
-        let account: *mut Account = $input as *mut Account;
+        let account: *mut RuntimeAccount = $input as *mut RuntimeAccount;
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicated account
         //   - duplicated marker + 7 bytes of padding in case of a duplicated account
         $input = $input.add(size_of::<u64>());
 
         if (*account).borrow_state != NON_DUP_MARKER {
-            clone_account_info($accounts, $accounts_slice, (*account).borrow_state);
+            clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
-            $accounts.write(AccountInfo { raw: account });
+            $accounts.write(AccountView::new_unchecked(account));
 
             $input = $input.add(STATIC_ACCOUNT_DATA);
             $input = $input.add((*account).data_len as usize);
@@ -268,29 +268,28 @@ macro_rules! process_accounts {
     };
 }
 
-/// Create an [`AccountInfo`] referencing the same account referenced by the [`AccountInfo`] at the
+/// Create an [`AccountView`] referencing the same account referenced by the [`AccountView`] at the
 /// specified `index`.
 ///
 /// # Safety
 ///
 /// The caller must ensure that:
-///   - `accounts` pointer must point to an array of [`AccountInfo`]s where the new [`AccountInfo`]
+///   - `accounts` pointer must point to an array of [`AccountView`]s where the new [`AccountView`]
 ///     will be written.
-///   - `accounts_slice` pointer must point to a slice of [`AccountInfo`]s already initialized.
+///   - `accounts_slice` pointer must point to a slice of [`AccountView`]s already initialized.
 ///   - `index` is a valid index in the `accounts_slice`.
 //
 // Note: The function is marked as `cold` to stop the compiler from optimizing the parsing of
 // duplicated accounts, which leads to an overall increase in CU consumption.
+#[allow(clippy::clone_on_copy)]
 #[cold]
 #[inline(always)]
-unsafe fn clone_account_info(
-    accounts: *mut AccountInfo,
-    accounts_slice: *const AccountInfo,
+unsafe fn clone_account_view(
+    accounts: *mut AccountView,
+    accounts_slice: *const AccountView,
     index: u8,
 ) {
-    accounts.write(AccountInfo {
-        raw: (*accounts_slice.add(index as usize)).raw,
-    });
+    accounts.write((*accounts_slice.add(index as usize)).clone());
 }
 
 /// Parse the arguments from the runtime input buffer.
@@ -308,7 +307,7 @@ unsafe fn clone_account_info(
 #[inline(always)]
 pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
-    accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
+    accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
 ) -> (&'static Address, usize, &'static [u8]) {
     // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of accounts
     // (MAX_TX_ACCOUNTS) that can be processed in a transaction.
@@ -325,14 +324,14 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     input = input.add(size_of::<u64>());
 
     if processed > 0 {
-        let mut accounts = accounts.as_mut_ptr() as *mut AccountInfo;
+        let mut accounts = accounts.as_mut_ptr() as *mut AccountView;
         // Represents the beginning of the accounts slice.
         let accounts_slice = accounts;
 
         // The first account is always non-duplicated, so process
         // it directly as such.
-        let account: *mut Account = input as *mut Account;
-        accounts.write(AccountInfo { raw: account });
+        let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
+        accounts.write(AccountView::new_unchecked(account));
 
         input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
         input = input.add((*account).data_len as usize);
@@ -406,7 +405,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     to_skip -= 1;
 
                     // Read the next account.
-                    let account: *mut Account = input as *mut Account;
+                    let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
                     // Adds an 8-bytes offset for:
                     //   - rent epoch in case of a non-duplicated account
                     //   - duplicated marker + 7 bytes of padding in case of a duplicated account
@@ -710,8 +709,8 @@ mod tests {
     /// The mock program ID used for testing.
     const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
 
-    /// An uninitialized account info.
-    const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
+    /// An uninitialized account view.
+    const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
 
     /// Struct representing a memory region with a specific alignment.
     struct AlignedMemory {
@@ -861,49 +860,49 @@ mod tests {
 
     /// Asserts that the accounts slice contains the expected number of accounts and that each
     /// account's data length matches its index.
-    fn assert_accounts(accounts: &[MaybeUninit<AccountInfo>]) {
+    fn assert_accounts(accounts: &[MaybeUninit<AccountView>]) {
         for (i, account) in accounts.iter().enumerate() {
-            let account_info = unsafe { account.assume_init_ref() };
-            assert_eq!(account_info.data_len(), i);
+            let account_view = unsafe { account.assume_init_ref() };
+            assert_eq!(account_view.data_len(), i);
         }
     }
 
     /// Asserts that the accounts slice contains the expected number of accounts and all accounts
     /// are duplicated, apart from the first one.
-    fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountInfo>], duplicated: usize) {
+    fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountView>], duplicated: usize) {
         assert!(accounts.len() > duplicated);
 
         let unique = accounts.len() - duplicated;
 
         // Unique accounts should have `data_len` equal to their index.
         for (i, account) in accounts[..unique].iter().enumerate() {
-            let account_info = unsafe { account.assume_init_ref() };
-            assert_eq!(account_info.data_len(), i);
+            let account_view = unsafe { account.assume_init_ref() };
+            assert_eq!(account_view.data_len(), i);
         }
 
         // Last unique account.
         let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
         // No mutable borrow active at this point.
-        assert!(duplicated.try_borrow_mut_data().is_ok());
+        assert!(duplicated.try_borrow_mut().is_ok());
 
         // Duplicated accounts should reference (share) the account pointer
         // to the last unique account.
         for account in accounts[unique..].iter() {
-            let account_info = unsafe { account.assume_init_ref() };
+            let account_view = unsafe { account.assume_init_ref() };
 
-            assert_eq!(account_info.raw, duplicated.raw);
-            assert_eq!(account_info.data_len(), duplicated.data_len());
+            assert_eq!(account_view, duplicated);
+            assert_eq!(account_view.data_len(), duplicated.data_len());
 
-            let borrowed = account_info.try_borrow_mut_data().unwrap();
+            let borrowed = account_view.try_borrow_mut().unwrap();
             // Only one mutable borrow at the same time should be allowed
             // on the duplicated account.
-            assert!(duplicated.try_borrow_mut_data().is_err());
+            assert!(duplicated.try_borrow_mut().is_err());
             drop(borrowed);
         }
 
         // There should not be any mutable borrow on the duplicated account
         // at this point.
-        assert!(duplicated.try_borrow_mut_data().is_ok());
+        assert!(duplicated.try_borrow_mut().is_ok());
     }
 
     #[test]

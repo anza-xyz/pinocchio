@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -18,13 +18,13 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   3. `[SIGNER]` The source account's owner/delegate.
 pub struct TransferChecked<'a, 'b> {
     /// Sender account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
     /// Mint Account
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
     /// Authority account.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Amount of micro-tokens to transfer.
     pub amount: u64,
     /// Decimal for the Token
@@ -43,10 +43,10 @@ impl TransferChecked<'_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::writable(self.to.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.from.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::writable(self.to.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data layout:

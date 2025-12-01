@@ -2,7 +2,7 @@
 //! input buffer.
 
 use crate::{
-    account_info::{Account, AccountInfo},
+    account::{AccountView, RuntimeAccount},
     entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
     error::ProgramError,
     Address, BPF_ALIGN_OF_U128,
@@ -157,7 +157,7 @@ impl InstructionContext {
     /// Reads the next account for the instruction.
     ///
     /// The account is represented as a [`MaybeAccount`], since it can either
-    /// represent and [`AccountInfo`] or the index of a duplicated account. It is up to the
+    /// represent and [`AccountView`] or the index of a duplicated account. It is up to the
     /// caller to handle the mapping back to the source account.
     ///
     /// # Error
@@ -256,7 +256,7 @@ impl InstructionContext {
     #[allow(clippy::cast_ptr_alignment, clippy::missing_safety_doc)]
     #[inline(always)]
     unsafe fn read_account(&mut self) -> MaybeAccount {
-        let account: *mut Account = self.buffer as *mut Account;
+        let account: *mut RuntimeAccount = self.buffer as *mut RuntimeAccount;
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicate account
         //   - duplicate marker + 7 bytes of padding in case of a duplicate account
@@ -267,7 +267,7 @@ impl InstructionContext {
             self.buffer = self.buffer.add((*account).data_len as usize);
             self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
 
-            MaybeAccount::Account(AccountInfo { raw: account })
+            MaybeAccount::Account(AccountView::new_unchecked(account))
         } else {
             // The caller will handle the mapping to the original account.
             MaybeAccount::Duplicated((*account).borrow_state)
@@ -275,25 +275,25 @@ impl InstructionContext {
     }
 }
 
-/// Wrapper type around an [`AccountInfo`] that may be a duplicate.
+/// Wrapper type around an [`AccountView`] that may be a duplicate.
 #[cfg_attr(feature = "copy", derive(Copy))]
 #[derive(Debug, Clone)]
 pub enum MaybeAccount {
-    /// An [`AccountInfo`] that is not a duplicate.
-    Account(AccountInfo),
+    /// An [`AccountView`] that is not a duplicate.
+    Account(AccountView),
 
     /// The index of the original account that was duplicated.
     Duplicated(u8),
 }
 
 impl MaybeAccount {
-    /// Extracts the wrapped [`AccountInfo`].
+    /// Extracts the wrapped [`AccountView`].
     ///
     /// It is up to the caller to guarantee that the [`MaybeAccount`] really is in an
     /// [`MaybeAccount::Account`]. Calling this method when the variant is a
     /// [`MaybeAccount::Duplicated`] will result in a panic.
     #[inline(always)]
-    pub fn assume_account(self) -> AccountInfo {
+    pub fn assume_account(self) -> AccountView {
         let MaybeAccount::Account(account) = self else {
             panic!("Duplicated account")
         };

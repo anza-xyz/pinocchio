@@ -1,6 +1,6 @@
 use super::AccountState;
 use pinocchio::{
-    account_info::{AccountInfo, Ref},
+    account::{AccountView, Ref},
     error::ProgramError,
     Address,
 };
@@ -51,28 +51,28 @@ pub struct TokenAccount {
 impl TokenAccount {
     pub const BASE_LEN: usize = core::mem::size_of::<TokenAccount>();
 
-    /// Return a `TokenAccount` from the given account info.
+    /// Return a `TokenAccount` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// This method performs owner and length validation on `AccountView`, safe borrowing
     /// the account data.
     #[inline]
-    pub fn from_account_info(
-        account_info: &AccountInfo,
+    pub fn from_account_view(
+        account_view: &AccountView,
     ) -> Result<Ref<TokenAccount>, ProgramError> {
-        if account_info.data_len() < Self::BASE_LEN {
+        if account_view.data_len() < Self::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if !account_info.is_owned_by(&ID) {
+        if !account_view.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
 
-    /// Return a `TokenAccount` from the given account info.
+    /// Return a `TokenAccount` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, but does not
+    /// This method performs owner and length validation on `AccountView`, but does not
     /// perform the borrow check.
     ///
     /// # Safety
@@ -80,18 +80,16 @@ impl TokenAccount {
     /// The caller must ensure that it is safe to borrow the account data (e.g., there are
     /// no mutable borrows of the account data).
     #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+    pub unsafe fn from_account_view_unchecked(
+        account_view: &AccountView,
     ) -> Result<&TokenAccount, ProgramError> {
-        if account_info.data_len() < Self::BASE_LEN {
+        if account_view.data_len() < Self::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner() != &ID {
+        if account_view.owner() != &ID {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
 
     /// Return a `TokenAccount` from the given bytes.

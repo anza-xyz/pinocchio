@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -14,10 +14,10 @@ use pinocchio::{
 ///   1. `[SIGNER]` Nonce authority
 pub struct AuthorizeNonceAccount<'a, 'b> {
     /// Nonce account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Nonce authority.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
 
     /// New entity authorized to execute nonce instructions on the account.
     pub new_authority: &'b Address,
@@ -33,8 +33,8 @@ impl AuthorizeNonceAccount<'_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly_signer(self.authority.address()),
         ];
 
         // instruction data

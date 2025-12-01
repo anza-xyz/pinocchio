@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -11,7 +11,7 @@ use pinocchio::{
 ///   0. `[WRITE, SIGNER]` Assigned account address
 pub struct Assign<'a, 'b> {
     /// Account to be assigned.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Program account to assign as owner.
     pub owner: &'b Address,
@@ -26,7 +26,8 @@ impl Assign<'_, '_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable_signer(self.account.key())];
+        let account_metas: [AccountMeta; 1] =
+            [AccountMeta::writable_signer(self.account.address())];
 
         // instruction data
         // -  [0..4 ]: instruction discriminator

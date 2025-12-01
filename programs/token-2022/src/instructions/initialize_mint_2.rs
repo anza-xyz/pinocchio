@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     Address, ProgramResult,
@@ -15,7 +15,7 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITABLE]` Mint account
 pub struct InitializeMint2<'a, 'b> {
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Decimals.
     pub decimals: u8,
     /// Mint Authority.
@@ -30,7 +30,7 @@ impl InitializeMint2<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.mint.key())];
+        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.mint.address())];
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)

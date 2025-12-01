@@ -1,7 +1,7 @@
 use core::slice::from_raw_parts;
 
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
     Address, ProgramResult,
@@ -17,11 +17,11 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   2. `[SIGNER]` The mint's minting authority.
 pub struct MintTo<'a, 'b> {
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Token Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Authority
-    pub mint_authority: &'a AccountInfo,
+    pub mint_authority: &'a AccountView,
     /// Amount
     pub amount: u64,
     /// Token Program
@@ -38,9 +38,9 @@ impl MintTo<'_, '_> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.mint.key()),
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly_signer(self.mint_authority.key()),
+            AccountMeta::writable(self.mint.address()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly_signer(self.mint_authority.address()),
         ];
 
         // Instruction data layout:

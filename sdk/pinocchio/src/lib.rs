@@ -30,7 +30,7 @@
 //! To use the `entrypoint!` macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account_info::AccountInfo,
+//!   AccountView,
 //!   entrypoint,
 //!   msg,
 //!   ProgramResult,
@@ -41,7 +41,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountInfo],
+//!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   msg!("Hello from my program!");
@@ -136,7 +136,7 @@
 //! To use the [`no_allocator!`] macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account_info::AccountInfo,
+//!   AccountView,
 //!   default_panic_handler,
 //!   msg,
 //!   no_allocator,
@@ -151,7 +151,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountInfo],
+//!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   msg!("Hello from `no_std` program!");
@@ -193,7 +193,7 @@
 //! #[cfg(feature = "bpf-entrypoint")]
 //! mod entrypoint {
 //!   use pinocchio::{
-//!     account_info::AccountInfo,
+//!     AccountView,
 //!     entrypoint,
 //!     msg,
 //!     ProgramResult,
@@ -204,7 +204,7 @@
 //!
 //!   pub fn process_instruction(
 //!     program_id: &Address,
-//!     accounts: &[AccountInfo],
+//!     accounts: &[AccountView],
 //!     instruction_data: &[u8],
 //!   ) -> ProgramResult {
 //!     msg!("Hello from my program!");
@@ -223,7 +223,6 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-pub mod account_info;
 pub mod cpi;
 pub mod entrypoint;
 pub mod instruction;
@@ -238,6 +237,10 @@ pub mod sysvars;
 
 #[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
 pub use entrypoint::lazy as lazy_entrypoint;
+
+// Re-export the `solana_account_view` for downstream use.
+pub use solana_account_view as account;
+pub use solana_account_view::AccountView;
 
 // Re-export the `solana_address` for downstream use.
 pub use solana_address as address;
@@ -255,7 +258,7 @@ pub use solana_program_error::ProgramResult;
 /// value (`255`) is reserved to indicate non-duplicated accounts.
 ///
 /// The `MAX_TX_ACCOUNTS` is used to statically initialize the array of
-/// `AccountInfo`s when parsing accounts in an instruction.
+/// `AccountView`s when parsing accounts in an instruction.
 pub const MAX_TX_ACCOUNTS: usize = (u8::MAX - 1) as usize;
 
 /// `assert_eq(core::mem::align_of::<u128>(), 8)` is true for BPF but not

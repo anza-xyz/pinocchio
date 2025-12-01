@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     cpi::invoke,
     instruction::{AccountMeta, Instruction},
     ProgramResult,
@@ -14,13 +14,13 @@ use pinocchio::{
 ///   3. `[]` Rent sysvar
 pub struct InitializeAccount<'a> {
     /// New Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Owner of the new Account.
-    pub owner: &'a AccountInfo,
+    pub owner: &'a AccountView,
     /// Rent Sysvar Account
-    pub rent_sysvar: &'a AccountInfo,
+    pub rent_sysvar: &'a AccountView,
 }
 
 impl InitializeAccount<'_> {
@@ -28,10 +28,10 @@ impl InitializeAccount<'_> {
     pub fn invoke(&self) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::readonly(self.owner.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
+            AccountMeta::writable(self.account.address()),
+            AccountMeta::readonly(self.mint.address()),
+            AccountMeta::readonly(self.owner.address()),
+            AccountMeta::readonly(self.rent_sysvar.address()),
         ];
 
         let instruction = Instruction {

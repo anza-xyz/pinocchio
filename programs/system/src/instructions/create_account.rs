@@ -1,5 +1,5 @@
 use pinocchio::{
-    account_info::AccountInfo,
+    account::AccountView,
     error::ProgramError,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
@@ -14,10 +14,10 @@ use pinocchio::{
 ///   1. `[WRITE, SIGNER]` New account
 pub struct CreateAccount<'a> {
     /// Funding account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
 
     /// New account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
 
     /// Number of lamports to transfer to the new account.
     pub lamports: u64,
@@ -32,13 +32,13 @@ pub struct CreateAccount<'a> {
 impl<'a> CreateAccount<'a> {
     #[inline(always)]
     pub fn with_minimal_balance(
-        from: &'a AccountInfo,
-        to: &'a AccountInfo,
-        rent_sysvar: &'a AccountInfo,
+        from: &'a AccountView,
+        to: &'a AccountView,
+        rent_sysvar: &'a AccountView,
         space: u64,
         owner: &'a Address,
     ) -> Result<Self, ProgramError> {
-        let rent = Rent::from_account_info(rent_sysvar)?;
+        let rent = Rent::from_account_view(rent_sysvar)?;
         let lamports = rent.minimum_balance(space as usize);
 
         Ok(Self {
@@ -59,8 +59,8 @@ impl<'a> CreateAccount<'a> {
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // account metadata
         let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable_signer(self.from.key()),
-            AccountMeta::writable_signer(self.to.key()),
+            AccountMeta::writable_signer(self.from.address()),
+            AccountMeta::writable_signer(self.to.address()),
         ];
 
         // instruction data
