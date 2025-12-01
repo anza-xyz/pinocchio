@@ -150,6 +150,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pinocchio-stake"
+version = "0.0.1"
+dependencies = [
+ "pinocchio",
+ "pinocchio-pubkey",
+]
+
+[[package]]
 name = "pinocchio-system"
 version = "0.4.0"
 dependencies = [
