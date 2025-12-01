@@ -1,8 +1,8 @@
 use pinocchio::{
     account_info::AccountInfo,
+    error::ProgramError,
     instruction::{AccountMeta, Instruction, Signer},
     program::invoke_signed,
-    program_error::ProgramError,
     pubkey::Pubkey,
     sysvars::rent::Rent,
     ProgramResult,

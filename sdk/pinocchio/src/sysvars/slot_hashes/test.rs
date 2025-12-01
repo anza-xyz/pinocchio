@@ -1,7 +1,7 @@
 use super::test_utils::*;
 use crate::{
     account_info::{Account, AccountInfo},
-    program_error::ProgramError,
+    error::ProgramError,
     sysvars::{clock::Slot, slot_hashes::*},
 };
 use core::{

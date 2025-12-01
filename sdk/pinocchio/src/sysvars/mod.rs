@@ -2,7 +2,7 @@
 
 #[cfg(target_os = "solana")]
 use crate::syscalls::sol_get_sysvar;
-use crate::{program_error::ProgramError, pubkey::Pubkey};
+use crate::{error::ProgramError, pubkey::Pubkey};
 #[cfg(not(target_os = "solana"))]
 use core::hint::black_box;
 
@@ -44,7 +44,7 @@ pub trait Sysvar: Sized {
 #[macro_export]
 macro_rules! impl_sysvar_get {
     ($syscall_name:ident) => {
-        fn get() -> Result<Self, $crate::program_error::ProgramError> {
+        fn get() -> Result<Self, $crate::error::ProgramError> {
             let mut var = core::mem::MaybeUninit::<Self>::uninit();
             let var_addr = var.as_mut_ptr() as *mut _ as *mut u8;
 
@@ -60,7 +60,7 @@ macro_rules! impl_sysvar_get {
                     Ok(unsafe { var.assume_init() })
                 }
                 // Unexpected errors are folded into `UnsupportedSysvar`.
-                _ => Err($crate::program_error::ProgramError::UnsupportedSysvar),
+                _ => Err($crate::error::ProgramError::UnsupportedSysvar),
             }
         }
     };
