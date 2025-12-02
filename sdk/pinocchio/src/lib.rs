@@ -38,6 +38,7 @@
 //!   entrypoint,
 //!   ProgramResult
 //! };
+//! use solana_program_log::log;
 //!
 //! entrypoint!(process_instruction);
 //!
@@ -46,6 +47,7 @@
 //!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
+//!   log!("Hello from my pinocchio program!");
 //!   Ok(())
 //! }
 //! ```
@@ -105,7 +107,7 @@
 //! pub fn process_instruction(
 //!   mut context: InstructionContext
 //! ) -> ProgramResult {
-//!     Ok(())
+//!   Ok(())
 //! }
 //! ```
 //!
