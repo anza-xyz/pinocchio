@@ -1,11 +1,8 @@
-use super::AccountState;
-use pinocchio::{
-    account::{AccountView, Ref},
-    error::ProgramError,
-    Address,
-};
+use solana_account_view::{AccountView, Ref};
+use solana_address::Address;
+use solana_program_error::ProgramError;
 
-use crate::ID;
+use crate::{state::AccountState, ID};
 
 /// Token account data.
 #[repr(C)]

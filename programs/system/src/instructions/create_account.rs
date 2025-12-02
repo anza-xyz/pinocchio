@@ -1,10 +1,9 @@
 use pinocchio::{
-    account::AccountView,
+    cpi::{invoke_signed, Signer},
     error::ProgramError,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
+    instruction::{InstructionAccount, InstructionView},
     sysvars::rent::Rent,
-    Address, ProgramResult,
+    AccountView, Address, ProgramResult,
 };
 
 /// Create a new account.
@@ -57,10 +56,10 @@ impl<'a> CreateAccount<'a> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable_signer(self.from.address()),
-            AccountMeta::writable_signer(self.to.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 2] = [
+            InstructionAccount::writable_signer(self.from.address()),
+            InstructionAccount::writable_signer(self.to.address()),
         ];
 
         // instruction data
@@ -74,9 +73,9 @@ impl<'a> CreateAccount<'a> {
         instruction_data[12..20].copy_from_slice(&self.space.to_le_bytes());
         instruction_data[20..52].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

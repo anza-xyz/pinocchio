@@ -1,8 +1,7 @@
 use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    Address, ProgramResult,
+    cpi::{invoke_signed, Signer},
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, Address, ProgramResult,
 };
 
 /// Assign account to a program based on a seed.
@@ -36,10 +35,10 @@ impl AssignWithSeed<'_, '_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly_signer(self.base.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 2] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly_signer(self.base.address()),
         ];
 
         // instruction data
@@ -57,9 +56,9 @@ impl AssignWithSeed<'_, '_, '_> {
         instruction_data[44..offset].copy_from_slice(self.seed.as_bytes());
         instruction_data[offset..offset + 32].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data[..offset + 32],
         };
 

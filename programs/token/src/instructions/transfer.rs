@@ -1,11 +1,11 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -34,11 +34,11 @@ impl Transfer<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.from.address()),
-            AccountMeta::writable(self.to.address()),
-            AccountMeta::readonly_signer(self.authority.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.from.address()),
+            InstructionAccount::writable(self.to.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data layout:
@@ -51,9 +51,9 @@ impl Transfer<'_> {
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
         };
 

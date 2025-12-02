@@ -1,9 +1,9 @@
-use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Transfers from and closes a nested associated token account: an
 /// associated token account owned by an associated token account.
@@ -49,15 +49,15 @@ impl RecoverNested<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 7] = [
-            AccountMeta::writable(self.account.address()),
-            AccountMeta::readonly(self.mint.address()),
-            AccountMeta::writable(self.destination_account.address()),
-            AccountMeta::readonly(self.owner_account.address()),
-            AccountMeta::readonly(self.owner_mint.address()),
-            AccountMeta::writable_signer(self.wallet.address()),
-            AccountMeta::readonly(self.token_program.address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 7] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::writable(self.destination_account.address()),
+            InstructionAccount::readonly(self.owner_account.address()),
+            InstructionAccount::readonly(self.owner_mint.address()),
+            InstructionAccount::writable_signer(self.wallet.address()),
+            InstructionAccount::readonly(self.token_program.address()),
         ];
 
         // Instruction data:
@@ -65,9 +65,9 @@ impl RecoverNested<'_> {
 
         let instruction_data = [2u8];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

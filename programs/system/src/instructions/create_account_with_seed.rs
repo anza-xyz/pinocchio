@@ -1,10 +1,9 @@
 use pinocchio::{
-    account::AccountView,
+    cpi::{invoke_signed, Signer},
     error::ProgramError,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
+    instruction::{InstructionAccount, InstructionView},
     sysvars::rent::Rent,
-    Address, ProgramResult,
+    AccountView, Address, ProgramResult,
 };
 
 /// Create a new account at an address derived from a base address and a seed.
@@ -73,11 +72,11 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable_signer(self.from.address()),
-            AccountMeta::writable(self.to.address()),
-            AccountMeta::readonly_signer(self.base.unwrap_or(self.from).address()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable_signer(self.from.address()),
+            InstructionAccount::writable(self.to.address()),
+            InstructionAccount::readonly_signer(self.base.unwrap_or(self.from).address()),
         ];
 
         // instruction data
@@ -100,9 +99,9 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
         instruction_data[offset + 8..offset + 16].copy_from_slice(&self.space.to_le_bytes());
         instruction_data[offset + 16..offset + 48].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data[..offset + 48],
         };
 

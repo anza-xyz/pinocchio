@@ -1,8 +1,7 @@
 use pinocchio::{
-    account::AccountView,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    Address, ProgramResult,
+    cpi::{invoke_signed, Signer},
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, Address, ProgramResult,
 };
 
 /// Assign account to a program
@@ -25,9 +24,9 @@ impl Assign<'_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 1] =
-            [AccountMeta::writable_signer(self.account.address())];
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 1] =
+            [InstructionAccount::writable_signer(self.account.address())];
 
         // instruction data
         // -  [0..4 ]: instruction discriminator
@@ -36,9 +35,9 @@ impl Assign<'_, '_> {
         instruction_data[0] = 1;
         instruction_data[4..36].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 
