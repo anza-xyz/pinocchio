@@ -229,7 +229,7 @@ impl Rent {
 }
 
 impl Sysvar for Rent {
-    impl_sysvar_get!(sol_get_rent_sysvar);
+    impl_sysvar_get!(RENT_ID, 7);
 }
 
 /// The return value of [`Rent::due`].

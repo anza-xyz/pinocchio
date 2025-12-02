@@ -64,6 +64,50 @@ macro_rules! impl_sysvar_get {
             }
         }
     };
+    // This variant uses the generic `sol_get_sysvar` syscall. Note that it only
+    // supports sysvars without padding or with padding at the end of their byte
+    // layout since the syscall data follows bincode serialization.
+    ($syscall_id:expr, $padding:literal) => {
+        fn get() -> Result<Self, ProgramError> {
+            let mut var = core::mem::MaybeUninit::<Self>::uninit();
+            let var_addr = var.as_mut_ptr() as *mut _ as *mut u8;
+
+            #[cfg(target_os = "solana")]
+            // SAFETY: The allocation is valid for the size of `Self`. It fixes
+            // the size to `size_of::<Self>() - padding` for the syscall since
+            // the byte layout follows bincode serialization; the remaining bytes
+            // are considered padding and initialized to zero.
+            let result = unsafe {
+                let length = core::mem::size_of::<Self>() - $padding;
+                // Make sure all bytes are initialized.
+                var_addr.add(length).write_bytes(0, $padding);
+
+                $crate::syscalls::sol_get_sysvar(
+                    &$syscall_id as *const _ as *const u8,
+                    var_addr,
+                    0,
+                    length as u64,
+                )
+            };
+
+            #[cfg(not(target_os = "solana"))]
+            let result = {
+                // SAFETY: The allocation is valid for the size of `Self`.
+                unsafe { var_addr.write_bytes(0, size_of::<Self>()) };
+                core::hint::black_box(var_addr as *const _ as u64)
+            };
+
+            match result {
+                $crate::SUCCESS => {
+                    // SAFETY: The syscall initialized the memory and
+                    // padding bytes are set to zero.
+                    Ok(unsafe { var.assume_init() })
+                }
+                // Unexpected errors are folded into `UnsupportedSysvar`.
+                _ => Err(ProgramError::UnsupportedSysvar),
+            }
+        }
+    };
 }
 
 /// Handler for retrieving a slice of sysvar data from the `sol_get_sysvar`
