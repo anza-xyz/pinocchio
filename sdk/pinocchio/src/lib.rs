@@ -162,16 +162,16 @@
 //! 💡 The [`no_allocator!`] macro can also be used in combination with the
 //! [`lazy_program_entrypoint!`].
 //!
-//! ## `std` crate feature
+//! ## `alloc` crate feature
 //!
 //! By default, Pinocchio is a `no_std` crate. This means that it does not use any
 //! code from the standard (`std`) library. While this does not affect how Pinocchio
 //! is used, there is a one particular apparent difference. Helpers that need to
 //! allocate memory, such as fetching `SlotHashes` sysvar, are not available. To
-//! enable these helpers, the `std` feature must be enabled when adding Pinocchio
+//! enable these helpers, the `alloc` feature must be enabled when adding Pinocchio
 //! as a dependency:
 //! ```ignore
-//! pinocchio = { version = "0.10.0", features = ["std"] }
+//! pinocchio = { version = "0.10.0", features = ["alloc"] }
 //! ```
 //!
 //! ## Advanced entrypoint configuration
@@ -212,8 +212,8 @@
 
 #![no_std]
 
-#[cfg(feature = "std")]
-extern crate std;
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 pub mod entrypoint;
 pub mod sysvars;

@@ -9,9 +9,7 @@ use core::{
     ptr,
 };
 
-extern crate std;
-use std::io::Write;
-use std::vec::Vec;
+use alloc::vec::Vec;
 
 #[test]
 fn test_layout_constants() {
@@ -31,7 +29,10 @@ fn test_layout_constants() {
     );
 
     pub fn check_base58(input_bytes: &[u8], expected_b58: &str) {
-        assert_eq!(five8_const::decode_32_const(expected_b58), input_bytes);
+        assert_eq!(
+            Address::from_str_const(expected_b58).as_array(),
+            input_bytes
+        );
     }
 
     check_base58(
@@ -169,7 +170,7 @@ fn test_entry_count_no_std() {
     // Too small buffer should fail new()
     let num_entries = entries.len() as u64;
     let data_len = NUM_ENTRIES_SIZE + entries.len() * ENTRY_SIZE;
-    let mut small_data = std::vec![0u8; data_len];
+    let mut small_data = alloc::vec![0u8; data_len];
     small_data[0..NUM_ENTRIES_SIZE].copy_from_slice(&num_entries.to_le_bytes());
     let mut offset = NUM_ENTRIES_SIZE;
     for (slot, hash) in entries {
@@ -315,19 +316,19 @@ fn test_mock_offset_copy() {
     let mock_sysvar_data = create_mock_data(entries);
 
     // Test offset 0 (full data)
-    let mut buffer_full = std::vec![0u8; mock_sysvar_data.len()];
+    let mut buffer_full = alloc::vec![0u8; mock_sysvar_data.len()];
     mock_fetch_into_unchecked(&mock_sysvar_data, &mut buffer_full, 0).unwrap();
     assert_eq!(buffer_full, mock_sysvar_data);
 
     // Test offset 8 (skip length prefix, get entries only)
     let entries_size = 3 * ENTRY_SIZE;
-    let mut buffer_entries = std::vec![0u8; entries_size];
+    let mut buffer_entries = alloc::vec![0u8; entries_size];
     mock_fetch_into_unchecked(&mock_sysvar_data, &mut buffer_entries, 8).unwrap();
     assert_eq!(buffer_entries, &mock_sysvar_data[8..8 + entries_size]);
 
     // Test offset 8 + ENTRY_SIZE (skip first entry)
     let remaining_entries_size = 2 * ENTRY_SIZE;
-    let mut buffer_skip_first = std::vec![0u8; remaining_entries_size];
+    let mut buffer_skip_first = alloc::vec![0u8; remaining_entries_size];
     let skip_first_offset = 8 + ENTRY_SIZE;
     mock_fetch_into_unchecked(
         &mock_sysvar_data,
@@ -402,8 +403,6 @@ fn test_log_function() {
 
 #[test]
 fn test_from_account_view_constructor() {
-    std::io::stderr().flush().unwrap();
-
     const NUM_ENTRIES: usize = 3;
     const START_SLOT: u64 = 1234;
 
@@ -415,7 +414,7 @@ fn test_from_account_view_constructor() {
         let header_size = core::mem::size_of::<AccountLayout>();
         let total_size = header_size + data.len();
         let word_len = total_size.div_ceil(8);
-        aligned_backing = std::vec![0u64; word_len];
+        aligned_backing = alloc::vec![0u64; word_len];
         let base_ptr = aligned_backing.as_mut_ptr() as *mut u8;
 
         let header_ptr = base_ptr as *mut AccountLayout;
@@ -460,7 +459,7 @@ fn test_from_account_view_constructor() {
 /// `SlotHashes` getters to make sure the view itself works.  We do not verify
 /// that the syscall populated real on-chain bytes, as doing so requires an
 /// environment outside the scope of host `cargo test`.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 #[test]
 fn test_fetch_allocates_buffer_host() {
     const START_SLOT: u64 = 500;
@@ -469,7 +468,7 @@ fn test_fetch_allocates_buffer_host() {
 
     // This should allocate a 20_488-byte boxed slice and *not* panic.
     let mut slot_hashes =
-        SlotHashes::<std::boxed::Box<[u8]>>::fetch().expect("fetch() should allocate");
+        SlotHashes::<alloc::boxed::Box<[u8]>>::fetch().expect("fetch() should allocate");
 
     // Overwrite the stubbed contents with known data so we can reuse the
     // remainder of the test harness.

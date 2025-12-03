@@ -5,12 +5,8 @@ pub mod lazy;
 
 pub use lazy::{InstructionContext, MaybeAccount};
 
-#[cfg(not(feature = "std"))]
-use core::alloc::{GlobalAlloc, Layout};
-
-#[cfg(target_os = "solana")]
-pub use alloc::BumpAllocator;
 use core::{
+    alloc::{GlobalAlloc, Layout},
     cmp::min,
     mem::{size_of, MaybeUninit},
     ptr::with_exposed_provenance_mut,
@@ -21,6 +17,9 @@ use crate::{
     account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
+
+#[cfg(all(target_os = "solana", feature = "alloc"))]
+pub use alloc::BumpAllocator;
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
@@ -125,6 +124,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// manually.
 ///
 /// [`crate::nostd_panic_handler`]: https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:expr ) => {
@@ -459,14 +459,12 @@ macro_rules! default_panic_handler {
 /// This macro sets up a default panic handler that logs the location (file, line and column) where
 /// the panic occurred and then calls the syscall `abort()`.
 ///
-/// This macro can only be used when all crates are `no_std` and the `"std"` feature is disabled.
-#[cfg(not(feature = "std"))]
+/// This macro should be used when all crates are `no_std`.
 #[macro_export]
 macro_rules! nostd_panic_handler {
     () => {
         /// A panic handler for `no_std`.
         #[cfg(target_os = "solana")]
-        #[no_mangle]
         #[panic_handler]
         fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
             if let Some(location) = info.location() {
@@ -502,6 +500,7 @@ macro_rules! nostd_panic_handler {
 /// Default global allocator.
 ///
 /// This macro sets up a default global allocator that uses a bump allocator to allocate memory.
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! default_allocator {
     () => {
@@ -523,17 +522,6 @@ macro_rules! default_allocator {
     };
 }
 
-/// A global allocator that does not allocate memory.
-///
-/// Using this macro with the `"std"` feature enabled will result in a compile error.
-#[cfg(feature = "std")]
-#[macro_export]
-macro_rules! no_allocator {
-    () => {
-        compile_error!("Feature 'std' cannot be enabled.");
-    };
-}
-
 /// A global allocator that does not dynamically allocate memory.
 ///
 /// This macro sets up a global allocator that denies all dynamic allocations, while allowing static
@@ -542,8 +530,7 @@ macro_rules! no_allocator {
 ///
 /// The program will panic if it tries to dynamically allocate memory.
 ///
-/// This is used when the `"std"` feature is disabled.
-#[cfg(not(feature = "std"))]
+/// This is used when the `"alloc"` feature is disabled.
 #[macro_export]
 macro_rules! no_allocator {
     () => {
@@ -602,12 +589,25 @@ macro_rules! no_allocator {
     };
 }
 
-#[cfg(target_os = "solana")]
+/// An allocator that does not allocate memory.
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
+pub struct NoAllocator;
+
+unsafe impl GlobalAlloc for NoAllocator {
+    #[inline]
+    unsafe fn alloc(&self, _: Layout) -> *mut u8 {
+        panic!("** NoAllocator::alloc() does not allocate memory **");
+    }
+
+    #[inline]
+    unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
+        // I deny all allocations, so I don't need to free.
+    }
+}
+
+#[cfg(all(target_os = "solana", feature = "alloc"))]
 mod alloc {
-    //! The bump allocator used as the default rust heap when running programs.
-
-    extern crate alloc;
-
     use core::{
         alloc::{GlobalAlloc, Layout},
         mem::size_of,
@@ -653,34 +653,13 @@ mod alloc {
     }
 }
 
-#[cfg(not(feature = "std"))]
-/// An allocator that does not allocate memory.
-#[cfg_attr(feature = "copy", derive(Copy))]
-#[derive(Clone, Debug)]
-pub struct NoAllocator;
-
-#[cfg(not(feature = "std"))]
-unsafe impl GlobalAlloc for NoAllocator {
-    #[inline]
-    unsafe fn alloc(&self, _: Layout) -> *mut u8 {
-        panic!("** NO ALLOCATOR **");
-    }
-
-    #[inline]
-    unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
-        // I deny all allocations, so I don't need to free.
-    }
-}
-
-#[cfg(all(test, not(target_os = "solana")))]
+#[cfg(test)]
 mod tests {
-    extern crate std;
-
-    use core::{alloc::Layout, ptr::copy_nonoverlapping};
-    use std::{
-        alloc::{alloc, dealloc},
+    use ::alloc::{
+        alloc::{alloc, dealloc, handle_alloc_error},
         vec,
     };
+    use core::{alloc::Layout, ptr::copy_nonoverlapping};
 
     use super::*;
 
@@ -703,7 +682,7 @@ mod tests {
             unsafe {
                 let ptr = alloc(layout);
                 if ptr.is_null() {
-                    std::alloc::handle_alloc_error(layout);
+                    handle_alloc_error(layout);
                 }
                 AlignedMemory { ptr, layout }
             }

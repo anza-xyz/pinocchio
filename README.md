@@ -168,16 +168,18 @@ pub fn process_instruction(
 > ⚠️ **Note:**
 > The `no_allocator!` macro can also be used in combination with the `lazy_program_entrypoint!`.
 
-## Crate feature: `std`
+## Crate feature: `alloc`
 
-By default, Pinocchio is a `no_std` crate. This means that it does not use any code from the
-standard (`std`) library. While this does not affect how Pinocchio is used, there is a one
-particular apparent difference. Helpers that need to allocate memory, such as fetching `SlotHashes`
-sysvar data, are not available. To enable these helpers, the `std` feature must be enabled when adding
-Pinocchio as a dependency:
+The `alloc` feature is enabled by default and it uses the [`alloc`](https://doc.rust-lang.org/alloc/) crate. This provides access to dynamic memory allocation in combination with the `default_allocator`, e.g., required to use `String` and `Vec` in a program. Helpers that need to allocate memory, such as fetching `SlotHashes` sysvar data, are also available.
+
+When no allocation is needed or desired, the feature can be disabled:
+
 ```
-pinocchio = { version = "0.10.0", features = ["std"] }
+pinocchio = { version = "0.10.0", default-features = false }
 ```
+
+> ⚠️ **Note:**
+> The `default_allocator` macro is not available when disabling the `alloc` feature.
 
 ## Advance entrypoint configuration
 

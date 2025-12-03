@@ -18,9 +18,10 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
+alloc = ["solana-instruction-view?/slice-cpi"]
 copy = ["solana-account-view/copy", "solana-address/copy"]
 cpi = ["dep:solana-instruction-view"]
-std = ["solana-address/std"]
+default = ["alloc"]
 
 [dependencies]
 solana-account-view = { workspace = true }
@@ -32,4 +33,5 @@ solana-program-error = { workspace = true }
 solana-define-syscall = { workspace = true }
 
 [dev-dependencies]
-five8_const = { workspace = true }
+solana-address = { workspace = true, features = ["decode"] }
+pinocchio = { path = ".", features = ["alloc"] }
