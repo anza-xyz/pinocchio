@@ -70,10 +70,10 @@ To use the `entrypoint!` macro, use the following in your entrypoint definition:
 use pinocchio::{
   account::AccountView,
   entrypoint,
-  msg,
   ProgramResult,
   Address
 };
+use solana_program_log::log;
 
 entrypoint!(process_instruction);
 
@@ -82,7 +82,7 @@ pub fn process_instruction(
   accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
-  msg!("Hello from my program!");
+  log!("Hello from my pinocchio program!");
   Ok(())
 }
 ```
@@ -114,7 +114,6 @@ use pinocchio::{
   default_panic_handler,
   entrypoint::InstructionContext,
   lazy_program_entrypoint,
-  msg,
   ProgramResult
 };
 
@@ -125,7 +124,6 @@ default_panic_handler!();
 pub fn process_instruction(
   mut context: InstructionContext
 ) -> ProgramResult {
-    msg!("Hello from my lazy program!");
     Ok(())
 }
 ```
@@ -149,7 +147,6 @@ To use the `no_allocator!` macro, use the following in your entrypoint definitio
 use pinocchio::{
   account::AccountView,
   default_panic_handler,
-  msg,
   no_allocator,
   program_entrypoint,
   ProgramResult,
@@ -165,7 +162,6 @@ pub fn process_instruction(
   accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
-  msg!("Hello from `no_std` program!");
   Ok(())
 }
 ```
@@ -174,12 +170,14 @@ pub fn process_instruction(
 
 ## Crate feature: `std`
 
-By default, `pinocchio` is a `no_std` crate. This means that it does not use any code from the standard (`std`) library. While this does not affect how `pinocchio` is used, there is one particular apparent difference. In a `no_std` environment, the `msg!` macro does not provide any formatting options since the `format!` macro requires the `std` library. In order to use `msg!` with formatting, the `std` feature should be enabled when adding `pinocchio` as a dependency:
+By default, Pinocchio is a `no_std` crate. This means that it does not use any code from the
+standard (`std`) library. While this does not affect how Pinocchio is used, there is a one
+particular apparent difference. Helpers that need to allocate memory, such as fetching `SlotHashes`
+sysvar data, are not available. To enable these helpers, the `std` feature must be enabled when adding
+Pinocchio as a dependency:
 ```
-pinocchio = { version = "0.7.0", features = ["std"] }
+pinocchio = { version = "0.10.0", features = ["std"] }
 ```
-
-Instead of enabling the `std` feature to be able to format log messages with `msg!`, it is recommended to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log) crate. This crate provides a lightweight `log!` macro with better compute units consumption than the standard `format!` macro without requiring the `std` library.
 
 ## Advance entrypoint configuration
 
@@ -191,7 +189,6 @@ mod entrypoint {
   use pinocchio::{
     account::AccountView,
     entrypoint,
-    msg,
     ProgramResult,
     Address
   };
@@ -203,7 +200,6 @@ mod entrypoint {
     accounts: &[AccountView],
     instruction_data: &[u8],
   ) -> ProgramResult {
-    msg!("Hello from my program!");
     Ok(())
   }
 }

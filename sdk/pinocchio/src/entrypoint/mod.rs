@@ -94,7 +94,6 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 ///     use pinocchio::{
 ///         AccountView,
 ///         entrypoint,
-///         msg,
 ///         Address,
 ///         ProgramResult
 ///     };
@@ -106,7 +105,6 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 ///         accounts: &[AccountView],
 ///         instruction_data: &[u8],
 ///     ) -> ProgramResult {
-///         msg!("Hello from my program!");
 ///         Ok(())
 ///     }
 ///
@@ -436,33 +434,8 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
 
 /// Default panic hook.
 ///
-/// This macro sets up a default panic hook that logs the panic message and the file where the panic
-/// occurred. It acts as a hook after Rust runtime panics; syscall `abort()` will be called after it
-/// returns.
-///
-/// Note that this requires the `"std"` feature to be enabled.
-#[cfg(feature = "std")]
-#[macro_export]
-macro_rules! default_panic_handler {
-    () => {
-        /// Default panic handler.
-        #[cfg(target_os = "solana")]
-        #[no_mangle]
-        fn custom_panic(info: &core::panic::PanicInfo<'_>) {
-            // Panic reporting.
-            $crate::msg!("{}", info);
-        }
-    };
-}
-
-/// Default panic hook.
-///
 /// This macro sets up a default panic hook that logs the file where the panic occurred. It acts as
 /// a hook after Rust runtime panics; syscall `abort()` will be called after it returns.
-///
-/// This is used when the `"std"` feature is disabled, while either the program or any of its
-/// dependencies are not `no_std`.
-#[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! default_panic_handler {
     () => {
@@ -471,10 +444,12 @@ macro_rules! default_panic_handler {
         #[no_mangle]
         fn custom_panic(info: &core::panic::PanicInfo<'_>) {
             if let Some(location) = info.location() {
-                $crate::log::sol_log(location.file());
+                let location = location.file();
+                unsafe { $crate::syscalls::sol_log_(location.as_ptr(), location.len() as u64) };
             }
             // Panic reporting.
-            $crate::log::sol_log("** PANICKED **");
+            const PANICKED: &str = "** PANICKED **";
+            unsafe { $crate::syscalls::sol_log_(PANICKED.as_ptr(), PANICKED.len() as u64) };
         }
     };
 }
@@ -505,8 +480,11 @@ macro_rules! nostd_panic_handler {
                 }
             } else {
                 // Panic reporting.
-                $crate::log::sol_log("** PANICKED **");
-                unsafe { $crate::syscalls::abort() }
+                const PANICKED: &str = "** PANICKED **";
+                unsafe {
+                    $crate::syscalls::sol_log_(PANICKED.as_ptr(), PANICKED.len() as u64);
+                    $crate::syscalls::abort();
+                }
             }
         }
 
