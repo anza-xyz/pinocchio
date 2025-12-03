@@ -28,5 +28,8 @@ solana-address = { workspace = true, features = ["syscalls"] }
 solana-instruction-view = { workspace = true, features = ["cpi"], optional = true }
 solana-program-error = { workspace = true }
 
+[target.'cfg(any(target_os = "solana", target_arch = "bpf"))'.dependencies]
+solana-define-syscall = { workspace = true }
+
 [dev-dependencies]
 five8_const = { workspace = true }

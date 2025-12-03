@@ -114,6 +114,7 @@ dependencies = [
  "five8_const 0.1.4",
  "solana-account-view",
  "solana-address",
+ "solana-define-syscall",
  "solana-instruction-view",
  "solana-program-error",
 ]

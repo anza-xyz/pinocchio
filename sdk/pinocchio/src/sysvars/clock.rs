@@ -1,5 +1,9 @@
 //! Information about the network's clock, ticks, slots, etc.
 
+// This is necessary since `sol_get_clock_sysvar` is deprecated but still used here.
+// It can be removed once the implementation uses `get_sysvar` instead.
+#![allow(deprecated)]
+
 use crate::{
     account::{AccountView, Ref},
     error::ProgramError,

@@ -2,6 +2,10 @@
 //!
 //! This is required for the rent sysvar implementation.
 
+// This is necessary since `sol_get_rent_sysvar` is deprecated but still used here.
+// It can be removed once the implementation uses `get_sysvar` instead.
+#![allow(deprecated)]
+
 use crate::{
     account::{AccountView, Ref},
     error::ProgramError,
