@@ -653,12 +653,10 @@ mod alloc {
     }
 }
 
-#[cfg(all(test, not(target_os = "solana")))]
+#[cfg(test)]
 mod tests {
-    extern crate alloc;
-
-    use alloc::{
-        alloc::{alloc, dealloc},
+    use ::alloc::{
+        alloc::{alloc, dealloc, handle_alloc_error},
         vec,
     };
     use core::{alloc::Layout, ptr::copy_nonoverlapping};
@@ -684,7 +682,7 @@ mod tests {
             unsafe {
                 let ptr = alloc(layout);
                 if ptr.is_null() {
-                    alloc::alloc::handle_alloc_error(layout);
+                    handle_alloc_error(layout);
                 }
                 AlignedMemory { ptr, layout }
             }

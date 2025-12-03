@@ -210,7 +210,7 @@
 //! cargo build-sbf --features bpf-entrypoint
 //! ```
 
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

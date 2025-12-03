@@ -141,46 +141,45 @@ fn test_fetch_into_offset_validation() {
 #[test]
 fn test_fetch_into_host_stub() {
     // 1. Full-size buffer, offset 0.
-    let mut full = std::vec![0u8; MAX_SIZE];
+    let mut full = alloc::vec![0u8; MAX_SIZE];
     let n = raw::fetch_into(&mut full, 0).expect("fetch_into(full, 0)");
     assert_eq!(n, 0);
 
     // 2. Header-only buffer.
-    let mut header_only = std::vec![0u8; NUM_ENTRIES_SIZE];
+    let mut header_only = alloc::vec![0u8; NUM_ENTRIES_SIZE];
     let n2 = raw::fetch_into(&mut header_only, 0).expect("fetch_into(header_only, 0)");
     assert_eq!(n2, 0);
 
     // 3. One-entry buffer.
-    let mut one_entry = std::vec![0u8; NUM_ENTRIES_SIZE + ENTRY_SIZE];
+    let mut one_entry = alloc::vec![0u8; NUM_ENTRIES_SIZE + ENTRY_SIZE];
     let n3 = raw::fetch_into(&mut one_entry, 0).expect("fetch_into(one_entry, 0)");
     assert_eq!(n3, 0);
 
     // 4. Header-skipped fetch should succeed and return the number of entries that fit.
-    let mut skip_header = std::vec![0u8; ENTRY_SIZE];
+    let mut skip_header = alloc::vec![0u8; ENTRY_SIZE];
     let entries_count = raw::fetch_into(&mut skip_header, 8).expect("fetch_into(skip_header, 8)");
     assert_eq!(entries_count, 1); // Buffer can fit exactly 1 entry
 
     // 5. Mis-aligned buffer size should error.
-    let mut misaligned = std::vec![0u8; NUM_ENTRIES_SIZE + 39];
+    let mut misaligned = alloc::vec![0u8; NUM_ENTRIES_SIZE + 39];
     assert!(raw::fetch_into(&mut misaligned, 0).is_err());
 
     // 6. Mid-entry offset should error.
-    let mut buf = std::vec![0u8; 64];
+    let mut buf = alloc::vec![0u8; 64];
     assert!(raw::fetch_into(&mut buf, 12).is_err());
 
     // 7. Offset + len overflow should error.
-    let mut small = std::vec![0u8; 200];
+    let mut small = alloc::vec![0u8; 200];
     assert!(raw::fetch_into(&mut small, MAX_SIZE - 199).is_err());
 }
 
 /// Test that `fetch_into` with offset correctly avoids interpreting slot
 /// data as entry count.
-#[cfg(test)]
 #[test]
 fn test_fetch_into_offset_avoids_incorrect_entry_count() {
     // When fetch_into is called with offset != 0, the first
     // 8 bytes of the buffer contains header data, not entry data.
-    let mut buffer = std::vec![0u8; 3 * ENTRY_SIZE];
+    let mut buffer = alloc::vec![0u8; 3 * ENTRY_SIZE];
 
     // Call fetch_into with offset 8 (skipping the 8-byte header)
     let result = raw::fetch_into(&mut buffer, 8);
@@ -197,7 +196,7 @@ fn test_fetch_into_offset_avoids_incorrect_entry_count() {
     );
 
     // Buffer for exactly 1 entry starting from offset 48 (2nd entry)
-    let mut second_entry_buffer = std::vec![0u8; ENTRY_SIZE];
+    let mut second_entry_buffer = alloc::vec![0u8; ENTRY_SIZE];
     let second_result = raw::fetch_into(&mut second_entry_buffer, 48).unwrap();
     assert_eq!(second_result, 1);
 }

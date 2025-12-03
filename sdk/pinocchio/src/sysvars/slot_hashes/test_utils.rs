@@ -3,10 +3,9 @@
 //! freely while production code remains `#![no_std]`.
 
 use super::*;
-extern crate std;
 use crate::account::{AccountView, RuntimeAccount};
+use alloc::vec::Vec;
 use core::ptr;
-use std::vec::Vec;
 
 /// Matches the pinocchio Account struct.
 /// Account fields are private, so this struct allows more readable
@@ -88,7 +87,7 @@ pub fn generate_mock_entries(
 /// Build a `Vec<u8>` the size of the *golden* `SlotHashes` sysvar (20 488 bytes)
 /// containing the supplied `entries` and with the `declared_len` header.
 pub fn build_slot_hashes_bytes(declared_len: u64, entries: &[(u64, Hash)]) -> Vec<u8> {
-    let mut data = std::vec![0u8; MAX_SIZE];
+    let mut data = alloc::vec![0u8; MAX_SIZE];
     data[..NUM_ENTRIES_SIZE].copy_from_slice(&declared_len.to_le_bytes());
     let mut offset = NUM_ENTRIES_SIZE;
     for (slot, hash) in entries {
@@ -124,7 +123,7 @@ pub unsafe fn make_account_view(
     let hdr_size = mem::size_of::<AccountLayout>();
     let total = hdr_size + data.len();
     let words = total.div_ceil(8);
-    let mut backing: Vec<u64> = std::vec![0u64; words];
+    let mut backing: Vec<u64> = alloc::vec![0u64; words];
     assert!(
         mem::align_of::<u64>() >= mem::align_of::<AccountLayout>(),
         "`backing` should be properly aligned to store an `AccountLayout` instance"
@@ -158,7 +157,6 @@ pub unsafe fn make_account_view(
     )
 }
 
-#[cfg(test)]
 #[test]
 fn test_account_layout_compatibility() {
     assert_eq!(

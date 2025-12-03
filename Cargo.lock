@@ -22,15 +22,6 @@ dependencies = [
 
 [[package]]
 name = "five8_const"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26dec3da8bc3ef08f2c04f61eab298c3ab334523e55f076354d6d6f613799a7b"
-dependencies = [
- "five8_core",
-]
-
-[[package]]
-name = "five8_const"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a0f1728185f277989ca573a402716ae0beaaea3f76a8ff87ef9dd8fb19436c5"
@@ -54,7 +45,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 name = "pinocchio"
 version = "0.9.2"
 dependencies = [
- "five8_const 0.1.4",
+ "pinocchio",
  "solana-account-view",
  "solana-address",
  "solana-define-syscall",
@@ -190,7 +181,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e37320fd2945c5d654b2c6210624a52d66c3f1f73b653ed211ab91a703b35bdd"
 dependencies = [
  "five8",
- "five8_const 1.0.0",
+ "five8_const",
  "solana-define-syscall",
  "solana-program-error",
 ]
