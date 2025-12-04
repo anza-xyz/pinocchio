@@ -1,6 +1,7 @@
-//! # A library to create Solana programs in Rust
-//!
-//! Pinocchio is a *no-external* dependencies library to create Solana programs
+#![no_std]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
+//! A *no external* dependencies library to create Solana programs
 //! in Rust. The only dependencies are types from the Solana SDK specifically
 //! designed for on-chain programs. This mitigates dependency issues and offers
 //! an efficient zero-copy library to write programs, optimized in terms of both
@@ -189,6 +190,11 @@
 //! pinocchio = { version = "0.10.0", default-features = false }
 //! ```
 //!
+//! ### `copy`
+//!
+//! The `copy` feature enables the derivation of the `Copy` trait for types. It also enables the
+//! `copy` feature on the `solana-account-view` and `solana-address` re-exports.
+//!
 //! ### `cpi`
 //!
 //! The `cpi` feature enables the cross-program invocation helpers, as well as types
@@ -233,9 +239,6 @@
 //! ```ignore
 //! cargo build-sbf --features bpf-entrypoint
 //! ```
-
-#![no_std]
-#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

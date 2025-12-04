@@ -5,7 +5,7 @@
   <img width="400" alt="Limestone" src="https://github.com/user-attachments/assets/3a1894b4-403f-4c35-90aa-548e7672fe90" />
 </p>
 <p align="center">
-  Create Solana programs with no dependencies<sup>*</sup> attached.
+  Create Solana programs with no external dependencies attached.
 </p>
 
 <p align="center">
@@ -24,19 +24,15 @@
 <i>There are no dependencies on me</i>
 </p>
 
-<p style="font-size: 12px; color: #999999">
-<strong><sup>*</sup></strong> It includes only dependencies to Solana SDK types &mdash; i.e., no <i>external</i> dependencies. 
-</p>
-
 ## Overview
 
-Pinocchio is a *no-external* dependencies library to create Solana programs in Rust. The only dependencies are types from the Solana SDK specifically designed for on-chain programs. This mitigates dependency issues and offers an efficient zero-copy library to write programs, optimized in terms of both compute units consumption and binary size.
+Pinocchio is a *no external* dependencies library to create Solana programs in Rust. The only dependencies are types from the Solana SDK specifically designed for on-chain programs. This mitigates dependency issues and offers an efficient zero-copy library to write programs, optimized in terms of both compute units consumption and binary size.
 
 ## Features
 
 * `no_std` crate
-* no-external dependencies
-* efficient `program_entrypoint!` macro – no copies or allocations
+* only dependencies to Solana SDK types
+* efficient `program_entrypoint!` macro with no copies or allocations
 * lightweight `lazy_program_entrypoint` providing more control over how the input is parsed
 
 ## Getting started
@@ -190,6 +186,11 @@ pinocchio = { version = "0.10.0", default-features = false }
 
 > ⚠️ **Note:**
 > The `default_allocator` macro is not available when disabling the `alloc` feature.
+
+### `copy`
+
+The `copy` feature enables the derivation of the `Copy` trait for types. It also enables the `copy` feature
+on the `solana-account-view` and `solana-address` re-exports.
 
 ### `cpi`
 
