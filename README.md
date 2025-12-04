@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/anza-xyz/pinocchio/actions/workflows/main.yml"><img src="https://img.shields.io/github/actions/workflow/status/anza-xyz/pinocchio/main.yml?logo=GitHub" /></a>
   <a href="https://crates.io/crates/pinocchio"><img src="https://img.shields.io/crates/v/pinocchio?logo=rust" /></a>
-  <a href="https://docs.rs/pinocchio"><img src="https://img.shields.io/badge/docs-latest-brightgreen?logo=docsdotrs" /></a>
+  <a href="https://docs.rs/pinocchio"><img src="https://img.shields.io/docsrs/pinocchio?logo=docsdotrs" /></a>
 </p>
 
 <p align="right">
