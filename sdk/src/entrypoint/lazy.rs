@@ -10,20 +10,6 @@ use crate::{
 
 /// Declare the lazy program entrypoint.
 ///
-/// Use the `lazy_program_entrypoint!` macro instead.
-#[deprecated(
-    since = "0.7.0",
-    note = "Use the `lazy_program_entrypoint!` macro instead"
-)]
-#[macro_export]
-macro_rules! lazy_entrypoint {
-    ( $process_instruction:expr ) => {
-        $crate::lazy_program_entrypoint!($process_instruction);
-    };
-}
-
-/// Declare the lazy program entrypoint.
-///
 /// This entrypoint is defined as *lazy* because it does not read the accounts upfront.
 /// Instead, it provides an [`InstructionContext`] to the access input information on demand.
 /// This is useful when the program needs more control over the compute units it uses.
@@ -111,20 +97,6 @@ pub struct InstructionContext {
 }
 
 impl InstructionContext {
-    /// Creates a new [`InstructionContext`] for the input buffer.
-    ///
-    /// The caller must ensure that the input buffer is valid, i.e., it represents
-    /// the program input parameters serialized by the SVM loader.
-    ///
-    /// This method is deprecated and will be removed in a future version. It is
-    /// missing the `unsafe` qualifier.
-    #[deprecated(since = "0.8.3", note = "Use `new_unchecked` instead")]
-    #[allow(clippy::not_unsafe_ptr_arg_deref)]
-    #[inline(always)]
-    pub fn new(input: *mut u8) -> Self {
-        unsafe { Self::new_unchecked(input) }
-    }
-
     /// Creates a new [`InstructionContext`] for the input buffer.
     ///
     /// # Safety
