@@ -27,17 +27,6 @@ pub const HEAP_START_ADDRESS: u64 = 0x300000000;
 /// Length of the heap memory region used for program heap.
 pub const HEAP_LENGTH: usize = 32 * 1024;
 
-#[deprecated(
-    since = "0.6.0",
-    note = "Use `ProgramResult` from the crate root instead"
-)]
-/// The result of a program execution.
-pub type ProgramResult = super::ProgramResult;
-
-#[deprecated(since = "0.6.0", note = "Use `SUCCESS` from the crate root instead")]
-/// Return value for a successful program execution.
-pub const SUCCESS: u64 = super::SUCCESS;
-
 /// Value used to indicate that a serialized account is not a duplicate.
 pub const NON_DUP_MARKER: u8 = u8::MAX;
 
