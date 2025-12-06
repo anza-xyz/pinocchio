@@ -151,7 +151,7 @@ impl IntrospectedInstruction<'_> {
         }
     }
 
-    /// Load the number of instructions in the currently executing `Transaction`.
+    /// Get the number of accounts of the `Instruction`.
     #[inline(always)]
     pub fn num_account_metas(&self) -> usize {
         // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
