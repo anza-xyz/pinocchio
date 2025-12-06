@@ -134,7 +134,7 @@ pub struct IntrospectedInstruction<'a> {
 }
 
 impl IntrospectedInstruction<'_> {
-    /// Create a new IntrospectedInstruction.
+    /// Create a new `IntrospectedInstruction`.
     ///
     /// # Safety
     ///
