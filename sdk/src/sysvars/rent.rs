@@ -53,15 +53,17 @@ pub const DEFAULT_EXEMPTION_THRESHOLD: f64 = 2.0;
 
 /// The `u64` representation of the default exemption threshold.
 ///
-/// This is used to check whether the `f64` value can be safely cast to a `u64`.
-const CURRENT_EXEMPTION_THRESHOLD: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 64];
+/// This value is equivalent to `2.0f64`. It is only used to check whether
+/// the exemption threshold is the default value to avoid performing
+/// floating-point operations on-chain.
+const CURRENT_EXEMPTION_THRESHOLD: u64 = 4611686018427387904;
 
-/// The `f64::to_le_bytes` representation of the SIMD-0194 exemption threshold.
+/// The `u64` representation of the SIMD-0194 exemption threshold.
 ///
-/// This value is equivalent to `1f64`. It is only used to check whether
+/// This value is equivalent to `1.0f64`. It is only used to check whether
 /// the exemption threshold is the deprecated value to avoid performing
 /// floating-point operations on-chain.
-const SIMD0194_EXEMPTION_THRESHOLD: [u8; 8] = [0, 0, 0, 0, 0, 0, 240, 63];
+const SIMD0194_EXEMPTION_THRESHOLD: u64 = 4607182418800017408;
 
 /// Default percentage of collected rent that is burned.
 ///
@@ -174,8 +176,9 @@ impl Rent {
     #[inline]
     pub fn minimum_balance(&self, data_len: usize) -> u64 {
         let bytes = data_len as u64;
+        let exemption_threshold = u64::from_le_bytes(self.exemption_threshold);
 
-        match self.exemption_threshold {
+        match exemption_threshold {
             SIMD0194_EXEMPTION_THRESHOLD => {
                 (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte
             }
@@ -226,7 +229,7 @@ mod tests {
     pub fn test_minimum_balance() {
         let mut rent = super::Rent {
             lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE_YEAR,
-            exemption_threshold: CURRENT_EXEMPTION_THRESHOLD,
+            exemption_threshold: CURRENT_EXEMPTION_THRESHOLD.to_le_bytes(),
             burn_percent: DEFAULT_BURN_PERCENT,
         };
 
@@ -254,7 +257,7 @@ mod tests {
     pub fn test_minimum_balance_simd0194() {
         let mut rent = super::Rent {
             lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE,
-            exemption_threshold: SIMD0194_EXEMPTION_THRESHOLD,
+            exemption_threshold: SIMD0194_EXEMPTION_THRESHOLD.to_le_bytes(),
             burn_percent: DEFAULT_BURN_PERCENT,
         };
 
