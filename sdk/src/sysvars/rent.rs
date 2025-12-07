@@ -43,6 +43,7 @@ pub const DEFAULT_LAMPORTS_PER_BYTE_YEAR: u64 = 1_000_000_000 / 100 * 365 / (102
 /// - `$7.30` per megabyte
 pub const DEFAULT_LAMPORTS_PER_BYTE: u64 = 6960;
 
+#[cfg(not(target_arch = "bpf"))]
 /// Default amount of time (in years) the balance has to include rent for the
 /// account to be rent exempt.
 #[deprecated(
