@@ -6,13 +6,16 @@
 // It can be removed once the implementation uses `get_sysvar` instead.
 #![allow(deprecated)]
 
-use crate::{
-    account::{AccountView, Ref},
-    error::ProgramError,
-    hint::unlikely,
-    impl_sysvar_get,
-    sysvars::Sysvar,
-    Address,
+use {
+    crate::{
+        account::{AccountView, Ref},
+        error::ProgramError,
+        hint::unlikely,
+        impl_sysvar_get,
+        sysvars::Sysvar,
+        Address,
+    },
+    core::mem::size_of,
 };
 
 /// The ID of the rent sysvar.
@@ -52,19 +55,19 @@ pub const DEFAULT_LAMPORTS_PER_BYTE: u64 = 6960;
 )]
 pub const DEFAULT_EXEMPTION_THRESHOLD: f64 = 2.0;
 
-/// The `u64` representation of the default exemption threshold.
+/// The `u64::to_le_bytes` representation of the default exemption threshold.
 ///
 /// This value is equivalent to `2.0f64`. It is only used to check whether
 /// the exemption threshold is the default value to avoid performing
 /// floating-point operations on-chain.
-const CURRENT_EXEMPTION_THRESHOLD: u64 = 4611686018427387904;
+const CURRENT_EXEMPTION_THRESHOLD: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 64];
 
-/// The `u64` representation of the SIMD-0194 exemption threshold.
+/// The `u64::to_le_bytes` representation of the SIMD-0194 exemption threshold.
 ///
 /// This value is equivalent to `1.0f64`. It is only used to check whether
 /// the exemption threshold is the deprecated value to avoid performing
 /// floating-point operations on-chain.
-const SIMD0194_EXEMPTION_THRESHOLD: u64 = 4607182418800017408;
+const SIMD0194_EXEMPTION_THRESHOLD: [u8; 8] = [0, 0, 0, 0, 0, 0, 240, 63];
 
 /// Default percentage of collected rent that is burned.
 ///
@@ -102,9 +105,6 @@ pub struct Rent {
 }
 
 impl Rent {
-    /// The length of the `Rent` sysvar account data.
-    pub const LEN: usize = 8 + 8 + 1;
-
     /// Return a `Rent` from the given account view.
     ///
     /// This method performs a check on the account view key.
@@ -143,7 +143,7 @@ impl Rent {
     /// a valid representation of `Rent`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<&Self, ProgramError> {
-        if bytes.len() < Self::LEN {
+        if bytes.len() < size_of::<Self>() {
             return Err(ProgramError::InvalidArgument);
         }
         // SAFETY: `bytes` has been validated to be at least `Self::LEN` bytes long; the
@@ -177,24 +177,28 @@ impl Rent {
     #[inline]
     pub fn minimum_balance(&self, data_len: usize) -> u64 {
         let bytes = data_len as u64;
-        let exemption_threshold = u64::from_le_bytes(self.exemption_threshold);
 
-        match exemption_threshold {
-            SIMD0194_EXEMPTION_THRESHOLD => {
-                (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte
+        // There are two cases where it is possible to avoid floating-point
+        // operations:
+        //
+        //   1)  exemption threshold is `1.0` (the SIMD-0194 default)
+        //   2)  exemption threshold is `2.0` (the current default)
+        //
+        // In all other cases, perform the full calculation using floating-point
+        // operations. Note that on BPF targets, floating-point operations are
+        // not supported, so panic in that case.
+        if self.exemption_threshold == SIMD0194_EXEMPTION_THRESHOLD {
+            (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte
+        } else if self.exemption_threshold == CURRENT_EXEMPTION_THRESHOLD {
+            2 * (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte
+        } else {
+            #[cfg(not(target_arch = "bpf"))]
+            {
+                (((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte) as f64
+                    * f64::from_le_bytes(self.exemption_threshold)) as u64
             }
-            CURRENT_EXEMPTION_THRESHOLD => {
-                2 * (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte
-            }
-            _ => {
-                #[cfg(not(target_arch = "bpf"))]
-                {
-                    (((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte) as f64
-                        * f64::from_le_bytes(self.exemption_threshold)) as u64
-                }
-                #[cfg(target_arch = "bpf")]
-                panic!("Floating-point operations are not supported on BPF targets");
-            }
+            #[cfg(target_arch = "bpf")]
+            panic!("Floating-point operations are not supported on BPF targets");
         }
     }
 
@@ -230,7 +234,7 @@ mod tests {
     pub fn test_minimum_balance() {
         let mut rent = super::Rent {
             lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE_YEAR,
-            exemption_threshold: CURRENT_EXEMPTION_THRESHOLD.to_le_bytes(),
+            exemption_threshold: CURRENT_EXEMPTION_THRESHOLD,
             burn_percent: DEFAULT_BURN_PERCENT,
         };
 
@@ -258,7 +262,7 @@ mod tests {
     pub fn test_minimum_balance_simd0194() {
         let mut rent = super::Rent {
             lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE,
-            exemption_threshold: SIMD0194_EXEMPTION_THRESHOLD.to_le_bytes(),
+            exemption_threshold: SIMD0194_EXEMPTION_THRESHOLD,
             burn_percent: DEFAULT_BURN_PERCENT,
         };
 
