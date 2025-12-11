@@ -24,8 +24,24 @@ pub use alloc::BumpAllocator;
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
 
-/// Length of the heap memory region used for program heap.
-pub const HEAP_LENGTH: usize = 32 * 1024;
+/// Minimum heap length supported by the runtime.
+pub const MIN_HEAP_LENGTH: usize = 0x8000;
+
+/// Maximum heap length supported by the runtime.
+pub const MAX_HEAP_LENGTH: usize = 0x40000;
+
+/// Default heap length used by the runtime.
+pub const DEFAULT_HEAP_LENGTH: usize = MIN_HEAP_LENGTH;
+
+/// Length of the heap memory region used for program heap. Kept for backward compatibility.
+pub const HEAP_LENGTH: usize = DEFAULT_HEAP_LENGTH;
+
+/// Validate that a heap length is within the supported bounds.
+pub const fn assert_heap_length(len: usize) -> usize {
+    assert!(len >= MIN_HEAP_LENGTH, "heap length below supported minimum");
+    assert!(len <= MAX_HEAP_LENGTH, "heap length above supported maximum");
+    len
+}
 
 /// Value used to indicate that a serialized account is not a duplicate.
 pub const NON_DUP_MARKER: u8 = u8::MAX;
@@ -493,11 +509,15 @@ macro_rules! nostd_panic_handler {
 #[macro_export]
 macro_rules! default_allocator {
     () => {
+        $crate::default_allocator!($crate::entrypoint::DEFAULT_HEAP_LENGTH);
+    };
+    ( $len:expr ) => {
+        const __PIN_HEAP_LENGTH: usize = $crate::entrypoint::assert_heap_length($len);
         #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[global_allocator]
         static A: $crate::entrypoint::BumpAllocator = $crate::entrypoint::BumpAllocator {
             start: $crate::entrypoint::HEAP_START_ADDRESS as usize,
-            len: $crate::entrypoint::HEAP_LENGTH,
+            len: __PIN_HEAP_LENGTH,
         };
 
         /// A default allocator for when the program is compiled on a target different than
@@ -523,6 +543,10 @@ macro_rules! default_allocator {
 #[macro_export]
 macro_rules! no_allocator {
     () => {
+        $crate::no_allocator!($crate::entrypoint::DEFAULT_HEAP_LENGTH);
+    };
+    ( $len:expr ) => {
+        const __PIN_HEAP_LENGTH: usize = $crate::entrypoint::assert_heap_length($len);
         #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[global_allocator]
         static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
@@ -553,8 +577,7 @@ macro_rules! no_allocator {
 
             // Assert if the allocation does not exceed the heap size.
             assert!(
-                end <= $crate::entrypoint::HEAP_START_ADDRESS as usize
-                    + $crate::entrypoint::HEAP_LENGTH,
+                end <= $crate::entrypoint::HEAP_START_ADDRESS as usize + __PIN_HEAP_LENGTH,
                 "allocation exceeds heap size"
             );
 
@@ -623,15 +646,18 @@ mod alloc {
 
             let mut pos = *pos_ptr;
             if pos == 0 {
-                // First time, set starting position.
-                pos = self.start + self.len;
+                // First allocation starts after the cursor word.
+                pos = self.start + size_of::<usize>();
             }
-            pos = pos.saturating_sub(layout.size());
+            pos = pos.wrapping_add(layout.align().wrapping_sub(1));
             pos &= !(layout.align().wrapping_sub(1));
-            if pos < self.start + size_of::<*mut u8>() {
+            let end = pos.saturating_add(layout.size());
+            // On BPF we rely on the runtime to fault if the heap is exhausted.
+            #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+            if end > self.start + self.len {
                 return null_mut();
             }
-            *pos_ptr = pos;
+            *pos_ptr = end;
             pos as *mut u8
         }
 
@@ -647,6 +673,7 @@ mod tests {
     use ::alloc::{
         alloc::{alloc, dealloc, handle_alloc_error},
         vec,
+        vec::Vec,
     };
     use core::{alloc::Layout, ptr::copy_nonoverlapping};
 
@@ -943,5 +970,55 @@ mod tests {
         assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_duplicated_accounts(&accounts, 32);
+    }
+
+    fn simulate_forward_bump(len: usize, layouts: &[Layout]) -> Option<Vec<usize>> {
+        const HEAP_START: usize = 0x1000;
+        let mut cursor = HEAP_START + size_of::<usize>();
+        let mut allocations = Vec::with_capacity(layouts.len());
+        for layout in layouts {
+            cursor = cursor.wrapping_add(layout.align().wrapping_sub(1));
+            cursor &= !(layout.align().wrapping_sub(1));
+            let end = cursor.checked_add(layout.size())?;
+            if end > HEAP_START + len {
+                return None;
+            }
+            allocations.push(cursor);
+            cursor = end;
+        }
+        Some(allocations)
+    }
+
+    #[test]
+    fn bump_allocator_grows_forward_and_aligns() {
+        let layouts = [
+            Layout::from_size_align(8, 8).unwrap(),
+            Layout::from_size_align(16, 16).unwrap(),
+        ];
+        let allocations =
+            simulate_forward_bump(MIN_HEAP_LENGTH, &layouts).expect("should fit in heap");
+        assert_eq!(
+            allocations[0],
+            0x1000 + size_of::<usize>(),
+            "first allocation should start at the beginning of the heap after the cursor word"
+        );
+        assert_eq!(allocations[1] % 16, 0, "alignment is preserved");
+    }
+
+    #[test]
+    fn bump_allocator_fails_on_exhaustion() {
+        let layouts = [Layout::from_size_align(MIN_HEAP_LENGTH, 8).unwrap()];
+        assert!(
+            simulate_forward_bump(MIN_HEAP_LENGTH, &layouts).is_none(),
+            "allocation that overflows the heap should fail"
+        );
+    }
+
+    const _: usize = assert_heap_length(MIN_HEAP_LENGTH);
+    const _: usize = assert_heap_length(MAX_HEAP_LENGTH);
+
+    #[test]
+    fn default_heap_length_matches_minimum() {
+        assert_eq!(DEFAULT_HEAP_LENGTH, MIN_HEAP_LENGTH);
     }
 }

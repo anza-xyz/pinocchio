@@ -160,7 +160,7 @@ pub fn process_instruction(
 > ⚠️ **Note:**
 > The `no_allocator!` macro can also be used in combination with the `lazy_program_entrypoint!`.
 
-Since the `no_allocator!` macro does not allocate memory, the `32kb` memory region reserved for the heap remains unused. To take advantage of this, the `no_allocator!` macro emits an `allocate_unchecked` helper function that allows you to manually reserve memory for a type at compile time.
+Since the `no_allocator!` macro does not allocate memory, the default `32kb` heap region (the minimum heap size; it can be increased up to `256kb` via `no_allocator!(heap_len)` or `default_allocator!(heap_len)`) remains unused. To take advantage of this, the `no_allocator!` macro emits an `allocate_unchecked` helper function that allows you to manually reserve memory for a type at compile time.
 
 ```rust
 /// static allocation:
