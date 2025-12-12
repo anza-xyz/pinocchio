@@ -52,7 +52,7 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
         owner: &'c Address,
     ) -> Result<Self, ProgramError> {
         let rent = Rent::from_account_view(rent_sysvar)?;
-        let lamports = rent.minimum_balance(space as usize);
+        let lamports = rent.try_minimum_balance(space as usize)?;
 
         Ok(Self {
             from,

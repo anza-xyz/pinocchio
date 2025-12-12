@@ -24,6 +24,9 @@ pub const RENT_ID: Address = Address::new_from_array([
     253, 68, 227, 219, 217, 138, 0, 0, 0, 0,
 ]);
 
+/// Maximum permitted size of account data (10 MiB).
+const MAX_PERMITTED_DATA_LENGTH: u64 = 10 * 1024 * 1024;
+
 /// Default rental rate in lamports/byte-year.
 ///
 /// This calculation is based on:
@@ -174,8 +177,37 @@ impl Rent {
     /// # Returns
     ///
     /// The minimum balance in lamports for rent exemption.
-    #[inline]
+    ///
+    /// # Panics
+    ///
+    /// Panics if `data_len` exceeds the maximum permitted data length.
+    #[deprecated(since = "0.10.0", note = "Use `Rent::try_minimum_balance` instead")]
+    #[inline(always)]
     pub fn minimum_balance(&self, data_len: usize) -> u64 {
+        self.try_minimum_balance(data_len)
+            .expect("Maximum permitted data length exceeded")
+    }
+
+    /// Calculates the minimum balance for rent exemption without performing
+    /// any validation.
+    ///
+    /// This method avoids floating-point operations when the `exemption_threshold`
+    /// is the default value.
+    ///
+    /// # Arguments
+    ///
+    /// * `data_len` - The number of bytes in the account
+    ///
+    /// # Returns
+    ///
+    /// The minimum balance in lamports for rent exemption.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `data_len` is within permitted the permitted
+    /// limit to avoid overflow.
+    #[inline(always)]
+    pub unsafe fn minimum_balance_unchecked(&self, data_len: usize) -> u64 {
         let bytes = data_len as u64;
 
         // There are two cases where it is possible to avoid floating-point
@@ -199,6 +231,34 @@ impl Rent {
             }
             #[cfg(target_arch = "bpf")]
             panic!("Floating-point operations are not supported on BPF targets");
+        }
+    }
+
+    /// Calculates the minimum balance for rent exemption.
+    ///
+    /// This method avoids floating-point operations when the `exemption_threshold`
+    /// is the default value.
+    ///
+    /// # Arguments
+    ///
+    /// * `data_len` - The number of bytes in the account
+    ///
+    /// # Returns
+    ///
+    /// The minimum balance in lamports for rent exemption.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProgramError::InvalidArgument` if `data_len` exceeds the maximum permitted
+    /// data length.
+    #[inline(always)]
+    pub fn try_minimum_balance(&self, data_len: usize) -> Result<u64, ProgramError> {
+        if data_len as u64 > MAX_PERMITTED_DATA_LENGTH {
+            Err(ProgramError::InvalidArgument)
+        } else {
+            // SAFETY: The `data_len` is validated to be lower than the maximum permitted
+            // data length.
+            Ok(unsafe { self.minimum_balance_unchecked(data_len) })
         }
     }
 
