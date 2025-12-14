@@ -1,15 +1,11 @@
-//! # Pinocchio
-//!
-//! Pinocchio is a zero-dependency library to create Solana programs in Rust.
-//! It takes advantage of the way SVM loaders serialize the program input parameters
-//! into a byte array that is then passed to the program's entrypoint to define
-//! zero-copy types to read the input - these types are defined in an efficient way
-//! taking into consideration that they will be used in on-chain programs.
-//!
-//! It is intended to be used by on-chain programs only; for off-chain programs,
-//! use instead the [`solana-sdk`] crate.
-//!
-//! [`solana-sdk`]: https://docs.rs/solana-sdk/latest/solana_sdk/
+#![no_std]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
+//! A *no external* dependencies library to create Solana programs
+//! in Rust. The only dependencies are types from the Solana SDK specifically
+//! designed for on-chain programs. This mitigates dependency issues and offers
+//! an efficient zero-copy library to write programs, optimized in terms of both
+//! compute units consumption and binary size.
 //!
 //! ## Defining the program entrypoint
 //!
@@ -20,31 +16,37 @@
 //! and [panic handler](https://doc.rust-lang.org/nomicon/panic-handler.html) using
 //! the [`default_allocator!`] and [`default_panic_handler!`] macros.
 //!
-//! The [`entrypoint!`] is a convenience macro that invokes three other macros to set
-//! all symbols required for a program execution:
+//! The [`entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.entrypoint.html)
+//! is a convenience macro that invokes three other macros to set all components
+//! required for a program execution:
 //!
 //! * [`program_entrypoint!`]: declares the program entrypoint
 //! * [`default_allocator!`]: declares the default (bump) global allocator
 //! * [`default_panic_handler!`]: declares the default panic handler
 //!
+//! When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
+//! instead of `default_panic_handler!` to declare a rust runtime panic handler.
+//! There's no need to do this when any dependency is `std` since rust compiler will
+//! emit a panic handler.
+//!
 //! To use the `entrypoint!` macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account_info::AccountInfo,
+//!   AccountView,
+//!   Address,
 //!   entrypoint,
-//!   msg,
-//!   ProgramResult,
-//!   pubkey::Pubkey
+//!   ProgramResult
 //! };
+//! use solana_program_log::log;
 //!
 //! entrypoint!(process_instruction);
 //!
 //! pub fn process_instruction(
-//!   program_id: &Pubkey,
-//!   accounts: &[AccountInfo],
+//!   program_id: &Address,
+//!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
-//!   msg!("Hello from my program!");
+//!   log!("Hello from my pinocchio program!");
 //!   Ok(())
 //! }
 //! ```
@@ -55,23 +57,21 @@
 //! * `accounts`: the accounts received
 //! * `instruction_data`: data for the instruction
 //!
-//! Pinocchio also offers variations of the program entrypoint
-//! ([`lazy_program_entrypoint`]) and global allocator ([`no_allocator`]). In
-//! order to use these, the program needs to specify the program entrypoint,
-//! global allocator and panic handler individually. The [`entrypoint!`] macro
-//! is equivalent to writing:
+//! `pinocchio` also offers variations of the program entrypoint (`lazy_program_entrypoint`)
+//! and global allocator (`no_allocator`). In order to use these, the program needs to
+//! specify the program entrypoint, global allocator and panic handler individually. The
+//! `entrypoint!` macro is equivalent to writing:
 //! ```ignore
 //! program_entrypoint!(process_instruction);
 //! default_allocator!();
 //! default_panic_handler!();
 //! ```
-//! Any of these macros can be replaced by other implementations and Pinocchio
-//! offers a couple of variants for this.
+//! Any of these macros can be replaced by alternative implementations.
 //!
 //! ### [`lazy_program_entrypoint!`]
 //!
 //! The [`entrypoint!`] macro looks similar to the "standard" one found in
-//! [`solana-program`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html).
+//! [`solana-program-entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html).
 //! It parses the whole input and provides the `program_id`, `accounts` and
 //! `instruction_data` separately. This consumes compute units before the program
 //! begins its execution. In some cases, it is beneficial for a program to have
@@ -94,7 +94,6 @@
 //!   default_panic_handler,
 //!   entrypoint::InstructionContext,
 //!   lazy_program_entrypoint,
-//!   msg,
 //!   ProgramResult
 //! };
 //!
@@ -105,8 +104,7 @@
 //! pub fn process_instruction(
 //!   mut context: InstructionContext
 //! ) -> ProgramResult {
-//!     msg!("Hello from my lazy program!");
-//!     Ok(())
+//!   Ok(())
 //! }
 //! ```
 //!
@@ -136,13 +134,12 @@
 //! To use the [`no_allocator!`] macro, use the following in your entrypoint definition:
 //! ```ignore
 //! use pinocchio::{
-//!   account_info::AccountInfo,
+//!   AccountView,
+//!   Address,
 //!   default_panic_handler,
-//!   msg,
 //!   no_allocator,
 //!   program_entrypoint,
-//!   ProgramResult,
-//!   pubkey::Pubkey
+//!   ProgramResult
 //! };
 //!
 //! program_entrypoint!(process_instruction);
@@ -150,11 +147,10 @@
 //! no_allocator!();
 //!
 //! pub fn process_instruction(
-//!   program_id: &Pubkey,
-//!   accounts: &[AccountInfo],
+//!   program_id: &Address,
+//!   accounts: &[AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
-//!   msg!("Hello from `no_std` program!");
 //!   Ok(())
 //! }
 //! ```
@@ -163,22 +159,50 @@
 //! 💡 The [`no_allocator!`] macro can also be used in combination with the
 //! [`lazy_program_entrypoint!`].
 //!
-//! ## `std` crate feature
-//!
-//! By default, Pinocchio is a `no_std` crate. This means that it does not use any
-//! code from the standard (`std`) library. While this does not affect how Pinocchio
-//! is used, there is a one particular apparent difference. In a `no_std` environment,
-//! the [`msg!`] macro does not provide any formatting options since the `format!` macro
-//! requires the `std` library. In order to use [`msg!`] with formatting, the `std`
-//! feature should be enable when adding Pinocchio as a dependency:
+//! Since the `no_allocator!` macro does not allocate memory, the `32kb` memory region
+//! reserved for the heap remains unused. To take advantage of this, the `no_allocator!`
+//! macro emits an `allocate_unchecked` helper function that allows you to manually
+//! reserve memory for a type at compile time.
 //! ```ignore
-//! pinocchio = { version = "0.7.0", features = ["std"] }
+//! /// static allocation:
+//! ///    - 0 is the offset when the type will be allocated
+//! ///    - `allocate_unchecked` returns a mutable reference to the allocated type
+//! let lamports = allocate_unchecked::<u64>(0);
+//! *lamports = 1_000_000_000;
 //! ```
 //!
-//! Instead of enabling the `std` feature to be able to format log messages with [`msg!`],
-//! it is recommended to use the [`pinocchio-log`](https://crates.io/crates/pinocchio-log)
-//! crate. This crate provides a lightweight `log!` macro with better compute units
-//! consumption than the standard `format!` macro without requiring the `std` library.
+//! Note that it is the developer's responsibility to ensure that types do not overlap
+//! in memory - the `offset + <size of type>` of different types must not overlap.
+//!
+//! ## Crate features
+//!
+//! ### `alloc`
+//!
+//! The `alloc` feature is enabled by default and it uses the [`alloc`](https://doc.rust-lang.org/alloc/)
+//! crate. This provides access to dynamic memory allocation in combination with the
+//! [`default_allocator!`], e.g., required to use `String` and `Vec` in a program.
+//! Helpers that need to allocate memory, such as fetching [`crate::sysvars::slot_hashes::SlotHashes::fetch`]
+//! sysvar data, are also available.
+//!
+//! When no allocation is needed or desired, the feature can be disabled:
+//!
+//! ```ignore
+//! pinocchio = { version = "0.10.0", default-features = false }
+//! ```
+//!
+//! ### `copy`
+//!
+//! The `copy` feature enables the derivation of the `Copy` trait for types. It also enables the
+//! `copy` feature on the `solana-account-view` and `solana-address` re-exports.
+//!
+//! ### `cpi`
+//!
+//! The `cpi` feature enables the cross-program invocation helpers, as well as types
+//! to define instructions and signer information.
+//!
+//! ```ignore
+//! pinocchio = { version = "0.10.0", features = ["cpi"] }
+//! ```
 //!
 //! ## Advanced entrypoint configuration
 //!
@@ -193,21 +217,19 @@
 //! #[cfg(feature = "bpf-entrypoint")]
 //! mod entrypoint {
 //!   use pinocchio::{
-//!     account_info::AccountInfo,
+//!     AccountView,
+//!     Address,
 //!     entrypoint,
-//!     msg,
-//!     ProgramResult,
-//!     pubkey::Pubkey
+//!     ProgramResult
 //!   };
 //!
 //!   entrypoint!(process_instruction);
 //!
 //!   pub fn process_instruction(
-//!     program_id: &Pubkey,
-//!     accounts: &[AccountInfo],
+//!     program_id: &Address,
+//!     accounts: &[AccountView],
 //!     instruction_data: &[u8],
 //!   ) -> ProgramResult {
-//!     msg!("Hello from my program!");
 //!     Ok(())
 //!   }
 //! }
@@ -217,29 +239,32 @@
 //! ```ignore
 //! cargo build-sbf --features bpf-entrypoint
 //! ```
-#![warn(missing_copy_implementations, missing_debug_implementations)]
-#![no_std]
 
-#[cfg(feature = "std")]
-extern crate std;
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
-pub mod account_info;
-pub mod cpi;
 pub mod entrypoint;
-pub mod instruction;
-pub mod log;
-pub mod memory;
-#[deprecated(since = "0.8.0", note = "Use the `cpi` module instead")]
-pub mod program {
-    pub use crate::cpi::*;
-}
-pub mod program_error;
-pub mod pubkey;
-pub mod syscalls;
 pub mod sysvars;
 
-#[deprecated(since = "0.7.0", note = "Use the `entrypoint` module instead")]
-pub use entrypoint::lazy as lazy_entrypoint;
+// Re-export the `solana_account_view` for downstream use.
+pub use solana_account_view as account;
+pub use solana_account_view::AccountView;
+
+// Re-export the `solana_address` for downstream use.
+pub use solana_address as address;
+pub use solana_address::Address;
+
+// Re-export the `solana_define_syscall` for downstream use.
+#[cfg(any(target_os = "solana", target_arch = "bpf"))]
+pub use solana_define_syscall::definitions as syscalls;
+
+// Re-export the `solana_instruction_view` for downstream use.
+#[cfg(feature = "cpi")]
+pub use {solana_instruction_view as instruction, solana_instruction_view::cpi};
+
+// Re-export the `solana_program_error` for downstream use.
+pub use solana_program_error as error;
+pub use solana_program_error::ProgramResult;
 
 /// Maximum number of accounts that a transaction may process.
 ///
@@ -249,7 +274,7 @@ pub use entrypoint::lazy as lazy_entrypoint;
 /// value (`255`) is reserved to indicate non-duplicated accounts.
 ///
 /// The `MAX_TX_ACCOUNTS` is used to statically initialize the array of
-/// `AccountInfo`s when parsing accounts in an instruction.
+/// `AccountView`s when parsing accounts in an instruction.
 pub const MAX_TX_ACCOUNTS: usize = (u8::MAX - 1) as usize;
 
 /// `assert_eq(core::mem::align_of::<u128>(), 8)` is true for BPF but not
@@ -258,9 +283,6 @@ const BPF_ALIGN_OF_U128: usize = 8;
 
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = 0;
-
-/// The result of a program execution.
-pub type ProgramResult = Result<(), program_error::ProgramError>;
 
 /// Module with functions to provide hints to the compiler about how code
 /// should be optimized.

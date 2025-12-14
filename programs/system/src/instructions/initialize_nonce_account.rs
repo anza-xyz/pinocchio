@@ -1,12 +1,13 @@
 use pinocchio::{
-    account_info::AccountInfo,
     cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    ProgramResult,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, Address, ProgramResult,
 };
 
 /// Drive state of Uninitialized nonce account to Initialized, setting the nonce value.
+///
+/// The [`Address`] parameter specifies the entity authorized to execute nonce
+/// instruction on the account
 ///
 /// No signatures are required to execute this instruction, enabling derived
 /// nonce account addresses.
@@ -17,39 +18,39 @@ use pinocchio::{
 ///   2. `[]` Rent sysvar
 pub struct InitializeNonceAccount<'a, 'b> {
     /// Nonce account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Recent blockhashes sysvar.
-    pub recent_blockhashes_sysvar: &'a AccountInfo,
+    pub recent_blockhashes_sysvar: &'a AccountView,
 
     /// Rent sysvar.
-    pub rent_sysvar: &'a AccountInfo,
+    pub rent_sysvar: &'a AccountView,
 
     /// Indicates the entity authorized to execute nonce
     /// instruction on the account
-    pub authority: &'b Pubkey,
+    pub authority: &'b Address,
 }
 
 impl InitializeNonceAccount<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.recent_blockhashes_sysvar.address()),
+            InstructionAccount::readonly(self.rent_sysvar.address()),
         ];
 
         // instruction data
         // -  [0..4 ]: instruction discriminator
-        // -  [4..36]: authority pubkey
+        // -  [4..36]: authority address
         let mut instruction_data = [0; 36];
         instruction_data[0] = 6;
-        instruction_data[4..36].copy_from_slice(self.authority);
+        instruction_data[4..36].copy_from_slice(self.authority.as_array());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

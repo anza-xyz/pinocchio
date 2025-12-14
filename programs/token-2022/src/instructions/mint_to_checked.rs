@@ -1,12 +1,12 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -18,17 +18,17 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   2. `[SIGNER]` The mint's minting authority.
 pub struct MintToChecked<'a, 'b> {
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Token Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Authority
-    pub mint_authority: &'a AccountInfo,
+    pub mint_authority: &'a AccountView,
     /// Amount
     pub amount: u64,
     /// Decimals
     pub decimals: u8,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl MintToChecked<'_, '_> {
@@ -39,11 +39,11 @@ impl MintToChecked<'_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.mint.key()),
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly_signer(self.mint_authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.mint.address()),
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly_signer(self.mint_authority.address()),
         ];
 
         // Instruction data layout:
@@ -59,9 +59,9 @@ impl MintToChecked<'_, '_> {
         // Set decimals as u8 at offset [9]
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };
 

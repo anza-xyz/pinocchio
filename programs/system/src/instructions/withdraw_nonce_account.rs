@@ -1,8 +1,7 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+    cpi::{invoke_signed, Signer},
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, ProgramResult,
 };
 
 /// Withdraw funds from a nonce account.
@@ -18,19 +17,19 @@ use pinocchio::{
 ///   4. `[SIGNER]` Nonce authority
 pub struct WithdrawNonceAccount<'a> {
     /// Nonce account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Recipient account.
-    pub recipient: &'a AccountInfo,
+    pub recipient: &'a AccountView,
 
     /// Recent blockhashes sysvar.
-    pub recent_blockhashes_sysvar: &'a AccountInfo,
+    pub recent_blockhashes_sysvar: &'a AccountView,
 
     /// Rent sysvar.
-    pub rent_sysvar: &'a AccountInfo,
+    pub rent_sysvar: &'a AccountView,
 
     /// Nonce authority.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
 
     /// Lamports to withdraw.
     ///
@@ -47,13 +46,13 @@ impl WithdrawNonceAccount<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 5] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.recipient.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 5] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::writable(self.recipient.address()),
+            InstructionAccount::readonly(self.recent_blockhashes_sysvar.address()),
+            InstructionAccount::readonly(self.rent_sysvar.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // instruction data
@@ -63,9 +62,9 @@ impl WithdrawNonceAccount<'_> {
         instruction_data[0] = 5;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

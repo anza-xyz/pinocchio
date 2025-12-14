@@ -2,20 +2,24 @@
 //!
 //! This is required for the rent sysvar implementation.
 
-use super::Sysvar;
+// This is necessary since `sol_get_rent_sysvar` is deprecated but still used here.
+// It can be removed once the implementation uses `get_sysvar` instead.
+#![allow(deprecated)]
+
 use crate::{
-    account_info::{AccountInfo, Ref},
+    account::{AccountView, Ref},
+    error::ProgramError,
     hint::unlikely,
     impl_sysvar_get,
-    program_error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
+    sysvars::Sysvar,
+    Address,
 };
 
 /// The ID of the rent sysvar.
-pub const RENT_ID: Pubkey = [
+pub const RENT_ID: Address = Address::new_from_array([
     6, 167, 213, 23, 25, 44, 92, 81, 33, 140, 201, 76, 61, 74, 241, 127, 88, 218, 238, 8, 155, 161,
     253, 68, 227, 219, 217, 138, 0, 0, 0, 0,
-];
+]);
 
 /// Default rental rate in lamports/byte-year.
 ///
@@ -66,7 +70,8 @@ pub const ACCOUNT_STORAGE_OVERHEAD: u64 = 128;
 
 /// Rent sysvar data
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub struct Rent {
     /// Rental rate in lamports per byte-year
     #[deprecated(
@@ -91,22 +96,22 @@ impl Rent {
     /// The length of the `Rent` sysvar account data.
     pub const LEN: usize = 8 + 8 + 1;
 
-    /// Return a `Rent` from the given account info.
+    /// Return a `Rent` from the given account view.
     ///
-    /// This method performs a check on the account info key.
+    /// This method performs a check on the account view key.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Rent>, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &RENT_ID)) {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Rent>, ProgramError> {
+        if unlikely(account_view.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
 
-    /// Return a `Rent` from the given account info.
+    /// Return a `Rent` from the given account view.
     ///
-    /// This method performs a check on the account info key, but does not
+    /// This method performs a check on the account view key, but does not
     /// perform the borrow check.
     ///
     /// # Safety
@@ -114,15 +119,13 @@ impl Rent {
     /// The caller must ensure that it is safe to borrow the account data - e.g., there are
     /// no mutable borrows of the account data.
     #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+    pub unsafe fn from_account_view_unchecked(
+        account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &RENT_ID)) {
+        if unlikely(account_view.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
 
     /// Return a `Rent` from the given bytes.
@@ -233,7 +236,8 @@ impl Sysvar for Rent {
 }
 
 /// The return value of [`Rent::due`].
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RentDue {
     /// Used to indicate the account is rent exempt.
     Exempt,

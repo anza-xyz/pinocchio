@@ -1,11 +1,11 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -17,11 +17,11 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   2. `[SIGNER]` Authority account
 pub struct Transfer<'a> {
     /// Sender account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
     /// Authority account.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Amount of micro-tokens to transfer.
     pub amount: u64,
 }
@@ -34,11 +34,11 @@ impl Transfer<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::writable(self.to.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.from.address()),
+            InstructionAccount::writable(self.to.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data layout:
@@ -51,9 +51,9 @@ impl Transfer<'_> {
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
         };
 

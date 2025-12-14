@@ -1,9 +1,6 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    ProgramResult,
-};
+use solana_account_view::AccountView;
+use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
+use solana_program_error::ProgramResult;
 
 /// Initialize a new Token Account.
 ///
@@ -14,29 +11,29 @@ use pinocchio::{
 ///   3. `[]` Rent sysvar
 pub struct InitializeAccount<'a> {
     /// New Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Owner of the new Account.
-    pub owner: &'a AccountInfo,
+    pub owner: &'a AccountView,
     /// Rent Sysvar Account
-    pub rent_sysvar: &'a AccountInfo,
+    pub rent_sysvar: &'a AccountView,
 }
 
 impl InitializeAccount<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::readonly(self.owner.key()),
-            AccountMeta::readonly(self.rent_sysvar.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 4] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::readonly(self.owner.address()),
+            InstructionAccount::readonly(self.rent_sysvar.address()),
         ];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &[1],
         };
 

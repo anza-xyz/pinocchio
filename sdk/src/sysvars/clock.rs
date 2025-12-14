@@ -1,19 +1,23 @@
 //! Information about the network's clock, ticks, slots, etc.
 
-use super::Sysvar;
+// This is necessary since `sol_get_clock_sysvar` is deprecated but still used here.
+// It can be removed once the implementation uses `get_sysvar` instead.
+#![allow(deprecated)]
+
 use crate::{
-    account_info::{AccountInfo, Ref},
+    account::{AccountView, Ref},
+    error::ProgramError,
     hint::unlikely,
     impl_sysvar_get,
-    program_error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
+    sysvars::Sysvar,
+    Address,
 };
 
 /// The ID of the clock sysvar.
-pub const CLOCK_ID: Pubkey = [
+pub const CLOCK_ID: Address = Address::new_from_array([
     6, 167, 213, 23, 24, 199, 116, 201, 40, 86, 99, 152, 105, 29, 94, 182, 139, 94, 184, 163, 155,
     75, 109, 92, 115, 85, 91, 33, 0, 0, 0, 0,
-];
+]);
 
 /// The unit of time given to a leader for encoding a block.
 ///
@@ -34,7 +38,8 @@ pub type UnixTimestamp = i64;
 ///
 /// All members of `Clock` start from 0 upon network boot.
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub struct Clock {
     /// The current `Slot`.
     pub slot: Slot,
@@ -82,22 +87,22 @@ impl Clock {
     /// The length of the `Clock` sysvar account data.
     pub const LEN: usize = 8 + 8 + 8 + 8 + 8;
 
-    /// Return a `Clock` from the given account info.
+    /// Return a `Clock` from the given account view.
     ///
-    /// This method performs a check on the account info key.
+    /// This method performs a check on the account view address.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Clock>, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &CLOCK_ID)) {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Clock>, ProgramError> {
+        if unlikely(account_view.address() != &CLOCK_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
 
-    /// Return a `Clock` from the given account info.
+    /// Return a `Clock` from the given account view.
     ///
-    /// This method performs a check on the account info key, but does not
+    /// This method performs a check on the account view address, but does not
     /// perform the borrow check.
     ///
     /// # Safety
@@ -105,15 +110,13 @@ impl Clock {
     /// The caller must ensure that it is safe to borrow the account data - e.g., there are
     /// no mutable borrows of the account data.
     #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+    pub unsafe fn from_account_view_unchecked(
+        account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &CLOCK_ID)) {
+        if unlikely(account_view.address() != &CLOCK_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
 
     /// Return a `Clock` from the given bytes.

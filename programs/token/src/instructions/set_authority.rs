@@ -1,12 +1,12 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -26,13 +26,13 @@ pub enum AuthorityType {
 ///   1. `[SIGNER]` The current authority of the mint or account.
 pub struct SetAuthority<'a> {
     /// Account (Mint or Token)
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Authority of the Account.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// The type of authority to update.
     pub authority_type: AuthorityType,
     /// The new authority
-    pub new_authority: Option<&'a Pubkey>,
+    pub new_authority: Option<&'a Address>,
 }
 
 impl SetAuthority<'_> {
@@ -43,17 +43,17 @@ impl SetAuthority<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 2] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // instruction data
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: authority_type (1 byte, u8)
         // -  [2]: new_authority presence flag (1 byte, AuthorityType)
-        // -  [3..35] new_authority (optional, 32 bytes, Pubkey)
+        // -  [3..35] new_authority (optional, 32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 35];
         let mut length = instruction_data.len();
 
@@ -65,16 +65,16 @@ impl SetAuthority<'_> {
         if let Some(new_authority) = self.new_authority {
             // Set new_authority as [u8; 32] at offset [2..35]
             write_bytes(&mut instruction_data[2..3], &[1]);
-            write_bytes(&mut instruction_data[3..], new_authority);
+            write_bytes(&mut instruction_data[3..], new_authority.as_array());
         } else {
             write_bytes(&mut instruction_data[2..3], &[0]);
             // Adjust length if no new authority
             length = 3;
         }
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
         };
 

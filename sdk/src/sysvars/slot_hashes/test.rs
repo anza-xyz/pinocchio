@@ -1,7 +1,7 @@
 use super::test_utils::*;
 use crate::{
-    account_info::{Account, AccountInfo},
-    program_error::ProgramError,
+    account::{AccountView, RuntimeAccount},
+    error::ProgramError,
     sysvars::{clock::Slot, slot_hashes::*},
 };
 use core::{
@@ -9,9 +9,7 @@ use core::{
     ptr,
 };
 
-extern crate std;
-use std::io::Write;
-use std::vec::Vec;
+use alloc::vec::Vec;
 
 #[test]
 fn test_layout_constants() {
@@ -22,20 +20,23 @@ fn test_layout_constants() {
     assert_eq!(MAX_SIZE, 20_488);
     assert_eq!(size_of::<SlotHashEntry>(), ENTRY_SIZE);
     assert_eq!(align_of::<SlotHashEntry>(), align_of::<[u8; 8]>());
-    assert_eq!(
-        SLOTHASHES_ID,
-        [
-            6, 167, 213, 23, 25, 47, 10, 175, 198, 242, 101, 227, 251, 119, 204, 122, 218, 130,
-            197, 41, 208, 190, 59, 19, 110, 45, 0, 85, 32, 0, 0, 0,
-        ]
+    assert!(
+        SLOTHASHES_ID
+            == Address::new_from_array([
+                6, 167, 213, 23, 25, 47, 10, 175, 198, 242, 101, 227, 251, 119, 204, 122, 218, 130,
+                197, 41, 208, 190, 59, 19, 110, 45, 0, 85, 32, 0, 0, 0,
+            ])
     );
 
     pub fn check_base58(input_bytes: &[u8], expected_b58: &str) {
-        assert_eq!(five8_const::decode_32_const(expected_b58), input_bytes);
+        assert_eq!(
+            Address::from_str_const(expected_b58).as_array(),
+            input_bytes
+        );
     }
 
     check_base58(
-        &SLOTHASHES_ID,
+        SLOTHASHES_ID.as_array(),
         "SysvarS1otHashes111111111111111111111111111",
     );
 }
@@ -169,7 +170,7 @@ fn test_entry_count_no_std() {
     // Too small buffer should fail new()
     let num_entries = entries.len() as u64;
     let data_len = NUM_ENTRIES_SIZE + entries.len() * ENTRY_SIZE;
-    let mut small_data = std::vec![0u8; data_len];
+    let mut small_data = alloc::vec![0u8; data_len];
     small_data[0..NUM_ENTRIES_SIZE].copy_from_slice(&num_entries.to_le_bytes());
     let mut offset = NUM_ENTRIES_SIZE;
     for (slot, hash) in entries {
@@ -315,19 +316,19 @@ fn test_mock_offset_copy() {
     let mock_sysvar_data = create_mock_data(entries);
 
     // Test offset 0 (full data)
-    let mut buffer_full = std::vec![0u8; mock_sysvar_data.len()];
+    let mut buffer_full = alloc::vec![0u8; mock_sysvar_data.len()];
     mock_fetch_into_unchecked(&mock_sysvar_data, &mut buffer_full, 0).unwrap();
     assert_eq!(buffer_full, mock_sysvar_data);
 
     // Test offset 8 (skip length prefix, get entries only)
     let entries_size = 3 * ENTRY_SIZE;
-    let mut buffer_entries = std::vec![0u8; entries_size];
+    let mut buffer_entries = alloc::vec![0u8; entries_size];
     mock_fetch_into_unchecked(&mock_sysvar_data, &mut buffer_entries, 8).unwrap();
     assert_eq!(buffer_entries, &mock_sysvar_data[8..8 + entries_size]);
 
     // Test offset 8 + ENTRY_SIZE (skip first entry)
     let remaining_entries_size = 2 * ENTRY_SIZE;
-    let mut buffer_skip_first = std::vec![0u8; remaining_entries_size];
+    let mut buffer_skip_first = alloc::vec![0u8; remaining_entries_size];
     let skip_first_offset = 8 + ENTRY_SIZE;
     mock_fetch_into_unchecked(
         &mock_sysvar_data,
@@ -401,9 +402,7 @@ fn test_log_function() {
 }
 
 #[test]
-fn test_from_account_info_constructor() {
-    std::io::stderr().flush().unwrap();
-
+fn test_from_account_view_constructor() {
     const NUM_ENTRIES: usize = 3;
     const START_SLOT: u64 = 1234;
 
@@ -411,13 +410,11 @@ fn test_from_account_info_constructor() {
     let data = create_mock_data(&mock_entries);
 
     let mut aligned_backing: Vec<u64>;
-    let acct_ptr;
-
-    unsafe {
+    let acct_ptr = unsafe {
         let header_size = core::mem::size_of::<AccountLayout>();
         let total_size = header_size + data.len();
-        let word_len = (total_size + 7) / 8;
-        aligned_backing = std::vec![0u64; word_len];
+        let word_len = total_size.div_ceil(8);
+        aligned_backing = alloc::vec![0u64; word_len];
         let base_ptr = aligned_backing.as_mut_ptr() as *mut u8;
 
         let header_ptr = base_ptr as *mut AccountLayout;
@@ -430,7 +427,7 @@ fn test_from_account_info_constructor() {
                 executable: 0,
                 resize_delta: 0,
                 key: SLOTHASHES_ID,
-                owner: [0u8; 32],
+                owner: Address::new_from_array([0u8; 32]),
                 lamports: 0,
                 data_len: data.len() as u64,
             },
@@ -438,13 +435,13 @@ fn test_from_account_info_constructor() {
 
         ptr::copy_nonoverlapping(data.as_ptr(), base_ptr.add(header_size), data.len());
 
-        acct_ptr = base_ptr as *mut Account;
-    }
+        base_ptr as *mut RuntimeAccount
+    };
 
-    let account_info = AccountInfo { raw: acct_ptr };
+    let account_view = unsafe { AccountView::new_unchecked(acct_ptr) };
 
-    let slot_hashes = SlotHashes::from_account_info(&account_info)
-        .expect("from_account_info should succeed with well-formed data");
+    let slot_hashes = SlotHashes::from_account_view(&account_view)
+        .expect("from_account_view should succeed with well-formed data");
 
     assert_eq!(slot_hashes.len(), NUM_ENTRIES);
     for (i, entry) in slot_hashes.into_iter().enumerate() {
@@ -462,7 +459,7 @@ fn test_from_account_info_constructor() {
 /// `SlotHashes` getters to make sure the view itself works.  We do not verify
 /// that the syscall populated real on-chain bytes, as doing so requires an
 /// environment outside the scope of host `cargo test`.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 #[test]
 fn test_fetch_allocates_buffer_host() {
     const START_SLOT: u64 = 500;
@@ -471,7 +468,7 @@ fn test_fetch_allocates_buffer_host() {
 
     // This should allocate a 20_488-byte boxed slice and *not* panic.
     let mut slot_hashes =
-        SlotHashes::<std::boxed::Box<[u8]>>::fetch().expect("fetch() should allocate");
+        SlotHashes::<alloc::boxed::Box<[u8]>>::fetch().expect("fetch() should allocate");
 
     // Overwrite the stubbed contents with known data so we can reuse the
     // remainder of the test harness.

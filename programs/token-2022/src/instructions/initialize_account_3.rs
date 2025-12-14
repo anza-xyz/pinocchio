@@ -1,12 +1,9 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    ProgramResult,
-};
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -17,37 +14,37 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   1. `[]` The mint this account will be associated with.
 pub struct InitializeAccount3<'a, 'b> {
     /// New Account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Owner of the new Account.
-    pub owner: &'a Pubkey,
+    pub owner: &'a Address,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl InitializeAccount3<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 2] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.mint.address()),
         ];
 
         // instruction data
         // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..33]: owner (32 bytes, Pubkey)
+        // -  [1..33]: owner (32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 33];
 
         // Set discriminator as u8 at offset [0]
         write_bytes(&mut instruction_data, &[18]);
         // Set owner as [u8; 32] at offset [1..33]
-        write_bytes(&mut instruction_data[1..], self.owner);
+        write_bytes(&mut instruction_data[1..], self.owner.as_array());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },
         };
 

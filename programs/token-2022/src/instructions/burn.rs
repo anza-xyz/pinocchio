@@ -1,12 +1,12 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -18,15 +18,15 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   2. `[SIGNER]` The account's owner/delegate.
 pub struct Burn<'a, 'b> {
     /// Source of the Burn Account
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Mint Account
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Owner of the Token Account
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Amount
     pub amount: u64,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl Burn<'_, '_> {
@@ -37,11 +37,11 @@ impl Burn<'_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // Account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::writable(self.mint.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::writable(self.mint.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data
@@ -54,9 +54,9 @@ impl Burn<'_, '_> {
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..], &self.amount.to_le_bytes());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
         };
 

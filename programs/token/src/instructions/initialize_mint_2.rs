@@ -1,12 +1,9 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    cpi::invoke,
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    ProgramResult,
-};
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -16,27 +13,28 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   0. `[WRITABLE]` Mint account
 pub struct InitializeMint2<'a> {
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Decimals.
     pub decimals: u8,
     /// Mint Authority.
-    pub mint_authority: &'a Pubkey,
+    pub mint_authority: &'a Address,
     /// Freeze Authority.
-    pub freeze_authority: Option<&'a Pubkey>,
+    pub freeze_authority: Option<&'a Address>,
 }
 
 impl InitializeMint2<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // Account metadata
-        let account_metas: [AccountMeta; 1] = [AccountMeta::writable(self.mint.key())];
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 1] =
+            [InstructionAccount::writable(self.mint.address())];
 
         // Instruction data layout:
         // -  [0]: instruction discriminator (1 byte, u8)
         // -  [1]: decimals (1 byte, u8)
-        // -  [2..34]: mint_authority (32 bytes, Pubkey)
+        // -  [2..34]: mint_authority (32 bytes, Address)
         // -  [34]: freeze_authority presence flag (1 byte, u8)
-        // -  [35..67]: freeze_authority (optional, 32 bytes, Pubkey)
+        // -  [35..67]: freeze_authority (optional, 32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 67];
         let mut length = instruction_data.len();
 
@@ -44,13 +42,13 @@ impl InitializeMint2<'_> {
         write_bytes(&mut instruction_data, &[20]);
         // Set decimals as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[self.decimals]);
-        // Set mint_authority as Pubkey at offset [2..34]
-        write_bytes(&mut instruction_data[2..34], self.mint_authority);
+        // Set mint_authority as Address at offset [2..34]
+        write_bytes(&mut instruction_data[2..34], self.mint_authority.as_array());
 
         if let Some(freeze_auth) = self.freeze_authority {
             // Set Option = `true` & freeze_authority at offset [34..67]
             write_bytes(&mut instruction_data[34..35], &[1]);
-            write_bytes(&mut instruction_data[35..], freeze_auth);
+            write_bytes(&mut instruction_data[35..], freeze_auth.as_array());
         } else {
             // Set Option = `false`
             write_bytes(&mut instruction_data[34..35], &[0]);
@@ -58,9 +56,9 @@ impl InitializeMint2<'_> {
             length = 35;
         }
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
         };
 

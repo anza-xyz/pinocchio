@@ -1,27 +1,25 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    cpi::{invoke_signed, Signer},
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, Address, ProgramResult,
 };
 
 /// Change the entity authorized to execute nonce instructions on the account.
 ///
-/// The `Pubkey` parameter identifies the entity to authorize.
+/// The [`Address`] parameter identifies the entity to authorize.
 ///
 /// ### Accounts:
 ///   0. `[WRITE]` Nonce account
 ///   1. `[SIGNER]` Nonce authority
 pub struct AuthorizeNonceAccount<'a, 'b> {
     /// Nonce account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Nonce authority.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
 
     /// New entity authorized to execute nonce instructions on the account.
-    pub new_authority: &'b Pubkey,
+    pub new_authority: &'b Address,
 }
 
 impl AuthorizeNonceAccount<'_, '_> {
@@ -32,10 +30,10 @@ impl AuthorizeNonceAccount<'_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 2] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // instruction data
@@ -43,11 +41,11 @@ impl AuthorizeNonceAccount<'_, '_> {
         // -  [4..12]: lamports
         let mut instruction_data = [0; 36];
         instruction_data[0] = 7;
-        instruction_data[4..36].copy_from_slice(self.new_authority);
+        instruction_data[4..36].copy_from_slice(self.new_authority.as_array());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

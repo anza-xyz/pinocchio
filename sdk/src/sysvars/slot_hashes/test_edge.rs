@@ -1,14 +1,18 @@
-use crate::{program_error::ProgramError, sysvars::slot_hashes::*};
-extern crate std;
-use super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account_info};
+use super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account_view};
+use crate::{error::ProgramError, sysvars::slot_hashes::*};
 
 #[test]
-fn test_wrong_key_from_account_info() {
+fn test_wrong_key_from_account_view() {
     let bytes = raw_slot_hashes(0, &[]);
-    let (info, _backing) =
-        unsafe { make_account_info([1u8; 32], &bytes, crate::entrypoint::NON_DUP_MARKER) };
+    let (view, _backing) = unsafe {
+        make_account_view(
+            Address::new_from_array([1u8; 32]),
+            &bytes,
+            crate::entrypoint::NON_DUP_MARKER,
+        )
+    };
     assert!(matches!(
-        SlotHashes::from_account_info(&info),
+        SlotHashes::from_account_view(&view),
         Err(ProgramError::InvalidArgument)
     ));
 }
@@ -18,7 +22,7 @@ fn test_wrong_size_buffer_rejected() {
     // Buffer that declares 1 entry but is 1 byte too small to hold it.
     let num_entries: u64 = 1;
     let required_size = NUM_ENTRIES_SIZE + (num_entries as usize) * ENTRY_SIZE;
-    let mut small_buffer = std::vec![0u8; required_size - 1];
+    let mut small_buffer = alloc::vec![0u8; required_size - 1];
     small_buffer[0..NUM_ENTRIES_SIZE].copy_from_slice(&num_entries.to_le_bytes());
 
     assert!(matches!(
@@ -80,11 +84,11 @@ fn test_zero_len_minimal_slice_iterates_empty() {
 }
 
 #[test]
-fn test_borrow_state_failure_from_account_info() {
+fn test_borrow_state_failure_from_account_view() {
     let bytes = raw_slot_hashes(0, &[]);
-    let (info, _backing) = unsafe { make_account_info(SLOTHASHES_ID, &bytes, 0) };
+    let (view, _backing) = unsafe { make_account_view(SLOTHASHES_ID, &bytes, 0) };
     assert!(matches!(
-        SlotHashes::from_account_info(&info),
+        SlotHashes::from_account_view(&view),
         Err(ProgramError::AccountBorrowFailed)
     ));
 }

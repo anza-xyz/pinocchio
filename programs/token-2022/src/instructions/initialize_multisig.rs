@@ -1,13 +1,9 @@
 use core::{mem::MaybeUninit, slice};
 
-use pinocchio::{
-    account_info::AccountInfo,
-    cpi::invoke_with_bounds,
-    instruction::{AccountMeta, Instruction},
-    program_error::ProgramError,
-    pubkey::Pubkey,
-    ProgramResult,
-};
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView};
+use solana_program_error::{ProgramError, ProgramResult};
 
 /// Maximum number of multisignature signers.
 pub const MAX_MULTISIG_SIGNERS: usize = 11;
@@ -24,16 +20,16 @@ where
     'a: 'b,
 {
     /// Multisig Account.
-    pub multisig: &'a AccountInfo,
+    pub multisig: &'a AccountView,
     /// Rent sysvar Account.
-    pub rent_sysvar: &'a AccountInfo,
+    pub rent_sysvar: &'a AccountView,
     /// Signer Accounts
-    pub signers: &'b [&'a AccountInfo],
+    pub signers: &'b [&'a AccountView],
     /// The number of signers (M) required to validate this multisignature
     /// account.
     pub m: u8,
     /// Token Program.
-    pub token_program: &'c Pubkey,
+    pub token_program: &'c Address,
 }
 
 impl InitializeMultisig<'_, '_, '_> {
@@ -53,24 +49,27 @@ impl InitializeMultisig<'_, '_, '_> {
 
         let num_accounts = 2 + signers.len();
 
-        // Account metadata
-        const UNINIT_META: MaybeUninit<AccountMeta> = MaybeUninit::<AccountMeta>::uninit();
-        let mut acc_metas = [UNINIT_META; 2 + MAX_MULTISIG_SIGNERS];
+        // Instruction accounts
+        const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
+            MaybeUninit::<InstructionAccount>::uninit();
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 2 + MAX_MULTISIG_SIGNERS];
 
         unsafe {
             // SAFETY:
-            // - `account_metas` is sized to 2 + MAX_MULTISIG_SIGNERS
+            // - `instruction_accounts` is sized to 2 + MAX_MULTISIG_SIGNERS
             // - Index 0 and 1 are always present
-            acc_metas
+            instruction_accounts
                 .get_unchecked_mut(0)
-                .write(AccountMeta::writable(multisig.key()));
-            acc_metas
+                .write(InstructionAccount::writable(multisig.address()));
+            instruction_accounts
                 .get_unchecked_mut(1)
-                .write(AccountMeta::readonly(rent_sysvar.key()));
+                .write(InstructionAccount::readonly(rent_sysvar.address()));
         }
 
-        for (account_meta, signer) in acc_metas[2..].iter_mut().zip(signers.iter()) {
-            account_meta.write(AccountMeta::readonly(signer.key()));
+        for (instruction_account, signer) in
+            instruction_accounts[2..].iter_mut().zip(signers.iter())
+        {
+            instruction_account.write(InstructionAccount::readonly(signer.address()));
         }
 
         // Instruction data layout:
@@ -78,31 +77,33 @@ impl InitializeMultisig<'_, '_, '_> {
         // -  [1]: m (1 byte, u8)
         let data = &[2, m];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: token_program,
-            accounts: unsafe { slice::from_raw_parts(acc_metas.as_ptr() as _, num_accounts) },
+            accounts: unsafe {
+                slice::from_raw_parts(instruction_accounts.as_ptr() as _, num_accounts)
+            },
             data,
         };
 
-        // Account info array
-        const UNINIT_INFO: MaybeUninit<&AccountInfo> = MaybeUninit::uninit();
-        let mut acc_infos = [UNINIT_INFO; 2 + MAX_MULTISIG_SIGNERS];
+        // Account view array
+        const UNINIT_VIEW: MaybeUninit<&AccountView> = MaybeUninit::uninit();
+        let mut acc_views = [UNINIT_VIEW; 2 + MAX_MULTISIG_SIGNERS];
 
         unsafe {
             // SAFETY:
-            // - `account_infos` is sized to 2 + MAX_MULTISIG_SIGNERS
+            // - `account_views` is sized to 2 + MAX_MULTISIG_SIGNERS
             // - Index 0 and 1 are always present
-            acc_infos.get_unchecked_mut(0).write(multisig);
-            acc_infos.get_unchecked_mut(1).write(rent_sysvar);
+            acc_views.get_unchecked_mut(0).write(multisig);
+            acc_views.get_unchecked_mut(1).write(rent_sysvar);
         }
 
         // Fill signer accounts
-        for (account_info, signer) in acc_infos[2..].iter_mut().zip(signers.iter()) {
-            account_info.write(signer);
+        for (account_view, signer) in acc_views[2..].iter_mut().zip(signers.iter()) {
+            account_view.write(signer);
         }
 
         invoke_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(&instruction, unsafe {
-            slice::from_raw_parts(acc_infos.as_ptr() as _, num_accounts)
+            slice::from_raw_parts(acc_views.as_ptr() as _, num_accounts)
         })
     }
 }

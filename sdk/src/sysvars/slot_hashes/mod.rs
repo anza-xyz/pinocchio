@@ -13,22 +13,24 @@ mod test_raw;
 #[cfg(test)]
 mod test_utils;
 
-use crate::{
-    account_info::{AccountInfo, Ref},
-    hint::unlikely,
-    program_error::ProgramError,
-    pubkey::{pubkey_eq, Pubkey},
-    sysvars::clock::Slot,
-};
 use core::{mem, ops::Deref, slice::from_raw_parts};
-#[cfg(feature = "std")]
-use std::boxed::Box;
+
+use crate::{
+    account::{AccountView, Ref},
+    error::ProgramError,
+    hint::unlikely,
+    sysvars::clock::Slot,
+    Address,
+};
+
+#[cfg(feature = "alloc")]
+use alloc::{boxed::Box, vec::Vec};
 
 /// `SysvarS1otHashes111111111111111111111111111`
-pub const SLOTHASHES_ID: Pubkey = [
+pub const SLOTHASHES_ID: Address = Address::new_from_array([
     6, 167, 213, 23, 25, 47, 10, 175, 198, 242, 101, 227, 251, 119, 204, 122, 218, 130, 197, 41,
     208, 190, 59, 19, 110, 45, 0, 85, 32, 0, 0, 0,
-];
+]);
 /// Number of bytes in a hash.
 pub const HASH_BYTES: usize = 32;
 /// Sysvar data is:
@@ -48,7 +50,8 @@ pub const MAX_SIZE: usize = NUM_ENTRIES_SIZE + MAX_ENTRIES * ENTRY_SIZE;
 pub type Hash = [u8; HASH_BYTES];
 
 /// A single entry in the `SlotHashes` sysvar.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Eq, Debug, PartialEq)]
 #[repr(C)]
 pub struct SlotHashEntry {
     /// The slot number stored as little-endian bytes.
@@ -68,7 +71,14 @@ pub struct SlotHashes<T: Deref<Target = [u8]>> {
 
 /// Log a `Hash` from a program.
 pub fn log(hash: &Hash) {
-    crate::pubkey::log(hash);
+    #[cfg(any(target_os = "solana", target_arch = "bpf"))]
+    // SAFETY: `sol_log_pubkey` expects a valid pointer to a 32-byte array.
+    unsafe {
+        solana_address::syscalls::sol_log_pubkey(hash.as_ptr());
+    }
+
+    #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+    core::hint::black_box(hash);
 }
 
 /// Reads the entry count from the first 8 bytes of data.
@@ -264,7 +274,7 @@ impl<'a, T: Deref<Target = [u8]>> IntoIterator for &'a SlotHashes<T> {
 }
 
 impl<'a> SlotHashes<Ref<'a, [u8]>> {
-    /// Creates a `SlotHashes` instance by safely borrowing data from an `AccountInfo`.
+    /// Creates a `SlotHashes` instance by safely borrowing data from an `AccountView`.
     ///
     /// This function verifies that:
     /// - The account key matches the `SLOTHASHES_ID`
@@ -277,19 +287,19 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
     /// - `ProgramError::InvalidArgument` if the account key doesn't match the `SlotHashes` sysvar ID
     /// - `ProgramError::AccountBorrowFailed` if the account data is already mutably borrowed
     #[inline(always)]
-    pub fn from_account_info(account_info: &'a AccountInfo) -> Result<Self, ProgramError> {
-        if unlikely(!pubkey_eq(account_info.key(), &SLOTHASHES_ID)) {
+    pub fn from_account_view(account_view: &'a AccountView) -> Result<Self, ProgramError> {
+        if unlikely(account_view.address() != &SLOTHASHES_ID) {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let data_ref = account_info.try_borrow_data()?;
+        let data_ref = account_view.try_borrow()?;
 
         // SAFETY: The account was validated to be the `SlotHashes` sysvar.
         Ok(unsafe { SlotHashes::new_unchecked(data_ref) })
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl SlotHashes<Box<[u8]>> {
     /// Fills the provided buffer with the full `SlotHashes` sysvar data.
     ///
@@ -301,7 +311,7 @@ impl SlotHashes<Box<[u8]>> {
         crate::sysvars::get_sysvar_unchecked(buffer_ptr, &SLOTHASHES_ID, 0, MAX_SIZE)?;
 
         // For tests on builds that don't actually fill the buffer.
-        #[cfg(not(target_os = "solana"))]
+        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
         core::ptr::write_bytes(buffer_ptr, 0, NUM_ENTRIES_SIZE);
 
         Ok(())
@@ -310,7 +320,7 @@ impl SlotHashes<Box<[u8]>> {
     /// Allocates an optimal buffer for the sysvar data based on available features.
     #[inline(always)]
     fn allocate_and_fetch() -> Result<Box<[u8]>, ProgramError> {
-        let mut buf = std::vec::Vec::with_capacity(MAX_SIZE);
+        let mut buf = Vec::with_capacity(MAX_SIZE);
         unsafe {
             // SAFETY: `buf` was allocated with capacity `MAX_SIZE` so its
             // pointer is valid for exactly that many bytes. `fill_from_sysvar`

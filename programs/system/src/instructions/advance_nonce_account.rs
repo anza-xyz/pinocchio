@@ -1,8 +1,7 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+    cpi::{invoke_signed, Signer},
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, ProgramResult,
 };
 
 /// Consumes a stored nonce, replacing it with a successor.
@@ -13,13 +12,13 @@ use pinocchio::{
 ///   2. `[SIGNER]` Nonce authority
 pub struct AdvanceNonceAccount<'a> {
     /// Nonce account.
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
 
     /// Recent blockhashes sysvar.
-    pub recent_blockhashes_sysvar: &'a AccountInfo,
+    pub recent_blockhashes_sysvar: &'a AccountView,
 
     /// Nonce authority.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
 }
 
 impl AdvanceNonceAccount<'_> {
@@ -30,18 +29,18 @@ impl AdvanceNonceAccount<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.recent_blockhashes_sysvar.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.recent_blockhashes_sysvar.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // instruction
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
-            data: &[4],
+            accounts: &instruction_accounts,
+            data: &[4, 0, 0, 0],
         };
 
         invoke_signed(

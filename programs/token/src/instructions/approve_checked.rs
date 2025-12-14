@@ -1,11 +1,11 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -18,13 +18,13 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   3. `[SIGNER]` The source account owner.
 pub struct ApproveChecked<'a> {
     /// Source Account.
-    pub source: &'a AccountInfo,
+    pub source: &'a AccountView,
     /// Mint Account.
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Delegate Account.
-    pub delegate: &'a AccountInfo,
+    pub delegate: &'a AccountView,
     /// Source Owner Account.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Amount.
     pub amount: u64,
     /// Decimals.
@@ -39,12 +39,12 @@ impl ApproveChecked<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // Account metadata
-        let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.source.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::readonly(self.delegate.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 4] = [
+            InstructionAccount::writable(self.source.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::readonly(self.delegate.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data
@@ -60,9 +60,9 @@ impl ApproveChecked<'_> {
         // Set decimals as u8 at offset [9]
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };
 
