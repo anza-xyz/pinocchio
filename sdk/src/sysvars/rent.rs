@@ -58,14 +58,14 @@ pub const DEFAULT_LAMPORTS_PER_BYTE: u64 = 6960;
 )]
 pub const DEFAULT_EXEMPTION_THRESHOLD: f64 = 2.0;
 
-/// The `u64::to_le_bytes` representation of the default exemption threshold.
+/// The `f64::to_le_bytes` representation of the default exemption threshold.
 ///
 /// This value is equivalent to `2.0f64`. It is only used to check whether
 /// the exemption threshold is the default value to avoid performing
 /// floating-point operations on-chain.
 const CURRENT_EXEMPTION_THRESHOLD: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 64];
 
-/// The `u64::to_le_bytes` representation of the SIMD-0194 exemption threshold.
+/// The `f64::to_le_bytes` representation of the SIMD-0194 exemption threshold.
 ///
 /// This value is equivalent to `1.0f64`. It is only used to check whether
 /// the exemption threshold is the deprecated value to avoid performing
