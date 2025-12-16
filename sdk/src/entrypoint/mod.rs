@@ -18,10 +18,7 @@ use crate::{
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
-#[cfg(all(
-    any(test, target_os = "solana", target_arch = "bpf"),
-    feature = "alloc"
-))]
+#[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
 
 /// Start address of the memory region used for program heap.
@@ -503,7 +500,7 @@ macro_rules! default_allocator {
         #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[global_allocator]
         static A: $crate::entrypoint::BumpAllocator = unsafe {
-            $crate::entrypoint::BumpAllocator::new(
+            $crate::entrypoint::BumpAllocator::new_unchecked(
                 $crate::entrypoint::HEAP_START_ADDRESS as usize,
                 // Use the maximum heap length allowed. Programs can request heap sizes up
                 // to this value using the `ComputeBudget`.
@@ -606,13 +603,10 @@ unsafe impl GlobalAlloc for NoAllocator {
     }
 }
 
-#[cfg(all(
-    any(test, target_os = "solana", target_arch = "bpf"),
-    feature = "alloc"
-))]
+#[cfg(feature = "alloc")]
 mod alloc {
     use {
-        crate::hint::unlikely,
+        crate::{entrypoint::MAX_HEAP_LENGTH, hint::unlikely},
         core::{
             alloc::{GlobalAlloc, Layout},
             mem::size_of,
@@ -639,16 +633,13 @@ mod alloc {
     impl BumpAllocator {
         /// Creates the allocator tied to specific range of addresses.
         ///
-        /// The start address must be aligned to `usize` and the length must be
-        /// at least `size_of::<usize>()` bytes.
-        ///
         /// # Safety
         ///
         /// This is unsafe in most situations, unless you are totally sure that
         /// the provided start address and length can be written to by the allocator,
         /// and that the memory will be usable for the lifespan of the allocator.
-        /// The reserved memory region must be at least `size_of::<usize>()` bytes
-        /// long.
+        /// The start address must be aligned to `usize` and the length must be
+        /// at least `size_of::<usize>()` bytes.
         ///
         /// For Solana on-chain programs, a certain address range is reserved, so
         /// the allocator can be given those addresses. In general, the `len` is
@@ -663,7 +654,7 @@ mod alloc {
     }
 
     // Integer arithmetic in this global allocator implementation is safe when operating on the
-    // prescribed `GlobalAlloc::start` and `GlobalAlloc::end`. Any other use may overflow and
+    // prescribed `BumpAllocator::start` and `BumpAllocator::end`. Any other use may overflow and
     // is thus unsupported and at one's own risk.
     #[allow(clippy::arithmetic_side_effects)]
     unsafe impl GlobalAlloc for BumpAllocator {
@@ -689,17 +680,13 @@ mod alloc {
                 pos = self.start + size_of::<usize>();
             }
 
-            let padding = layout.align() - 1;
-
-            if unlikely(self.end - pos < padding) {
-                return null_mut();
-            }
-
             // Determines the allocation address, adjusting the alignment for the
             // type being allocated.
             let allocation = (pos + layout.align() - 1) & !(layout.align() - 1);
 
-            if unlikely(self.end - allocation < layout.size()) {
+            if unlikely(layout.size() > MAX_HEAP_LENGTH as usize)
+                || unlikely(self.end < allocation + layout.size())
+            {
                 return null_mut();
             }
 
