@@ -18,14 +18,21 @@ use crate::{
     Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
 
-#[cfg(all(any(target_os = "solana", target_arch = "bpf"), feature = "alloc"))]
+#[cfg(all(
+    any(test, target_os = "solana", target_arch = "bpf"),
+    feature = "alloc"
+))]
 pub use alloc::BumpAllocator;
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
 
 /// Length of the heap memory region used for program heap.
+#[deprecated(since = "0.10.0", note = "Use `MAX_HEAP_LENGTH` instead")]
 pub const HEAP_LENGTH: usize = 32 * 1024;
+
+/// Maximum heap length in bytes that a program can request.
+pub const MAX_HEAP_LENGTH: u32 = 256 * 1024;
 
 /// Value used to indicate that a serialized account is not a duplicate.
 pub const NON_DUP_MARKER: u8 = u8::MAX;
@@ -495,9 +502,13 @@ macro_rules! default_allocator {
     () => {
         #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[global_allocator]
-        static A: $crate::entrypoint::BumpAllocator = $crate::entrypoint::BumpAllocator {
-            start: $crate::entrypoint::HEAP_START_ADDRESS as usize,
-            len: $crate::entrypoint::HEAP_LENGTH,
+        static A: $crate::entrypoint::BumpAllocator = unsafe {
+            $crate::entrypoint::BumpAllocator::new(
+                $crate::entrypoint::HEAP_START_ADDRESS as usize,
+                // Use the maximum heap length allowed. Programs can request heap sizes up
+                // to this value using the `ComputeBudget`.
+                $crate::entrypoint::MAX_HEAP_LENGTH as usize,
+            )
         };
 
         /// A default allocator for when the program is compiled on a target different than
@@ -554,7 +565,7 @@ macro_rules! no_allocator {
             // Assert if the allocation does not exceed the heap size.
             assert!(
                 end <= $crate::entrypoint::HEAP_START_ADDRESS as usize
-                    + $crate::entrypoint::HEAP_LENGTH,
+                    + $crate::entrypoint::MAX_HEAP_LENGTH as usize,
                 "allocation exceeds heap size"
             );
 
@@ -595,62 +606,137 @@ unsafe impl GlobalAlloc for NoAllocator {
     }
 }
 
-#[cfg(all(any(target_os = "solana", target_arch = "bpf"), feature = "alloc"))]
+#[cfg(all(
+    any(test, target_os = "solana", target_arch = "bpf"),
+    feature = "alloc"
+))]
 mod alloc {
-    use core::{
-        alloc::{GlobalAlloc, Layout},
-        mem::size_of,
-        ptr::null_mut,
+    use {
+        crate::hint::unlikely,
+        core::{
+            alloc::{GlobalAlloc, Layout},
+            mem::size_of,
+            ptr::null_mut,
+        },
     };
 
-    /// The bump allocator used as the default rust heap when running programs.
+    /// The bump allocator used as the default Rust heap when running programs.
+    ///
+    /// The allocator uses a forward bump allocation strategy, where memory is allocated
+    /// by moving a pointer forward in a pre-allocated memory region. The current position
+    /// of the heap pointer is stored at the start of the memory region.
+    ///
+    /// This implementation relies on the runtime to zero out memory and to enforce the
+    /// limit of the heap memory region. Use of memory outside the allocated region will
+    /// result in a runtime error.
     #[cfg_attr(feature = "copy", derive(Copy))]
     #[derive(Clone, Debug)]
     pub struct BumpAllocator {
-        pub start: usize,
-        pub len: usize,
+        start: usize,
+        end: usize,
     }
 
-    /// Integer arithmetic in this global allocator implementation is safe when operating on the
-    /// prescribed [`HEAP_START_ADDRESS`] and [`HEAP_LENGTH`]. Any other use may overflow and is
-    /// thus unsupported and at one's own risk.
+    impl BumpAllocator {
+        /// Creates the allocator tied to specific range of addresses.
+        ///
+        /// The start address must be aligned to `usize` and the length must be
+        /// at least `size_of::<usize>()` bytes.
+        ///
+        /// # Safety
+        ///
+        /// This is unsafe in most situations, unless you are totally sure that
+        /// the provided start address and length can be written to by the allocator,
+        /// and that the memory will be usable for the lifespan of the allocator.
+        /// The reserved memory region must be at least `size_of::<usize>()` bytes
+        /// long.
+        ///
+        /// For Solana on-chain programs, a certain address range is reserved, so
+        /// the allocator can be given those addresses. In general, the `len` is
+        /// set to the maximum heap length allowed by the runtime. The runtime
+        /// will enforce the actual heap size requested by the program.
+        pub const unsafe fn new_unchecked(start: usize, len: usize) -> Self {
+            Self {
+                start,
+                end: start + len,
+            }
+        }
+    }
+
+    // Integer arithmetic in this global allocator implementation is safe when operating on the
+    // prescribed `GlobalAlloc::start` and `GlobalAlloc::end`. Any other use may overflow and
+    // is thus unsupported and at one's own risk.
     #[allow(clippy::arithmetic_side_effects)]
     unsafe impl GlobalAlloc for BumpAllocator {
-        /// Allocates memory as a bump allocator.
+        /// Allocates memory as described by the given `layout` using a forward bump allocator.
+        ///
+        /// Returns a pointer to newly-allocated memory, or `null` to indicate allocation failure.
+        ///
+        /// # Safety
+        ///
+        /// `layout` must have non-zero size. Attempting to allocate for a zero-sized layout will
+        /// result in undefined behavior.
         #[inline]
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            // Reads the current position of the heap pointer.
+            //
+            // Integer-to-pointer cast: the caller guarantees that `self.start` is a valid
+            // address for the lifetime of the allocator and aligned to `usize`.
             let pos_ptr = self.start as *mut usize;
-
             let mut pos = *pos_ptr;
-            if pos == 0 {
+
+            if unlikely(pos == 0) {
                 // First time, set starting position.
-                pos = self.start + self.len;
+                pos = self.start + size_of::<usize>();
             }
-            pos = pos.saturating_sub(layout.size());
-            pos &= !(layout.align().wrapping_sub(1));
-            if pos < self.start + size_of::<*mut u8>() {
+
+            let padding = layout.align() - 1;
+
+            if unlikely(self.end - pos < padding) {
                 return null_mut();
             }
-            *pos_ptr = pos;
-            pos as *mut u8
+
+            // Determines the allocation address, adjusting the alignment for the
+            // type being allocated.
+            let allocation = (pos + layout.align() - 1) & !(layout.align() - 1);
+
+            if unlikely(self.end - allocation < layout.size()) {
+                return null_mut();
+            }
+
+            // Updates the heap pointer.
+            *pos_ptr = allocation + layout.size();
+
+            allocation as *mut u8
         }
 
+        /// Behaves like `alloc`, but also ensures that the contents are set to zero before being returned.
+        ///
+        /// This method relies on the runtime to zero out the memory when reserving the heap region,
+        /// so it simply calls `alloc`.
         #[inline]
-        unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
-            // I'm a bump allocator, I don't free.
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            self.alloc(layout)
         }
+
+        /// This method has no effect since the bump allocator does not free memory.
+        #[inline]
+        unsafe fn dealloc(&self, _: *mut u8, _: Layout) {}
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use ::alloc::{
-        alloc::{alloc, dealloc, handle_alloc_error},
-        vec,
+    use {
+        super::*,
+        ::alloc::{
+            alloc::{alloc, dealloc, handle_alloc_error},
+            vec,
+        },
+        core::{
+            alloc::Layout,
+            ptr::{copy_nonoverlapping, null_mut},
+        },
     };
-    use core::{alloc::Layout, ptr::copy_nonoverlapping};
-
-    use super::*;
 
     /// The mock program ID used for testing.
     const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
@@ -943,5 +1029,77 @@ mod tests {
         assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_duplicated_accounts(&accounts, 32);
+    }
+
+    #[test]
+    fn test_bump_allocator() {
+        // alloc the entire
+        {
+            let mut heap = AlignedMemory::new(128);
+            unsafe { heap.write(&[0; 128], 0) };
+
+            let allocator = unsafe {
+                BumpAllocator::new_unchecked(heap.as_mut_ptr() as usize, heap.layout.size())
+            };
+
+            for i in 0..128 - size_of::<*mut u8>() {
+                let ptr = unsafe {
+                    allocator.alloc(Layout::from_size_align(1, size_of::<u8>()).unwrap())
+                };
+                assert_eq!(
+                    ptr as usize,
+                    heap.as_mut_ptr() as usize + size_of::<*mut u8>() + i
+                );
+            }
+            assert_eq!(null_mut(), unsafe {
+                allocator.alloc(Layout::from_size_align(1, size_of::<u8>()).unwrap())
+            });
+        }
+        // check alignment
+        {
+            let mut heap = AlignedMemory::new(128);
+            unsafe { heap.write(&[0; 128], 0) };
+
+            let allocator = unsafe {
+                BumpAllocator::new_unchecked(heap.as_mut_ptr() as usize, heap.layout.size())
+            };
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u8>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u8>()));
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u16>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u16>()));
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u32>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u32>()));
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u64>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u64>()));
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u128>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u128>()));
+            let ptr = unsafe { allocator.alloc(Layout::from_size_align(1, 64).unwrap()) };
+            assert_eq!(0, ptr.align_offset(64));
+        }
+        // alloc entire block (minus the pos ptr)
+        {
+            let mut heap = AlignedMemory::new(128);
+            unsafe { heap.write(&[0; 128], 0) };
+
+            let allocator = unsafe {
+                BumpAllocator::new_unchecked(heap.as_mut_ptr() as usize, heap.layout.size())
+            };
+            let ptr = unsafe {
+                allocator.alloc(
+                    Layout::from_size_align(
+                        heap.layout.size() - size_of::<usize>(),
+                        size_of::<u8>(),
+                    )
+                    .unwrap(),
+                )
+            };
+            assert_ne!(ptr, null_mut());
+            assert_eq!(0, ptr.align_offset(size_of::<u64>()));
+        }
     }
 }
