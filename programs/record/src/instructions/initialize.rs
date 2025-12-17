@@ -1,5 +1,5 @@
 use pinocchio::{
-    cpi::{invoke_signed, Signer},
+    cpi::invoke_signed,
     instruction::{InstructionAccount, InstructionView},
     AccountView, ProgramResult,
 };
@@ -19,11 +19,6 @@ pub struct Initialize<'a> {
 impl Initialize<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
-    }
-
-    #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         let instruction_accounts: [InstructionAccount; 2] = [
             InstructionAccount::writable(self.account.address()),
             InstructionAccount::readonly(self.authority.address()),
@@ -35,10 +30,6 @@ impl Initialize<'_> {
             data: &[0],
         };
 
-        invoke_signed(
-            &instruction,
-            &[self.account, self.authority],
-            signers,
-        )
+        invoke_signed(&instruction, &[self.account, self.authority], &[])
     }
 }
