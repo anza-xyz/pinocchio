@@ -88,6 +88,12 @@ pub const DEFAULT_BURN_PERCENT: u8 = 50;
 /// added to an accounts data length when calculating [`Rent::minimum_balance`].
 pub const ACCOUNT_STORAGE_OVERHEAD: u64 = 128;
 
+/// Maximum lamports per byte for the SIMD-0194 exemption threshold.
+const SIMD0194_MAX_LAMPORTS_PER_BYTE: u64 = 1_759_197_129_867;
+
+/// Maximum lamports per byte for the current exemption threshold.
+const CURRENT_MAX_LAMPORTS_PER_BYTE: u64 = 879_598_564_933;
+
 /// Rent sysvar data
 #[repr(C)]
 #[cfg_attr(feature = "copy", derive(Copy))]
@@ -180,7 +186,8 @@ impl Rent {
     ///
     /// # Panics
     ///
-    /// Panics if `data_len` exceeds the maximum permitted data length.
+    /// Panics if `data_len` exceeds the maximum permitted data length or if the
+    /// `lamports_per_byte` is too large based on the `exemption_threshold`.
     #[deprecated(since = "0.10.0", note = "Use `Rent::try_minimum_balance` instead")]
     #[inline(always)]
     pub fn minimum_balance(&self, data_len: usize) -> u64 {
@@ -194,6 +201,12 @@ impl Rent {
     /// This method avoids floating-point operations when the `exemption_threshold`
     /// is the default value.
     ///
+    /// # Important
+    ///
+    /// The caller must ensure that `data_len` is within the permitted limit
+    /// and the `lamports_per_byte` is within the permitted limit based on
+    /// the `exemption_threshold` to avoid overflow.
+    ///
     /// # Arguments
     ///
     /// * `data_len` - The number of bytes in the account
@@ -201,13 +214,8 @@ impl Rent {
     /// # Returns
     ///
     /// The minimum balance in lamports for rent exemption.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that `data_len` is within permitted the permitted
-    /// limit to avoid overflow.
     #[inline(always)]
-    pub unsafe fn minimum_balance_unchecked(&self, data_len: usize) -> u64 {
+    pub fn minimum_balance_unchecked(&self, data_len: usize) -> u64 {
         let bytes = data_len as u64;
 
         // There are two cases where it is possible to avoid floating-point
@@ -249,17 +257,30 @@ impl Rent {
     ///
     /// # Errors
     ///
-    /// Returns `ProgramError::InvalidArgument` if `data_len` exceeds the maximum permitted
-    /// data length.
+    /// Returns `ProgramError::InvalidArgument` if `data_len` exceeds the maximum
+    /// permitted data length or if the `lamports_per_byte` is too large based on
+    /// the `exemption_threshold`, which would cause an overflow.
+    #[allow(clippy::collapsible_if)]
     #[inline(always)]
     pub fn try_minimum_balance(&self, data_len: usize) -> Result<u64, ProgramError> {
         if data_len as u64 > MAX_PERMITTED_DATA_LENGTH {
-            Err(ProgramError::InvalidArgument)
-        } else {
-            // SAFETY: The `data_len` is validated to be lower than the maximum permitted
-            // data length.
-            Ok(unsafe { self.minimum_balance_unchecked(data_len) })
+            return Err(ProgramError::InvalidArgument);
         }
+
+        // Validate `lamports_per_byte` based on `exemption_threshold`
+        // to prevent overflow.
+
+        if unlikely(self.lamports_per_byte > CURRENT_MAX_LAMPORTS_PER_BYTE) {
+            if self.exemption_threshold == CURRENT_EXEMPTION_THRESHOLD {
+                return Err(ProgramError::InvalidArgument);
+            }
+        } else if unlikely(self.lamports_per_byte > SIMD0194_MAX_LAMPORTS_PER_BYTE) {
+            if self.exemption_threshold == SIMD0194_EXEMPTION_THRESHOLD {
+                return Err(ProgramError::InvalidArgument);
+            }
+        }
+
+        Ok(self.minimum_balance_unchecked(data_len))
     }
 
     /// Determines if an account can be considered rent exempt.
