@@ -260,6 +260,9 @@ impl Rent {
     /// Returns `ProgramError::InvalidArgument` if `data_len` exceeds the maximum
     /// permitted data length or if the `lamports_per_byte` is too large based on
     /// the `exemption_threshold`, which would cause an overflow.
+    //
+    // Note: Clippy suggests collapsing the `if` statements, but they are kept
+    // separate since it is more CU-efficient this way.
     #[allow(clippy::collapsible_if)]
     #[inline(always)]
     pub fn try_minimum_balance(&self, data_len: usize) -> Result<u64, ProgramError> {
