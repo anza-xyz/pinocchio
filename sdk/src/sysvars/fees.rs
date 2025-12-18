@@ -1,7 +1,12 @@
 //! Calculation of transaction fees.
 
 use super::{clock::DEFAULT_MS_PER_SLOT, Sysvar};
-use crate::impl_sysvar_get;
+use crate::{impl_sysvar_get, Address};
+
+pub const FEES_ID: Address = Address::new_from_array([
+    6, 167, 213, 23, 24, 226, 90, 141, 131, 80, 60, 37, 26, 122, 240, 113, 38, 253, 114, 0, 223,
+    111, 196, 237, 82, 106, 156, 144, 0, 0, 0, 0,
+]);
 
 /// Fee calculator for processing transactions
 #[cfg_attr(feature = "copy", derive(Copy))]
@@ -96,5 +101,5 @@ impl Fees {
 }
 
 impl Sysvar for Fees {
-    impl_sysvar_get!(sol_get_fees_sysvar);
+    impl_sysvar_get!(FEES_ID, 7);
 }

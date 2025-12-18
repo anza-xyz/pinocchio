@@ -80,7 +80,7 @@ pub const DEFAULT_TICKS_PER_SECOND: u64 = 160;
 pub const DEFAULT_MS_PER_SLOT: u64 = 1_000 * DEFAULT_TICKS_PER_SLOT / DEFAULT_TICKS_PER_SECOND;
 
 impl Sysvar for Clock {
-    impl_sysvar_get!(sol_get_clock_sysvar);
+    impl_sysvar_get!(CLOCK_ID, 0);
 }
 
 impl Clock {

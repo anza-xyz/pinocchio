@@ -17,13 +17,11 @@ pub mod slot_hashes;
 /// the sysvar data.
 //
 // Defined in the bpf loader as [`OFFSET_LENGTH_EXCEEDS_SYSVAR`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L172).
-#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 const OFFSET_LENGTH_EXCEEDS_SYSVAR: u64 = 1;
 
 /// Return value indicating that the sysvar was not found.
 //
 // Defined in the bpf loader as [`SYSVAR_NOT_FOUND`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L171).
-#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 const SYSVAR_NOT_FOUND: u64 = 2;
 
 /// A type that holds sysvar data.
@@ -69,13 +67,13 @@ macro_rules! impl_sysvar_get {
     // supports sysvars without padding or with padding at the end of their byte
     // layout since the syscall data follows bincode serialization.
     ($syscall_id:expr, $padding:literal) => {
-        fn get() -> Result<Self, ProgramError> {
+        fn get() -> Result<Self, $crate::error::ProgramError> {
             let mut var = core::mem::MaybeUninit::<Self>::uninit();
             let var_addr = var.as_mut_ptr() as *mut _ as *mut u8;
 
             #[cfg(target_os = "solana")]
             // SAFETY: The allocation is valid for the size of `Self`. It fixes
-            // the size to `size_of::<Self>() - padding` for the syscall since
+            // the size to `size_of::<Self>() - $padding` for the syscall since
             // the byte layout follows bincode serialization; the remaining bytes
             // are considered padding and initialized to zero.
             let result = unsafe {
@@ -104,8 +102,14 @@ macro_rules! impl_sysvar_get {
                     // padding bytes are set to zero.
                     Ok(unsafe { var.assume_init() })
                 }
+                $crate::sysvars::OFFSET_LENGTH_EXCEEDS_SYSVAR => {
+                    Err($crate::error::ProgramError::InvalidArgument)
+                }
+                $crate::sysvars::SYSVAR_NOT_FOUND => {
+                    Err($crate::error::ProgramError::UnsupportedSysvar)
+                }
                 // Unexpected errors are folded into `UnsupportedSysvar`.
-                _ => Err(ProgramError::UnsupportedSysvar),
+                _ => Err($crate::error::ProgramError::UnsupportedSysvar),
             }
         }
     };

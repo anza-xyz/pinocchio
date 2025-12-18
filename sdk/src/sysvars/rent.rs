@@ -65,12 +65,12 @@ pub const DEFAULT_EXEMPTION_THRESHOLD: f64 = 2.0;
 /// floating-point operations on-chain.
 const CURRENT_EXEMPTION_THRESHOLD: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 64];
 
-/// The `u64` representation of the SIMD-0194 exemption threshold.
+/// The `f64::to_le_bytes` representation of the SIMD-0194 exemption threshold.
 ///
 /// This value is equivalent to `1.0f64`. It is only used to check whether
 /// the exemption threshold is the deprecated value to avoid performing
 /// floating-point operations on-chain.
-const SIMD0194_EXEMPTION_THRESHOLD: u64 = 4607182418800017408;
+const SIMD0194_EXEMPTION_THRESHOLD: [u8; 8] = [0, 0, 0, 0, 0, 0, 240, 63];
 
 /// Default percentage of collected rent that is burned.
 ///
@@ -100,7 +100,7 @@ const CURRENT_MAX_LAMPORTS_PER_BYTE: u64 = 879_598_564_933;
 #[derive(Clone, Debug)]
 pub struct Rent {
     /// Rental rate in lamports per byte.
-    pub lamports_per_byte: u64,
+    lamports_per_byte: [u8; 8],
 
     /// Exemption threshold in years.
     ///
@@ -152,7 +152,7 @@ impl Rent {
     /// a valid representation of `Rent`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<&Self, ProgramError> {
-        if bytes.len() < size_of::<Self>() {
+        if bytes.len() != size_of::<Self>() {
             return Err(ProgramError::InvalidArgument);
         }
         // SAFETY: `bytes` has been validated to be at least `Self::LEN` bytes long; the
@@ -169,6 +169,12 @@ impl Rent {
     #[inline]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes.as_ptr() as *const Rent)
+    }
+
+    /// Return the rental rate in lamports per byte.
+    #[inline(always)]
+    pub const fn lamports_per_byte(&self) -> u64 {
+        u64::from_le_bytes(self.lamports_per_byte)
     }
 
     /// Calculates the minimum balance for rent exemption.
@@ -217,7 +223,6 @@ impl Rent {
     #[inline(always)]
     pub fn minimum_balance_unchecked(&self, data_len: usize) -> u64 {
         let bytes = data_len as u64;
-        let exemption_threshold = u64::from_le_bytes(self.exemption_threshold);
 
         // There are two cases where it is possible to avoid floating-point
         // operations:
@@ -229,13 +234,13 @@ impl Rent {
         // operations. Note that on BPF targets, floating-point operations are
         // not supported, so panic in that case.
         if self.exemption_threshold == SIMD0194_EXEMPTION_THRESHOLD {
-            (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte
+            (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte()
         } else if self.exemption_threshold == CURRENT_EXEMPTION_THRESHOLD {
-            2 * (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte
+            2 * (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte()
         } else {
             #[cfg(not(target_arch = "bpf"))]
             {
-                (((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte) as f64
+                (((ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte()) as f64
                     * f64::from_le_bytes(self.exemption_threshold)) as u64
             }
             #[cfg(target_arch = "bpf")]
@@ -274,11 +279,11 @@ impl Rent {
         // Validate `lamports_per_byte` based on `exemption_threshold`
         // to prevent overflow.
 
-        if unlikely(self.lamports_per_byte > CURRENT_MAX_LAMPORTS_PER_BYTE) {
+        if unlikely(self.lamports_per_byte() > CURRENT_MAX_LAMPORTS_PER_BYTE) {
             if self.exemption_threshold == CURRENT_EXEMPTION_THRESHOLD {
                 return Err(ProgramError::InvalidArgument);
             }
-        } else if unlikely(self.lamports_per_byte > SIMD0194_MAX_LAMPORTS_PER_BYTE) {
+        } else if unlikely(self.lamports_per_byte() > SIMD0194_MAX_LAMPORTS_PER_BYTE) {
             if self.exemption_threshold == SIMD0194_EXEMPTION_THRESHOLD {
                 return Err(ProgramError::InvalidArgument);
             }
@@ -304,7 +309,7 @@ impl Rent {
 }
 
 impl Sysvar for Rent {
-    impl_sysvar_get!(sol_get_rent_sysvar);
+    impl_sysvar_get!(RENT_ID, 0);
 }
 
 #[cfg(test)]
@@ -318,15 +323,15 @@ mod tests {
     #[test]
     pub fn test_minimum_balance() {
         let mut rent = super::Rent {
-            lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE_YEAR,
-            exemption_threshold: CURRENT_EXEMPTION_THRESHOLD.to_le_bytes(),
+            lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE_YEAR.to_le_bytes(),
+            exemption_threshold: CURRENT_EXEMPTION_THRESHOLD,
             burn_percent: DEFAULT_BURN_PERCENT,
         };
 
         // Using the default exemption threshold.
 
         let balance = rent.minimum_balance(100);
-        let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte) as f64
+        let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte()) as f64
             * f64::from_le_bytes(rent.exemption_threshold)) as u64;
 
         assert!(calculated > 0);
@@ -336,7 +341,7 @@ mod tests {
         rent.exemption_threshold = 0.5f64.to_le_bytes();
 
         let balance = rent.minimum_balance(100);
-        let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte) as f64
+        let calculated = (((ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte()) as f64
             * f64::from_le_bytes(rent.exemption_threshold)) as u64;
 
         assert!(calculated > 0);
@@ -346,24 +351,24 @@ mod tests {
     #[test]
     pub fn test_minimum_balance_simd0194() {
         let mut rent = super::Rent {
-            lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE,
-            exemption_threshold: SIMD0194_EXEMPTION_THRESHOLD.to_le_bytes(),
+            lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE.to_le_bytes(),
+            exemption_threshold: SIMD0194_EXEMPTION_THRESHOLD,
             burn_percent: DEFAULT_BURN_PERCENT,
         };
 
         // Using the default exemption threshold.
 
         let balance = rent.minimum_balance(100);
-        let calculated = (ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte;
+        let calculated = (ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte();
 
         assert!(calculated > 0);
         assert_eq!(balance, calculated);
 
         // Using a different lamports per byte value.
-        rent.lamports_per_byte = DEFAULT_LAMPORTS_PER_BYTE * 2;
+        rent.lamports_per_byte = (DEFAULT_LAMPORTS_PER_BYTE * 2).to_le_bytes();
 
         let balance = rent.minimum_balance(100);
-        let calculated = (ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte;
+        let calculated = (ACCOUNT_STORAGE_OVERHEAD + 100) * rent.lamports_per_byte();
 
         assert!(calculated > 0);
         assert_eq!(balance, calculated);
