@@ -85,13 +85,62 @@ The information from the input is parsed into their own entities:
 * `accounts`: the accounts received
 * `instruction_data`: data for the instruction
 
-`pinocchio` also offers variations of the program entrypoint (`lazy_program_entrypoint`) and global allocator (`no_allocator`). In order to use these, the program needs to specify the program entrypoint, global allocator and panic handler individually. The `entrypoint!` macro is equivalent to writing:
+`pinocchio` also offers variations of the program entrypoint (`custom_program_entrypoint`, `lazy_program_entrypoint`) and global allocator (`no_allocator`). In order to use these, the program needs to specify the program entrypoint, global allocator and panic handler individually. The `entrypoint!` macro is equivalent to writing:
 ```rust
 program_entrypoint!(process_instruction);
 default_allocator!();
 default_panic_handler!();
 ```
 Any of these macros can be replaced by alternative implementations.
+
+📌 [`custom_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.custom_program_entrypoint.html)
+
+The `custom_program_entrypoint!` allows you to define your own entrypoint function with custom logic before delegating to the standard pinocchio input parsing. This enables fast-path optimizations where you can handle simple cases directly and only pay the cost of full input parsing when necessary.
+
+The `custom_program_entrypoint!` macro is suitable for programs that can benefit from bypassing input parsing in certain conditions (e.g., when there are no accounts), while still using the standard [`program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.program_entrypoint.html) parsing for the general case.
+
+To use the `custom_program_entrypoint!` macro, use the following in your entrypoint definition:
+
+```rust
+#![no_std]
+
+use pinocchio::{
+  AccountView, 
+  Address, 
+  ProgramResult, 
+  custom_program_entrypoint, 
+  no_allocator, 
+  nostd_panic_handler
+};
+
+use solana_program_log::log;
+
+no_allocator!();
+nostd_panic_handler!();
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn entrypoint(ptr: *mut u8) -> u64 {
+    let num_accounts = unsafe { *(ptr as *const u64) };
+    if num_accounts == 0 {
+        log("Fast path!");
+        return 0;
+    }
+    entrypoint_2(ptr)
+}
+
+custom_program_entrypoint!(entrypoint_2, process_instruction);
+
+pub fn process_instruction(
+  program_id: &Address,
+  accounts: &[AccountView],
+  instruction_data: &[u8],
+) -> ProgramResult {
+  log!("Slow path!");
+  Ok(())
+}
+```
+
+You can also chain multiple custom entrypoints, or directly consume the internal parsing function [`entrypoint_deserialize`](https://docs.rs/pinocchio/latest/pinocchio/fn.entrypoint_deserialize.html), used in both `custom_program_entrypoint!` and `program_entrypoint!` if more flexibility is required.
 
 📌 [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html)
 
