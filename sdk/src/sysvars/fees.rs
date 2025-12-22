@@ -101,5 +101,5 @@ impl Fees {
 }
 
 impl Sysvar for Fees {
-    impl_sysvar_get!(FEES_ID, 7);
+    impl_sysvar_get!(sol_get_fees_sysvar);
 }
