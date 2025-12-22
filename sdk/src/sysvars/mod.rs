@@ -67,6 +67,7 @@ macro_rules! impl_sysvar_get {
     // supports sysvars without padding or with padding at the end of their byte
     // layout since the syscall data follows bincode serialization.
     ($syscall_id:expr, $padding:literal) => {
+        #[inline(always)]
         fn get() -> Result<Self, $crate::error::ProgramError> {
             let mut var = core::mem::MaybeUninit::<Self>::uninit();
             let var_addr = var.as_mut_ptr() as *mut _ as *mut u8;

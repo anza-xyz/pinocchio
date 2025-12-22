@@ -113,6 +113,12 @@ pub struct Rent {
     burn_percent: u8,
 }
 
+// Assert that the size of the `Rent` struct is as expected (17 bytes).
+const _ASSERT_STRUCT_LEN: () = assert!(core::mem::size_of::<Rent>() == 17);
+
+// Assert that the alignment of the `Rent` struct is as expected (1 byte).
+const _ASSERT_ACCOUNT_ALIGN: () = assert!(core::mem::align_of::<Rent>() == 1);
+
 impl Rent {
     /// Return a `Rent` from the given account view.
     ///
