@@ -108,18 +108,17 @@ pub struct Rent {
     exemption_threshold: [u8; 8],
     // Burn percentage.
     //
-    // The concept of rent no longer exists, only rent-exemption. The
-    // field is not omitted to preserve the struct 8-byte layout.
+    // The concept of rent no longer exists, only rent-exemption.
     //
     // The field (`burn_percent: u8`) is omitted to maintain the struct
     // aligned to 8-bytes, which improves the performance of loading the
     // sysvar.
 }
 
-// Assert that the size of the `Rent` struct is as expected (17 bytes).
+// Assert that the size of the `Rent` struct is as expected (16 bytes).
 const _ASSERT_STRUCT_LEN: () = assert!(size_of::<Rent>() == 16);
 
-// Assert that the alignment of the `Rent` struct is as expected (1 byte).
+// Assert that the alignment of the `Rent` struct is as expected (8 byte).
 const _ASSERT_ACCOUNT_ALIGN: () = assert!(align_of::<Rent>() == 8);
 
 impl Rent {
