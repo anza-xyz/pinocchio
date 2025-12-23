@@ -1,6 +1,7 @@
 //! Macros and functions for defining the program entrypoint and setting up
 //! global handlers.
 
+pub mod custom;
 pub mod lazy;
 
 pub use lazy::{InstructionContext, MaybeAccount};
@@ -161,26 +162,45 @@ macro_rules! program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account::AccountView> =
-                core::mem::MaybeUninit::<$crate::account::AccountView>::uninit();
-            // Create an array of uninitialized account views.
-            let mut accounts = [UNINIT; $maximum];
-
-            let (program_id, count, instruction_data) =
-                $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
-
-            // Call the program's entrypoint passing `count` account views; we know that
-            // they are initialized so we cast the pointer to a slice of `[AccountView]`.
-            match $process_instruction(
-                &program_id,
-                core::slice::from_raw_parts(accounts.as_ptr() as _, count),
-                &instruction_data,
-            ) {
-                Ok(()) => $crate::SUCCESS,
-                Err(error) => error.into(),
-            }
+            $crate::entrypoint::entrypoint_deserialize::<$maximum, _>(input, $process_instruction)
         }
     };
+}
+
+/// Entrypoint deserialization.
+///
+/// This function inlines entrypoint deserialization for use in the `program_entrypoint!` and
+/// `custom_program_entrypoint!` macros.
+///
+/// **Note**: This is a low-level function that should not be called directly. Use the
+/// `program_entrypoint!` or `custom_program_entrypoint!` macros instead.
+///
+/// # Safety
+///
+/// The caller must ensure that the `input` buffer is valid, i.e., it represents the program input
+/// parameters serialized by the SVM loader. Additionally, the `input` should last for the lifetime
+/// of the program execution since the returned values reference the `input`.
+#[inline(always)]
+pub fn entrypoint_deserialize<const MAX_ACCOUNTS: usize>(
+    input: *mut u8,
+    process_instruction: fn(&Address, &[AccountView], &[u8]) -> crate::ProgramResult,
+) -> u64 {
+    const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
+    // Create an array of uninitialized account views.
+    let mut accounts = [UNINIT; MAX_ACCOUNTS];
+
+    let (program_id, count, instruction_data) = unsafe { deserialize::<MAX_ACCOUNTS>(input, &mut accounts) };
+
+    // Call the program's entrypoint passing `count` account views; we know that
+    // they are initialized so we cast the pointer to a slice of `[AccountView]`.
+    match process_instruction(
+        program_id,
+        unsafe { from_raw_parts(accounts.as_ptr() as _, count) },
+        instruction_data,
+    ) {
+        Ok(()) => crate::SUCCESS,
+        Err(error) => error.into(),
+    }
 }
 
 /// Align a pointer to the BPF alignment of [`u128`].
