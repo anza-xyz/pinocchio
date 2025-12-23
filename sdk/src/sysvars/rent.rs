@@ -15,7 +15,7 @@ use {
         sysvars::Sysvar,
         Address,
     },
-    core::mem::size_of,
+    core::mem::{align_of, size_of},
 };
 
 /// The ID of the rent sysvar.
@@ -100,18 +100,26 @@ const CURRENT_MAX_LAMPORTS_PER_BYTE: u64 = 879_598_564_933;
 #[derive(Clone, Debug)]
 pub struct Rent {
     /// Rental rate in lamports per byte.
-    pub lamports_per_byte: u64,
+    lamports_per_byte: u64,
 
     /// Exemption threshold in years.
     ///
     /// The concept of rent no longer exists, only rent-exemption.
     exemption_threshold: [u8; 8],
-
-    /// Burn percentage.
-    ///
-    /// The concept of rent no longer exists, only rent-exemption.
-    burn_percent: u8,
+    // Burn percentage.
+    //
+    // The concept of rent no longer exists, only rent-exemption.
+    //
+    // The field (`burn_percent: u8`) is omitted to maintain the struct
+    // aligned to 8-bytes, which improves the performance of loading the
+    // sysvar.
 }
+
+// Assert that the size of the `Rent` struct is as expected (16 bytes).
+const _ASSERT_STRUCT_LEN: () = assert!(size_of::<Rent>() == 16);
+
+// Assert that the alignment of the `Rent` struct is as expected (8 byte).
+const _ASSERT_ACCOUNT_ALIGN: () = assert!(align_of::<Rent>() == 8);
 
 impl Rent {
     /// Return a `Rent` from the given account view.
@@ -148,11 +156,14 @@ impl Rent {
 
     /// Return a `Rent` from the given bytes.
     ///
-    /// This method performs a length validation. The caller must ensure that `bytes` contains
-    /// a valid representation of `Rent`.
+    /// This method performs a length and alignment validation. The caller must ensure
+    /// that `bytes` contains a valid representation of `Rent`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<&Self, ProgramError> {
         if bytes.len() < size_of::<Self>() {
+            return Err(ProgramError::InvalidArgument);
+        }
+        if bytes.as_ptr().align_offset(align_of::<Rent>()) != 0 {
             return Err(ProgramError::InvalidArgument);
         }
         // SAFETY: `bytes` has been validated to be at least `Self::LEN` bytes long; the
@@ -303,15 +314,15 @@ impl Rent {
 }
 
 impl Sysvar for Rent {
-    impl_sysvar_get!(sol_get_rent_sysvar);
+    impl_sysvar_get!(RENT_ID, 0);
 }
 
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests {
     use crate::sysvars::rent::{
-        ACCOUNT_STORAGE_OVERHEAD, CURRENT_EXEMPTION_THRESHOLD, DEFAULT_BURN_PERCENT,
-        DEFAULT_LAMPORTS_PER_BYTE, DEFAULT_LAMPORTS_PER_BYTE_YEAR, SIMD0194_EXEMPTION_THRESHOLD,
+        ACCOUNT_STORAGE_OVERHEAD, CURRENT_EXEMPTION_THRESHOLD, DEFAULT_LAMPORTS_PER_BYTE,
+        DEFAULT_LAMPORTS_PER_BYTE_YEAR, SIMD0194_EXEMPTION_THRESHOLD,
     };
 
     #[test]
@@ -319,7 +330,7 @@ mod tests {
         let mut rent = super::Rent {
             lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE_YEAR,
             exemption_threshold: CURRENT_EXEMPTION_THRESHOLD,
-            burn_percent: DEFAULT_BURN_PERCENT,
+            //burn_percent: DEFAULT_BURN_PERCENT,
         };
 
         // Using the default exemption threshold.
@@ -332,6 +343,7 @@ mod tests {
         assert_eq!(balance, calculated);
 
         // Using a different exemption threshold.
+
         rent.exemption_threshold = 0.5f64.to_le_bytes();
 
         let balance = rent.minimum_balance(100);
@@ -347,7 +359,7 @@ mod tests {
         let mut rent = super::Rent {
             lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE,
             exemption_threshold: SIMD0194_EXEMPTION_THRESHOLD,
-            burn_percent: DEFAULT_BURN_PERCENT,
+            //burn_percent: DEFAULT_BURN_PERCENT,
         };
 
         // Using the default exemption threshold.
@@ -359,6 +371,7 @@ mod tests {
         assert_eq!(balance, calculated);
 
         // Using a different lamports per byte value.
+
         rent.lamports_per_byte = DEFAULT_LAMPORTS_PER_BYTE * 2;
 
         let balance = rent.minimum_balance(100);
