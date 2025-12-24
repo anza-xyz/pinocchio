@@ -258,6 +258,10 @@ pub use solana_address::Address;
 #[cfg(any(target_os = "solana", target_arch = "bpf"))]
 pub use solana_define_syscall::definitions as syscalls;
 
+// Re-export the `solana_hash` for downstream use.
+pub use solana_hash as hash;
+pub use solana_hash::Hash;
+
 // Re-export the `solana_instruction_view` for downstream use.
 #[cfg(feature = "cpi")]
 pub use {solana_instruction_view as instruction, solana_instruction_view::cpi};
