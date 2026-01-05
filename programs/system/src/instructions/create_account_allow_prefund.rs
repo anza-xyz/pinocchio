@@ -2,7 +2,7 @@ use pinocchio::{
     cpi::{invoke_signed, Signer},
     error::ProgramError,
     instruction::{InstructionAccount, InstructionView},
-    sysvars::rent::Rent,
+    sysvars::{rent::Rent, Sysvar},
     AccountView, Address, ProgramResult,
 };
 
@@ -31,21 +31,24 @@ pub struct CreateAccountAllowPrefund<'a> {
 
 impl<'a> CreateAccountAllowPrefund<'a> {
     #[inline(always)]
-    /// Creates a new `CreateAccountAllowPrefund` instruction with the minimal balance required
+    /// Creates a new `CreateAccountAllowPrefund` instruction with the minimum balance required
     /// for the account. The caller must provide a `payer` if the account needs lamports;
     /// otherwise, the resulting instruction will fail when invoked.
     ///
     /// This instruction does not warn if the account has more than enough lamports; large
     /// lamport balances can be frozen by `CreateAccountAllowPrefund` if used incorrectly.
-    pub fn with_minimal_balance(
-        payer: Option<&'a AccountView>,
+    pub fn with_minimum_balance(
         to: &'a AccountView,
-        rent_sysvar: &'a AccountView,
         space: u64,
         owner: &'a Address,
+        payer: Option<&'a AccountView>,
+        rent_sysvar: Option<&'a AccountView>,
     ) -> Result<Self, ProgramError> {
-        let rent = Rent::from_account_view(rent_sysvar)?;
-        let required_lamports = rent.try_minimum_balance(space as usize)?;
+        let required_lamports = if let Some(rent_sysvar) = rent_sysvar {
+            Rent::from_account_view(rent_sysvar)?.try_minimum_balance(space as usize)?
+        } else {
+            Rent::get()?.try_minimum_balance(space as usize)?
+        };
         let lamports = required_lamports.saturating_sub(to.lamports());
 
         Ok(Self {
