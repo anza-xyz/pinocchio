@@ -11,7 +11,7 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` New account
 ///   1. `[WRITE, SIGNER]` (OPTIONAL) Funding account
-pub struct CreateAccountAllowPrefund<'a> {
+pub struct CreateAccountAllowPrefund<'a, 'b> {
     /// New account.
     pub to: &'a AccountView,
 
@@ -19,13 +19,13 @@ pub struct CreateAccountAllowPrefund<'a> {
     pub space: u64,
 
     /// Address of program that will own the new account.
-    pub owner: &'a Address,
+    pub owner: &'b Address,
 
     /// Funding account and lamports to transfer to the new account.
     pub payer_and_lamports: Option<(&'a AccountView, u64)>,
 }
 
-impl<'a> CreateAccountAllowPrefund<'a> {
+impl<'a, 'b> CreateAccountAllowPrefund<'a, 'b> {
     #[inline(always)]
     /// Creates a new `CreateAccountAllowPrefund` instruction with the minimum balance required
     /// for the account. The caller must provide a `payer` if the account needs lamports;
@@ -36,7 +36,7 @@ impl<'a> CreateAccountAllowPrefund<'a> {
     pub fn with_minimum_balance(
         to: &'a AccountView,
         space: u64,
-        owner: &'a Address,
+        owner: &'b Address,
         payer: Option<&'a AccountView>,
         rent_sysvar: Option<&'a AccountView>,
     ) -> Result<Self, ProgramError> {
