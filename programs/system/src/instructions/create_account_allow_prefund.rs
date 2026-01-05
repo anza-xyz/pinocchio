@@ -34,7 +34,7 @@ impl<'a> CreateAccountAllowPrefund<'a> {
     /// Creates a new CreateAccountAllowPrefund instruction with the minimal balance required
     /// for the account. The caller must provide a `payer` if the account needs lamports;
     /// otherwise, the resulting instruction will fail when invoked.
-    /// 
+    ///
     /// This instruction does not warn if the account has more than enough lamports; large
     /// lamport balances can be frozen by `CreateAccountAllowPrefund` if used incorrectly.
     pub fn with_minimal_balance(
