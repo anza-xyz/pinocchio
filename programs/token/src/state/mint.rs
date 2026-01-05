@@ -1,8 +1,6 @@
-use pinocchio::{
-    account_info::{AccountInfo, Ref},
-    program_error::ProgramError,
-    pubkey::Pubkey,
-};
+use solana_account_view::{AccountView, Ref};
+use solana_address::Address;
+use solana_program_error::ProgramError;
 
 use crate::ID;
 
@@ -16,7 +14,7 @@ pub struct Mint {
     /// be provided during mint creation. If no mint authority is present
     /// then the mint has a fixed supply and no further tokens may be
     /// minted.
-    mint_authority: Pubkey,
+    mint_authority: Address,
 
     /// Total supply of tokens.
     supply: [u8; 8],
@@ -31,33 +29,33 @@ pub struct Mint {
     freeze_authority_flag: [u8; 4],
 
     /// Optional authority to freeze token accounts.
-    freeze_authority: Pubkey,
+    freeze_authority: Address,
 }
 
 impl Mint {
     /// The length of the `Mint` account data.
     pub const LEN: usize = core::mem::size_of::<Mint>();
 
-    /// Return a `Mint` from the given account info.
+    /// Return a `Mint` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// This method performs owner and length validation on `AccountView`, safe borrowing
     /// the account data.
     #[inline]
-    pub fn from_account_info(account_info: &AccountInfo) -> Result<Ref<Mint>, ProgramError> {
-        if account_info.data_len() != Self::LEN {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Mint>, ProgramError> {
+        if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if !account_info.is_owned_by(&ID) {
+        if !account_view.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
 
-    /// Return a `Mint` from the given account info.
+    /// Return a `Mint` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, but does not
+    /// This method performs owner and length validation on `AccountView`, but does not
     /// perform the borrow check.
     ///
     /// # Safety
@@ -65,18 +63,16 @@ impl Mint {
     /// The caller must ensure that it is safe to borrow the account data (e.g., there are
     /// no mutable borrows of the account data).
     #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+    pub unsafe fn from_account_view_unchecked(
+        account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
-        if account_info.data_len() != Self::LEN {
+        if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner() != &ID {
+        if account_view.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
 
     /// Return a `Mint` from the given bytes.
@@ -97,7 +93,7 @@ impl Mint {
         self.mint_authority_flag[0] == 1
     }
 
-    pub fn mint_authority(&self) -> Option<&Pubkey> {
+    pub fn mint_authority(&self) -> Option<&Address> {
         if self.has_mint_authority() {
             Some(self.mint_authority_unchecked())
         } else {
@@ -110,7 +106,7 @@ impl Mint {
     /// This method should be used when the caller knows that the mint will have a mint
     /// authority set since it skips the `Option` check.
     #[inline(always)]
-    pub fn mint_authority_unchecked(&self) -> &Pubkey {
+    pub fn mint_authority_unchecked(&self) -> &Address {
         &self.mint_authority
     }
 
@@ -131,7 +127,7 @@ impl Mint {
         self.freeze_authority_flag[0] == 1
     }
 
-    pub fn freeze_authority(&self) -> Option<&Pubkey> {
+    pub fn freeze_authority(&self) -> Option<&Address> {
         if self.has_freeze_authority() {
             Some(self.freeze_authority_unchecked())
         } else {
@@ -144,7 +140,7 @@ impl Mint {
     /// This method should be used when the caller knows that the mint will have a freeze
     /// authority set since it skips the `Option` check.
     #[inline(always)]
-    pub fn freeze_authority_unchecked(&self) -> &Pubkey {
+    pub fn freeze_authority_unchecked(&self) -> &Address {
         &self.freeze_authority
     }
 }

@@ -5,39 +5,31 @@ pub mod lazy;
 
 pub use lazy::{InstructionContext, MaybeAccount};
 
-#[cfg(not(feature = "std"))]
-use core::alloc::{GlobalAlloc, Layout};
-
-#[cfg(target_os = "solana")]
-pub use alloc::BumpAllocator;
 use core::{
+    alloc::{GlobalAlloc, Layout},
     cmp::min,
     mem::{size_of, MaybeUninit},
+    ptr::with_exposed_provenance_mut,
     slice::from_raw_parts,
 };
 
 use crate::{
-    account_info::{Account, AccountInfo, MAX_PERMITTED_DATA_INCREASE},
-    pubkey::Pubkey,
-    BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
+    account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
+    Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
 };
+
+#[cfg(feature = "alloc")]
+pub use alloc::BumpAllocator;
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
 
 /// Length of the heap memory region used for program heap.
+#[deprecated(since = "0.10.0", note = "Use `MAX_HEAP_LENGTH` instead")]
 pub const HEAP_LENGTH: usize = 32 * 1024;
 
-#[deprecated(
-    since = "0.6.0",
-    note = "Use `ProgramResult` from the crate root instead"
-)]
-/// The result of a program execution.
-pub type ProgramResult = super::ProgramResult;
-
-#[deprecated(since = "0.6.0", note = "Use `SUCCESS` from the crate root instead")]
-/// Return value for a successful program execution.
-pub const SUCCESS: u64 = super::SUCCESS;
+/// Maximum heap length in bytes that a program can request.
+pub const MAX_HEAP_LENGTH: u32 = 256 * 1024;
 
 /// Value used to indicate that a serialized account is not a duplicate.
 pub const NON_DUP_MARKER: u8 = u8::MAX;
@@ -45,7 +37,7 @@ pub const NON_DUP_MARKER: u8 = u8::MAX;
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data increase.
-const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INCREASE;
+const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -65,8 +57,8 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 ///
 /// ```ignore
 /// fn process_instruction(
-///     program_id: &Pubkey,      // Public key of the account the program was loaded into
-///     accounts: &[AccountInfo], // All accounts required to process the instruction
+///     program_id: &Address,      // Address of the account the program was loaded into
+///     accounts: &[AccountView], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
@@ -92,21 +84,19 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 /// pub mod entrypoint {
 ///
 ///     use pinocchio::{
-///         account_info::AccountInfo,
+///         AccountView,
 ///         entrypoint,
-///         msg,
-///         pubkey::Pubkey,
+///         Address,
 ///         ProgramResult
 ///     };
 ///
 ///     entrypoint!(process_instruction);
 ///
 ///     pub fn process_instruction(
-///         program_id: &Pubkey,
-///         accounts: &[AccountInfo],
+///         program_id: &Address,
+///         accounts: &[AccountView],
 ///         instruction_data: &[u8],
 ///     ) -> ProgramResult {
-///         msg!("Hello from my program!");
 ///         Ok(())
 ///     }
 ///
@@ -127,6 +117,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<Account>() + MAX_PERMITTED_DATA_INC
 /// manually.
 ///
 /// [`crate::nostd_panic_handler`]: https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:expr ) => {
@@ -149,8 +140,8 @@ macro_rules! entrypoint {
 ///
 /// ```ignore
 /// fn process_instruction(
-///     program_id: &Pubkey,      // Public key of the account the program was loaded into
-///     accounts: &[AccountInfo], // All accounts required to process the instruction
+///     program_id: &Address,     // Address of the account the program was loaded into
+///     accounts: &[AccountView], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
@@ -170,16 +161,16 @@ macro_rules! program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account_info::AccountInfo> =
-                core::mem::MaybeUninit::<$crate::account_info::AccountInfo>::uninit();
-            // Create an array of uninitialized account infos.
+            const UNINIT: core::mem::MaybeUninit<$crate::account::AccountView> =
+                core::mem::MaybeUninit::<$crate::account::AccountView>::uninit();
+            // Create an array of uninitialized account views.
             let mut accounts = [UNINIT; $maximum];
 
             let (program_id, count, instruction_data) =
                 $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
 
-            // Call the program's entrypoint passing `count` account infos; we know that
-            // they are initialized so we cast the pointer to a slice of `[AccountInfo]`.
+            // Call the program's entrypoint passing `count` account views; we know that
+            // they are initialized so we cast the pointer to a slice of `[AccountView]`.
             match $process_instruction(
                 &program_id,
                 core::slice::from_raw_parts(accounts.as_ptr() as _, count),
@@ -195,9 +186,14 @@ macro_rules! program_entrypoint {
 /// Align a pointer to the BPF alignment of [`u128`].
 macro_rules! align_pointer {
     ($ptr:ident) => {
-        // integer-to-pointer cast: the resulting pointer will have the same provenance as
-        // the original pointer and it follows the alignment requirement for the input.
-        (($ptr as usize + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1)) as *mut u8
+        // Integer-to-pointer cast: first compute the aligned address as a `usize`,
+        // since this is more CU-efficient than using `ptr::align_offset()` or the
+        // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
+        // back to a pointer. The resulting pointer is guaranteed to be valid
+        // becauseit follows the layout serialized by the runtime.
+        with_exposed_provenance_mut(
+            ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
+        )
     };
 }
 
@@ -225,16 +221,16 @@ macro_rules! process_n_accounts {
         $accounts = $accounts.add(1);
 
         // Read the next account.
-        let account: *mut Account = $input as *mut Account;
+        let account: *mut RuntimeAccount = $input as *mut RuntimeAccount;
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicated account
         //   - duplicated marker + 7 bytes of padding in case of a duplicated account
         $input = $input.add(size_of::<u64>());
 
         if (*account).borrow_state != NON_DUP_MARKER {
-            clone_account_info($accounts, $accounts_slice, (*account).borrow_state);
+            clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
-            $accounts.write(AccountInfo { raw: account });
+            $accounts.write(AccountView::new_unchecked(account));
 
             $input = $input.add(STATIC_ACCOUNT_DATA);
             $input = $input.add((*account).data_len as usize);
@@ -263,29 +259,28 @@ macro_rules! process_accounts {
     };
 }
 
-/// Create an [`AccountInfo`] referencing the same account referenced by the [`AccountInfo`] at the
+/// Create an [`AccountView`] referencing the same account referenced by the [`AccountView`] at the
 /// specified `index`.
 ///
 /// # Safety
 ///
 /// The caller must ensure that:
-///   - `accounts` pointer must point to an array of [`AccountInfo`]s where the new [`AccountInfo`]
+///   - `accounts` pointer must point to an array of [`AccountView`]s where the new [`AccountView`]
 ///     will be written.
-///   - `accounts_slice` pointer must point to a slice of [`AccountInfo`]s already initialized.
+///   - `accounts_slice` pointer must point to a slice of [`AccountView`]s already initialized.
 ///   - `index` is a valid index in the `accounts_slice`.
 //
 // Note: The function is marked as `cold` to stop the compiler from optimizing the parsing of
 // duplicated accounts, which leads to an overall increase in CU consumption.
+#[allow(clippy::clone_on_copy)]
 #[cold]
 #[inline(always)]
-unsafe fn clone_account_info(
-    accounts: *mut AccountInfo,
-    accounts_slice: *const AccountInfo,
+unsafe fn clone_account_view(
+    accounts: *mut AccountView,
+    accounts_slice: *const AccountView,
     index: u8,
 ) {
-    accounts.write(AccountInfo {
-        raw: (*accounts_slice.add(index as usize)).raw,
-    });
+    accounts.write((*accounts_slice.add(index as usize)).clone());
 }
 
 /// Parse the arguments from the runtime input buffer.
@@ -303,8 +298,8 @@ unsafe fn clone_account_info(
 #[inline(always)]
 pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
-    accounts: &mut [MaybeUninit<AccountInfo>; MAX_ACCOUNTS],
-) -> (&'static Pubkey, usize, &'static [u8]) {
+    accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
+) -> (&'static Address, usize, &'static [u8]) {
     // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of accounts
     // (MAX_TX_ACCOUNTS) that can be processed in a transaction.
     const {
@@ -320,14 +315,14 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     input = input.add(size_of::<u64>());
 
     if processed > 0 {
-        let mut accounts = accounts.as_mut_ptr() as *mut AccountInfo;
+        let mut accounts = accounts.as_mut_ptr() as *mut AccountView;
         // Represents the beginning of the accounts slice.
         let accounts_slice = accounts;
 
         // The first account is always non-duplicated, so process
         // it directly as such.
-        let account: *mut Account = input as *mut Account;
-        accounts.write(AccountInfo { raw: account });
+        let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
+        accounts.write(AccountView::new_unchecked(account));
 
         input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
         input = input.add((*account).data_len as usize);
@@ -401,7 +396,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     to_skip -= 1;
 
                     // Read the next account.
-                    let account: *mut Account = input as *mut Account;
+                    let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
                     // Adds an 8-bytes offset for:
                     //   - rent epoch in case of a non-duplicated account
                     //   - duplicated marker + 7 bytes of padding in case of a duplicated account
@@ -425,52 +420,29 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     let input = input.add(instruction_data_len);
 
     // program id
-    let program_id: &Pubkey = &*(input as *const Pubkey);
+    let program_id: &Address = &*(input as *const Address);
 
     (program_id, processed, instruction_data)
 }
 
 /// Default panic hook.
 ///
-/// This macro sets up a default panic hook that logs the panic message and the file where the panic
-/// occurred. It acts as a hook after Rust runtime panics; syscall `abort()` will be called after it
-/// returns.
-///
-/// Note that this requires the `"std"` feature to be enabled.
-#[cfg(feature = "std")]
-#[macro_export]
-macro_rules! default_panic_handler {
-    () => {
-        /// Default panic handler.
-        #[cfg(target_os = "solana")]
-        #[no_mangle]
-        fn custom_panic(info: &core::panic::PanicInfo<'_>) {
-            // Panic reporting.
-            $crate::msg!("{}", info);
-        }
-    };
-}
-
-/// Default panic hook.
-///
 /// This macro sets up a default panic hook that logs the file where the panic occurred. It acts as
 /// a hook after Rust runtime panics; syscall `abort()` will be called after it returns.
-///
-/// This is used when the `"std"` feature is disabled, while either the program or any of its
-/// dependencies are not `no_std`.
-#[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! default_panic_handler {
     () => {
         /// Default panic handler.
-        #[cfg(target_os = "solana")]
+        #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[no_mangle]
         fn custom_panic(info: &core::panic::PanicInfo<'_>) {
             if let Some(location) = info.location() {
-                $crate::log::sol_log(location.file());
+                let location = location.file();
+                unsafe { $crate::syscalls::sol_log_(location.as_ptr(), location.len() as u64) };
             }
             // Panic reporting.
-            $crate::log::sol_log("** PANICKED **");
+            const PANICKED: &str = "** PANICKED **";
+            unsafe { $crate::syscalls::sol_log_(PANICKED.as_ptr(), PANICKED.len() as u64) };
         }
     };
 }
@@ -480,14 +452,12 @@ macro_rules! default_panic_handler {
 /// This macro sets up a default panic handler that logs the location (file, line and column) where
 /// the panic occurred and then calls the syscall `abort()`.
 ///
-/// This macro can only be used when all crates are `no_std` and the `"std"` feature is disabled.
-#[cfg(not(feature = "std"))]
+/// This macro should be used when all crates are `no_std`.
 #[macro_export]
 macro_rules! nostd_panic_handler {
     () => {
         /// A panic handler for `no_std`.
-        #[cfg(target_os = "solana")]
-        #[no_mangle]
+        #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[panic_handler]
         fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
             if let Some(location) = info.location() {
@@ -501,8 +471,11 @@ macro_rules! nostd_panic_handler {
                 }
             } else {
                 // Panic reporting.
-                $crate::log::sol_log("** PANICKED **");
-                unsafe { $crate::syscalls::abort() }
+                const PANICKED: &str = "** PANICKED **";
+                unsafe {
+                    $crate::syscalls::sol_log_(PANICKED.as_ptr(), PANICKED.len() as u64);
+                    $crate::syscalls::abort();
+                }
             }
         }
 
@@ -510,7 +483,7 @@ macro_rules! nostd_panic_handler {
         /// `"solana"`.
         ///
         /// This links the `std` library, which will set up a default panic handler.
-        #[cfg(not(target_os = "solana"))]
+        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
         mod __private_panic_handler {
             extern crate std as __std;
         }
@@ -520,35 +493,29 @@ macro_rules! nostd_panic_handler {
 /// Default global allocator.
 ///
 /// This macro sets up a default global allocator that uses a bump allocator to allocate memory.
+#[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! default_allocator {
     () => {
-        #[cfg(target_os = "solana")]
+        #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[global_allocator]
-        static A: $crate::entrypoint::BumpAllocator = $crate::entrypoint::BumpAllocator {
-            start: $crate::entrypoint::HEAP_START_ADDRESS as usize,
-            len: $crate::entrypoint::HEAP_LENGTH,
+        static A: $crate::entrypoint::BumpAllocator = unsafe {
+            $crate::entrypoint::BumpAllocator::new_unchecked(
+                $crate::entrypoint::HEAP_START_ADDRESS as usize,
+                // Use the maximum heap length allowed. Programs can request heap sizes up
+                // to this value using the `ComputeBudget`.
+                $crate::entrypoint::MAX_HEAP_LENGTH as usize,
+            )
         };
 
         /// A default allocator for when the program is compiled on a target different than
         /// `"solana"`.
         ///
         /// This links the `std` library, which will set up a default global allocator.
-        #[cfg(not(target_os = "solana"))]
+        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
         mod __private_alloc {
             extern crate std as __std;
         }
-    };
-}
-
-/// A global allocator that does not allocate memory.
-///
-/// Using this macro with the `"std"` feature enabled will result in a compile error.
-#[cfg(feature = "std")]
-#[macro_export]
-macro_rules! no_allocator {
-    () => {
-        compile_error!("Feature 'std' cannot be enabled.");
     };
 }
 
@@ -560,12 +527,11 @@ macro_rules! no_allocator {
 ///
 /// The program will panic if it tries to dynamically allocate memory.
 ///
-/// This is used when the `"std"` feature is disabled.
-#[cfg(not(feature = "std"))]
+/// This is used when the `"alloc"` feature is disabled.
 #[macro_export]
 macro_rules! no_allocator {
     () => {
-        #[cfg(target_os = "solana")]
+        #[cfg(any(target_os = "solana", target_arch = "bpf"))]
         #[global_allocator]
         static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
 
@@ -596,7 +562,7 @@ macro_rules! no_allocator {
             // Assert if the allocation does not exceed the heap size.
             assert!(
                 end <= $crate::entrypoint::HEAP_START_ADDRESS as usize
-                    + $crate::entrypoint::HEAP_LENGTH,
+                    + $crate::entrypoint::MAX_HEAP_LENGTH as usize,
                 "allocation exceeds heap size"
             );
 
@@ -613,73 +579,22 @@ macro_rules! no_allocator {
         /// `"solana"`.
         ///
         /// This links the `std` library, which will set up a default global allocator.
-        #[cfg(not(target_os = "solana"))]
+        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
         mod __private_alloc {
             extern crate std as __std;
         }
     };
 }
 
-#[cfg(target_os = "solana")]
-mod alloc {
-    //! The bump allocator used as the default rust heap when running programs.
-
-    extern crate alloc;
-
-    use core::{
-        alloc::{GlobalAlloc, Layout},
-        mem::size_of,
-        ptr::null_mut,
-    };
-
-    /// The bump allocator used as the default rust heap when running programs.
-    #[derive(Clone, Copy, Debug)]
-    pub struct BumpAllocator {
-        pub start: usize,
-        pub len: usize,
-    }
-
-    /// Integer arithmetic in this global allocator implementation is safe when operating on the
-    /// prescribed [`HEAP_START_ADDRESS`] and [`HEAP_LENGTH`]. Any other use may overflow and is
-    /// thus unsupported and at one's own risk.
-    #[allow(clippy::arithmetic_side_effects)]
-    unsafe impl GlobalAlloc for BumpAllocator {
-        /// Allocates memory as a bump allocator.
-        #[inline]
-        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-            let pos_ptr = self.start as *mut usize;
-
-            let mut pos = *pos_ptr;
-            if pos == 0 {
-                // First time, set starting position.
-                pos = self.start + self.len;
-            }
-            pos = pos.saturating_sub(layout.size());
-            pos &= !(layout.align().wrapping_sub(1));
-            if pos < self.start + size_of::<*mut u8>() {
-                return null_mut();
-            }
-            *pos_ptr = pos;
-            pos as *mut u8
-        }
-
-        #[inline]
-        unsafe fn dealloc(&self, _: *mut u8, _: Layout) {
-            // I'm a bump allocator, I don't free.
-        }
-    }
-}
-
-#[cfg(not(feature = "std"))]
 /// An allocator that does not allocate memory.
-#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone, Debug)]
 pub struct NoAllocator;
 
-#[cfg(not(feature = "std"))]
 unsafe impl GlobalAlloc for NoAllocator {
     #[inline]
     unsafe fn alloc(&self, _: Layout) -> *mut u8 {
-        panic!("** NO ALLOCATOR **");
+        panic!("** NoAllocator::alloc() does not allocate memory **");
     }
 
     #[inline]
@@ -688,23 +603,133 @@ unsafe impl GlobalAlloc for NoAllocator {
     }
 }
 
-#[cfg(all(test, not(target_os = "solana")))]
-mod tests {
-    extern crate std;
-
-    use core::{alloc::Layout, ptr::copy_nonoverlapping};
-    use std::{
-        alloc::{alloc, dealloc},
-        vec,
+#[cfg(feature = "alloc")]
+mod alloc {
+    use {
+        crate::{entrypoint::MAX_HEAP_LENGTH, hint::unlikely},
+        core::{
+            alloc::{GlobalAlloc, Layout},
+            mem::size_of,
+            ptr::null_mut,
+        },
     };
 
-    use super::*;
+    /// The bump allocator used as the default Rust heap when running programs.
+    ///
+    /// The allocator uses a forward bump allocation strategy, where memory is allocated
+    /// by moving a pointer forward in a pre-allocated memory region. The current position
+    /// of the heap pointer is stored at the start of the memory region.
+    ///
+    /// This implementation relies on the runtime to zero out memory and to enforce the
+    /// limit of the heap memory region. Use of memory outside the allocated region will
+    /// result in a runtime error.
+    #[cfg_attr(feature = "copy", derive(Copy))]
+    #[derive(Clone, Debug)]
+    pub struct BumpAllocator {
+        start: usize,
+        end: usize,
+    }
+
+    impl BumpAllocator {
+        /// Creates the allocator tied to specific range of addresses.
+        ///
+        /// # Safety
+        ///
+        /// This is unsafe in most situations, unless you are totally sure that
+        /// the provided start address and length can be written to by the allocator,
+        /// and that the memory will be usable for the lifespan of the allocator.
+        /// The start address must be aligned to `usize` and the length must be
+        /// at least `size_of::<usize>()` bytes.
+        ///
+        /// For Solana on-chain programs, a certain address range is reserved, so
+        /// the allocator can be given those addresses. In general, the `len` is
+        /// set to the maximum heap length allowed by the runtime. The runtime
+        /// will enforce the actual heap size requested by the program.
+        pub const unsafe fn new_unchecked(start: usize, len: usize) -> Self {
+            Self {
+                start,
+                end: start + len,
+            }
+        }
+    }
+
+    // Integer arithmetic in this global allocator implementation is safe when operating on the
+    // prescribed `BumpAllocator::start` and `BumpAllocator::end`. Any other use may overflow and
+    // is thus unsupported and at one's own risk.
+    #[allow(clippy::arithmetic_side_effects)]
+    unsafe impl GlobalAlloc for BumpAllocator {
+        /// Allocates memory as described by the given `layout` using a forward bump allocator.
+        ///
+        /// Returns a pointer to newly-allocated memory, or `null` to indicate allocation failure.
+        ///
+        /// # Safety
+        ///
+        /// `layout` must have non-zero size. Attempting to allocate for a zero-sized layout will
+        /// result in undefined behavior.
+        #[inline]
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            // Reads the current position of the heap pointer.
+            //
+            // Integer-to-pointer cast: the caller guarantees that `self.start` is a valid
+            // address for the lifetime of the allocator and aligned to `usize`.
+            let pos_ptr = self.start as *mut usize;
+            let mut pos = *pos_ptr;
+
+            if unlikely(pos == 0) {
+                // First time, set starting position.
+                pos = self.start + size_of::<usize>();
+            }
+
+            // Determines the allocation address, adjusting the alignment for the
+            // type being allocated.
+            let allocation = (pos + layout.align() - 1) & !(layout.align() - 1);
+
+            if unlikely(layout.size() > MAX_HEAP_LENGTH as usize)
+                || unlikely(self.end < allocation + layout.size())
+            {
+                return null_mut();
+            }
+
+            // Updates the heap pointer.
+            *pos_ptr = allocation + layout.size();
+
+            allocation as *mut u8
+        }
+
+        /// Behaves like `alloc`, but also ensures that the contents are set to zero before being returned.
+        ///
+        /// This method relies on the runtime to zero out the memory when reserving the heap region,
+        /// so it simply calls `alloc`.
+        #[inline]
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            self.alloc(layout)
+        }
+
+        /// This method has no effect since the bump allocator does not free memory.
+        #[inline]
+        unsafe fn dealloc(&self, _: *mut u8, _: Layout) {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        ::alloc::{
+            alloc::{alloc, dealloc, handle_alloc_error},
+            vec,
+        },
+        core::{
+            alloc::Layout,
+            ptr::{copy_nonoverlapping, null_mut},
+        },
+    };
 
     /// The mock program ID used for testing.
-    const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
+    const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
 
-    /// An uninitialized account info.
-    const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
+    /// An uninitialized account view.
+    const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
 
     /// Struct representing a memory region with a specific alignment.
     struct AlignedMemory {
@@ -719,7 +744,7 @@ mod tests {
             unsafe {
                 let ptr = alloc(layout);
                 if ptr.is_null() {
-                    std::alloc::handle_alloc_error(layout);
+                    handle_alloc_error(layout);
                 }
                 AlignedMemory { ptr, layout }
             }
@@ -784,7 +809,7 @@ mod tests {
         input.write(instruction_data, offset);
         offset += instruction_data.len();
         // Program ID (mock).
-        input.write(&MOCK_PROGRAM_ID, offset);
+        input.write(MOCK_PROGRAM_ID.as_array(), offset);
 
         input
     }
@@ -847,56 +872,56 @@ mod tests {
         input.write(instruction_data, offset);
         offset += instruction_data.len();
         // Program ID (mock).
-        input.write(&MOCK_PROGRAM_ID, offset);
+        input.write(MOCK_PROGRAM_ID.as_array(), offset);
 
         input
     }
 
     /// Asserts that the accounts slice contains the expected number of accounts and that each
     /// account's data length matches its index.
-    fn assert_accounts(accounts: &[MaybeUninit<AccountInfo>]) {
+    fn assert_accounts(accounts: &[MaybeUninit<AccountView>]) {
         for (i, account) in accounts.iter().enumerate() {
-            let account_info = unsafe { account.assume_init_ref() };
-            assert_eq!(account_info.data_len(), i);
+            let account_view = unsafe { account.assume_init_ref() };
+            assert_eq!(account_view.data_len(), i);
         }
     }
 
     /// Asserts that the accounts slice contains the expected number of accounts and all accounts
     /// are duplicated, apart from the first one.
-    fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountInfo>], duplicated: usize) {
+    fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountView>], duplicated: usize) {
         assert!(accounts.len() > duplicated);
 
         let unique = accounts.len() - duplicated;
 
         // Unique accounts should have `data_len` equal to their index.
         for (i, account) in accounts[..unique].iter().enumerate() {
-            let account_info = unsafe { account.assume_init_ref() };
-            assert_eq!(account_info.data_len(), i);
+            let account_view = unsafe { account.assume_init_ref() };
+            assert_eq!(account_view.data_len(), i);
         }
 
         // Last unique account.
         let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
         // No mutable borrow active at this point.
-        assert!(duplicated.try_borrow_mut_data().is_ok());
+        assert!(duplicated.try_borrow_mut().is_ok());
 
         // Duplicated accounts should reference (share) the account pointer
         // to the last unique account.
         for account in accounts[unique..].iter() {
-            let account_info = unsafe { account.assume_init_ref() };
+            let account_view = unsafe { account.assume_init_ref() };
 
-            assert_eq!(account_info.raw, duplicated.raw);
-            assert_eq!(account_info.data_len(), duplicated.data_len());
+            assert_eq!(account_view, duplicated);
+            assert_eq!(account_view.data_len(), duplicated.data_len());
 
-            let borrowed = account_info.try_borrow_mut_data().unwrap();
+            let borrowed = account_view.try_borrow_mut().unwrap();
             // Only one mutable borrow at the same time should be allowed
             // on the duplicated account.
-            assert!(duplicated.try_borrow_mut_data().is_err());
+            assert!(duplicated.try_borrow_mut().is_err());
             drop(borrowed);
         }
 
         // There should not be any mutable borrow on the duplicated account
         // at this point.
-        assert!(duplicated.try_borrow_mut_data().is_ok());
+        assert!(duplicated.try_borrow_mut().is_ok());
     }
 
     #[test]
@@ -912,7 +937,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 0);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
 
         // Input with 3 accounts but the accounts array has only space
@@ -925,7 +950,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 1);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_accounts(&accounts[..count]);
 
@@ -939,7 +964,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 64);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_accounts(&accounts);
     }
@@ -957,7 +982,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 0);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
 
         // Input with 3 (1 + 2 duplicated) accounts but the accounts array has only space for 2. The
@@ -971,7 +996,7 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 2);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_duplicated_accounts(&accounts[..count], 1);
 
@@ -988,8 +1013,80 @@ mod tests {
             unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
 
         assert_eq!(count, 64);
-        assert_eq!(program_id, &MOCK_PROGRAM_ID);
+        assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
         assert_duplicated_accounts(&accounts, 32);
+    }
+
+    #[test]
+    fn test_bump_allocator() {
+        // alloc the entire
+        {
+            let mut heap = AlignedMemory::new(128);
+            unsafe { heap.write(&[0; 128], 0) };
+
+            let allocator = unsafe {
+                BumpAllocator::new_unchecked(heap.as_mut_ptr() as usize, heap.layout.size())
+            };
+
+            for i in 0..128 - size_of::<*mut u8>() {
+                let ptr = unsafe {
+                    allocator.alloc(Layout::from_size_align(1, size_of::<u8>()).unwrap())
+                };
+                assert_eq!(
+                    ptr as usize,
+                    heap.as_mut_ptr() as usize + size_of::<*mut u8>() + i
+                );
+            }
+            assert_eq!(null_mut(), unsafe {
+                allocator.alloc(Layout::from_size_align(1, size_of::<u8>()).unwrap())
+            });
+        }
+        // check alignment
+        {
+            let mut heap = AlignedMemory::new(128);
+            unsafe { heap.write(&[0; 128], 0) };
+
+            let allocator = unsafe {
+                BumpAllocator::new_unchecked(heap.as_mut_ptr() as usize, heap.layout.size())
+            };
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u8>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u8>()));
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u16>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u16>()));
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u32>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u32>()));
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u64>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u64>()));
+            let ptr =
+                unsafe { allocator.alloc(Layout::from_size_align(1, size_of::<u128>()).unwrap()) };
+            assert_eq!(0, ptr.align_offset(size_of::<u128>()));
+            let ptr = unsafe { allocator.alloc(Layout::from_size_align(1, 64).unwrap()) };
+            assert_eq!(0, ptr.align_offset(64));
+        }
+        // alloc entire block (minus the pos ptr)
+        {
+            let mut heap = AlignedMemory::new(128);
+            unsafe { heap.write(&[0; 128], 0) };
+
+            let allocator = unsafe {
+                BumpAllocator::new_unchecked(heap.as_mut_ptr() as usize, heap.layout.size())
+            };
+            let ptr = unsafe {
+                allocator.alloc(
+                    Layout::from_size_align(
+                        heap.layout.size() - size_of::<usize>(),
+                        size_of::<u8>(),
+                    )
+                    .unwrap(),
+                )
+            };
+            assert_ne!(ptr, null_mut());
+            assert_eq!(0, ptr.align_offset(size_of::<u64>()));
+        }
     }
 }

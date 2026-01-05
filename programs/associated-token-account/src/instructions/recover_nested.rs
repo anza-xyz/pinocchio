@@ -1,9 +1,9 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 /// Transfers from and closes a nested associated token account: an
 /// associated token account owned by an associated token account.
@@ -26,19 +26,19 @@ use pinocchio::{
 ///   6. `[]`  SPL Token program
 pub struct RecoverNested<'a> {
     /// Nested associated token account, must be owned by `owner_associated_token_account`
-    pub account: &'a AccountInfo,
+    pub account: &'a AccountView,
     /// Token mint for the nested associated token account
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Wallet's associated token account
-    pub destination_account: &'a AccountInfo,
+    pub destination_account: &'a AccountView,
     /// Owner associated token account address, must be owned by `wallet_account`
-    pub owner_account: &'a AccountInfo,
+    pub owner_account: &'a AccountView,
     /// Token mint for the owner associated token account
-    pub owner_mint: &'a AccountInfo,
+    pub owner_mint: &'a AccountView,
     /// Wallet address for the owner associated token account
-    pub wallet: &'a AccountInfo,
+    pub wallet: &'a AccountView,
     /// SPL Token program
-    pub token_program: &'a AccountInfo,
+    pub token_program: &'a AccountView,
 }
 
 impl RecoverNested<'_> {
@@ -49,15 +49,15 @@ impl RecoverNested<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 7] = [
-            AccountMeta::writable(self.account.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::writable(self.destination_account.key()),
-            AccountMeta::readonly(self.owner_account.key()),
-            AccountMeta::readonly(self.owner_mint.key()),
-            AccountMeta::writable_signer(self.wallet.key()),
-            AccountMeta::readonly(self.token_program.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 7] = [
+            InstructionAccount::writable(self.account.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::writable(self.destination_account.address()),
+            InstructionAccount::readonly(self.owner_account.address()),
+            InstructionAccount::readonly(self.owner_mint.address()),
+            InstructionAccount::writable_signer(self.wallet.address()),
+            InstructionAccount::readonly(self.token_program.address()),
         ];
 
         // Instruction data:
@@ -65,9 +65,9 @@ impl RecoverNested<'_> {
 
         let instruction_data = [2u8];
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 

@@ -1,35 +1,33 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    program_error::ProgramError,
-    pubkey::Pubkey,
+    cpi::{invoke_signed, Signer},
+    error::ProgramError,
+    instruction::{InstructionAccount, InstructionView},
     sysvars::rent::Rent,
-    ProgramResult,
+    AccountView, Address, ProgramResult,
 };
 
-/// Create a new account at an address derived from a base pubkey and a seed.
+/// Create a new account at an address derived from a base address and a seed.
 ///
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` Funding account
 ///   1. `[WRITE]` Created account
-///   2. `[SIGNER]` (optional) Base account; the account matching the base Pubkey below must be
+///   2. `[SIGNER]` (optional) Base account; the account matching the base address below must be
 ///      provided as a signer, but may be the same as the funding account
 pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     /// Funding account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
 
     /// New account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
 
     /// Base account.
     ///
-    /// The account matching the base Pubkey below must be provided as
+    /// The account matching the base [`Address`] below must be provided as
     /// a signer, but may be the same as the funding account and provided
     /// as account 0.
-    pub base: Option<&'a AccountInfo>,
+    pub base: Option<&'a AccountView>,
 
-    /// String of ASCII chars, no longer than `Pubkey::MAX_SEED_LEN`.
+    /// String of ASCII chars, no longer than [`MAX_SEED_LEN`](https://docs.rs/solana-address/latest/solana_address/constant.MAX_SEED_LEN.html).
     pub seed: &'b str,
 
     /// Number of lamports to transfer to the new account.
@@ -39,22 +37,22 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     pub space: u64,
 
     /// Address of program that will own the new account.
-    pub owner: &'c Pubkey,
+    pub owner: &'c Address,
 }
 
 impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
     #[inline(always)]
     pub fn with_minimal_balance(
-        from: &'a AccountInfo,
-        to: &'a AccountInfo,
-        base: Option<&'a AccountInfo>,
+        from: &'a AccountView,
+        to: &'a AccountView,
+        base: Option<&'a AccountView>,
         seed: &'b str,
-        rent_sysvar: &'a AccountInfo,
+        rent_sysvar: &'a AccountView,
         space: u64,
-        owner: &'c Pubkey,
+        owner: &'c Address,
     ) -> Result<Self, ProgramError> {
-        let rent = Rent::from_account_info(rent_sysvar)?;
-        let lamports = rent.minimum_balance(space as usize);
+        let rent = Rent::from_account_view(rent_sysvar)?;
+        let lamports = rent.try_minimum_balance(space as usize)?;
 
         Ok(Self {
             from,
@@ -74,24 +72,25 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable_signer(self.from.key()),
-            AccountMeta::writable(self.to.key()),
-            AccountMeta::readonly_signer(self.base.unwrap_or(self.from).key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable_signer(self.from.address()),
+            InstructionAccount::writable(self.to.address()),
+            InstructionAccount::readonly_signer(self.base.unwrap_or(self.from).address()),
         ];
 
         // instruction data
         // - [0..4  ]: instruction discriminator
-        // - [4..36 ]: base pubkey
+        // - [4..36 ]: base address
         // - [36..44]: seed length
         // - [44..  ]: seed (max 32)
         // - [..  +8]: lamports
         // - [..  +8]: account space
-        // - [.. +32]: owner pubkey
+        // - [.. +32]: owner address
         let mut instruction_data = [0; 120];
         instruction_data[0] = 3;
-        instruction_data[4..36].copy_from_slice(self.base.unwrap_or(self.from).key());
+        instruction_data[4..36]
+            .copy_from_slice(self.base.unwrap_or(self.from).address().as_array());
         instruction_data[36..44].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
 
         let offset = 44 + self.seed.len();
@@ -100,9 +99,9 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
         instruction_data[offset + 8..offset + 16].copy_from_slice(&self.space.to_le_bytes());
         instruction_data[offset + 16..offset + 48].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data[..offset + 48],
         };
 

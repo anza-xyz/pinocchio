@@ -1,9 +1,8 @@
+use solana_account_view::{AccountView, Ref};
+use solana_address::Address;
+use solana_program_error::ProgramError;
+
 use super::AccountState;
-use pinocchio::{
-    account_info::{AccountInfo, Ref},
-    program_error::ProgramError,
-    pubkey::Pubkey,
-};
 
 use crate::ID;
 
@@ -11,10 +10,10 @@ use crate::ID;
 #[repr(C)]
 pub struct TokenAccount {
     /// The mint associated with this account
-    mint: Pubkey,
+    mint: Address,
 
     /// The owner of this account.
-    owner: Pubkey,
+    owner: Address,
 
     /// The amount of tokens this account holds.
     amount: [u8; 8],
@@ -24,7 +23,7 @@ pub struct TokenAccount {
 
     /// If `delegate` is `Some` then `delegated_amount` represents
     /// the amount authorized by the delegate.
-    delegate: Pubkey,
+    delegate: Address,
 
     /// The account's state.
     state: u8,
@@ -45,34 +44,34 @@ pub struct TokenAccount {
     close_authority_flag: [u8; 4],
 
     /// Optional authority to close the account.
-    close_authority: Pubkey,
+    close_authority: Address,
 }
 
 impl TokenAccount {
     pub const BASE_LEN: usize = core::mem::size_of::<TokenAccount>();
 
-    /// Return a `TokenAccount` from the given account info.
+    /// Return a `TokenAccount` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, safe borrowing
+    /// This method performs owner and length validation on `AccountView`, safe borrowing
     /// the account data.
     #[inline]
-    pub fn from_account_info(
-        account_info: &AccountInfo,
+    pub fn from_account_view(
+        account_view: &AccountView,
     ) -> Result<Ref<TokenAccount>, ProgramError> {
-        if account_info.data_len() < Self::BASE_LEN {
+        if account_view.data_len() < Self::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if !account_info.is_owned_by(&ID) {
+        if !account_view.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Ref::map(account_info.try_borrow_data()?, |data| unsafe {
+        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
 
-    /// Return a `TokenAccount` from the given account info.
+    /// Return a `TokenAccount` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountInfo`, but does not
+    /// This method performs owner and length validation on `AccountView`, but does not
     /// perform the borrow check.
     ///
     /// # Safety
@@ -80,18 +79,16 @@ impl TokenAccount {
     /// The caller must ensure that it is safe to borrow the account data (e.g., there are
     /// no mutable borrows of the account data).
     #[inline]
-    pub unsafe fn from_account_info_unchecked(
-        account_info: &AccountInfo,
+    pub unsafe fn from_account_view_unchecked(
+        account_view: &AccountView,
     ) -> Result<&TokenAccount, ProgramError> {
-        if account_info.data_len() < Self::BASE_LEN {
+        if account_view.data_len() < Self::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_info.owner() != &ID {
+        if account_view.owner() != &ID {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Self::from_bytes_unchecked(
-            account_info.borrow_data_unchecked(),
-        ))
+        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
 
     /// Return a `TokenAccount` from the given bytes.
@@ -107,11 +104,11 @@ impl TokenAccount {
         &*(bytes[..Self::BASE_LEN].as_ptr() as *const TokenAccount)
     }
 
-    pub fn mint(&self) -> &Pubkey {
+    pub fn mint(&self) -> &Address {
         &self.mint
     }
 
-    pub fn owner(&self) -> &Pubkey {
+    pub fn owner(&self) -> &Address {
         &self.owner
     }
 
@@ -124,7 +121,7 @@ impl TokenAccount {
         self.delegate_flag[0] == 1
     }
 
-    pub fn delegate(&self) -> Option<&Pubkey> {
+    pub fn delegate(&self) -> Option<&Address> {
         if self.has_delegate() {
             Some(self.delegate_unchecked())
         } else {
@@ -134,7 +131,7 @@ impl TokenAccount {
 
     /// Use this when you know the account will have a delegate and want to skip the `Option` check.
     #[inline(always)]
-    pub fn delegate_unchecked(&self) -> &Pubkey {
+    pub fn delegate_unchecked(&self) -> &Address {
         &self.delegate
     }
 
@@ -174,7 +171,7 @@ impl TokenAccount {
         self.close_authority_flag[0] == 1
     }
 
-    pub fn close_authority(&self) -> Option<&Pubkey> {
+    pub fn close_authority(&self) -> Option<&Address> {
         if self.has_close_authority() {
             Some(self.close_authority_unchecked())
         } else {
@@ -187,7 +184,7 @@ impl TokenAccount {
     /// This method should be used when the caller knows that the token will have a close
     /// authority set since it skips the `Option` check.
     #[inline(always)]
-    pub fn close_authority_unchecked(&self) -> &Pubkey {
+    pub fn close_authority_unchecked(&self) -> &Address {
         &self.close_authority
     }
 

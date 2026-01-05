@@ -1,10 +1,11 @@
 //! Provides access to cluster system accounts.
 
-#[cfg(target_os = "solana")]
-use crate::syscalls::sol_get_sysvar;
-use crate::{program_error::ProgramError, pubkey::Pubkey};
-#[cfg(not(target_os = "solana"))]
+#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
 use core::hint::black_box;
+
+#[cfg(any(target_os = "solana", target_arch = "bpf"))]
+use crate::syscalls::sol_get_sysvar;
+use crate::{error::ProgramError, Address};
 
 pub mod clock;
 pub mod fees;
@@ -16,13 +17,11 @@ pub mod slot_hashes;
 /// the sysvar data.
 //
 // Defined in the bpf loader as [`OFFSET_LENGTH_EXCEEDS_SYSVAR`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L172).
-#[cfg(target_os = "solana")]
 const OFFSET_LENGTH_EXCEEDS_SYSVAR: u64 = 1;
 
 /// Return value indicating that the sysvar was not found.
 //
 // Defined in the bpf loader as [`SYSVAR_NOT_FOUND`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L171).
-#[cfg(target_os = "solana")]
 const SYSVAR_NOT_FOUND: u64 = 2;
 
 /// A type that holds sysvar data.
@@ -44,14 +43,14 @@ pub trait Sysvar: Sized {
 #[macro_export]
 macro_rules! impl_sysvar_get {
     ($syscall_name:ident) => {
-        fn get() -> Result<Self, $crate::program_error::ProgramError> {
+        fn get() -> Result<Self, $crate::error::ProgramError> {
             let mut var = core::mem::MaybeUninit::<Self>::uninit();
             let var_addr = var.as_mut_ptr() as *mut _ as *mut u8;
 
-            #[cfg(target_os = "solana")]
+            #[cfg(any(target_os = "solana", target_arch = "bpf"))]
             let result = unsafe { $crate::syscalls::$syscall_name(var_addr) };
 
-            #[cfg(not(target_os = "solana"))]
+            #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
             let result = core::hint::black_box(var_addr as *const _ as u64);
 
             match result {
@@ -60,7 +59,58 @@ macro_rules! impl_sysvar_get {
                     Ok(unsafe { var.assume_init() })
                 }
                 // Unexpected errors are folded into `UnsupportedSysvar`.
-                _ => Err($crate::program_error::ProgramError::UnsupportedSysvar),
+                _ => Err($crate::error::ProgramError::UnsupportedSysvar),
+            }
+        }
+    };
+    // This variant uses the generic `sol_get_sysvar` syscall. Note that it only
+    // supports sysvars without padding or with padding at the end of their byte
+    // layout since the syscall data follows bincode serialization.
+    ($syscall_id:expr, $padding:literal) => {
+        #[inline(always)]
+        fn get() -> Result<Self, $crate::error::ProgramError> {
+            let mut var = core::mem::MaybeUninit::<Self>::uninit();
+            let var_addr = var.as_mut_ptr() as *mut _ as *mut u8;
+
+            #[cfg(target_os = "solana")]
+            // SAFETY: The allocation is valid for the size of `Self`. It fixes
+            // the size to `size_of::<Self>() - $padding` for the syscall since
+            // the byte layout follows bincode serialization; the remaining bytes
+            // are considered padding and initialized to zero.
+            let result = unsafe {
+                let length = core::mem::size_of::<Self>() - $padding;
+                // Make sure all bytes are initialized.
+                var_addr.add(length).write_bytes(0, $padding);
+
+                $crate::syscalls::sol_get_sysvar(
+                    &$syscall_id as *const _ as *const u8,
+                    var_addr,
+                    0,
+                    length as u64,
+                )
+            };
+
+            #[cfg(not(target_os = "solana"))]
+            let result = {
+                // SAFETY: The allocation is valid for the size of `Self`.
+                unsafe { var_addr.write_bytes(0, size_of::<Self>()) };
+                core::hint::black_box(var_addr as *const _ as u64)
+            };
+
+            match result {
+                $crate::SUCCESS => {
+                    // SAFETY: The syscall initialized the memory and
+                    // padding bytes are set to zero.
+                    Ok(unsafe { var.assume_init() })
+                }
+                $crate::sysvars::OFFSET_LENGTH_EXCEEDS_SYSVAR => {
+                    Err($crate::error::ProgramError::InvalidArgument)
+                }
+                $crate::sysvars::SYSVAR_NOT_FOUND => {
+                    Err($crate::error::ProgramError::UnsupportedSysvar)
+                }
+                // Unexpected errors are folded into `UnsupportedSysvar`.
+                _ => Err($crate::error::ProgramError::UnsupportedSysvar),
             }
         }
     };
@@ -76,11 +126,11 @@ macro_rules! impl_sysvar_get {
 #[inline]
 pub unsafe fn get_sysvar_unchecked(
     dst: *mut u8,
-    sysvar_id: &Pubkey,
+    sysvar_id: &Address,
     offset: usize,
     len: usize,
 ) -> Result<(), ProgramError> {
-    #[cfg(target_os = "solana")]
+    #[cfg(any(target_os = "solana", target_arch = "bpf"))]
     {
         let result = unsafe {
             sol_get_sysvar(
@@ -100,7 +150,7 @@ pub unsafe fn get_sysvar_unchecked(
         }
     }
 
-    #[cfg(not(target_os = "solana"))]
+    #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
     {
         black_box((dst, sysvar_id, offset, len));
         Ok(())
@@ -110,7 +160,7 @@ pub unsafe fn get_sysvar_unchecked(
 /// Handler for retrieving a slice of sysvar data from the `sol_get_sysvar`
 /// syscall.
 #[inline(always)]
-pub fn get_sysvar(dst: &mut [u8], sysvar_id: &Pubkey, offset: usize) -> Result<(), ProgramError> {
+pub fn get_sysvar(dst: &mut [u8], sysvar_id: &Address, offset: usize) -> Result<(), ProgramError> {
     // SAFETY: Use the length of the slice as the length parameter.
     unsafe { get_sysvar_unchecked(dst.as_mut_ptr(), sysvar_id, offset, dst.len()) }
 }

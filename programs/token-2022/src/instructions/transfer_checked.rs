@@ -1,12 +1,12 @@
 use core::slice::from_raw_parts;
 
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+use solana_account_view::AccountView;
+use solana_address::Address;
+use solana_instruction_view::{
+    cpi::{invoke_signed, Signer},
+    InstructionAccount, InstructionView,
 };
+use solana_program_error::ProgramResult;
 
 use crate::{write_bytes, UNINIT_BYTE};
 
@@ -19,19 +19,19 @@ use crate::{write_bytes, UNINIT_BYTE};
 ///   3. `[SIGNER]` The source account's owner/delegate.
 pub struct TransferChecked<'a, 'b> {
     /// Sender account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
     /// Mint Account
-    pub mint: &'a AccountInfo,
+    pub mint: &'a AccountView,
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
     /// Authority account.
-    pub authority: &'a AccountInfo,
+    pub authority: &'a AccountView,
     /// Amount of micro-tokens to transfer.
     pub amount: u64,
     /// Decimal for the Token
     pub decimals: u8,
     /// Token Program
-    pub token_program: &'b Pubkey,
+    pub token_program: &'b Address,
 }
 
 impl TransferChecked<'_, '_> {
@@ -42,12 +42,12 @@ impl TransferChecked<'_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 4] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::readonly(self.mint.key()),
-            AccountMeta::writable(self.to.key()),
-            AccountMeta::readonly_signer(self.authority.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 4] = [
+            InstructionAccount::writable(self.from.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::writable(self.to.address()),
+            InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
         // Instruction data layout:
@@ -63,9 +63,9 @@ impl TransferChecked<'_, '_> {
         // Set decimals as u8 at offset [9]
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
         };
 

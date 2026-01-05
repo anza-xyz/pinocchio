@@ -24,7 +24,7 @@ This is a `no_std` crate.
 Initializing a mint account:
 ```rust
 // This example assumes that the instruction receives a writable `mint`
-// account; `authority` is a `Pubkey`.
+// account; `authority` is a `Address`.
 InitializeMint {
     mint,
     rent_sysvar,

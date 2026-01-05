@@ -1,9 +1,7 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    pubkey::Pubkey,
-    ProgramResult,
+    cpi::{invoke_signed, Signer},
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, Address, ProgramResult,
 };
 
 /// Transfer lamports from a derived address.
@@ -14,26 +12,26 @@ use pinocchio::{
 ///   2. `[WRITE]` Recipient account
 pub struct TransferWithSeed<'a, 'b, 'c> {
     /// Funding account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
 
     /// Base account.
     ///
-    /// The account matching the base Pubkey below must be provided as
+    /// The account matching the base [`Address`] below must be provided as
     /// a signer, but may be the same as the funding account and provided
     /// as account 0.
-    pub base: &'a AccountInfo,
+    pub base: &'a AccountView,
 
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
 
     /// Amount of lamports to transfer.
     pub lamports: u64,
 
-    /// String of ASCII chars, no longer than `Pubkey::MAX_SEED_LEN`.
+    /// String of ASCII chars, no longer than [`MAX_SEED_LEN`](https://docs.rs/solana-address/latest/solana_address/constant.MAX_SEED_LEN.html).
     pub seed: &'b str,
 
     /// Address of program that will own the new account.
-    pub owner: &'c Pubkey,
+    pub owner: &'c Address,
 }
 
 impl TransferWithSeed<'_, '_, '_> {
@@ -44,11 +42,11 @@ impl TransferWithSeed<'_, '_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 3] = [
-            AccountMeta::writable(self.from.key()),
-            AccountMeta::readonly_signer(self.base.key()),
-            AccountMeta::writable(self.to.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 3] = [
+            InstructionAccount::writable(self.from.address()),
+            InstructionAccount::readonly_signer(self.base.address()),
+            InstructionAccount::writable(self.to.address()),
         ];
 
         // instruction data
@@ -56,7 +54,7 @@ impl TransferWithSeed<'_, '_, '_> {
         // - [4..12 ]: lamports amount
         // - [12..20]: seed length
         // - [20..  ]: seed (max 32)
-        // - [.. +32]: owner pubkey
+        // - [.. +32]: owner address
         let mut instruction_data = [0; 80];
         instruction_data[0] = 11;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
@@ -66,9 +64,9 @@ impl TransferWithSeed<'_, '_, '_> {
         instruction_data[20..offset].copy_from_slice(self.seed.as_bytes());
         instruction_data[offset..offset + 32].copy_from_slice(self.owner.as_ref());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data[..offset + 32],
         };
 

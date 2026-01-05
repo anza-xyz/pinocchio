@@ -3,25 +3,24 @@
 //! freely while production code remains `#![no_std]`.
 
 use super::*;
-extern crate std;
-use crate::account_info::{Account, AccountInfo};
-use crate::pubkey::Pubkey;
-use core::{mem, ptr};
-use std::vec::Vec;
+use crate::account::{AccountView, RuntimeAccount};
+use alloc::vec::Vec;
+use core::ptr;
 
 /// Matches the pinocchio Account struct.
 /// Account fields are private, so this struct allows more readable
 /// use of them in tests.
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[cfg_attr(feature = "copy", derive(Copy))]
+#[derive(Clone)]
 pub struct AccountLayout {
     pub borrow_state: u8,
     pub is_signer: u8,
     pub is_writable: u8,
     pub executable: u8,
     pub resize_delta: i32,
-    pub key: Pubkey,
-    pub owner: Pubkey,
+    pub key: Address,
+    pub owner: Address,
     pub lamports: u64,
     pub data_len: u64,
 }
@@ -88,7 +87,7 @@ pub fn generate_mock_entries(
 /// Build a `Vec<u8>` the size of the *golden* `SlotHashes` sysvar (20 488 bytes)
 /// containing the supplied `entries` and with the `declared_len` header.
 pub fn build_slot_hashes_bytes(declared_len: u64, entries: &[(u64, Hash)]) -> Vec<u8> {
-    let mut data = std::vec![0u8; MAX_SIZE];
+    let mut data = alloc::vec![0u8; MAX_SIZE];
     data[..NUM_ENTRIES_SIZE].copy_from_slice(&declared_len.to_le_bytes());
     let mut offset = NUM_ENTRIES_SIZE;
     for (slot, hash) in entries {
@@ -105,26 +104,26 @@ pub fn create_mock_data(entries: &[(u64, Hash)]) -> Vec<u8> {
     build_slot_hashes_bytes(entries.len() as u64, entries)
 }
 
-/// Allocate a heap-backed `AccountInfo` whose data region is initialized with
+/// Allocate a heap-backed `AccountView` whose data region is initialized with
 /// `data` and whose key is `key`.
 ///
 /// The function also returns the backing `Vec<u64>` so the caller can keep it
 /// alive for the duration of the test (otherwise the memory would be freed and
-/// the raw pointer inside `AccountInfo` would dangle).
+/// the raw pointer inside `AccountView` would dangle).
 ///
 /// # Safety
-/// The caller must ensure the returned `AccountInfo` is used only for reading
+/// The caller must ensure the returned `AccountView` is used only for reading
 /// or according to borrow rules because the Solana runtime invariants are not
 /// fully enforced in this hand-rolled representation.
-pub unsafe fn make_account_info(
-    key: Pubkey,
+pub unsafe fn make_account_view(
+    key: Address,
     data: &[u8],
     borrow_state: u8,
-) -> (AccountInfo, Vec<u64>) {
+) -> (AccountView, Vec<u64>) {
     let hdr_size = mem::size_of::<AccountLayout>();
     let total = hdr_size + data.len();
-    let words = (total + 7) / 8;
-    let mut backing: Vec<u64> = std::vec![0u64; words];
+    let words = total.div_ceil(8);
+    let mut backing: Vec<u64> = alloc::vec![0u64; words];
     assert!(
         mem::align_of::<u64>() >= mem::align_of::<AccountLayout>(),
         "`backing` should be properly aligned to store an `AccountLayout` instance"
@@ -140,7 +139,7 @@ pub unsafe fn make_account_info(
             executable: 0,
             resize_delta: 0,
             key,
-            owner: [0u8; 32],
+            owner: Address::new_from_array([0u8; 32]),
             lamports: 0,
             data_len: data.len() as u64,
         },
@@ -153,24 +152,21 @@ pub unsafe fn make_account_info(
     );
 
     (
-        AccountInfo {
-            raw: hdr_ptr as *mut Account,
-        },
+        AccountView::new_unchecked(hdr_ptr as *mut RuntimeAccount),
         backing,
     )
 }
 
-#[cfg(test)]
 #[test]
 fn test_account_layout_compatibility() {
     assert_eq!(
         mem::size_of::<AccountLayout>(),
-        mem::size_of::<Account>(),
+        mem::size_of::<RuntimeAccount>(),
         "Header size must match Account size"
     );
     assert_eq!(
         mem::align_of::<AccountLayout>(),
-        mem::align_of::<Account>(),
+        mem::align_of::<RuntimeAccount>(),
         "Header alignment must match Account alignment"
     );
 
@@ -181,13 +177,13 @@ fn test_account_layout_compatibility() {
             is_writable: 1,
             executable: 0,
             resize_delta: 100,
-            key: [1u8; 32],
-            owner: [2u8; 32],
+            key: Address::new_from_array([1u8; 32]),
+            owner: Address::new_from_array([2u8; 32]),
             lamports: 1000,
             data_len: 256,
         };
 
-        let account_ptr = &test_header as *const AccountLayout as *const Account;
+        let account_ptr = &test_header as *const AccountLayout as *const RuntimeAccount;
         let account_ref = &*account_ptr;
         assert_eq!(
             account_ref.borrow_state, 42,

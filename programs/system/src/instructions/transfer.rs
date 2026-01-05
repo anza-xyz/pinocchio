@@ -1,8 +1,7 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Signer},
-    program::invoke_signed,
-    ProgramResult,
+    cpi::{invoke_signed, Signer},
+    instruction::{InstructionAccount, InstructionView},
+    AccountView, ProgramResult,
 };
 
 /// Transfer lamports.
@@ -12,10 +11,10 @@ use pinocchio::{
 ///   1. `[WRITE]` Recipient account
 pub struct Transfer<'a> {
     /// Funding account.
-    pub from: &'a AccountInfo,
+    pub from: &'a AccountView,
 
     /// Recipient account.
-    pub to: &'a AccountInfo,
+    pub to: &'a AccountView,
 
     /// Amount of lamports to transfer.
     pub lamports: u64,
@@ -29,10 +28,10 @@ impl Transfer<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // account metadata
-        let account_metas: [AccountMeta; 2] = [
-            AccountMeta::writable_signer(self.from.key()),
-            AccountMeta::writable(self.to.key()),
+        // Instruction accounts
+        let instruction_accounts: [InstructionAccount; 2] = [
+            InstructionAccount::writable_signer(self.from.address()),
+            InstructionAccount::writable(self.to.address()),
         ];
 
         // instruction data
@@ -42,9 +41,9 @@ impl Transfer<'_> {
         instruction_data[0] = 2;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
 
-        let instruction = Instruction {
+        let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &instruction_data,
         };
 
