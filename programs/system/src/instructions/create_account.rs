@@ -29,7 +29,7 @@ pub struct CreateAccount<'a, 'b> {
 }
 
 impl<'a, 'b> CreateAccount<'a, 'b> {
-    #[deprecated(note = "Use `with_minimum_balance` instead")]
+    #[deprecated(since = "0.5.0", note = "Use `with_minimum_balance` instead")]
     #[inline(always)]
     pub fn with_minimal_balance(
         from: &'a AccountView,
