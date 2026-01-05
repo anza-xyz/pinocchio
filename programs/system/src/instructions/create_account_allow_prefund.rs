@@ -63,13 +63,8 @@ impl<'a> CreateAccountAllowPrefund<'a> {
         // - [4..12 ]: lamports
         // - [12..20]: account space
         // - [20..52]: owner address
-        const ZEROES_WITH_DISCRIMINATOR: [u8; 52] = {
-            let mut arr = [0u8; 52];
-            // CreateAccountAllowPrefund has discriminator 13
-            arr[0] = 13;
-            arr
-        };
-        let mut instruction_data = ZEROES_WITH_DISCRIMINATOR;
+        let mut instruction_data = [0u8; 52];
+        instruction_data[0] = 13;
         // Lamports remains 0 here, but may be changed just below
         instruction_data[12..20].copy_from_slice(&self.space.to_le_bytes());
         instruction_data[20..52].copy_from_slice(self.owner.as_ref());
