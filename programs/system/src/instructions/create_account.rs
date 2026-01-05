@@ -11,7 +11,7 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` Funding account
 ///   1. `[WRITE, SIGNER]` New account
-pub struct CreateAccount<'a> {
+pub struct CreateAccount<'a, 'b> {
     /// Funding account.
     pub from: &'a AccountView,
 
@@ -25,10 +25,10 @@ pub struct CreateAccount<'a> {
     pub space: u64,
 
     /// Address of program that will own the new account.
-    pub owner: &'a Address,
+    pub owner: &'b Address,
 }
 
-impl<'a> CreateAccount<'a> {
+impl<'a, 'b> CreateAccount<'a, 'b> {
     #[deprecated(note = "Use `with_minimum_balance` instead")]
     #[inline(always)]
     pub fn with_minimal_balance(
@@ -36,7 +36,7 @@ impl<'a> CreateAccount<'a> {
         to: &'a AccountView,
         rent_sysvar: &'a AccountView,
         space: u64,
-        owner: &'a Address,
+        owner: &'b Address,
     ) -> Result<Self, ProgramError> {
         Self::with_minimum_balance(from, to, space, owner, Some(rent_sysvar))
     }
@@ -46,7 +46,7 @@ impl<'a> CreateAccount<'a> {
         from: &'a AccountView,
         to: &'a AccountView,
         space: u64,
-        owner: &'a Address,
+        owner: &'b Address,
         rent_sysvar: Option<&'a AccountView>,
     ) -> Result<Self, ProgramError> {
         let lamports = if let Some(rent_sysvar) = rent_sysvar {
