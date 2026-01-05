@@ -64,6 +64,7 @@ impl<'a> CreateAccountAllowPrefund<'a> {
         // - [12..20]: account space
         // - [20..52]: owner address
         let mut instruction_data = [0u8; 52];
+        // CreateAccountAllowPrefund has discriminator 13
         instruction_data[0] = 13;
         // Lamports remains 0 here, but may be changed just below
         instruction_data[12..20].copy_from_slice(&self.space.to_le_bytes());
