@@ -32,7 +32,7 @@ pub struct CreateAccountAllowPrefund<'a> {
 impl<'a> CreateAccountAllowPrefund<'a> {
     #[inline(always)]
     pub fn with_minimal_balance(
-        from: &'a AccountView,
+        payer: Option<&'a AccountView>,
         to: &'a AccountView,
         rent_sysvar: &'a AccountView,
         space: u64,
@@ -43,7 +43,7 @@ impl<'a> CreateAccountAllowPrefund<'a> {
         let lamports = required_lamports.saturating_sub(to.lamports());
 
         Ok(Self {
-            payer: Some(from),
+            payer,
             lamports,
             to,
             space,
