@@ -12,13 +12,6 @@ use pinocchio::{
 ///   0. `[WRITE, SIGNER]` New account
 ///   1. `[WRITE, SIGNER]` (OPTIONAL) Funding account
 pub struct CreateAccountAllowPrefund<'a> {
-    /// Funding account, if transferring any lamports to the new account.
-    pub payer: Option<&'a AccountView>,
-
-    /// Lamports to transfer (ignored if payer is None). Here separated from
-    /// payer for performance reasons.
-    pub lamports: u64,
-
     /// New account.
     pub to: &'a AccountView,
 
@@ -27,6 +20,9 @@ pub struct CreateAccountAllowPrefund<'a> {
 
     /// Address of program that will own the new account.
     pub owner: &'a Address,
+
+    /// Funding account and lamports to transfer to the new account.
+    pub payer_and_lamports: Option<(&'a AccountView, u64)>,
 }
 
 impl<'a> CreateAccountAllowPrefund<'a> {
@@ -52,11 +48,10 @@ impl<'a> CreateAccountAllowPrefund<'a> {
         let lamports = required_lamports.saturating_sub(to.lamports());
 
         Ok(Self {
-            payer,
-            lamports,
             to,
             space,
             owner,
+            payer_and_lamports: payer.map(|p| (p, lamports)),
         })
     }
 
@@ -79,22 +74,18 @@ impl<'a> CreateAccountAllowPrefund<'a> {
         instruction_data[12..20].copy_from_slice(&self.space.to_le_bytes());
         instruction_data[20..52].copy_from_slice(self.owner.as_ref());
 
-        if self.lamports > 0 {
-            instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
-            if let Some(payer) = self.payer {
-                let instruction_accounts: [InstructionAccount; 2] = [
-                    InstructionAccount::writable_signer(self.to.address()),
-                    InstructionAccount::writable_signer(payer.address()),
-                ];
-                let instruction = InstructionView {
-                    program_id: &crate::ID,
-                    accounts: &instruction_accounts,
-                    data: &instruction_data,
-                };
-                invoke_signed(&instruction, &[self.to, payer], signers)
-            } else {
-                Err(ProgramError::InvalidInstructionData)
-            }
+        if let Some((payer, lamports)) = self.payer_and_lamports {
+            instruction_data[4..12].copy_from_slice(&lamports.to_le_bytes());
+            let instruction_accounts: [InstructionAccount; 2] = [
+                InstructionAccount::writable_signer(self.to.address()),
+                InstructionAccount::writable_signer(payer.address()),
+            ];
+            let instruction = InstructionView {
+                program_id: &crate::ID,
+                accounts: &instruction_accounts,
+                data: &instruction_data,
+            };
+            invoke_signed(&instruction, &[self.to, payer], signers)
         } else {
             let instruction_accounts: [InstructionAccount; 1] =
                 [InstructionAccount::writable_signer(self.to.address())];
