@@ -155,7 +155,6 @@
 //! }
 //! ```
 //!
-//!
 //! 💡 The [`no_allocator!`] macro can also be used in combination with the
 //! [`lazy_program_entrypoint!`].
 //!
@@ -238,6 +237,17 @@
 //! When building the program binary, you must enable the `bpf-entrypoint` feature:
 //! ```ignore
 //! cargo build-sbf --features bpf-entrypoint
+//! ```
+//!
+//! ## Upstream BPF compatibility
+//!
+//! Pinocchio is compatible with upstream BPF target (`target_arch = bpf`). When using syscalls (e.g.,
+//! cross-program invocations), it is necessary to explicitly enable static syscalls in your
+//! program's `Cargo.toml`:
+//! ```toml
+//! [dependencies]
+//! # Enable static syscalls for BPF target
+//! solana-define-syscall = { version = "4.0.1", features = ["unstable-static-syscalls"] }
 //! ```
 
 #[cfg(feature = "alloc")]
