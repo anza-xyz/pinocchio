@@ -12,7 +12,7 @@ use pinocchio::{
 ///   0. `[WRITE, SIGNER]` New account
 ///   1. `[WRITE, SIGNER]` (OPTIONAL) Funding account
 pub struct CreateAccountAllowPrefund<'a> {
-    /// Funding account and number of lamports to transfer to the new account.
+    /// Funding account, if transferring any lamports to the new account.
     pub payer: Option<&'a AccountView>,
 
     /// Lamports to transfer (ignored if payer is None). Here separated from
