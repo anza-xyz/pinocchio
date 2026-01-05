@@ -2,7 +2,7 @@ use pinocchio::{
     cpi::{invoke_signed, Signer},
     error::ProgramError,
     instruction::{InstructionAccount, InstructionView},
-    sysvars::rent::Rent,
+    sysvars::{rent::Rent, Sysvar},
     AccountView, Address, ProgramResult,
 };
 
@@ -41,6 +41,7 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
 }
 
 impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
+    #[deprecated(since = "0.5.0", note = "Use `with_minimum_balance` instead")]
     #[inline(always)]
     pub fn with_minimal_balance(
         from: &'a AccountView,
@@ -51,8 +52,25 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
         space: u64,
         owner: &'c Address,
     ) -> Result<Self, ProgramError> {
-        let rent = Rent::from_account_view(rent_sysvar)?;
-        let lamports = rent.try_minimum_balance(space as usize)?;
+        Self::with_minimum_balance(from, to, base, seed, space, owner, Some(rent_sysvar))
+    }
+
+    #[inline(always)]
+    pub fn with_minimum_balance(
+        from: &'a AccountView,
+        to: &'a AccountView,
+        base: Option<&'a AccountView>,
+        seed: &'b str,
+        space: u64,
+        owner: &'c Address,
+        rent_sysvar: Option<&'a AccountView>,
+    ) -> Result<Self, ProgramError> {
+        let lamports = if let Some(rent_sysvar) = rent_sysvar {
+            let rent = Rent::from_account_view(rent_sysvar)?;
+            rent.try_minimum_balance(space as usize)?
+        } else {
+            Rent::get()?.try_minimum_balance(space as usize)?
+        };
 
         Ok(Self {
             from,
