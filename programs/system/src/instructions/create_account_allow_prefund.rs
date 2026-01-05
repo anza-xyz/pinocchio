@@ -39,7 +39,8 @@ impl<'a> CreateAccountAllowPrefund<'a> {
         owner: &'a Address,
     ) -> Result<Self, ProgramError> {
         let rent = Rent::from_account_view(rent_sysvar)?;
-        let lamports = rent.try_minimum_balance(space as usize)?;
+        let required_lamports = rent.try_minimum_balance(space as usize)?;
+        let lamports = required_lamports.saturating_sub(to.lamports());
 
         Ok(Self {
             payer: Some(from),
