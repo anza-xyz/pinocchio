@@ -31,7 +31,7 @@ pub struct CreateAccountAllowPrefund<'a> {
 
 impl<'a> CreateAccountAllowPrefund<'a> {
     #[inline(always)]
-    /// Creates a new CreateAccountAllowPrefund instruction with the minimal balance required
+    /// Creates a new `CreateAccountAllowPrefund` instruction with the minimal balance required
     /// for the account. The caller must provide a `payer` if the account needs lamports;
     /// otherwise, the resulting instruction will fail when invoked.
     ///
