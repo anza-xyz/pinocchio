@@ -41,6 +41,20 @@ pub struct CreateAccountWithSeed<'a, 'b, 'c> {
 }
 
 impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
+    #[deprecated(note = "Use `with_minimum_balance` instead")]
+    #[inline(always)]
+    pub fn with_minimal_balance(
+        from: &'a AccountView,
+        to: &'a AccountView,
+        base: Option<&'a AccountView>,
+        seed: &'b str,
+        rent_sysvar: &'a AccountView,
+        space: u64,
+        owner: &'c Address,
+    ) -> Result<Self, ProgramError> {
+        Self::with_minimum_balance(from, to, base, seed, space, owner, Some(rent_sysvar))
+    }
+
     #[inline(always)]
     pub fn with_minimum_balance(
         from: &'a AccountView,

@@ -29,6 +29,18 @@ pub struct CreateAccount<'a> {
 }
 
 impl<'a> CreateAccount<'a> {
+    #[deprecated(note = "Use `with_minimum_balance` instead")]
+    #[inline(always)]
+    pub fn with_minimal_balance(
+        from: &'a AccountView,
+        to: &'a AccountView,
+        rent_sysvar: &'a AccountView,
+        space: u64,
+        owner: &'a Address,
+    ) -> Result<Self, ProgramError> {
+        Self::with_minimum_balance(from, to, space, owner, Some(rent_sysvar))
+    }
+
     #[inline(always)]
     pub fn with_minimum_balance(
         from: &'a AccountView,
