@@ -74,7 +74,7 @@ pub fn process_instruction(
   accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
-  log!("Hello from my pinocchio program!");
+  log("Hello from my pinocchio program!");
   Ok(())
 }
 ```
@@ -117,7 +117,7 @@ pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
     // Fast path: check the number of accounts
     let num_accounts = unsafe { *(input as *const u64) };
     if num_accounts == 0 {
-        log!("Fast path - no accounts!");
+        log("Fast path - no accounts!");
         return 0;
     }
 
@@ -130,7 +130,7 @@ pub fn process_instruction(
   accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
-  log!("Standard path");
+  log("Standard path");
   Ok(())
 }
 ```
