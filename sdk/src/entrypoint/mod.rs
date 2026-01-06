@@ -15,7 +15,7 @@ use core::{
 
 use crate::{
     account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
-    Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS, ProgramResult
+    Address, ProgramResult, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS,
 };
 
 #[cfg(feature = "alloc")]
