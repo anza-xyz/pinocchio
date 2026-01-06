@@ -15,7 +15,7 @@ use core::{
 
 use crate::{
     account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
-    Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
+    Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS, ProgramResult
 };
 
 #[cfg(feature = "alloc")]
@@ -178,7 +178,7 @@ macro_rules! program_entrypoint {
 #[inline(always)]
 pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     input: *mut u8,
-    process_instruction: fn(&Address, &[AccountView], &[u8]) -> crate::ProgramResult,
+    process_instruction: fn(&Address, &[AccountView], &[u8]) -> ProgramResult,
 ) -> u64 {
     const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
     // Create an array of uninitialized account views.
@@ -194,7 +194,7 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
         unsafe { from_raw_parts(accounts.as_ptr() as _, count) },
         instruction_data,
     ) {
-        Ok(()) => crate::SUCCESS,
+        Ok(()) => SUCCESS,
         Err(error) => error.into(),
     }
 }
