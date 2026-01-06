@@ -57,6 +57,7 @@ SVM
 BPF
 SBF
 inlined
+inlines
 CU/S
 borrowable
 callee
