@@ -103,9 +103,10 @@ use pinocchio::{
   AccountView,
   Address,
   entrypoint::process_entrypoint,
+  MAX_TX_ACCOUNTS,
   no_allocator,
   nostd_panic_handler,
-  ProgramResult
+  ProgramResult,
 };
 use solana_program_log::log;
 
@@ -122,7 +123,7 @@ pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
     }
 
     // Standard path: delegate to process_entrypoint
-    unsafe { process_entrypoint::<pinocchio::MAX_TX_ACCOUNTS>(input, process_instruction) }
+    unsafe { process_entrypoint::<MAX_TX_ACCOUNTS>(input, process_instruction) }
 }
 
 pub fn process_instruction(
