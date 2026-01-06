@@ -15,7 +15,7 @@ use core::{
 
 use crate::{
     account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
-    Address, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS,
+    Address, ProgramResult, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS,
 };
 
 #[cfg(feature = "alloc")]
@@ -161,26 +161,42 @@ macro_rules! program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account::AccountView> =
-                core::mem::MaybeUninit::<$crate::account::AccountView>::uninit();
-            // Create an array of uninitialized account views.
-            let mut accounts = [UNINIT; $maximum];
-
-            let (program_id, count, instruction_data) =
-                $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
-
-            // Call the program's entrypoint passing `count` account views; we know that
-            // they are initialized so we cast the pointer to a slice of `[AccountView]`.
-            match $process_instruction(
-                &program_id,
-                core::slice::from_raw_parts(accounts.as_ptr() as _, count),
-                &instruction_data,
-            ) {
-                Ok(()) => $crate::SUCCESS,
-                Err(error) => error.into(),
-            }
+            $crate::entrypoint::process_entrypoint::<$maximum>(input, $process_instruction)
         }
     };
+}
+
+/// Entrypoint deserialization.
+///
+/// This function inlines entrypoint deserialization for use in the `program_entrypoint!` macro.
+///
+/// # Safety
+///
+/// The caller must ensure that the `input` buffer is valid, i.e., it represents the program input
+/// parameters serialized by the SVM loader. Additionally, the `input` should last for the lifetime
+/// of the program execution since the returned values reference the `input`.
+#[inline(always)]
+pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
+    input: *mut u8,
+    process_instruction: fn(&Address, &[AccountView], &[u8]) -> ProgramResult,
+) -> u64 {
+    const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
+    // Create an array of uninitialized account views.
+    let mut accounts = [UNINIT; MAX_ACCOUNTS];
+
+    let (program_id, count, instruction_data) =
+        unsafe { deserialize::<MAX_ACCOUNTS>(input, &mut accounts) };
+
+    // Call the program's entrypoint passing `count` account views; we know that
+    // they are initialized so we cast the pointer to a slice of `[AccountView]`.
+    match process_instruction(
+        program_id,
+        unsafe { from_raw_parts(accounts.as_ptr() as _, count) },
+        instruction_data,
+    ) {
+        Ok(()) => SUCCESS,
+        Err(error) => error.into(),
+    }
 }
 
 /// Align a pointer to the BPF alignment of [`u128`].

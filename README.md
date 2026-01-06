@@ -74,7 +74,7 @@ pub fn process_instruction(
   accounts: &[AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
-  log!("Hello from my pinocchio program!");
+  log("Hello from my pinocchio program!");
   Ok(())
 }
 ```
@@ -92,6 +92,49 @@ default_allocator!();
 default_panic_handler!();
 ```
 Any of these macros can be replaced by alternative implementations.
+
+📌 Custom entrypoints with [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html)
+
+For programs that need maximum control over the entrypoint, `pinocchio` exposes the [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html) function. This function is the same deserialization logic used internally by the `program_entrypoint!` macro, exposed as a public API and can be called directly from a custom entrypoint, allowing you to implement fast-path optimizations or custom pre-processing logic before falling back to standard input parsing.
+
+To use `process_entrypoint` in a custom entrypoint:
+```rust
+use pinocchio::{
+  AccountView,
+  Address,
+  entrypoint::process_entrypoint,
+  MAX_TX_ACCOUNTS,
+  no_allocator,
+  nostd_panic_handler,
+  ProgramResult,
+};
+use solana_program_log::log;
+
+no_allocator!();
+nostd_panic_handler!();
+
+#[no_mangle]
+pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+    // Fast path: check the number of accounts
+    let num_accounts = unsafe { *(input as *const u64) };
+    if num_accounts == 0 {
+        log("Fast path - no accounts!");
+        return 0;
+    }
+
+    // Standard path: delegate to process_entrypoint
+    unsafe { process_entrypoint::<MAX_TX_ACCOUNTS>(input, process_instruction) }
+}
+
+pub fn process_instruction(
+  program_id: &Address,
+  accounts: &[AccountView],
+  instruction_data: &[u8],
+) -> ProgramResult {
+  log("Standard path");
+  Ok(())
+}
+```
 
 📌 [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html)
 
