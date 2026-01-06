@@ -93,7 +93,7 @@ default_panic_handler!();
 ```
 Any of these macros can be replaced by alternative implementations.
 
-📌 Custom Entrypoints with [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html)
+📌 Custom entrypoints with [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html)
 
 For programs that need maximum control over the entrypoint, `pinocchio` exposes the [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html) function. This function is the same deserialization logic used internally by the `program_entrypoint!` macro, exposed as a public API and can be called directly from a custom entrypoint, allowing you to implement fast-path optimizations or custom pre-processing logic before falling back to standard input parsing.
 
