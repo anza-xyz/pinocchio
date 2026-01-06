@@ -93,6 +93,48 @@ default_panic_handler!();
 ```
 Any of these macros can be replaced by alternative implementations.
 
+📌 Custom Entrypoints with [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html)
+
+For programs that need maximum control over the entrypoint, `pinocchio` exposes the [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html) function. This function is the same deserialization logic used internally by the `program_entrypoint!` macro, exposed as a public API and can be called directly from a custom entrypoint, allowing you to implement fast-path optimizations or custom pre-processing logic before falling back to standard input parsing.
+
+To use `process_entrypoint` in a custom entrypoint:
+```rust
+use pinocchio::{
+  AccountView,
+  Address,
+  entrypoint::process_entrypoint,
+  no_allocator,
+  nostd_panic_handler,
+  ProgramResult
+};
+use solana_program_log::log;
+
+no_allocator!();
+nostd_panic_handler!();
+
+#[no_mangle]
+pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+    // Fast path: check the number of accounts
+    let num_accounts = unsafe { *(input as *const u64) };
+    if num_accounts == 0 {
+        log!("Fast path - no accounts!");
+        return 0;
+    }
+
+    // Standard path: delegate to process_entrypoint
+    unsafe { process_entrypoint::<pinocchio::MAX_TX_ACCOUNTS>(input, process_instruction) }
+}
+
+pub fn process_instruction(
+  program_id: &Address,
+  accounts: &[AccountView],
+  instruction_data: &[u8],
+) -> ProgramResult {
+  log!("Standard path");
+  Ok(())
+}
+```
+
 📌 [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html)
 
 The `entrypoint!` macro looks similar to the "standard" one found in [`solana-program-entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html). It parses the whole input and provides the `program_id`, `accounts` and `instruction_data` separately. This consumes compute units before the program begins its execution. In some cases, it is beneficial for a program to have more control when the input parsing is happening, even whether the parsing is needed or not &mdash; this is the purpose of the [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html) macro. This macro only wraps the program input and provides methods to parse the input on demand.
