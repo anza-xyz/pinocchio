@@ -184,7 +184,8 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     // Create an array of uninitialized account views.
     let mut accounts = [UNINIT; MAX_ACCOUNTS];
 
-    let (program_id, count, instruction_data) = unsafe { deserialize::<MAX_ACCOUNTS>(input, &mut accounts) };
+    let (program_id, count, instruction_data) =
+        unsafe { deserialize::<MAX_ACCOUNTS>(input, &mut accounts) };
 
     // Call the program's entrypoint passing `count` account views; we know that
     // they are initialized so we cast the pointer to a slice of `[AccountView]`.
