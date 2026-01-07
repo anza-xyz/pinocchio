@@ -34,6 +34,7 @@ dependencies = [
  "solana-account-view",
  "solana-address",
  "solana-define-syscall",
+ "solana-hash",
  "solana-instruction-view",
  "solana-program-error",
 ]
@@ -113,6 +114,12 @@ name = "solana-define-syscall"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57e5b1c0bc1d4a4d10c88a4100499d954c09d3fecfae4912c1a074dff68b1738"
+
+[[package]]
+name = "solana-hash"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a5d48a6ee7b91fc7b998944ab026ed7b3e2fc8ee3bc58452644a86c2648152f"
 
 [[package]]
 name = "solana-instruction-view"

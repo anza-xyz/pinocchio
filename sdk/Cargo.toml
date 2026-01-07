@@ -23,13 +23,14 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [features]
 alloc = ["solana-instruction-view?/slice-cpi"]
-copy = ["solana-account-view/copy", "solana-address/copy"]
+copy = ["solana-account-view/copy", "solana-address/copy", "solana-hash/copy"]
 cpi = ["dep:solana-instruction-view"]
 default = ["alloc"]
 
 [dependencies]
 solana-account-view = { workspace = true }
 solana-address = { workspace = true, features = ["syscalls"] }
+solana-hash = { workspace = true }
 solana-instruction-view = { workspace = true, features = ["cpi"], optional = true }
 solana-program-error = { workspace = true }
 
