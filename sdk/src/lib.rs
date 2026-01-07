@@ -309,7 +309,7 @@
 //! solana-define-syscall = { version = "4.0.1", features = ["unstable-static-syscalls"] }
 //! ```
 //!
-//! When compiling your program with the upstream BPF target, the `std` library is no available.
+//! When compiling your program with the upstream BPF target, the `std` library is not available.
 //! Therefore, the program crate must include the `#![no_std]` crate-level attribute and use the
 //! [`nostd_panic_handler!`] macro. An allocator may be used as long as `alloc` is used.
 
