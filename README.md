@@ -217,7 +217,7 @@ Note that it is the developer's responsibility to ensure that types do not overl
 
 📌 [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
 
-When writing `no_std` program, it is necessary to declare a panic handler using the `nostd_panic_handler!` macro. This macro sets up a default panic handler that logs the location (file, line and column) where the panic occurred and then calls the `abort()` syscall.
+When writing `no_std` programs, it is necessary to declare a panic handler using the `nostd_panic_handler!` macro. This macro sets up a default panic handler that logs the location (file, line and column) where the panic occurred and then calls the `abort()` syscall.
 
 > ⚠️ **Note:**
 > The `default_panic_handler!` macro only works in an `std` context.
