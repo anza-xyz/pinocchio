@@ -53,7 +53,7 @@ The [`entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.entrypoint.
 
 * [`program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.program_entrypoint.html): declares the program entrypoint
 * [`default_allocator!`](https://docs.rs/pinocchio/latest/pinocchio/macro.default_allocator.html): declares the default (bump) global allocator
-* [`default_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.default_panic_handler.html): declares the default panic handler
+* [`default_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.default_panic_handler.html): declares the default panic "hook" that works in combination with the `std` panic handler
 
 When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html) instead of `default_panic_handler!` to declare a rust runtime panic handler. There's no need to do this when any dependency is `std` since rust compiler will emit a panic handler.
 
@@ -102,16 +102,16 @@ To use `process_entrypoint` in a custom entrypoint:
 use pinocchio::{
   AccountView,
   Address,
+  default_panic_handler,
   entrypoint::process_entrypoint,
   MAX_TX_ACCOUNTS,
   no_allocator,
-  nostd_panic_handler,
   ProgramResult,
 };
 use solana_program_log::log;
 
 no_allocator!();
-nostd_panic_handler!();
+default_panic_handler!();
 
 #[no_mangle]
 pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
@@ -122,7 +122,7 @@ pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
         return 0;
     }
 
-    // Standard path: delegate to process_entrypoint
+    // Standard path: delegate to `process_entrypoint`
     unsafe { process_entrypoint::<MAX_TX_ACCOUNTS>(input, process_instruction) }
 }
 
@@ -206,14 +206,21 @@ pub fn process_instruction(
 Since the `no_allocator!` macro does not allocate memory, the `32kb` memory region reserved for the heap remains unused. To take advantage of this, the `no_allocator!` macro emits an `allocate_unchecked` helper function that allows you to manually reserve memory for a type at compile time.
 
 ```rust
-/// static allocation:
-///    - 0 is the offset when the type will be allocated
-///    - `allocate_unchecked` returns a mutable reference to the allocated type
+// static allocation:
+//    - 0 is the offset when the type will be allocated
+//    - `allocate_unchecked` returns a mutable reference to the allocated type
 let lamports = allocate_unchecked::<u64>(0);
 *lamports = 1_000_000_000;
 ```
 
 Note that it is the developer's responsibility to ensure that types do not overlap in memory &mdash; the `offset + <size of type>` of different types must not overlap.
+
+📌 [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
+
+When writing `no_std` programs, it is necessary to declare a panic handler using the `nostd_panic_handler!` macro. This macro sets up a default panic handler that logs the location (file, line and column) where the panic occurred and then calls the `abort()` syscall.
+
+> ⚠️ **Note:**
+> The `default_panic_handler!` macro only works in an `std` context.
 
 ## Crate features
 
@@ -283,6 +290,8 @@ program's `Cargo.toml`:
 # Enable static syscalls for BPF target
 solana-define-syscall = { version = "4.0.1", features = ["unstable-static-syscalls"] }
 ```
+
+When compiling your program with the upstream BPF target, the `std` library is not available. Therefore, the program crate must include the `#![no_std]` crate-level attribute and use the `nostd_panic_handler!` macro. An allocator may be used as long as `alloc` is used.
 
 ## License
 
