@@ -51,7 +51,6 @@ jobs:
   semver_check:
     name: Check Semver
     runs-on: ubuntu-latest
-    environment: prod
     steps:
       - name: Git checkout
         uses: actions/checkout@v4
@@ -84,6 +83,7 @@ jobs:
   publish_release:
     name: Publish
     runs-on: ubuntu-latest
+    environment: prod
     needs: semver_check
     permissions:
       contents: write
