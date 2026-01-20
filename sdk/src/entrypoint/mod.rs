@@ -213,6 +213,15 @@ macro_rules! align_pointer {
     };
 }
 
+/// Advance the serialized input pointer past a non-duplicated account and align it for the next one.
+macro_rules! advance_non_dup_account_input {
+    ($input:ident, $account:expr) => {{
+        $input = $input.add(STATIC_ACCOUNT_DATA);
+        $input = $input.add((*$account).data_len as usize);
+        $input = align_pointer!($input);
+    }};
+}
+
 /// A macro to repeat a pattern to process an account `n` times, where `n` is the number of `_`
 /// tokens in the input.
 ///
@@ -247,10 +256,7 @@ macro_rules! process_n_accounts {
             clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
             $accounts.write(AccountView::new_unchecked(account));
-
-            $input = $input.add(STATIC_ACCOUNT_DATA);
-            $input = $input.add((*account).data_len as usize);
-            $input = align_pointer!($input);
+            advance_non_dup_account_input!($input, account);
         }
     };
 }
@@ -340,9 +346,8 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
         accounts.write(AccountView::new_unchecked(account));
 
-        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
-        input = input.add((*account).data_len as usize);
-        input = align_pointer!(input);
+        input = input.add(size_of::<u64>());
+        advance_non_dup_account_input!(input, account);
 
         if processed > 1 {
             // The number of accounts to process (`to_process_plus_one`) is limited to
@@ -419,9 +424,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     input = input.add(size_of::<u64>());
 
                     if (*account).borrow_state == NON_DUP_MARKER {
-                        input = input.add(STATIC_ACCOUNT_DATA);
-                        input = input.add((*account).data_len as usize);
-                        input = align_pointer!(input);
+                        advance_non_dup_account_input!(input, account);
                     }
                 }
             }
