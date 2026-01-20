@@ -213,8 +213,11 @@ macro_rules! align_pointer {
     };
 }
 
-/// Advance the serialized input pointer past a non-duplicated account and align it for the next one.
-macro_rules! advance_non_dup_account_input {
+/// Advance the input pointer in relation to a non-duplicated account.
+///
+/// The macro will add `STATIC_ACCOUNT_DATA` and the account length to
+/// the input pointer and align its address using [`align_pointer`].
+macro_rules! advance_input_with_account {
     ($input:ident, $account:expr) => {{
         $input = $input.add(STATIC_ACCOUNT_DATA);
         $input = $input.add((*$account).data_len as usize);
@@ -256,7 +259,7 @@ macro_rules! process_n_accounts {
             clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
             $accounts.write(AccountView::new_unchecked(account));
-            advance_non_dup_account_input!($input, account);
+            advance_input_with_account!($input, account);
         }
     };
 }
@@ -347,7 +350,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         accounts.write(AccountView::new_unchecked(account));
 
         input = input.add(size_of::<u64>());
-        advance_non_dup_account_input!(input, account);
+        advance_input_with_account!(input, account);
 
         if processed > 1 {
             // The number of accounts to process (`to_process_plus_one`) is limited to
@@ -424,7 +427,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     input = input.add(size_of::<u64>());
 
                     if (*account).borrow_state == NON_DUP_MARKER {
-                        advance_non_dup_account_input!(input, account);
+                        advance_input_with_account!(input, account);
                     }
                 }
             }
