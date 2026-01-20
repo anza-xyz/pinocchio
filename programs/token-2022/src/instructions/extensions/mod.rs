@@ -5,6 +5,7 @@ pub mod interest_bearing_mint;
 pub mod memo_transfer;
 pub mod metadata_pointer;
 pub mod mint_close_authority;
+pub mod pausable;
 pub mod permanent_delegate;
 pub mod permissioned_burn;
 pub mod scaled_ui_amount;
@@ -24,5 +25,6 @@ pub enum ExtensionDiscriminator {
     GroupPointer = 40,
     GroupMemberPointer = 41,
     ScaledUiAmount = 43,
+    Pausable = 44,
     PermissionedBurn = 46,
 }
