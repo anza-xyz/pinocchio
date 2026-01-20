@@ -206,7 +206,7 @@ macro_rules! align_pointer {
         // since this is more CU-efficient than using `ptr::align_offset()` or the
         // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
         // back to a pointer. The resulting pointer is guaranteed to be valid
-        // becauseit follows the layout serialized by the runtime.
+        // because it follows the layout serialized by the runtime.
         with_exposed_provenance_mut(
             ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
         )
