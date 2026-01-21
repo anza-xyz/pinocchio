@@ -206,11 +206,23 @@ macro_rules! align_pointer {
         // since this is more CU-efficient than using `ptr::align_offset()` or the
         // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
         // back to a pointer. The resulting pointer is guaranteed to be valid
-        // becauseit follows the layout serialized by the runtime.
+        // because it follows the layout serialized by the runtime.
         with_exposed_provenance_mut(
             ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
         )
     };
+}
+
+/// Advance the input pointer in relation to a non-duplicated account.
+///
+/// The macro will add `STATIC_ACCOUNT_DATA` and the account length to
+/// the input pointer and align its address using [`align_pointer`].
+macro_rules! advance_input_with_account {
+    ($input:ident, $account:expr) => {{
+        $input = $input.add(STATIC_ACCOUNT_DATA);
+        $input = $input.add((*$account).data_len as usize);
+        $input = align_pointer!($input);
+    }};
 }
 
 /// A macro to repeat a pattern to process an account `n` times, where `n` is the number of `_`
@@ -247,10 +259,7 @@ macro_rules! process_n_accounts {
             clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
             $accounts.write(AccountView::new_unchecked(account));
-
-            $input = $input.add(STATIC_ACCOUNT_DATA);
-            $input = $input.add((*account).data_len as usize);
-            $input = align_pointer!($input);
+            advance_input_with_account!($input, account);
         }
     };
 }
@@ -340,9 +349,8 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
         accounts.write(AccountView::new_unchecked(account));
 
-        input = input.add(STATIC_ACCOUNT_DATA + size_of::<u64>());
-        input = input.add((*account).data_len as usize);
-        input = align_pointer!(input);
+        input = input.add(size_of::<u64>());
+        advance_input_with_account!(input, account);
 
         if processed > 1 {
             // The number of accounts to process (`to_process_plus_one`) is limited to
@@ -419,9 +427,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     input = input.add(size_of::<u64>());
 
                     if (*account).borrow_state == NON_DUP_MARKER {
-                        input = input.add(STATIC_ACCOUNT_DATA);
-                        input = input.add((*account).data_len as usize);
-                        input = align_pointer!(input);
+                        advance_input_with_account!(input, account);
                     }
                 }
             }
