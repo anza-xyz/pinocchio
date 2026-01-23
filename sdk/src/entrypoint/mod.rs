@@ -149,9 +149,17 @@ macro_rules! entrypoint {
 /// identifiers in the current scope.
 ///
 /// There is a second optional argument that allows to specify the maximum number of accounts
-/// expected by instructions of the program. This is useful to reduce the stack size requirement for
-/// the entrypoint, as the default is set to [`MAX_TX_ACCOUNTS`]. If the program receives more
-/// accounts than the specified maximum, these accounts will be ignored.
+/// expected by instructions of the program. If the program receives more accounts than the
+/// specified maximum, these accounts will be ignored.
+///
+/// # Stack Usage
+///
+/// This macro uses the heap region (at the end of the heap address space) to store the accounts
+/// array, rather than the stack. This significantly reduces stack usage from
+/// `$maximum * size_of::<AccountView>()` bytes (e.g., ~2KB for [`MAX_TX_ACCOUNTS`]) to just a few
+/// bytes for pointers. The accounts array is placed at the end of the heap to avoid conflicts
+/// with the bump allocator and manual allocations using `allocate_unchecked` from
+/// [`crate::no_allocator!`].
 #[macro_export]
 macro_rules! program_entrypoint {
     ( $process_instruction:expr ) => {
@@ -161,19 +169,33 @@ macro_rules! program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            const UNINIT: core::mem::MaybeUninit<$crate::account::AccountView> =
-                core::mem::MaybeUninit::<$crate::account::AccountView>::uninit();
-            // Create an array of uninitialized account views.
-            let mut accounts = [UNINIT; $maximum];
+            // Use the heap region for the accounts array to reduce stack usage.
+            //
+            // The accounts array is placed at the end of the heap region to avoid
+            // conflicts with the bump allocator (which allocates forward from the start)
+            // and manual allocations using `allocate_unchecked` from `no_allocator!`.
+            //
+            // This reduces stack usage from `$maximum * size_of::<AccountView>()` bytes
+            // (e.g., 2032 bytes for MAX_TX_ACCOUNTS) to just a few bytes for pointers.
+            const ACCOUNTS_SIZE: usize =
+                $maximum * core::mem::size_of::<$crate::account::AccountView>();
+
+            let accounts_ptr = core::ptr::with_exposed_provenance_mut::<
+                [core::mem::MaybeUninit<$crate::account::AccountView>; $maximum],
+            >(
+                $crate::entrypoint::HEAP_START_ADDRESS as usize
+                    + $crate::entrypoint::MAX_HEAP_LENGTH as usize
+                    - ACCOUNTS_SIZE,
+            );
 
             let (program_id, count, instruction_data) =
-                $crate::entrypoint::deserialize::<$maximum>(input, &mut accounts);
+                $crate::entrypoint::deserialize::<$maximum>(input, &mut *accounts_ptr);
 
             // Call the program's entrypoint passing `count` account views; we know that
             // they are initialized so we cast the pointer to a slice of `[AccountView]`.
             match $process_instruction(
                 &program_id,
-                core::slice::from_raw_parts(accounts.as_ptr() as _, count),
+                core::slice::from_raw_parts((*accounts_ptr).as_ptr() as _, count),
                 &instruction_data,
             ) {
                 Ok(()) => $crate::SUCCESS,
