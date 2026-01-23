@@ -184,7 +184,7 @@ macro_rules! program_entrypoint {
                 [core::mem::MaybeUninit<$crate::account::AccountView>; $maximum],
             >(
                 $crate::entrypoint::HEAP_START_ADDRESS as usize
-                    + $crate::entrypoint::MAX_HEAP_LENGTH as usize
+                    + $crate::entrypoint::HEAP_LENGTH as usize
                     - ACCOUNTS_SIZE,
             );
 
