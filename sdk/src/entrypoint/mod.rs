@@ -110,6 +110,12 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// `#[panic_handler]` set by the `std`. Therefore, this macro should be used when the program or
 /// any of its dependencies are dependent on the `std` library.
 ///
+/// When using LTO(Link Time Optimization), the compiler may inline the instruction handler (and its call tree) into the
+/// generated `entrypoint`, which can significantly increase the entrypoint stack frame. If your
+/// program has large instruction dispatch logic or builds sizeable CPI account arrays, consider
+/// adding `#[inline(never)]` to the instruction handler to keep it out of the entrypoint stack
+/// frame and avoid BPF stack overflows.
+///
 /// When the program and all its dependencies are `no_std`, it is necessary to set a
 /// `#[panic_handler]` to handle panics. This is done by the [`crate::nostd_panic_handler`] macro.
 /// In this case, it is not possible to use the `entrypoint` macro. Use the
