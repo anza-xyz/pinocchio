@@ -8,6 +8,7 @@ use crate::syscalls::sol_get_sysvar;
 use crate::{error::ProgramError, Address};
 
 pub mod clock;
+pub mod epoch_rewards;
 pub mod fees;
 pub mod instructions;
 pub mod rent;
