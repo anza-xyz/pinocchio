@@ -115,7 +115,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// In this case, it is not possible to use the `entrypoint` macro. Use the
 /// [`crate::program_entrypoint!`] macro instead and set up the allocator and panic handler
 /// manually.
-/// 
+///
 /// The compiler may inline the instruction handler (and its call tree) into the
 /// generated `entrypoint`, which can significantly increase the entrypoint stack frame. If your
 /// program has large instruction dispatch logic or builds sizable CPI account arrays, consider
