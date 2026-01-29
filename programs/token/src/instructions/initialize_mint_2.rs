@@ -1,11 +1,11 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
-use solana_program_error::ProgramResult;
-
-use crate::{write_bytes, UNINIT_BYTE};
+use {
+    crate::{write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
+    solana_program_error::ProgramResult,
+};
 
 /// Initialize a new mint.
 ///
@@ -30,11 +30,11 @@ impl InitializeMint2<'_> {
             [InstructionAccount::writable(self.mint.address())];
 
         // Instruction data layout:
-        // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1]: decimals (1 byte, u8)
-        // -  [2..34]: mint_authority (32 bytes, Address)
-        // -  [34]: freeze_authority presence flag (1 byte, u8)
-        // -  [35..67]: freeze_authority (optional, 32 bytes, Address)
+        // - [0]: instruction discriminator (1 byte, u8)
+        // - [1]: decimals (1 byte, u8)
+        // - [2..34]: mint_authority (32 bytes, Address)
+        // - [34]: freeze_authority presence flag (1 byte, u8)
+        // - [35..67]: freeze_authority (optional, 32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 67];
         let mut length = instruction_data.len();
 

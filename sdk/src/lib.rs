@@ -10,9 +10,9 @@
 //! ## Defining the program entrypoint
 //!
 //! A Solana program needs to define an entrypoint, which will be called by the
-//! runtime to begin the program execution. The `entrypoint!` macro emits the common
-//! boilerplate to set up the program entrypoint. The macro will also set up [global
-//! allocator](https://doc.rust-lang.org/stable/core/alloc/trait.GlobalAlloc.html)
+//! runtime to begin the program execution. The `entrypoint!` macro emits the
+//! common boilerplate to set up the program entrypoint. The macro will also set
+//! up [global allocator](https://doc.rust-lang.org/stable/core/alloc/trait.GlobalAlloc.html)
 //! and [panic handler](https://doc.rust-lang.org/nomicon/panic-handler.html) using
 //! the [`default_allocator!`] and [`default_panic_handler!`] macros.
 //!
@@ -22,15 +22,16 @@
 //!
 //! * [`program_entrypoint!`]: declares the program entrypoint
 //! * [`default_allocator!`]: declares the default (bump) global allocator
-//! * [`default_panic_handler!`]: declares the default panic "hook" that works in
-//!   combination with the `std` panic handler
+//! * [`default_panic_handler!`]: declares the default panic "hook" that works
+//!   in combination with the `std` panic handler
 //!
 //! When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
 //! instead of `default_panic_handler!` to declare a rust runtime panic handler.
-//! There's no need to do this when any dependency is `std` since rust compiler will
-//! emit a panic handler.
+//! There's no need to do this when any dependency is `std` since rust compiler
+//! will emit a panic handler.
 //!
-//! To use the `entrypoint!` macro, use the following in your entrypoint definition:
+//! To use the `entrypoint!` macro, use the following in your entrypoint
+//! definition:
 //! ```ignore
 //! use pinocchio::{
 //!   AccountView,
@@ -58,10 +59,11 @@
 //! * `accounts`: the accounts received
 //! * `instruction_data`: data for the instruction
 //!
-//! `pinocchio` also offers variations of the program entrypoint (`lazy_program_entrypoint`)
-//! and global allocator (`no_allocator`). In order to use these, the program needs to
-//! specify the program entrypoint, global allocator and panic handler individually. The
-//! `entrypoint!` macro is equivalent to writing:
+//! `pinocchio` also offers variations of the program entrypoint
+//! (`lazy_program_entrypoint`) and global allocator (`no_allocator`). In order
+//! to use these, the program needs to specify the program entrypoint, global
+//! allocator and panic handler individually. The `entrypoint!` macro is
+//! equivalent to writing:
 //! ```ignore
 //! program_entrypoint!(process_instruction);
 //! default_allocator!();
@@ -72,11 +74,12 @@
 //! ### Custom entrypoints with [`crate::entrypoint::process_entrypoint`]
 //!
 //! For programs that need maximum control over the entrypoint, `pinocchio`
-//! exposes the [`crate::entrypoint::process_entrypoint`] function. This function is the
-//! same deserialization logic used internally by the [`program_entrypoint!`] macro, exposed
-//! as a public API and can be called directly from a custom entrypoint, allowing you to
-//! implement fast-path optimizations or custom pre-processing logic before falling back
-//! to standard input parsing.
+//! exposes the [`crate::entrypoint::process_entrypoint`] function. This
+//! function is the same deserialization logic used internally by the
+//! [`program_entrypoint!`] macro, exposed as a public API and can be called
+//! directly from a custom entrypoint, allowing you to implement fast-path
+//! optimizations or custom pre-processing logic before falling back to standard
+//! input parsing.
 //!
 //! To use [`crate::entrypoint::process_entrypoint`] in a custom entrypoint:
 //!
@@ -123,18 +126,18 @@
 //! The [`entrypoint!`] macro looks similar to the "standard" one found in
 //! [`solana-program-entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html).
 //! It parses the whole input and provides the `program_id`, `accounts` and
-//! `instruction_data` separately. This consumes compute units before the program
-//! begins its execution. In some cases, it is beneficial for a program to have
-//! more control when the input parsing is happening, even whether the parsing
-//! is needed or not - this is the purpose of the [`lazy_program_entrypoint!`]
-//! macro. This macro only wraps the program input and provides methods to parse
-//! the input on-demand.
+//! `instruction_data` separately. This consumes compute units before the
+//! program begins its execution. In some cases, it is beneficial for a program
+//! to have more control when the input parsing is happening, even whether the
+//! parsing is needed or not - this is the purpose of the
+//! [`lazy_program_entrypoint!`] macro. This macro only wraps the program input
+//! and provides methods to parse the input on-demand.
 //!
 //! The [`lazy_program_entrypoint`] is suitable for programs that have a single
-//! or very few instructions, since it requires the program to handle the parsing,
-//! which can become complex as the number of instructions increases. For *larger*
-//! programs, the [`program_entrypoint!`] will likely be easier and more efficient
-//! to use.
+//! or very few instructions, since it requires the program to handle the
+//! parsing, which can become complex as the number of instructions increases.
+//! For *larger* programs, the [`program_entrypoint!`] will likely be easier and
+//! more efficient to use.
 //!
 //! To use the [`lazy_program_entrypoint!`] macro, use the following in your
 //! entrypoint definition:
@@ -158,30 +161,34 @@
 //! }
 //! ```
 //!
-//! The [`InstructionContext`](entrypoint::InstructionContext) provides on-demand
-//! access to the information of the input:
+//! The [`InstructionContext`](entrypoint::InstructionContext) provides
+//! on-demand access to the information of the input:
 //!
-//! * [`remaining()`](entrypoint::InstructionContext::remaining): number of available
-//!   accounts to parse; this number is decremented as the program parses accounts.
-//! * [`next_account()`](entrypoint::InstructionContext::next_account): parses the
-//!   next available account (can be used as many times as accounts available).
-//! * [`instruction_data()`](entrypoint::InstructionContext::instruction_data): parses
-//!   the instruction data.
+//! * [`remaining()`](entrypoint::InstructionContext::remaining): number of
+//!   available accounts to parse; this number is decremented as the program
+//!   parses accounts.
+//! * [`next_account()`](entrypoint::InstructionContext::next_account): parses
+//!   the next available account (can be used as many times as accounts
+//!   available).
+//! * [`instruction_data()`](entrypoint::InstructionContext::instruction_data):
+//!   parses the instruction data.
 //! * [`program_id()`](entrypoint::InstructionContext::program_id): parses the
 //!   program id.
 //!
 //!
-//! 💡 The [`lazy_program_entrypoint!`] does not set up a global allocator nor a panic
-//! handler. A program should explicitly use one of the provided macros to set them
-//! up or include its own implementation.
+//! 💡 The [`lazy_program_entrypoint!`] does not set up a global allocator nor a
+//! panic handler. A program should explicitly use one of the provided macros to
+//! set them up or include its own implementation.
 //!
 //! ### [`no_allocator!`]
 //!
-//! When writing programs, it can be useful to make sure the program does not attempt
-//! to make any allocations. For this cases, Pinocchio includes a [`no_allocator!`]
-//! macro that set a global allocator just panics at any attempt to allocate memory.
+//! When writing programs, it can be useful to make sure the program does not
+//! attempt to make any allocations. For this cases, Pinocchio includes a
+//! [`no_allocator!`] macro that set a global allocator just panics at any
+//! attempt to allocate memory.
 //!
-//! To use the [`no_allocator!`] macro, use the following in your entrypoint definition:
+//! To use the [`no_allocator!`] macro, use the following in your entrypoint
+//! definition:
 //! ```ignore
 //! use pinocchio::{
 //!   AccountView,
@@ -208,27 +215,28 @@
 //! 💡 The [`no_allocator!`] macro can also be used in combination with the
 //! [`lazy_program_entrypoint!`].
 //!
-//! Since the `no_allocator!` macro does not allocate memory, the `32kb` memory region
-//! reserved for the heap remains unused. To take advantage of this, the `no_allocator!`
-//! macro emits an `allocate_unchecked` helper function that allows you to manually
-//! reserve memory for a type at compile time.
+//! Since the `no_allocator!` macro does not allocate memory, the `32kb` memory
+//! region reserved for the heap remains unused. To take advantage of this, the
+//! `no_allocator!` macro emits an `allocate_unchecked` helper function that
+//! allows you to manually reserve memory for a type at compile time.
 //! ```ignore
 //! // static allocation:
 //! //    - 0 is the offset when the type will be allocated
-//! //    - `allocate_unchecked` returns a mutable reference to the allocated type
-//! let lamports = allocate_unchecked::<u64>(0);
+//! //    - `allocate_unchecked` returns a mutable reference to the allocated
+//! type let lamports = allocate_unchecked::<u64>(0);
 //! *lamports = 1_000_000_000;
 //! ```
 //!
-//! Note that it is the developer's responsibility to ensure that types do not overlap
-//! in memory - the `offset + <size of type>` of different types must not overlap.
+//! Note that it is the developer's responsibility to ensure that types do not
+//! overlap in memory - the `offset + <size of type>` of different types must
+//! not overlap.
 //!
 //! ### [`nostd_panic_handler!`]
 //!
-//! When writing `no_std` programs, it is necessary to declare a panic handler using
-//! the [`nostd_panic_handler!`] macro. This macro sets up a default panic handler that
-//! logs the location (file, line and column) where the panic occurred and then calls
-//! the `abort()` syscall.
+//! When writing `no_std` programs, it is necessary to declare a panic handler
+//! using the [`nostd_panic_handler!`] macro. This macro sets up a default panic
+//! handler that logs the location (file, line and column) where the panic
+//! occurred and then calls the `abort()` syscall.
 //!
 //! 💡 The `default_panic_handler!` macro only works in an `std` context.
 //!
@@ -237,27 +245,27 @@
 //! ### `alloc`
 //!
 //! The `alloc` feature is enabled by default and it uses the [`alloc`](https://doc.rust-lang.org/alloc/)
-//! crate. This provides access to dynamic memory allocation in combination with the
-//! [`default_allocator!`], e.g., required to use `String` and `Vec` in a program.
-//! Helpers that need to allocate memory, such as fetching [`crate::sysvars::slot_hashes::SlotHashes::fetch`]
-//! sysvar data, are also available.
+//! crate. This provides access to dynamic memory allocation in combination with
+//! the [`default_allocator!`], e.g., required to use `String` and `Vec` in a
+//! program. Helpers that need to allocate memory, such as fetching
+//! [`crate::sysvars::slot_hashes::SlotHashes::fetch`] sysvar data, are also
+//! available.
 //!
 //! When no allocation is needed or desired, the feature can be disabled:
-//!
 //! ```ignore
 //! pinocchio = { version = "0.10.0", default-features = false }
 //! ```
 //!
 //! ### `copy`
 //!
-//! The `copy` feature enables the derivation of the `Copy` trait for types. It also enables the
-//! `copy` feature on the `solana-account-view` and `solana-address` re-exports.
+//! The `copy` feature enables the derivation of the `Copy` trait for types. It
+//! also enables the `copy` feature on the `solana-account-view` and
+//! `solana-address` re-exports.
 //!
 //! ### `cpi`
 //!
-//! The `cpi` feature enables the cross-program invocation helpers, as well as types
-//! to define instructions and signer information.
-//!
+//! The `cpi` feature enables the cross-program invocation helpers, as well as
+//! types to define instructions and signer information.
 //! ```ignore
 //! pinocchio = { version = "0.10.0", features = ["cpi"] }
 //! ```
@@ -266,11 +274,11 @@
 //!
 //! The symbols emitted by the entrypoint macros - program entrypoint, global
 //! allocator and default panic handler - can only be defined once globally. If
-//! the program crate is also intended to be used as a library, it is common practice
-//! to define a Cargo [feature](https://doc.rust-lang.org/cargo/reference/features.html)
-//! in your program crate to conditionally enable the module that includes the [`entrypoint!`]
-//! macro invocation. The convention is to name the feature `bpf-entrypoint`.
-//!
+//! the program crate is also intended to be used as a library, it is common
+//! practice to define a Cargo [feature](https://doc.rust-lang.org/cargo/reference/features.html)
+//! in your program crate to conditionally enable the module that includes the
+//! [`entrypoint!`] macro invocation. The convention is to name the feature
+//! `bpf-entrypoint`.
 //! ```ignore
 //! #[cfg(feature = "bpf-entrypoint")]
 //! mod entrypoint {
@@ -293,25 +301,27 @@
 //! }
 //! ```
 //!
-//! When building the program binary, you must enable the `bpf-entrypoint` feature:
+//! When building the program binary, you must enable the `bpf-entrypoint`
+//! feature:
 //! ```ignore
 //! cargo build-sbf --features bpf-entrypoint
 //! ```
 //!
 //! ## Upstream BPF compatibility
 //!
-//! Pinocchio is compatible with upstream BPF target (`target_arch = bpf`). When using syscalls (e.g.,
-//! cross-program invocations), it is necessary to explicitly enable static syscalls in your
-//! program's `Cargo.toml`:
+//! Pinocchio is compatible with upstream BPF target (`target_arch = bpf`). When
+//! using syscalls (e.g., cross-program invocations), it is necessary to
+//! explicitly enable static syscalls in your program's `Cargo.toml`:
 //! ```toml
 //! [dependencies]
 //! # Enable static syscalls for BPF target
 //! solana-define-syscall = { version = "4.0.1", features = ["unstable-static-syscalls"] }
 //! ```
 //!
-//! When compiling your program with the upstream BPF target, the `std` library is not available.
-//! Therefore, the program crate must include the `#![no_std]` crate-level attribute and use the
-//! [`nostd_panic_handler!`] macro. An allocator may be used as long as `alloc` is used.
+//! When compiling your program with the upstream BPF target, the `std` library
+//! is not available. Therefore, the program crate must include the `#![no_std]`
+//! crate-level attribute and use the [`nostd_panic_handler!`] macro. An
+//! allocator may be used as long as `alloc` is used.
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -320,24 +330,20 @@ pub mod entrypoint;
 pub mod sysvars;
 
 // Re-export the `solana_account_view` for downstream use.
-pub use solana_account_view as account;
-pub use solana_account_view::AccountView;
-
 // Re-export the `solana_address` for downstream use.
-pub use solana_address as address;
-pub use solana_address::Address;
-
 // Re-export the `solana_define_syscall` for downstream use.
 #[cfg(any(target_os = "solana", target_arch = "bpf"))]
 pub use solana_define_syscall::definitions as syscalls;
-
+// Re-export the `solana_program_error` for downstream use.
+pub use solana_program_error as error;
+pub use {
+    solana_account_view::{self as account, AccountView},
+    solana_address::{self as address, Address},
+    solana_program_error::ProgramResult,
+};
 // Re-export the `solana_instruction_view` for downstream use.
 #[cfg(feature = "cpi")]
 pub use {solana_instruction_view as instruction, solana_instruction_view::cpi};
-
-// Re-export the `solana_program_error` for downstream use.
-pub use solana_program_error as error;
-pub use solana_program_error::ProgramResult;
 
 /// Maximum number of accounts that a transaction may process.
 ///
@@ -363,13 +369,13 @@ pub mod hint {
     /// A "dummy" function with a hint to the compiler that it is unlikely to be
     /// called.
     ///
-    /// This function is used as a hint to the compiler to optimize other code paths
-    /// instead of the one where the function is used.
+    /// This function is used as a hint to the compiler to optimize other code
+    /// paths instead of the one where the function is used.
     #[cold]
     pub const fn cold_path() {}
 
-    /// Return the given `bool` value with a hint to the compiler that `true` is the
-    /// likely case.
+    /// Return the given `bool` value with a hint to the compiler that `true` is
+    /// the likely case.
     #[inline(always)]
     pub const fn likely(b: bool) -> bool {
         if b {
@@ -380,8 +386,8 @@ pub mod hint {
         }
     }
 
-    /// Return a given `bool` value with a hint to the compiler that `false` is the
-    /// likely case.
+    /// Return a given `bool` value with a hint to the compiler that `false` is
+    /// the likely case.
     #[inline(always)]
     pub const fn unlikely(b: bool) -> bool {
         if b {

@@ -10,20 +10,21 @@ use crate::{
 
 /// Declare the lazy program entrypoint.
 ///
-/// This entrypoint is defined as *lazy* because it does not read the accounts upfront.
-/// Instead, it provides an [`InstructionContext`] to the access input information on demand.
-/// This is useful when the program needs more control over the compute units it uses.
-/// The trade-off is that the program is responsible for managing potential duplicated
-/// accounts and set up a `global allocator` and `panic handler`.
+/// This entrypoint is defined as *lazy* because it does not read the accounts
+/// upfront. Instead, it provides an [`InstructionContext`] to the access input
+/// information on demand. This is useful when the program needs more control
+/// over the compute units it uses. The trade-off is that the program is
+/// responsible for managing potential duplicated accounts and set up a `global
+/// allocator` and `panic handler`.
 ///
-/// The usual use-case for a [`crate::lazy_program_entrypoint!`] is small programs with a single
-/// instruction. For most use-cases, it is recommended to use the [`crate::program_entrypoint!`]
-/// macro instead.
+/// The usual use-case for a [`crate::lazy_program_entrypoint!`] is small
+/// programs with a single instruction. For most use-cases, it is recommended to
+/// use the [`crate::program_entrypoint!`] macro instead.
 ///
-/// This macro emits the boilerplate necessary to begin program execution, calling a
-/// provided function to process the program instruction supplied by the runtime, and reporting
-/// its result to the runtime. Note that it does not set up a global allocator nor a panic
-/// handler.
+/// This macro emits the boilerplate necessary to begin program execution,
+/// calling a provided function to process the program instruction supplied by
+/// the runtime, and reporting its result to the runtime. Note that it does not
+/// set up a global allocator nor a panic handler.
 ///
 /// The only argument is the name of a function with this type signature:
 ///
@@ -35,9 +36,9 @@ use crate::{
 ///
 /// # Example
 ///
-/// Defining an entrypoint and making it conditional on the `bpf-entrypoint` feature. Although
-/// the `entrypoint` module is written inline in this example, it is common to put it into its
-/// own file.
+/// Defining an entrypoint and making it conditional on the `bpf-entrypoint`
+/// feature. Although the `entrypoint` module is written inline in this example,
+/// it is common to put it into its own file.
 ///
 /// ```no_run
 /// #[cfg(feature = "bpf-entrypoint")]
@@ -81,8 +82,9 @@ macro_rules! lazy_program_entrypoint {
 
 /// Context to access data from the input buffer for the instruction.
 ///
-/// This is a wrapper around the input buffer that provides methods to read the accounts
-/// and instruction data. It is used by the lazy entrypoint to access the input data on demand.
+/// This is a wrapper around the input buffer that provides methods to read the
+/// accounts and instruction data. It is used by the lazy entrypoint to access
+/// the input data on demand.
 #[derive(Debug)]
 pub struct InstructionContext {
     /// Pointer to the runtime input buffer to read from.
@@ -101,11 +103,12 @@ impl InstructionContext {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the input buffer is valid, i.e., it represents
-    /// the program input parameters serialized by the SVM loader. The SVM loader
-    /// serializes the input parameters aligned to `8` bytes, with the first
-    /// `8` bytes representing the number of accounts, followed by the accounts
-    /// themselves, the instruction data and the program id.
+    /// The caller must ensure that the input buffer is valid, i.e., it
+    /// represents the program input parameters serialized by the SVM
+    /// loader. The SVM loader serializes the input parameters aligned to
+    /// `8` bytes, with the first `8` bytes representing the number of
+    /// accounts, followed by the accounts themselves, the instruction data
+    /// and the program id.
     ///
     /// More information on the input buffer format can be found in the
     /// [SVM documentation].
@@ -127,8 +130,9 @@ impl InstructionContext {
     /// Reads the next account for the instruction.
     ///
     /// The account is represented as a [`MaybeAccount`], since it can either
-    /// represent and [`AccountView`] or the index of a duplicated account. It is up to the
-    /// caller to handle the mapping back to the source account.
+    /// represent and [`AccountView`] or the index of a duplicated account. It
+    /// is up to the caller to handle the mapping back to the source
+    /// account.
     ///
     /// # Error
     ///
@@ -146,14 +150,15 @@ impl InstructionContext {
 
     /// Returns the next account for the instruction.
     ///
-    /// Note that this method does *not* decrement the number of remaining accounts, but moves
-    /// the input pointer forward. It is intended for use when the caller is certain on the number of
-    /// remaining accounts.
+    /// Note that this method does *not* decrement the number of remaining
+    /// accounts, but moves the input pointer forward. It is intended for
+    /// use when the caller is certain on the number of remaining accounts.
     ///
     /// # Safety
     ///
-    /// It is up to the caller to guarantee that there are remaining accounts; calling this when
-    /// there are no more remaining accounts results in undefined behavior.
+    /// It is up to the caller to guarantee that there are remaining accounts;
+    /// calling this when there are no more remaining accounts results in
+    /// undefined behavior.
     #[inline(always)]
     pub unsafe fn next_account_unchecked(&mut self) -> MaybeAccount {
         self.read_account()
@@ -169,8 +174,9 @@ impl InstructionContext {
 
     /// Returns the data for the instruction.
     ///
-    /// This method can only be used after all accounts have been read; otherwise, it will
-    /// return a [`ProgramError::InvalidInstructionData`] error.
+    /// This method can only be used after all accounts have been read;
+    /// otherwise, it will return a [`ProgramError::InvalidInstructionData`]
+    /// error.
     #[inline(always)]
     pub fn instruction_data(&self) -> Result<&[u8], ProgramError> {
         if self.remaining > 0 {
@@ -184,8 +190,9 @@ impl InstructionContext {
     ///
     /// # Safety
     ///
-    /// It is up to the caller to guarantee that all accounts have been read; calling this method
-    /// before reading all accounts will result in undefined behavior.
+    /// It is up to the caller to guarantee that all accounts have been read;
+    /// calling this method before reading all accounts will result in
+    /// undefined behavior.
     #[inline(always)]
     pub unsafe fn instruction_data_unchecked(&self) -> &[u8] {
         let data_len = *(self.buffer as *const usize);
@@ -196,8 +203,9 @@ impl InstructionContext {
 
     /// Returns the program id for the instruction.
     ///
-    /// This method can only be used after all accounts have been read; otherwise, it will
-    /// return a [`ProgramError::InvalidInstructionData`] error.
+    /// This method can only be used after all accounts have been read;
+    /// otherwise, it will return a [`ProgramError::InvalidInstructionData`]
+    /// error.
     #[inline(always)]
     pub fn program_id(&self) -> Result<&Address, ProgramError> {
         if self.remaining > 0 {
@@ -211,8 +219,9 @@ impl InstructionContext {
     ///
     /// # Safety
     ///
-    /// It is up to the caller to guarantee that all accounts have been read; calling this method
-    /// before reading all accounts will result in undefined behavior.
+    /// It is up to the caller to guarantee that all accounts have been read;
+    /// calling this method before reading all accounts will result in
+    /// undefined behavior.
     #[inline(always)]
     pub unsafe fn program_id_unchecked(&self) -> &Address {
         let data_len = *(self.buffer as *const usize);
@@ -221,8 +230,8 @@ impl InstructionContext {
 
     /// Read an account from the input buffer.
     ///
-    /// This can only be called with a buffer that was serialized by the runtime as
-    /// it assumes a specific memory layout.
+    /// This can only be called with a buffer that was serialized by the runtime
+    /// as it assumes a specific memory layout.
     #[allow(clippy::cast_ptr_alignment, clippy::missing_safety_doc)]
     #[inline(always)]
     unsafe fn read_account(&mut self) -> MaybeAccount {
@@ -259,9 +268,9 @@ pub enum MaybeAccount {
 impl MaybeAccount {
     /// Extracts the wrapped [`AccountView`].
     ///
-    /// It is up to the caller to guarantee that the [`MaybeAccount`] really is in an
-    /// [`MaybeAccount::Account`]. Calling this method when the variant is a
-    /// [`MaybeAccount::Duplicated`] will result in a panic.
+    /// It is up to the caller to guarantee that the [`MaybeAccount`] really is
+    /// in an [`MaybeAccount::Account`]. Calling this method when the
+    /// variant is a [`MaybeAccount::Duplicated`] will result in a panic.
     #[inline(always)]
     pub fn assume_account(self) -> AccountView {
         let MaybeAccount::Account(account) = self else {

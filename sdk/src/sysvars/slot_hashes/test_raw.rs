@@ -1,7 +1,6 @@
 //! Tests focusing on low-level `slot_hashes::raw` helpers.
 
-use super::raw;
-use super::*;
+use super::{raw, *};
 
 #[test]
 fn test_validate_buffer_size() {
@@ -69,8 +68,8 @@ fn test_validate_buffer_size() {
     assert!(raw::get_valid_buffer_capacity(ENTRY_SIZE - 1, 8).is_err());
     assert!(raw::get_valid_buffer_capacity(39, 8).is_err()); // 39 is not divisible by 40
 
-    // Large buffers that would exceed MAX_SIZE - these now pass validate_buffer_size
-    // (the syscall will fail later, but that's acceptable)
+    // Large buffers that would exceed MAX_SIZE - these now pass
+    // validate_buffer_size (the syscall will fail later, but that's acceptable)
     assert_eq!(
         raw::get_valid_buffer_capacity((MAX_ENTRIES + 1) * ENTRY_SIZE, 8).unwrap(),
         MAX_ENTRIES + 1
@@ -155,7 +154,8 @@ fn test_fetch_into_host_stub() {
     let n3 = raw::fetch_into(&mut one_entry, 0).expect("fetch_into(one_entry, 0)");
     assert_eq!(n3, 0);
 
-    // 4. Header-skipped fetch should succeed and return the number of entries that fit.
+    // 4. Header-skipped fetch should succeed and return the number of entries that
+    //    fit.
     let mut skip_header = alloc::vec![0u8; ENTRY_SIZE];
     let entries_count = raw::fetch_into(&mut skip_header, 8).expect("fetch_into(skip_header, 8)");
     assert_eq!(entries_count, 1); // Buffer can fit exactly 1 entry

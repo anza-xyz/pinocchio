@@ -1,11 +1,12 @@
-use core::mem::MaybeUninit;
-
-use solana_account_view::AccountView;
-use solana_instruction_view::{
-    cpi::{invoke_signed_with_bounds, Signer, MAX_STATIC_CPI_ACCOUNTS},
-    InstructionAccount, InstructionView,
+use {
+    core::mem::MaybeUninit,
+    solana_account_view::AccountView,
+    solana_instruction_view::{
+        cpi::{invoke_signed_with_bounds, Signer, MAX_STATIC_CPI_ACCOUNTS},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::{ProgramError, ProgramResult},
 };
-use solana_program_error::{ProgramError, ProgramResult};
 
 /// Memo instruction.
 ///

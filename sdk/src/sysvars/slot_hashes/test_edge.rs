@@ -1,5 +1,7 @@
-use super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account_view};
-use crate::{error::ProgramError, sysvars::slot_hashes::*};
+use {
+    super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account_view},
+    crate::{error::ProgramError, sysvars::slot_hashes::*},
+};
 
 #[test]
 fn test_wrong_key_from_account_view() {

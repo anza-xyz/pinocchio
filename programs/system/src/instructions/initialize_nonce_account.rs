@@ -4,7 +4,8 @@ use pinocchio::{
     AccountView, Address, ProgramResult,
 };
 
-/// Drive state of Uninitialized nonce account to Initialized, setting the nonce value.
+/// Drive state of Uninitialized nonce account to Initialized, setting the nonce
+/// value.
 ///
 /// The [`Address`] parameter specifies the entity authorized to execute nonce
 /// instruction on the account
@@ -42,8 +43,8 @@ impl InitializeNonceAccount<'_, '_> {
         ];
 
         // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..36]: authority address
+        // - [0..4 ]: instruction discriminator
+        // - [4..36]: authority address
         let mut instruction_data = [0; 36];
         instruction_data[0] = 6;
         instruction_data[4..36].copy_from_slice(self.authority.as_array());

@@ -56,8 +56,8 @@ impl WithdrawNonceAccount<'_> {
         ];
 
         // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..12]: lamports
+        // - [0..4 ]: instruction discriminator
+        // - [4..12]: lamports
         let mut instruction_data = [0; 12];
         instruction_data[0] = 5;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());

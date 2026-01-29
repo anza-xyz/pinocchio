@@ -1,18 +1,17 @@
-use core::{mem::MaybeUninit, slice};
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView};
-use solana_program_error::{ProgramError, ProgramResult};
-
-use crate::instructions::MAX_MULTISIG_SIGNERS;
+use {
+    crate::instructions::MAX_MULTISIG_SIGNERS,
+    core::{mem::MaybeUninit, slice},
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView},
+    solana_program_error::{ProgramError, ProgramResult},
+};
 
 /// Initialize a new Multisig.
 ///
 /// ### Accounts:
 ///   0. `[writable]` The multisig account to initialize.
-///   1. `..+N` `[]` The `N` signer accounts, where `N` is `1 <=
-///      N <= 11`.
+///   1. `..+N` `[]` The `N` signer accounts, where `N` is `1 <= N <= 11`.
 pub struct InitializeMultisig2<'a, 'b, 'c>
 where
     'a: 'b,
@@ -65,8 +64,8 @@ impl InitializeMultisig2<'_, '_, '_> {
         }
 
         // Instruction data layout:
-        // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1]: m (1 byte, u8)
+        // - [0]: instruction discriminator (1 byte, u8)
+        // - [1]: m (1 byte, u8)
         let data = &[19, m];
 
         let instruction = InstructionView {

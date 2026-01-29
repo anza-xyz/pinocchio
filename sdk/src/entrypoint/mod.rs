@@ -3,23 +3,22 @@
 
 pub mod lazy;
 
-pub use lazy::{InstructionContext, MaybeAccount};
-
-use core::{
-    alloc::{GlobalAlloc, Layout},
-    cmp::min,
-    mem::{size_of, MaybeUninit},
-    ptr::with_exposed_provenance_mut,
-    slice::from_raw_parts,
-};
-
-use crate::{
-    account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
-    Address, ProgramResult, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS,
-};
-
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
+pub use lazy::{InstructionContext, MaybeAccount};
+use {
+    crate::{
+        account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
+        Address, ProgramResult, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS,
+    },
+    core::{
+        alloc::{GlobalAlloc, Layout},
+        cmp::min,
+        mem::{size_of, MaybeUninit},
+        ptr::with_exposed_provenance_mut,
+        slice::from_raw_parts,
+    },
+};
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
@@ -36,19 +35,21 @@ pub const NON_DUP_MARKER: u8 = u8::MAX;
 
 /// The "static" size of an account in the input buffer.
 ///
-/// This is the size of the account header plus the maximum permitted data increase.
+/// This is the size of the account header plus the maximum permitted data
+/// increase.
 const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
-/// The main difference from the standard (SDK) [`entrypoint`] macro is that this macro represents
-/// an entrypoint that does not perform allocations or copies when reading the input buffer.
+/// The main difference from the standard (SDK) [`entrypoint`] macro is that
+/// this macro represents an entrypoint that does not perform allocations or
+/// copies when reading the input buffer.
 ///
 /// [`entrypoint`]: https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html
 ///
-/// This macro emits the common boilerplate necessary to begin program execution, calling a provided
-/// function to process the program instruction supplied by the runtime, and reporting its result to
-/// the runtime.
+/// This macro emits the common boilerplate necessary to begin program
+/// execution, calling a provided function to process the program instruction
+/// supplied by the runtime, and reporting its result to the runtime.
 ///
 /// It also sets up a [global allocator] and [panic handler], using the
 /// [`crate::default_allocator!`] and [`crate::default_panic_handler!`] macros.
@@ -62,13 +63,14 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
-/// The argument is defined as an `expr`, which allows the use of any function pointer not just
-/// identifiers in the current scope.
+/// The argument is defined as an `expr`, which allows the use of any function
+/// pointer not just identifiers in the current scope.
 ///
-/// There is a second optional argument that allows to specify the maximum number of accounts
-/// expected by instructions of the program. This is useful to reduce the stack size requirement for
-/// the entrypoint, as the default is set to [`crate::MAX_TX_ACCOUNTS`]. If the program receives
-/// more accounts than the specified maximum, these accounts will be ignored.
+/// There is a second optional argument that allows to specify the maximum
+/// number of accounts expected by instructions of the program. This is useful
+/// to reduce the stack size requirement for the entrypoint, as the default is
+/// set to [`crate::MAX_TX_ACCOUNTS`]. If the program receives more accounts
+/// than the specified maximum, these accounts will be ignored.
 ///
 /// [global allocator]: https://doc.rust-lang.org/stable/alloc/alloc/trait.GlobalAlloc.html
 /// [maximum number of accounts]: https://github.com/anza-xyz/agave/blob/ccabfcf84921977202fd06d3197cbcea83742133/runtime/src/bank.rs#L3207-L3219
@@ -76,8 +78,9 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 ///
 /// # Examples
 ///
-/// Defining an entrypoint conditional on the `bpf-entrypoint` feature. Although the `entrypoint`
-/// module is written inline in this example, it is common to put it into its own file.
+/// Defining an entrypoint conditional on the `bpf-entrypoint` feature. Although
+/// the `entrypoint` module is written inline in this example, it is common to
+/// put it into its own file.
 ///
 /// ```no_run
 /// #[cfg(feature = "bpf-entrypoint")]
@@ -105,22 +108,24 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 ///
 /// # Important
 ///
-/// The panic handler set up is different depending on whether the `std` library is available to the
-/// linker or not. The `entrypoint` macro will set up a default panic "hook", that works with the
-/// `#[panic_handler]` set by the `std`. Therefore, this macro should be used when the program or
-/// any of its dependencies are dependent on the `std` library.
+/// The panic handler set up is different depending on whether the `std` library
+/// is available to the linker or not. The `entrypoint` macro will set up a
+/// default panic "hook", that works with the `#[panic_handler]` set by the
+/// `std`. Therefore, this macro should be used when the program or any of its
+/// dependencies are dependent on the `std` library.
 ///
-/// When the program and all its dependencies are `no_std`, it is necessary to set a
-/// `#[panic_handler]` to handle panics. This is done by the [`crate::nostd_panic_handler`] macro.
-/// In this case, it is not possible to use the `entrypoint` macro. Use the
-/// [`crate::program_entrypoint!`] macro instead and set up the allocator and panic handler
-/// manually.
+/// When the program and all its dependencies are `no_std`, it is necessary to
+/// set a `#[panic_handler]` to handle panics. This is done by the
+/// [`crate::nostd_panic_handler`] macro. In this case, it is not possible to
+/// use the `entrypoint` macro. Use the [`crate::program_entrypoint!`] macro
+/// instead and set up the allocator and panic handler manually.
 ///
 /// The compiler may inline the instruction handler (and its call tree) into the
-/// generated `entrypoint`, which can significantly increase the entrypoint stack frame. If your
-/// program has large instruction dispatch logic or builds sizable CPI account arrays, consider
-/// adding `#[inline(never)]` to the instruction handler to keep it out of the entrypoint stack
-/// frame and avoid BPF stack overflows.
+/// generated `entrypoint`, which can significantly increase the entrypoint
+/// stack frame. If your program has large instruction dispatch logic or builds
+/// sizable CPI account arrays, consider adding `#[inline(never)]` to the
+/// instruction handler to keep it out of the entrypoint stack frame and avoid
+/// BPF stack overflows.
 ///
 /// [`crate::nostd_panic_handler`]: https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html
 #[cfg(feature = "alloc")]
@@ -138,9 +143,9 @@ macro_rules! entrypoint {
 
 /// Declare the program entrypoint.
 ///
-/// This macro is similar to the [`crate::entrypoint!`] macro, but it does not set up a global
-/// allocator nor a panic handler. This is useful when the program will set up its own allocator and
-/// panic handler.
+/// This macro is similar to the [`crate::entrypoint!`] macro, but it does not
+/// set up a global allocator nor a panic handler. This is useful when the
+/// program will set up its own allocator and panic handler.
 ///
 /// The first argument is the name of a function with this type signature:
 ///
@@ -151,13 +156,14 @@ macro_rules! entrypoint {
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
-/// The argument is defined as an `expr`, which allows the use of any function pointer not just
-/// identifiers in the current scope.
+/// The argument is defined as an `expr`, which allows the use of any function
+/// pointer not just identifiers in the current scope.
 ///
-/// There is a second optional argument that allows to specify the maximum number of accounts
-/// expected by instructions of the program. This is useful to reduce the stack size requirement for
-/// the entrypoint, as the default is set to [`MAX_TX_ACCOUNTS`]. If the program receives more
-/// accounts than the specified maximum, these accounts will be ignored.
+/// There is a second optional argument that allows to specify the maximum
+/// number of accounts expected by instructions of the program. This is useful
+/// to reduce the stack size requirement for the entrypoint, as the default is
+/// set to [`MAX_TX_ACCOUNTS`]. If the program receives more accounts than the
+/// specified maximum, these accounts will be ignored.
 #[macro_export]
 macro_rules! program_entrypoint {
     ( $process_instruction:expr ) => {
@@ -174,13 +180,15 @@ macro_rules! program_entrypoint {
 
 /// Entrypoint deserialization.
 ///
-/// This function inlines entrypoint deserialization for use in the `program_entrypoint!` macro.
+/// This function inlines entrypoint deserialization for use in the
+/// `program_entrypoint!` macro.
 ///
 /// # Safety
 ///
-/// The caller must ensure that the `input` buffer is valid, i.e., it represents the program input
-/// parameters serialized by the SVM loader. Additionally, the `input` should last for the lifetime
-/// of the program execution since the returned values reference the `input`.
+/// The caller must ensure that the `input` buffer is valid, i.e., it represents
+/// the program input parameters serialized by the SVM loader. Additionally, the
+/// `input` should last for the lifetime of the program execution since the
+/// returned values reference the `input`.
 #[inline(always)]
 pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     input: *mut u8,
@@ -231,14 +239,15 @@ macro_rules! advance_input_with_account {
     }};
 }
 
-/// A macro to repeat a pattern to process an account `n` times, where `n` is the number of `_`
-/// tokens in the input.
+/// A macro to repeat a pattern to process an account `n` times, where `n` is
+/// the number of `_` tokens in the input.
 ///
-/// The main advantage of this macro is to inline the code to process `n` accounts, which is useful
-/// to reduce the number of jumps required.  As a result, it reduces the number of CUs required to
-/// process each account.
+/// The main advantage of this macro is to inline the code to process `n`
+/// accounts, which is useful to reduce the number of jumps required.  As a
+/// result, it reduces the number of CUs required to process each account.
 ///
-/// Note that this macro emits code to update both the `input` and `accounts` pointers.
+/// Note that this macro emits code to update both the `input` and `accounts`
+/// pointers.
 macro_rules! process_n_accounts {
     // Base case: no tokens left.
     ( () => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {};
@@ -270,8 +279,8 @@ macro_rules! process_n_accounts {
     };
 }
 
-/// Convenience macro to transform the number of accounts to process into a pattern of `_` tokens
-/// for the [`process_n_accounts`] macro.
+/// Convenience macro to transform the number of accounts to process into a
+/// pattern of `_` tokens for the [`process_n_accounts`] macro.
 macro_rules! process_accounts {
     ( 1 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
         process_n_accounts!( (_) => ( $input, $accounts, $accounts_slice ));
@@ -290,15 +299,16 @@ macro_rules! process_accounts {
     };
 }
 
-/// Create an [`AccountView`] referencing the same account referenced by the [`AccountView`] at the
-/// specified `index`.
+/// Create an [`AccountView`] referencing the same account referenced by the
+/// [`AccountView`] at the specified `index`.
 ///
 /// # Safety
 ///
 /// The caller must ensure that:
-///   - `accounts` pointer must point to an array of [`AccountView`]s where the new [`AccountView`]
-///     will be written.
-///   - `accounts_slice` pointer must point to a slice of [`AccountView`]s already initialized.
+///   - `accounts` pointer must point to an array of [`AccountView`]s where the
+///     new [`AccountView`] will be written.
+///   - `accounts_slice` pointer must point to a slice of [`AccountView`]s
+///     already initialized.
 ///   - `index` is a valid index in the `accounts_slice`.
 //
 // Note: The function is marked as `cold` to stop the compiler from optimizing the parsing of
@@ -316,23 +326,25 @@ unsafe fn clone_account_view(
 
 /// Parse the arguments from the runtime input buffer.
 ///
-/// This function parses the `accounts`, `instruction_data` and `program_id` from the input buffer.
-/// The `MAX_ACCOUNTS` constant defines the maximum number of accounts that can be parsed from the
-/// input buffer. If the number of accounts in the input buffer exceeds `MAX_ACCOUNTS`, the excess
+/// This function parses the `accounts`, `instruction_data` and `program_id`
+/// from the input buffer. The `MAX_ACCOUNTS` constant defines the maximum
+/// number of accounts that can be parsed from the input buffer. If the number
+/// of accounts in the input buffer exceeds `MAX_ACCOUNTS`, the excess
 /// accounts will be skipped (ignored).
 ///
 /// # Safety
 ///
-/// The caller must ensure that the `input` buffer is valid, i.e., it represents the program input
-/// parameters serialized by the SVM loader. Additionally, the `input` should last for the lifetime
-/// of the program execution since the returned values reference the `input`.
+/// The caller must ensure that the `input` buffer is valid, i.e., it represents
+/// the program input parameters serialized by the SVM loader. Additionally, the
+/// `input` should last for the lifetime of the program execution since the
+/// returned values reference the `input`.
 #[inline(always)]
 pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
     accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
 ) -> (&'static Address, usize, &'static [u8]) {
-    // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of accounts
-    // (MAX_TX_ACCOUNTS) that can be processed in a transaction.
+    // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of
+    // accounts (MAX_TX_ACCOUNTS) that can be processed in a transaction.
     const {
         assert!(
             MAX_ACCOUNTS <= MAX_TX_ACCOUNTS,
@@ -360,15 +372,16 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
 
         if processed > 1 {
             // The number of accounts to process (`to_process_plus_one`) is limited to
-            // `MAX_ACCOUNTS`, which is the capacity of the accounts array. When there are more
-            // accounts to process than the maximum, we still need to skip the remaining accounts
-            // (`to_skip`) to move the input pointer to the instruction data. At the end, we return
-            // the number of accounts processed (`processed`), which represents the accounts
+            // `MAX_ACCOUNTS`, which is the capacity of the accounts array. When there are
+            // more accounts to process than the maximum, we still need to skip
+            // the remaining accounts (`to_skip`) to move the input pointer to
+            // the instruction data. At the end, we return the number of
+            // accounts processed (`processed`), which represents the accounts
             // initialized in the `accounts` slice.
             //
-            // Note that `to_process_plus_one` includes the first (already processed) account to
-            // avoid decrementing the value. The actual number of remaining accounts to process is
-            // `to_process_plus_one - 1`.
+            // Note that `to_process_plus_one` includes the first (already processed)
+            // account to avoid decrementing the value. The actual number of
+            // remaining accounts to process is `to_process_plus_one - 1`.
             let mut to_process_plus_one = if MAX_ACCOUNTS < MAX_TX_ACCOUNTS {
                 min(processed, MAX_ACCOUNTS)
             } else {
@@ -379,8 +392,8 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
             processed = to_process_plus_one;
 
             // This is an optimization to reduce the number of jumps required to process the
-            // accounts. The macro `process_accounts` will generate inline code to process the
-            // specified number of accounts.
+            // accounts. The macro `process_accounts` will generate inline code to process
+            // the specified number of accounts.
             if to_process_plus_one == 2 {
                 process_accounts!(1 => (input, accounts, accounts_slice));
             } else {
@@ -413,13 +426,13 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                 }
             }
 
-            // Process any remaining accounts to move the offset to the instruction data (there is a
-            // duplication of logic but we avoid testing whether we have space for the account or
-            // not).
+            // Process any remaining accounts to move the offset to the instruction data
+            // (there is a duplication of logic but we avoid testing whether we
+            // have space for the account or not).
             //
-            // There might be accounts to skip only when `MAX_ACCOUNTS < MAX_TX_ACCOUNTS` so this
-            // allows the compiler to optimize the code and avoid the loop when `MAX_ACCOUNTS ==
-            // MAX_TX_ACCOUNTS`.
+            // There might be accounts to skip only when `MAX_ACCOUNTS < MAX_TX_ACCOUNTS` so
+            // this allows the compiler to optimize the code and avoid the loop
+            // when `MAX_ACCOUNTS == MAX_TX_ACCOUNTS`.
             if MAX_ACCOUNTS < MAX_TX_ACCOUNTS {
                 while to_skip > 0 {
                     // Marks the account as skipped.
@@ -455,8 +468,9 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
 
 /// Default panic hook.
 ///
-/// This macro sets up a default panic hook that logs the file where the panic occurred. It acts as
-/// a hook after Rust runtime panics; syscall `abort()` will be called after it returns.
+/// This macro sets up a default panic hook that logs the file where the panic
+/// occurred. It acts as a hook after Rust runtime panics; syscall `abort()`
+/// will be called after it returns.
 #[macro_export]
 macro_rules! default_panic_handler {
     () => {
@@ -477,8 +491,9 @@ macro_rules! default_panic_handler {
 
 /// A global `#[panic_handler]` for `no_std` programs.
 ///
-/// This macro sets up a default panic handler that logs the location (file, line and column) where
-/// the panic occurred and then calls the syscall `abort()`.
+/// This macro sets up a default panic handler that logs the location (file,
+/// line and column) where the panic occurred and then calls the syscall
+/// `abort()`.
 ///
 /// This macro should be used when all crates are `no_std`.
 #[macro_export]
@@ -520,7 +535,8 @@ macro_rules! nostd_panic_handler {
 
 /// Default global allocator.
 ///
-/// This macro sets up a default global allocator that uses a bump allocator to allocate memory.
+/// This macro sets up a default global allocator that uses a bump allocator to
+/// allocate memory.
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! default_allocator {
@@ -536,8 +552,8 @@ macro_rules! default_allocator {
             )
         };
 
-        /// A default allocator for when the program is compiled on a target different than
-        /// `"solana"`.
+        /// A default allocator for when the program is compiled on a target different
+        /// than `"solana"`.
         ///
         /// This links the `std` library, which will set up a default global allocator.
         #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
@@ -549,9 +565,10 @@ macro_rules! default_allocator {
 
 /// A global allocator that does not dynamically allocate memory.
 ///
-/// This macro sets up a global allocator that denies all dynamic allocations, while allowing static
-/// ("manual") allocations. This is useful when the program does not need to dynamically allocate
-/// memory and manages their own allocations.
+/// This macro sets up a global allocator that denies all dynamic allocations,
+/// while allowing static ("manual") allocations. This is useful when the
+/// program does not need to dynamically allocate memory and manages their own
+/// allocations.
 ///
 /// The program will panic if it tries to dynamically allocate memory.
 ///
@@ -563,16 +580,18 @@ macro_rules! no_allocator {
         #[global_allocator]
         static A: $crate::entrypoint::NoAllocator = $crate::entrypoint::NoAllocator;
 
-        /// Allocates memory for the given type `T` at the specified offset in the heap reserved
-        /// address space.
+        /// Allocates memory for the given type `T` at the specified offset in the heap
+        /// reserved address space.
         ///
         /// # Safety
         ///
-        /// It is the caller's responsibility to ensure that the offset does not overlap with
-        /// previous allocations and that type `T` can hold the bit-pattern `0` as a valid value.
+        /// It is the caller's responsibility to ensure that the offset does not overlap
+        /// with previous allocations and that type `T` can hold the bit-pattern `0` as
+        /// a valid value.
         ///
         /// For types that cannot hold the bit-pattern `0` as a valid value, use
-        /// [`core::mem::MaybeUninit<T>`] to allocate memory for the type and initialize it later.
+        /// [`core::mem::MaybeUninit<T>`] to allocate memory for the type and initialize
+        /// it later.
         //
         // Make this `const` once `const_mut_refs` is stable for the platform-tools toolchain Rust
         // version.
@@ -603,8 +622,8 @@ macro_rules! no_allocator {
             start
         }
 
-        /// A default allocator for when the program is compiled on a target different than
-        /// `"solana"`.
+        /// A default allocator for when the program is compiled on a target different
+        /// than `"solana"`.
         ///
         /// This links the `std` library, which will set up a default global allocator.
         #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
@@ -644,13 +663,14 @@ mod alloc {
 
     /// The bump allocator used as the default Rust heap when running programs.
     ///
-    /// The allocator uses a forward bump allocation strategy, where memory is allocated
-    /// by moving a pointer forward in a pre-allocated memory region. The current position
-    /// of the heap pointer is stored at the start of the memory region.
+    /// The allocator uses a forward bump allocation strategy, where memory is
+    /// allocated by moving a pointer forward in a pre-allocated memory
+    /// region. The current position of the heap pointer is stored at the
+    /// start of the memory region.
     ///
-    /// This implementation relies on the runtime to zero out memory and to enforce the
-    /// limit of the heap memory region. Use of memory outside the allocated region will
-    /// result in a runtime error.
+    /// This implementation relies on the runtime to zero out memory and to
+    /// enforce the limit of the heap memory region. Use of memory outside
+    /// the allocated region will result in a runtime error.
     #[cfg_attr(feature = "copy", derive(Copy))]
     #[derive(Clone, Debug)]
     pub struct BumpAllocator {
@@ -664,15 +684,17 @@ mod alloc {
         /// # Safety
         ///
         /// This is unsafe in most situations, unless you are totally sure that
-        /// the provided start address and length can be written to by the allocator,
-        /// and that the memory will be usable for the lifespan of the allocator.
-        /// The start address must be aligned to `usize` and the length must be
+        /// the provided start address and length can be written to by the
+        /// allocator, and that the memory will be usable for the
+        /// lifespan of the allocator. The start address must be aligned
+        /// to `usize` and the length must be
         /// at least `size_of::<usize>()` bytes.
         ///
-        /// For Solana on-chain programs, a certain address range is reserved, so
-        /// the allocator can be given those addresses. In general, the `len` is
-        /// set to the maximum heap length allowed by the runtime. The runtime
-        /// will enforce the actual heap size requested by the program.
+        /// For Solana on-chain programs, a certain address range is reserved,
+        /// so the allocator can be given those addresses. In general,
+        /// the `len` is set to the maximum heap length allowed by the
+        /// runtime. The runtime will enforce the actual heap size
+        /// requested by the program.
         pub const unsafe fn new_unchecked(start: usize, len: usize) -> Self {
             Self {
                 start,
@@ -681,19 +703,22 @@ mod alloc {
         }
     }
 
-    // Integer arithmetic in this global allocator implementation is safe when operating on the
-    // prescribed `BumpAllocator::start` and `BumpAllocator::end`. Any other use may overflow and
-    // is thus unsupported and at one's own risk.
+    // Integer arithmetic in this global allocator implementation is safe when
+    // operating on the prescribed `BumpAllocator::start` and
+    // `BumpAllocator::end`. Any other use may overflow and is thus unsupported
+    // and at one's own risk.
     #[allow(clippy::arithmetic_side_effects)]
     unsafe impl GlobalAlloc for BumpAllocator {
-        /// Allocates memory as described by the given `layout` using a forward bump allocator.
+        /// Allocates memory as described by the given `layout` using a forward
+        /// bump allocator.
         ///
-        /// Returns a pointer to newly-allocated memory, or `null` to indicate allocation failure.
+        /// Returns a pointer to newly-allocated memory, or `null` to indicate
+        /// allocation failure.
         ///
         /// # Safety
         ///
-        /// `layout` must have non-zero size. Attempting to allocate for a zero-sized layout will
-        /// result in undefined behavior.
+        /// `layout` must have non-zero size. Attempting to allocate for a
+        /// zero-sized layout will result in undefined behavior.
         #[inline]
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
             // Reads the current position of the heap pointer.
@@ -724,16 +749,18 @@ mod alloc {
             allocation as *mut u8
         }
 
-        /// Behaves like `alloc`, but also ensures that the contents are set to zero before being returned.
+        /// Behaves like `alloc`, but also ensures that the contents are set to
+        /// zero before being returned.
         ///
-        /// This method relies on the runtime to zero out the memory when reserving the heap region,
-        /// so it simply calls `alloc`.
+        /// This method relies on the runtime to zero out the memory when
+        /// reserving the heap region, so it simply calls `alloc`.
         #[inline]
         unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
             self.alloc(layout)
         }
 
-        /// This method has no effect since the bump allocator does not free memory.
+        /// This method has no effect since the bump allocator does not free
+        /// memory.
         #[inline]
         unsafe fn dealloc(&self, _: *mut u8, _: Layout) {}
     }
@@ -782,8 +809,9 @@ mod tests {
         ///
         /// # Safety
         ///
-        /// The caller must ensure that the `data` length does not exceed the remaining space in the
-        /// memory region starting from the `offset`.
+        /// The caller must ensure that the `data` length does not exceed the
+        /// remaining space in the memory region starting from the
+        /// `offset`.
         pub unsafe fn write(&mut self, data: &[u8], offset: usize) {
             copy_nonoverlapping(data.as_ptr(), self.ptr.add(offset), data.len());
         }
@@ -802,14 +830,17 @@ mod tests {
         }
     }
 
-    /// Creates an input buffer with a specified number of accounts and instruction data.
+    /// Creates an input buffer with a specified number of accounts and
+    /// instruction data.
     ///
-    /// This function mimics the input buffer created by the SVM loader.  Each account created has
-    /// zeroed data, apart from the `data_len` field, which is set to the index of the account.
+    /// This function mimics the input buffer created by the SVM loader.  Each
+    /// account created has zeroed data, apart from the `data_len` field,
+    /// which is set to the index of the account.
     ///
     /// # Safety
     ///
-    /// The returned `AlignedMemory` should only be used within the test context.
+    /// The returned `AlignedMemory` should only be used within the test
+    /// context.
     unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemory {
         let mut input = AlignedMemory::new(1_000_000_000);
         // Number of accounts.
@@ -842,19 +873,22 @@ mod tests {
         input
     }
 
-    /// Creates an input buffer with a specified number of accounts, including duplicated accounts,
-    /// and instruction data.
+    /// Creates an input buffer with a specified number of accounts, including
+    /// duplicated accounts, and instruction data.
     ///
-    /// This function differs from `create_input` in that it creates accounts with a marker
-    /// indicating that they are duplicated. There will be `accounts - duplicated` unique accounts,
-    /// and the remaining `duplicated` accounts will be duplicates of the last unique account.
+    /// This function differs from `create_input` in that it creates accounts
+    /// with a marker indicating that they are duplicated. There will be
+    /// `accounts - duplicated` unique accounts, and the remaining
+    /// `duplicated` accounts will be duplicates of the last unique account.
     ///
-    /// This function mimics the input buffer created by the SVM loader.  Each account created has
-    /// zeroed data, apart from the `data_len` field, which is set to the index of the account.
+    /// This function mimics the input buffer created by the SVM loader.  Each
+    /// account created has zeroed data, apart from the `data_len` field,
+    /// which is set to the index of the account.
     ///
     /// # Safety
     ///
-    /// The returned `AlignedMemory` should only be used within the test context.
+    /// The returned `AlignedMemory` should only be used within the test
+    /// context.
     unsafe fn create_input_with_duplicates(
         accounts: usize,
         instruction_data: &[u8],
@@ -905,8 +939,8 @@ mod tests {
         input
     }
 
-    /// Asserts that the accounts slice contains the expected number of accounts and that each
-    /// account's data length matches its index.
+    /// Asserts that the accounts slice contains the expected number of accounts
+    /// and that each account's data length matches its index.
     fn assert_accounts(accounts: &[MaybeUninit<AccountView>]) {
         for (i, account) in accounts.iter().enumerate() {
             let account_view = unsafe { account.assume_init_ref() };
@@ -914,8 +948,8 @@ mod tests {
         }
     }
 
-    /// Asserts that the accounts slice contains the expected number of accounts and all accounts
-    /// are duplicated, apart from the first one.
+    /// Asserts that the accounts slice contains the expected number of accounts
+    /// and all accounts are duplicated, apart from the first one.
     fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountView>], duplicated: usize) {
         assert!(accounts.len() > duplicated);
 
@@ -1013,9 +1047,9 @@ mod tests {
         assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
 
-        // Input with 3 (1 + 2 duplicated) accounts but the accounts array has only space for 2. The
-        // assert checks that the second account is a duplicate of the first one and the first one
-        // is unique.
+        // Input with 3 (1 + 2 duplicated) accounts but the accounts array has only
+        // space for 2. The assert checks that the second account is a duplicate
+        // of the first one and the first one is unique.
 
         let mut input = unsafe { create_input_with_duplicates(3, &ix_data, 2) };
         let mut accounts = [UNINIT; 2];
@@ -1028,9 +1062,10 @@ mod tests {
         assert_eq!(&ix_data, parsed_ix_data);
         assert_duplicated_accounts(&accounts[..count], 1);
 
-        // Input with `MAX_TX_ACCOUNTS` accounts (only 32 unique ones) but accounts array has only
-        // space for 64. The assert checks that the first 32 accounts are unique and the rest are
-        // duplicates of the account at index 31.
+        // Input with `MAX_TX_ACCOUNTS` accounts (only 32 unique ones) but accounts
+        // array has only space for 64. The assert checks that the first 32
+        // accounts are unique and the rest are duplicates of the account at
+        // index 31.
 
         let mut input = unsafe {
             create_input_with_duplicates(MAX_TX_ACCOUNTS, &ix_data, MAX_TX_ACCOUNTS - 32)

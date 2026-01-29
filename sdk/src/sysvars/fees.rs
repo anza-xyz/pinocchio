@@ -1,7 +1,9 @@
 //! Calculation of transaction fees.
 
-use super::{clock::DEFAULT_MS_PER_SLOT, Sysvar};
-use crate::impl_sysvar_get;
+use {
+    super::{clock::DEFAULT_MS_PER_SLOT, Sysvar},
+    crate::impl_sysvar_get,
+};
 
 /// Fee calculator for processing transactions
 #[cfg_attr(feature = "copy", derive(Copy))]
@@ -53,8 +55,9 @@ impl Default for FeeRateGovernor {
     fn default() -> Self {
         Self {
             lamports_per_signature: 0,
-            target_lamports_per_signature: DEFAULT_TARGET_LAMPORTS_PER_SIGNATURE, // Example default value
-            target_signatures_per_slot: DEFAULT_TARGET_SIGNATURES_PER_SLOT, // Assuming 400ms per slot
+            target_lamports_per_signature: DEFAULT_TARGET_LAMPORTS_PER_SIGNATURE, /* Example default value */
+            target_signatures_per_slot: DEFAULT_TARGET_SIGNATURES_PER_SLOT, /* Assuming 400ms per
+                                                                             * slot */
             min_lamports_per_signature: 0,
             max_lamports_per_signature: 0,
             burn_percent: DEFAULT_BURN_PERCENT,
@@ -63,7 +66,8 @@ impl Default for FeeRateGovernor {
 }
 
 impl FeeRateGovernor {
-    /// Create a new `FeeCalculator` based on current cluster signature throughput
+    /// Create a new `FeeCalculator` based on current cluster signature
+    /// throughput
     pub fn create_fee_calculator(&self) -> FeeCalculator {
         FeeCalculator::new(self.lamports_per_signature)
     }

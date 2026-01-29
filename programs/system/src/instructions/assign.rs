@@ -29,8 +29,8 @@ impl Assign<'_, '_> {
             [InstructionAccount::writable_signer(self.account.address())];
 
         // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..36]: owner address
+        // - [0..4 ]: instruction discriminator
+        // - [4..36]: owner address
         let mut instruction_data = [0; 36];
         instruction_data[0] = 1;
         instruction_data[4..36].copy_from_slice(self.owner.as_ref());

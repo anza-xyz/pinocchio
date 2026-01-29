@@ -35,8 +35,8 @@ impl Transfer<'_> {
         ];
 
         // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..12]: lamports amount
+        // - [0..4 ]: instruction discriminator
+        // - [4..12]: lamports amount
         let mut instruction_data = [0; 12];
         instruction_data[0] = 2;
         instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());

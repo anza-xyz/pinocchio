@@ -20,24 +20,10 @@ mod thaw_account;
 mod transfer;
 mod transfer_checked;
 
-pub use approve::*;
-pub use approve_checked::*;
-pub use burn::*;
-pub use burn_checked::*;
-pub use close_account::*;
-pub use freeze_account::*;
-pub use initialize_account::*;
-pub use initialize_account_2::*;
-pub use initialize_account_3::*;
-pub use initialize_mint::*;
-pub use initialize_mint_2::*;
-pub use initialize_multisig::*;
-pub use initialize_multisig_2::*;
-pub use mint_to::*;
-pub use mint_to_checked::*;
-pub use revoke::*;
-pub use set_authority::*;
-pub use sync_native::*;
-pub use thaw_account::*;
-pub use transfer::*;
-pub use transfer_checked::*;
+pub use {
+    approve::*, approve_checked::*, burn::*, burn_checked::*, close_account::*, freeze_account::*,
+    initialize_account::*, initialize_account_2::*, initialize_account_3::*, initialize_mint::*,
+    initialize_mint_2::*, initialize_multisig::*, initialize_multisig_2::*, mint_to::*,
+    mint_to_checked::*, revoke::*, set_authority::*, sync_native::*, thaw_account::*, transfer::*,
+    transfer_checked::*,
+};

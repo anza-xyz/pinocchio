@@ -12,16 +12,9 @@ mod transfer_with_seed;
 mod upgrade_nonce_account;
 mod withdraw_nonce_account;
 
-pub use advance_nonce_account::*;
-pub use allocate::*;
-pub use allocate_with_seed::*;
-pub use assign::*;
-pub use assign_with_seed::*;
-pub use authorize_nonce_account::*;
-pub use create_account::*;
-pub use create_account_with_seed::*;
-pub use initialize_nonce_account::*;
-pub use transfer::*;
-pub use transfer_with_seed::*;
-pub use upgrade_nonce_account::*;
-pub use withdraw_nonce_account::*;
+pub use {
+    advance_nonce_account::*, allocate::*, allocate_with_seed::*, assign::*, assign_with_seed::*,
+    authorize_nonce_account::*, create_account::*, create_account_with_seed::*,
+    initialize_nonce_account::*, transfer::*, transfer_with_seed::*, upgrade_nonce_account::*,
+    withdraw_nonce_account::*,
+};

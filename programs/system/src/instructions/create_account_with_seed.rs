@@ -11,8 +11,9 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` Funding account
 ///   1. `[WRITE]` Created account
-///   2. `[SIGNER]` (optional) Base account; the account matching the base address below must be
-///      provided as a signer, but may be the same as the funding account
+///   2. `[SIGNER]` (optional) Base account; the account matching the base
+///      address below must be provided as a signer, but may be the same as the
+///      funding account
 pub struct CreateAccountWithSeed<'a, 'b, 'c> {
     /// Funding account.
     pub from: &'a AccountView,
