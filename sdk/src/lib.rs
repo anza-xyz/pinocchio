@@ -334,12 +334,14 @@ pub mod sysvars;
 // Re-export the `solana_define_syscall` for downstream use.
 #[cfg(any(target_os = "solana", target_arch = "bpf"))]
 pub use solana_define_syscall::definitions as syscalls;
-// Re-export the `solana_program_error` for downstream use.
-pub use solana_program_error as error;
+// Re-export for downstream use:
+//   - `solana_account_view`
+//   - `solana_address`
+//   - `solana_program_error`
 pub use {
     solana_account_view::{self as account, AccountView},
     solana_address::{self as address, Address},
-    solana_program_error::ProgramResult,
+    solana_program_error::{self as error, ProgramResult},
 };
 // Re-export the `solana_instruction_view` for downstream use.
 #[cfg(feature = "cpi")]
