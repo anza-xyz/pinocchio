@@ -1,8 +1,9 @@
-use solana_account_view::{AccountView, Ref};
-use solana_address::Address;
-use solana_program_error::ProgramError;
-
-use crate::ID;
+use {
+    crate::ID,
+    solana_account_view::{AccountView, Ref},
+    solana_address::Address,
+    solana_program_error::ProgramError,
+};
 
 /// Mint data.
 #[repr(C)]
@@ -38,8 +39,8 @@ impl Mint {
 
     /// Return a `Mint` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountView`, safe borrowing
-    /// the account data.
+    /// This method performs owner and length validation on `AccountView`, safe
+    /// borrowing the account data.
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Mint>, ProgramError> {
         if account_view.data_len() != Self::LEN {
@@ -55,13 +56,13 @@ impl Mint {
 
     /// Return a `Mint` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountView`, but does not
-    /// perform the borrow check.
+    /// This method performs owner and length validation on `AccountView`, but
+    /// does not perform the borrow check.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that it is safe to borrow the account data (e.g., there are
-    /// no mutable borrows of the account data).
+    /// The caller must ensure that it is safe to borrow the account data (e.g.,
+    /// there are no mutable borrows of the account data).
     #[inline]
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
@@ -79,9 +80,9 @@ impl Mint {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `bytes` contains a valid representation of `Mint`, and
-    /// it is properly aligned to be interpreted as an instance of `Mint`.
-    /// At the moment `Mint` has an alignment of 1 byte.
+    /// The caller must ensure that `bytes` contains a valid representation of
+    /// `Mint`, and it is properly aligned to be interpreted as an instance
+    /// of `Mint`. At the moment `Mint` has an alignment of 1 byte.
     /// This method does not perform a length validation.
     #[inline(always)]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
@@ -103,8 +104,8 @@ impl Mint {
 
     /// Return the mint authority.
     ///
-    /// This method should be used when the caller knows that the mint will have a mint
-    /// authority set since it skips the `Option` check.
+    /// This method should be used when the caller knows that the mint will have
+    /// a mint authority set since it skips the `Option` check.
     #[inline(always)]
     pub fn mint_authority_unchecked(&self) -> &Address {
         &self.mint_authority
@@ -137,8 +138,8 @@ impl Mint {
 
     /// Return the freeze authority.
     ///
-    /// This method should be used when the caller knows that the mint will have a freeze
-    /// authority set since it skips the `Option` check.
+    /// This method should be used when the caller knows that the mint will have
+    /// a freeze authority set since it skips the `Option` check.
     #[inline(always)]
     pub fn freeze_authority_unchecked(&self) -> &Address {
         &self.freeze_authority

@@ -13,18 +13,18 @@ mod test_raw;
 #[cfg(test)]
 mod test_utils;
 
-use core::{mem, ops::Deref, slice::from_raw_parts};
-
-use crate::{
-    account::{AccountView, Ref},
-    error::ProgramError,
-    hint::unlikely,
-    sysvars::clock::Slot,
-    Address,
-};
-
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, vec::Vec};
+use {
+    crate::{
+        account::{AccountView, Ref},
+        error::ProgramError,
+        hint::unlikely,
+        sysvars::clock::Slot,
+        Address,
+    },
+    core::{mem, ops::Deref, slice::from_raw_parts},
+};
 
 /// `SysvarS1otHashes111111111111111111111111111`
 pub const SLOTHASHES_ID: Address = Address::new_from_array([
@@ -44,7 +44,8 @@ pub const SLOT_SIZE: usize = mem::size_of::<Slot>();
 pub const ENTRY_SIZE: usize = SLOT_SIZE + HASH_BYTES;
 /// Maximum number of slot hash entries that can be stored in the sysvar.
 pub const MAX_ENTRIES: usize = 512;
-/// Max size of the sysvar data in bytes. 20488. Golden on mainnet (never smaller)
+/// Max size of the sysvar data in bytes. 20488. Golden on mainnet (never
+/// smaller)
 pub const MAX_SIZE: usize = NUM_ENTRIES_SIZE + MAX_ENTRIES * ENTRY_SIZE;
 /// A single hash.
 pub type Hash = [u8; HASH_BYTES];
@@ -63,7 +64,8 @@ pub struct SlotHashEntry {
 // Fail compilation if `SlotHashEntry` is not byte-aligned.
 const _: [(); 1] = [(); mem::align_of::<SlotHashEntry>()];
 
-/// `SlotHashes` provides read-only, zero-copy access to `SlotHashes` sysvar bytes.
+/// `SlotHashes` provides read-only, zero-copy access to `SlotHashes` sysvar
+/// bytes.
 #[derive(Debug)]
 pub struct SlotHashes<T: Deref<Target = [u8]>> {
     data: T,
@@ -89,9 +91,9 @@ pub(crate) fn read_entry_count_from_bytes(data: &[u8]) -> Option<usize> {
         return None;
     }
     Some(unsafe {
-        // SAFETY: `data` is guaranteed to be at least `NUM_ENTRIES_SIZE` bytes long by the
-        // preceding length check, so it is sound to read the first 8 bytes and interpret
-        // them as a little-endian `u64`.
+        // SAFETY: `data` is guaranteed to be at least `NUM_ENTRIES_SIZE` bytes long by
+        // the preceding length check, so it is sound to read the first 8 bytes
+        // and interpret them as a little-endian `u64`.
         u64::from_le_bytes(*(data.as_ptr() as *const [u8; NUM_ENTRIES_SIZE]))
     } as usize)
 }
@@ -139,36 +141,41 @@ impl SlotHashEntry {
 }
 
 impl<T: Deref<Target = [u8]>> SlotHashes<T> {
-    /// Creates a `SlotHashes` instance with validation of the entry count and buffer size.
+    /// Creates a `SlotHashes` instance with validation of the entry count and
+    /// buffer size.
     ///
-    /// This constructor validates that the buffer has at least enough bytes to contain
-    /// the declared number of entries. The buffer can be any size above the minimum required,
-    /// making it suitable for both full `MAX_SIZE` buffers and smaller test data.
-    /// Does not validate that entries are sorted in descending order.
+    /// This constructor validates that the buffer has at least enough bytes to
+    /// contain the declared number of entries. The buffer can be any size
+    /// above the minimum required, making it suitable for both full
+    /// `MAX_SIZE` buffers and smaller test data. Does not validate that
+    /// entries are sorted in descending order.
     #[inline(always)]
     pub fn new(data: T) -> Result<Self, ProgramError> {
         parse_and_validate_data(&data)?;
         // SAFETY: `parse_and_validate_data` verifies that the data slice has at least
         // `NUM_ENTRIES_SIZE` bytes for the entry count and enough additional bytes to
-        // contain the declared number of entries, thus upholding all invariants required
-        // by `SlotHashes::new_unchecked`.
+        // contain the declared number of entries, thus upholding all invariants
+        // required by `SlotHashes::new_unchecked`.
         Ok(unsafe { Self::new_unchecked(data) })
     }
 
     /// Creates a `SlotHashes` instance without validation.
     ///
-    /// This is an unsafe constructor that bypasses all validation checks for performance.
-    /// In debug builds, it still runs `parse_and_validate_data` as a sanity check.
+    /// This is an unsafe constructor that bypasses all validation checks for
+    /// performance. In debug builds, it still runs
+    /// `parse_and_validate_data` as a sanity check.
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it does not validate the data size or format.
-    /// The caller must ensure:
-    /// 1. The underlying byte slice in `data` represents valid `SlotHashes` data
-    ///    (length prefix plus entries, where entries are sorted in descending order by slot).
-    /// 2. The data slice has at least `NUM_ENTRIES_SIZE + (declared_entries * ENTRY_SIZE)` bytes.
-    /// 3. The first 8 bytes contain a valid entry count in little-endian format.
-    ///
+    /// This function is unsafe because it does not validate the data size or
+    /// format. The caller must ensure:
+    /// 1. The underlying byte slice in `data` represents valid `SlotHashes`
+    ///    data (length prefix plus entries, where entries are sorted in
+    ///    descending order by slot).
+    /// 2. The data slice has at least `NUM_ENTRIES_SIZE + (declared_entries *
+    ///    ENTRY_SIZE)` bytes.
+    /// 3. The first 8 bytes contain a valid entry count in little-endian
+    ///    format.
     #[inline(always)]
     pub unsafe fn new_unchecked(data: T) -> Self {
         if cfg!(debug_assertions) {
@@ -182,9 +189,9 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// Returns the number of `SlotHashEntry` items accessible.
     #[inline(always)]
     pub fn len(&self) -> usize {
-        // SAFETY: `SlotHashes::new` and `new_unchecked` guarantee that `self.data` has at
-        // least `NUM_ENTRIES_SIZE` bytes, so reading the entry count without additional
-        // checks is safe.
+        // SAFETY: `SlotHashes::new` and `new_unchecked` guarantee that `self.data` has
+        // at least `NUM_ENTRIES_SIZE` bytes, so reading the entry count without
+        // additional checks is safe.
         unsafe { read_entry_count_from_bytes_unchecked(&self.data) }
     }
 
@@ -205,9 +212,10 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     pub fn entries(&self) -> &[SlotHashEntry] {
         unsafe {
             // SAFETY: The slice begins `NUM_ENTRIES_SIZE` bytes into `self.data`, which
-            // is guaranteed by parse_and_validate_data() to have at least `len * ENTRY_SIZE`
-            // additional bytes. The pointer is properly aligned for `SlotHashEntry` (which
-            // a compile-time assertion ensures is alignment 1).
+            // is guaranteed by parse_and_validate_data() to have at least `len *
+            // ENTRY_SIZE` additional bytes. The pointer is properly aligned for
+            // `SlotHashEntry` (which a compile-time assertion ensures is
+            // alignment 1).
             from_raw_parts(
                 self.data.as_ptr().add(NUM_ENTRIES_SIZE) as *const SlotHashEntry,
                 self.len(),
@@ -274,18 +282,22 @@ impl<'a, T: Deref<Target = [u8]>> IntoIterator for &'a SlotHashes<T> {
 }
 
 impl<'a> SlotHashes<Ref<'a, [u8]>> {
-    /// Creates a `SlotHashes` instance by safely borrowing data from an `AccountView`.
+    /// Creates a `SlotHashes` instance by safely borrowing data from an
+    /// `AccountView`.
     ///
     /// This function verifies that:
     /// - The account key matches the `SLOTHASHES_ID`
     /// - The account data can be successfully borrowed
     ///
-    /// Returns a `SlotHashes` instance that borrows the account's data for zero-copy access.
-    /// The returned instance is valid for the lifetime of the borrow.
+    /// Returns a `SlotHashes` instance that borrows the account's data for
+    /// zero-copy access. The returned instance is valid for the lifetime of
+    /// the borrow.
     ///
     /// # Errors
-    /// - `ProgramError::InvalidArgument` if the account key doesn't match the `SlotHashes` sysvar ID
-    /// - `ProgramError::AccountBorrowFailed` if the account data is already mutably borrowed
+    /// - `ProgramError::InvalidArgument` if the account key doesn't match the
+    ///   `SlotHashes` sysvar ID
+    /// - `ProgramError::AccountBorrowFailed` if the account data is already
+    ///   mutably borrowed
     #[inline(always)]
     pub fn from_account_view(account_view: &'a AccountView) -> Result<Self, ProgramError> {
         if unlikely(account_view.address() != &SLOTHASHES_ID) {
@@ -317,7 +329,8 @@ impl SlotHashes<Box<[u8]>> {
         Ok(())
     }
 
-    /// Allocates an optimal buffer for the sysvar data based on available features.
+    /// Allocates an optimal buffer for the sysvar data based on available
+    /// features.
     #[inline(always)]
     fn allocate_and_fetch() -> Result<Box<[u8]>, ProgramError> {
         let mut buf = Vec::with_capacity(MAX_SIZE);

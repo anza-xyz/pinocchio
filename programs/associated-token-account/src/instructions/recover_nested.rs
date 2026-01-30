@@ -1,9 +1,11 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{
-    cpi::{invoke_signed, Signer},
-    InstructionAccount, InstructionView,
+use {
+    solana_account_view::AccountView,
+    solana_instruction_view::{
+        cpi::{invoke_signed, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
 /// Transfers from and closes a nested associated token account: an
 /// associated token account owned by an associated token account.
@@ -25,13 +27,15 @@ use solana_program_error::ProgramResult;
 ///   5. `[WRITE, SIGNER]` Wallet address for the owner associated token account
 ///   6. `[]`  SPL Token program
 pub struct RecoverNested<'a> {
-    /// Nested associated token account, must be owned by `owner_associated_token_account`
+    /// Nested associated token account, must be owned by
+    /// `owner_associated_token_account`
     pub account: &'a AccountView,
     /// Token mint for the nested associated token account
     pub mint: &'a AccountView,
     /// Wallet's associated token account
     pub destination_account: &'a AccountView,
-    /// Owner associated token account address, must be owned by `wallet_account`
+    /// Owner associated token account address, must be owned by
+    /// `wallet_account`
     pub owner_account: &'a AccountView,
     /// Token mint for the owner associated token account
     pub owner_mint: &'a AccountView,

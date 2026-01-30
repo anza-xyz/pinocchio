@@ -1,14 +1,14 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{
-    cpi::{invoke_signed, Signer},
-    InstructionAccount, InstructionView,
+use {
+    crate::{write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{
+        cpi::{invoke_signed, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::ProgramResult,
 };
-use solana_program_error::ProgramResult;
-
-use crate::{write_bytes, UNINIT_BYTE};
 
 /// Transfer Tokens from one Token Account to another.
 ///
@@ -51,9 +51,9 @@ impl TransferChecked<'_, '_> {
         ];
 
         // Instruction data layout:
-        // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..9]: amount (8 bytes, u64)
-        // -  [9]: decimals (1 byte, u8)
+        // - [0]: instruction discriminator (1 byte, u8)
+        // - [1..9]: amount (8 bytes, u64)
+        // - [9]: decimals (1 byte, u8)
         let mut instruction_data = [UNINIT_BYTE; 10];
 
         // Set discriminator as u8 at offset [0]

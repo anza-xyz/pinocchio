@@ -1,9 +1,11 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{
-    cpi::{invoke_signed, Signer},
-    InstructionAccount, InstructionView,
+use {
+    solana_account_view::AccountView,
+    solana_instruction_view::{
+        cpi::{invoke_signed, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
 /// Freeze an initialized account using the Mint's freeze authority.
 ///

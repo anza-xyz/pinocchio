@@ -1,11 +1,10 @@
 //! Provides access to cluster system accounts.
 
-#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
-use core::hint::black_box;
-
 #[cfg(any(target_os = "solana", target_arch = "bpf"))]
 use crate::syscalls::sol_get_sysvar;
 use crate::{error::ProgramError, Address};
+#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+use core::hint::black_box;
 
 pub mod clock;
 pub mod fees;
@@ -13,8 +12,8 @@ pub mod instructions;
 pub mod rent;
 pub mod slot_hashes;
 
-/// Return value indicating that the `offset + length` is greater than the length of
-/// the sysvar data.
+/// Return value indicating that the `offset + length` is greater than the
+/// length of the sysvar data.
 //
 // Defined in the bpf loader as [`OFFSET_LENGTH_EXCEEDS_SYSVAR`](https://github.com/anza-xyz/agave/blob/master/programs/bpf_loader/src/syscalls/sysvar.rs#L172).
 const OFFSET_LENGTH_EXCEEDS_SYSVAR: u64 = 1;

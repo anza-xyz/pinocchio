@@ -1,12 +1,14 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{
-    cpi::{invoke_signed, Signer},
-    InstructionAccount, InstructionView,
+use {
+    solana_account_view::AccountView,
+    solana_instruction_view::{
+        cpi::{invoke_signed, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
-/// Creates an associated token account for the given wallet address and token mint.
-/// Returns an error if the account exists.
+/// Creates an associated token account for the given wallet address and token
+/// mint. Returns an error if the account exists.
 ///
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` Funding account (must be a system account)

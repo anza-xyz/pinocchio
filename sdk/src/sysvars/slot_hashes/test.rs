@@ -1,15 +1,16 @@
-use super::test_utils::*;
-use crate::{
-    account::{AccountView, RuntimeAccount},
-    error::ProgramError,
-    sysvars::{clock::Slot, slot_hashes::*},
+use {
+    super::test_utils::*,
+    crate::{
+        account::{AccountView, RuntimeAccount},
+        error::ProgramError,
+        sysvars::{clock::Slot, slot_hashes::*},
+    },
+    alloc::vec::Vec,
+    core::{
+        mem::{align_of, size_of},
+        ptr,
+    },
 };
-use core::{
-    mem::{align_of, size_of},
-    ptr,
-};
-
-use alloc::vec::Vec;
 
 #[test]
 fn test_layout_constants() {

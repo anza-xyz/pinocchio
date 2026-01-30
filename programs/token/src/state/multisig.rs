@@ -1,10 +1,10 @@
-use core::mem::size_of;
-
-use solana_account_view::{AccountView, Ref};
-use solana_address::Address;
-use solana_program_error::ProgramError;
-
-use crate::{instructions::MAX_MULTISIG_SIGNERS, ID};
+use {
+    crate::{instructions::MAX_MULTISIG_SIGNERS, ID},
+    core::mem::size_of,
+    solana_account_view::{AccountView, Ref},
+    solana_address::Address,
+    solana_program_error::ProgramError,
+};
 
 /// Multisignature data.
 #[repr(C)]
@@ -25,8 +25,8 @@ impl Multisig {
 
     /// Return a `Multisig` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountView`, safe borrowing
-    /// the account data.
+    /// This method performs owner and length validation on `AccountView`, safe
+    /// borrowing the account data.
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Multisig>, ProgramError> {
         if account_view.data_len() != Self::LEN {
@@ -42,13 +42,13 @@ impl Multisig {
 
     /// Return a `Multisig` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountView`, but does not
-    /// perform the borrow check.
+    /// This method performs owner and length validation on `AccountView`, but
+    /// does not perform the borrow check.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that it is safe to borrow the account data (e.g., there are
-    /// no mutable borrows of the account data).
+    /// The caller must ensure that it is safe to borrow the account data (e.g.,
+    /// there are no mutable borrows of the account data).
     #[inline]
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
@@ -66,8 +66,9 @@ impl Multisig {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `bytes` contains a valid representation of `Multisig`, and
-    /// it has the correct length to be interpreted as an instance of `Multisig`.
+    /// The caller must ensure that `bytes` contains a valid representation of
+    /// `Multisig`, and it has the correct length to be interpreted as an
+    /// instance of `Multisig`.
     #[inline(always)]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes.as_ptr() as *const Multisig)
@@ -89,8 +90,9 @@ impl Multisig {
     #[inline(always)]
     pub fn signers(&self) -> &[Address] {
         // SAFETY: `self.signers` is an array of `Address` with a fixed size of
-        // `MAX_MULTISIG_SIGNERS`; `self.signers_len` is always `<= MAX_MULTISIG_SIGNERS`
-        // and indicates how many of these signers are valid.
+        // `MAX_MULTISIG_SIGNERS`; `self.signers_len` is always `<=
+        // MAX_MULTISIG_SIGNERS` and indicates how many of these signers are
+        // valid.
         unsafe { self.signers.get_unchecked(..self.signers_len()) }
     }
 

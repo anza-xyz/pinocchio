@@ -1,6 +1,8 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
-use solana_program_error::ProgramResult;
+use {
+    solana_account_view::AccountView,
+    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
+    solana_program_error::ProgramResult,
+};
 
 /// Given a native token account updates its amount field based
 /// on the account's underlying `lamports`.

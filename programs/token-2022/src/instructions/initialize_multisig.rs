@@ -1,9 +1,10 @@
-use core::{mem::MaybeUninit, slice};
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView};
-use solana_program_error::{ProgramError, ProgramResult};
+use {
+    core::{mem::MaybeUninit, slice},
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView},
+    solana_program_error::{ProgramError, ProgramResult},
+};
 
 /// Maximum number of multisignature signers.
 pub const MAX_MULTISIG_SIGNERS: usize = 11;
@@ -13,8 +14,7 @@ pub const MAX_MULTISIG_SIGNERS: usize = 11;
 /// ### Accounts:
 ///   0. `[writable]` The multisig account to initialize.
 ///   1. `[]` Rent sysvar
-///   2. `..+N` `[]` The `N` signer accounts, where `N` is `1 <=
-///      N <= 11`.
+///   2. `..+N` `[]` The `N` signer accounts, where `N` is `1 <= N <= 11`.
 pub struct InitializeMultisig<'a, 'b, 'c>
 where
     'a: 'b,
@@ -73,8 +73,8 @@ impl InitializeMultisig<'_, '_, '_> {
         }
 
         // Instruction data layout:
-        // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1]: m (1 byte, u8)
+        // - [0]: instruction discriminator (1 byte, u8)
+        // - [1]: m (1 byte, u8)
         let data = &[2, m];
 
         let instruction = InstructionView {

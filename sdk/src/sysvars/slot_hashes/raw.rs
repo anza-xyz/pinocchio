@@ -11,7 +11,8 @@ use super::*;
 /// Validates buffer format for `SlotHashes` data and calculates entry capacity.
 ///
 /// Validates that the buffer follows the correct format:
-/// - If `offset == 0`: Buffer must have `8 + (N × 40)` format (header and entries)
+/// - If `offset == 0`: Buffer must have `8 + (N × 40)` format (header and
+///   entries)
 /// - If `offset != 0`: Buffer must be a multiple of 40 bytes (entries only)
 ///
 /// Does not validate that `offset + buffer_len ≤ MAX_SIZE`; this is checked
@@ -77,7 +78,8 @@ pub fn validate_fetch_offset(offset: usize, buffer_len: usize) -> Result<(), Pro
 /// # Arguments
 ///
 /// * `buffer` - Destination buffer to copy sysvar data into
-/// * `offset` - Byte offset within the `SlotHashes` sysvar data to start copying from
+/// * `offset` - Byte offset within the `SlotHashes` sysvar data to start
+///   copying from
 ///
 /// # Returns
 ///
@@ -107,10 +109,11 @@ pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramErro
 /// Copies `SlotHashes` sysvar bytes into `buffer` **without** validation.
 ///
 /// The caller is responsible for ensuring that:
-/// 1. `buffer` is large enough for the requested `offset + buffer.len()` range and
-///    properly laid out (see `validate_buffer_size` and `validate_fetch_offset`).
-/// 2. `offset + buffer.len()` is not greater than `MAX_SIZE`, or the syscall will
-///    fail.
+/// 1. `buffer` is large enough for the requested `offset + buffer.len()` range
+///    and properly laid out (see `validate_buffer_size` and
+///    `validate_fetch_offset`).
+/// 2. `offset + buffer.len()` is not greater than `MAX_SIZE`, or the syscall
+///    will fail.
 /// 3. The memory behind `buffer` is writable for its full length.
 ///
 /// # Safety

@@ -36,7 +36,8 @@ const MAX_PERMITTED_DATA_LENGTH: u64 = 10 * 1024 * 1024;
 /// - `$3.65` per megabyte year
 #[deprecated(
     since = "0.10.0",
-    note = "The concept of rent no longer exists, only rent-exemption. Use `DEFAULT_LAMPORTS_PER_BYTE` instead"
+    note = "The concept of rent no longer exists, only rent-exemption. Use \
+            `DEFAULT_LAMPORTS_PER_BYTE` instead"
 )]
 pub const DEFAULT_LAMPORTS_PER_BYTE_YEAR: u64 = 1_000_000_000 / 100 * 365 / (1024 * 1024);
 
@@ -142,8 +143,8 @@ impl Rent {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that it is safe to borrow the account data - e.g., there are
-    /// no mutable borrows of the account data.
+    /// The caller must ensure that it is safe to borrow the account data -
+    /// e.g., there are no mutable borrows of the account data.
     #[inline]
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
@@ -156,8 +157,8 @@ impl Rent {
 
     /// Return a `Rent` from the given bytes.
     ///
-    /// This method performs a length and alignment validation. The caller must ensure
-    /// that `bytes` contains a valid representation of `Rent`.
+    /// This method performs a length and alignment validation. The caller must
+    /// ensure that `bytes` contains a valid representation of `Rent`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<&Self, ProgramError> {
         if bytes.len() < size_of::<Self>() {
@@ -175,8 +176,8 @@ impl Rent {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `bytes` contains a valid representation of `Rent` and
-    /// that is has the expected length.
+    /// The caller must ensure that `bytes` contains a valid representation of
+    /// `Rent` and that is has the expected length.
     #[inline]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes.as_ptr() as *const Rent)
@@ -184,8 +185,8 @@ impl Rent {
 
     /// Calculates the minimum balance for rent exemption.
     ///
-    /// This method avoids floating-point operations when the `exemption_threshold`
-    /// is the default value.
+    /// This method avoids floating-point operations when the
+    /// `exemption_threshold` is the default value.
     ///
     /// # Arguments
     ///
@@ -209,8 +210,8 @@ impl Rent {
     /// Calculates the minimum balance for rent exemption without performing
     /// any validation.
     ///
-    /// This method avoids floating-point operations when the `exemption_threshold`
-    /// is the default value.
+    /// This method avoids floating-point operations when the
+    /// `exemption_threshold` is the default value.
     ///
     /// # Important
     ///
@@ -232,8 +233,8 @@ impl Rent {
         // There are two cases where it is possible to avoid floating-point
         // operations:
         //
-        //   1)  exemption threshold is `1.0` (the SIMD-0194 default)
-        //   2)  exemption threshold is `2.0` (the current default)
+        //   1) exemption threshold is `1.0` (the SIMD-0194 default)
+        //   2) exemption threshold is `2.0` (the current default)
         //
         // In all other cases, perform the full calculation using floating-point
         // operations. Note that on BPF targets, floating-point operations are
@@ -255,8 +256,8 @@ impl Rent {
 
     /// Calculates the minimum balance for rent exemption.
     ///
-    /// This method avoids floating-point operations when the `exemption_threshold`
-    /// is the default value.
+    /// This method avoids floating-point operations when the
+    /// `exemption_threshold` is the default value.
     ///
     /// # Arguments
     ///
@@ -268,9 +269,10 @@ impl Rent {
     ///
     /// # Errors
     ///
-    /// Returns `ProgramError::InvalidArgument` if `data_len` exceeds the maximum
-    /// permitted data length or if the `lamports_per_byte` is too large based on
-    /// the `exemption_threshold`, which would cause an overflow.
+    /// Returns `ProgramError::InvalidArgument` if `data_len` exceeds the
+    /// maximum permitted data length or if the `lamports_per_byte` is too
+    /// large based on the `exemption_threshold`, which would cause an
+    /// overflow.
     //
     // Note: Clippy suggests collapsing the `if` statements, but they are kept
     // separate since it is more CU-efficient this way.

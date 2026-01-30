@@ -2,10 +2,12 @@
 //! This module is compiled only when `cfg(test)` is active so `std` can be used
 //! freely while production code remains `#![no_std]`.
 
-use super::*;
-use crate::account::{AccountView, RuntimeAccount};
-use alloc::vec::Vec;
-use core::ptr;
+use {
+    super::*,
+    crate::account::{AccountView, RuntimeAccount},
+    alloc::vec::Vec,
+    core::ptr,
+};
 
 /// Matches the pinocchio Account struct.
 /// Account fields are private, so this struct allows more readable
@@ -84,8 +86,8 @@ pub fn generate_mock_entries(
     entries
 }
 
-/// Build a `Vec<u8>` the size of the *golden* `SlotHashes` sysvar (20 488 bytes)
-/// containing the supplied `entries` and with the `declared_len` header.
+/// Build a `Vec<u8>` the size of the *golden* `SlotHashes` sysvar (20 488
+/// bytes) containing the supplied `entries` and with the `declared_len` header.
 pub fn build_slot_hashes_bytes(declared_len: u64, entries: &[(u64, Hash)]) -> Vec<u8> {
     let mut data = alloc::vec![0u8; MAX_SIZE];
     data[..NUM_ENTRIES_SIZE].copy_from_slice(&declared_len.to_le_bytes());

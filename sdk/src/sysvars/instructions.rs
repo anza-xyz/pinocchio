@@ -1,13 +1,13 @@
-use core::{marker::PhantomData, mem::size_of, ops::Deref};
-
 #[cfg(feature = "cpi")]
 use crate::instruction::InstructionAccount;
-
-use crate::{
-    account::{AccountView, Ref},
-    address::ADDRESS_BYTES,
-    error::ProgramError,
-    Address,
+use {
+    crate::{
+        account::{AccountView, Ref},
+        address::ADDRESS_BYTES,
+        error::ProgramError,
+        Address,
+    },
+    core::{marker::PhantomData, mem::size_of, ops::Deref},
 };
 
 /// Instructions sysvar ID `Sysvar1nstructions1111111111111111111111111`.
@@ -34,13 +34,15 @@ where
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it does not check if the provided data is from the Sysvar Account.
+    /// This function is unsafe because it does not check if the provided data
+    /// is from the Sysvar Account.
     #[inline(always)]
     pub unsafe fn new_unchecked(data: T) -> Self {
         Instructions { data }
     }
 
-    /// Load the number of instructions in the currently executing `Transaction`.
+    /// Load the number of instructions in the currently executing
+    /// `Transaction`.
     #[inline(always)]
     pub fn num_instructions(&self) -> usize {
         // SAFETY: The first 2 bytes of the Instructions sysvar data represents the
@@ -53,18 +55,20 @@ where
     #[inline(always)]
     pub fn load_current_index(&self) -> u16 {
         let len = self.data.len();
-        // SAFETY: The last 2 bytes of the Instructions sysvar data represents the current
-        // instruction index.
+        // SAFETY: The last 2 bytes of the Instructions sysvar data represents the
+        // current instruction index.
         unsafe { u16::from_le_bytes(*(self.data.as_ptr().add(len - 2) as *const [u8; 2])) }
     }
 
-    /// Creates and returns an `IntrospectedInstruction` for the instruction at the specified index.
+    /// Creates and returns an `IntrospectedInstruction` for the instruction at
+    /// the specified index.
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it does not check if the provided index is out of bounds. It is
-    /// typically used internally with the `load_instruction_at` or `get_instruction_relative` functions,
-    /// which perform the necessary index verification.
+    /// This function is unsafe because it does not check if the provided index
+    /// is out of bounds. It is typically used internally with the
+    /// `load_instruction_at` or `get_instruction_relative` functions, which
+    /// perform the necessary index verification.
     #[inline(always)]
     pub unsafe fn deserialize_instruction_unchecked(
         &self,
@@ -78,7 +82,8 @@ where
         IntrospectedInstruction::new_unchecked(self.data.as_ptr().add(offset as usize))
     }
 
-    /// Creates and returns an `IntrospectedInstruction` for the instruction at the specified index.
+    /// Creates and returns an `IntrospectedInstruction` for the instruction at
+    /// the specified index.
     #[inline(always)]
     pub fn load_instruction_at(
         &self,
@@ -92,8 +97,8 @@ where
         Ok(unsafe { self.deserialize_instruction_unchecked(index) })
     }
 
-    /// Creates and returns an `IntrospectedInstruction` relative to the current `Instruction` in the
-    /// currently executing `Transaction.
+    /// Creates and returns an `IntrospectedInstruction` relative to the current
+    /// `Instruction` in the currently executing `Transaction.
     #[inline(always)]
     pub fn get_instruction_relative(
         &self,
@@ -138,11 +143,14 @@ impl IntrospectedInstruction<'_> {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it does not verify anything about the pointer.
+    /// This function is unsafe because it does not verify anything about the
+    /// pointer.
     ///
-    /// It is private and used internally within the `get_instruction_account_at` function, which
-    /// performs the necessary index verification. However, to optimize performance for users
-    /// who are sure that the index is in bounds, we have exposed it as an unsafe function.
+    /// It is private and used internally within the
+    /// `get_instruction_account_at` function, which performs the necessary
+    /// index verification. However, to optimize performance for users
+    /// who are sure that the index is in bounds, we have exposed it as an
+    /// unsafe function.
     #[inline(always)]
     unsafe fn new_unchecked(raw: *const u8) -> Self {
         Self {
@@ -154,7 +162,8 @@ impl IntrospectedInstruction<'_> {
     /// Get the number of accounts of the `Instruction`.
     #[inline(always)]
     pub fn num_account_metas(&self) -> usize {
-        // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
+        // SAFETY: The first 2 bytes represent the number of accounts in the
+        // instruction.
         u16::from_le_bytes(unsafe { *(self.raw as *const [u8; 2]) }) as usize
     }
 
@@ -162,11 +171,13 @@ impl IntrospectedInstruction<'_> {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it does not verify if the index is out of bounds.
+    /// This function is unsafe because it does not verify if the index is out
+    /// of bounds.
     ///
-    /// It is typically used internally within the `get_instruction_account_at` function, which
-    /// performs the necessary index verification. However, to optimize performance for users
-    /// who are sure that the index is in bounds, we have exposed it as an unsafe function.
+    /// It is typically used internally within the `get_instruction_account_at`
+    /// function, which performs the necessary index verification. However,
+    /// to optimize performance for users who are sure that the index is in
+    /// bounds, we have exposed it as an unsafe function.
     #[inline(always)]
     pub unsafe fn get_instruction_account_at_unchecked(
         &self,
@@ -186,7 +197,8 @@ impl IntrospectedInstruction<'_> {
         &self,
         index: usize,
     ) -> Result<&IntrospectedInstructionAccount, ProgramError> {
-        // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
+        // SAFETY: The first 2 bytes represent the number of accounts in the
+        // instruction.
         let num_accounts = self.num_account_metas();
 
         if index >= num_accounts {
@@ -200,7 +212,8 @@ impl IntrospectedInstruction<'_> {
     /// Get the program ID of the `Instruction`.
     #[inline(always)]
     pub fn get_program_id(&self) -> &Address {
-        // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
+        // SAFETY: The first 2 bytes represent the number of accounts in the
+        // instruction.
         let num_accounts = self.num_account_metas();
 
         // SAFETY: The program ID is located after the instruction accounts.
@@ -215,7 +228,8 @@ impl IntrospectedInstruction<'_> {
     /// Get the instruction data of the `Instruction`.
     #[inline(always)]
     pub fn get_instruction_data(&self) -> &[u8] {
-        // SAFETY: The first 2 bytes represent the number of accounts in the instruction.
+        // SAFETY: The first 2 bytes represent the number of accounts in the
+        // instruction.
         let offset =
             self.num_account_metas() * size_of::<IntrospectedInstructionAccount>() + ADDRESS_BYTES;
 

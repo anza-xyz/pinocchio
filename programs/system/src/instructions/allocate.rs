@@ -29,8 +29,8 @@ impl Allocate<'_> {
             [InstructionAccount::writable_signer(self.account.address())];
 
         // instruction data
-        // -  [0..4 ]: instruction discriminator
-        // -  [4..12]: space
+        // - [0..4 ]: instruction discriminator
+        // - [4..12]: space
         let mut instruction_data = [0; 12];
         instruction_data[0] = 8;
         instruction_data[4..12].copy_from_slice(&self.space.to_le_bytes());

@@ -1,10 +1,10 @@
-use core::{mem::MaybeUninit, slice};
-
-use solana_account_view::AccountView;
-use solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView};
-use solana_program_error::{ProgramError, ProgramResult};
-
-use crate::instructions::MAX_MULTISIG_SIGNERS;
+use {
+    crate::instructions::MAX_MULTISIG_SIGNERS,
+    core::{mem::MaybeUninit, slice},
+    solana_account_view::AccountView,
+    solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView},
+    solana_program_error::{ProgramError, ProgramResult},
+};
 
 /// Initialize a new Multisig.
 ///
@@ -60,8 +60,8 @@ impl InitializeMultisig2<'_, '_> {
         }
 
         // Instruction data layout:
-        // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1]: m (1 byte, u8)
+        // - [0]: instruction discriminator (1 byte, u8)
+        // - [1]: m (1 byte, u8)
         let data = &[19, m];
 
         let instruction = InstructionView {

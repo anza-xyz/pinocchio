@@ -1,8 +1,9 @@
-use solana_account_view::{AccountView, Ref};
-use solana_address::Address;
-use solana_program_error::ProgramError;
-
-use crate::{state::AccountState, ID};
+use {
+    crate::{state::AccountState, ID},
+    solana_account_view::{AccountView, Ref},
+    solana_address::Address,
+    solana_program_error::ProgramError,
+};
 
 /// Token account data.
 #[repr(C)]
@@ -30,9 +31,9 @@ pub struct TokenAccount {
     is_native: [u8; 4],
 
     /// When `is_native.is_some()` is `true`, this is a native token, and the
-    /// value logs the rent-exempt reserve. An Account is required to be rent-exempt,
-    /// so the value is used by the Processor to ensure that wrapped SOL
-    /// accounts do not drop below this threshold.
+    /// value logs the rent-exempt reserve. An Account is required to be
+    /// rent-exempt, so the value is used by the Processor to ensure that
+    /// wrapped SOL accounts do not drop below this threshold.
     native_amount: [u8; 8],
 
     /// The amount delegated.
@@ -50,8 +51,8 @@ impl TokenAccount {
 
     /// Return a `TokenAccount` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountView`, safe borrowing
-    /// the account data.
+    /// This method performs owner and length validation on `AccountView`, safe
+    /// borrowing the account data.
     #[inline]
     pub fn from_account_view(
         account_view: &AccountView,
@@ -69,13 +70,13 @@ impl TokenAccount {
 
     /// Return a `TokenAccount` from the given account view.
     ///
-    /// This method performs owner and length validation on `AccountView`, but does not
-    /// perform the borrow check.
+    /// This method performs owner and length validation on `AccountView`, but
+    /// does not perform the borrow check.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that it is safe to borrow the account data (e.g., there are
-    /// no mutable borrows of the account data).
+    /// The caller must ensure that it is safe to borrow the account data (e.g.,
+    /// there are no mutable borrows of the account data).
     #[inline]
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
@@ -93,10 +94,11 @@ impl TokenAccount {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `bytes` contains a valid representation of `TokenAccount`, and
-    /// it is properly aligned to be interpreted as an instance of `TokenAccount`.
-    /// At the moment `TokenAccount` has an alignment of 1 byte.
-    /// This method does not perform a length validation.
+    /// The caller must ensure that `bytes` contains a valid representation of
+    /// `TokenAccount`, and it is properly aligned to be interpreted as an
+    /// instance of `TokenAccount`. At the moment `TokenAccount` has an
+    /// alignment of 1 byte. This method does not perform a length
+    /// validation.
     #[inline(always)]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes.as_ptr() as *const TokenAccount)
@@ -127,7 +129,8 @@ impl TokenAccount {
         }
     }
 
-    /// Use this when you know the account will have a delegate and want to skip the `Option` check.
+    /// Use this when you know the account will have a delegate and want to skip
+    /// the `Option` check.
     #[inline(always)]
     pub fn delegate_unchecked(&self) -> &Address {
         &self.delegate
@@ -153,8 +156,8 @@ impl TokenAccount {
 
     /// Return the native amount.
     ///
-    /// This method should be used when the caller knows that the token is native since it
-    /// skips the `Option` check.
+    /// This method should be used when the caller knows that the token is
+    /// native since it skips the `Option` check.
     #[inline(always)]
     pub fn native_amount_unchecked(&self) -> u64 {
         u64::from_le_bytes(self.native_amount)
@@ -179,8 +182,8 @@ impl TokenAccount {
 
     /// Return the close authority.
     ///
-    /// This method should be used when the caller knows that the token will have a close
-    /// authority set since it skips the `Option` check.
+    /// This method should be used when the caller knows that the token will
+    /// have a close authority set since it skips the `Option` check.
     #[inline(always)]
     pub fn close_authority_unchecked(&self) -> &Address {
         &self.close_authority

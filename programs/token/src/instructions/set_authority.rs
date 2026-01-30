@@ -1,14 +1,14 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{
-    cpi::{invoke_signed, Signer},
-    InstructionAccount, InstructionView,
+use {
+    crate::{write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{
+        cpi::{invoke_signed, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::ProgramResult,
 };
-use solana_program_error::ProgramResult;
-
-use crate::{write_bytes, UNINIT_BYTE};
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
@@ -50,10 +50,10 @@ impl SetAuthority<'_> {
         ];
 
         // instruction data
-        // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1]: authority_type (1 byte, u8)
-        // -  [2]: new_authority presence flag (1 byte, AuthorityType)
-        // -  [3..35] new_authority (optional, 32 bytes, Address)
+        // - [0]: instruction discriminator (1 byte, u8)
+        // - [1]: authority_type (1 byte, u8)
+        // - [2]: new_authority presence flag (1 byte, AuthorityType)
+        // - [3..35] new_authority (optional, 32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 35];
         let mut length = instruction_data.len();
 

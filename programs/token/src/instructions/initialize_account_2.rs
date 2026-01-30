@@ -1,11 +1,11 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
-use solana_program_error::ProgramResult;
-
-use crate::{write_bytes, UNINIT_BYTE};
+use {
+    crate::{write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
+    solana_program_error::ProgramResult,
+};
 
 /// Initialize a new Token Account.
 ///
@@ -35,8 +35,8 @@ impl InitializeAccount2<'_> {
         ];
 
         // instruction data
-        // -  [0]: instruction discriminator (1 byte, u8)
-        // -  [1..33]: owner (32 bytes, Address)
+        // - [0]: instruction discriminator (1 byte, u8)
+        // - [1..33]: owner (32 bytes, Address)
         let mut instruction_data = [UNINIT_BYTE; 33];
 
         // Set discriminator as u8 at offset [0]

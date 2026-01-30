@@ -66,17 +66,20 @@ pub struct Clock {
     pub unix_timestamp: UnixTimestamp,
 }
 
-/// At 160 ticks/s, 64 ticks per slot implies that leader rotation and voting will happen
-/// every 400 ms. A fast voting cadence ensures faster finality and convergence
+/// At 160 ticks/s, 64 ticks per slot implies that leader rotation and voting
+/// will happen every 400 ms. A fast voting cadence ensures faster finality and
+/// convergence
 pub const DEFAULT_TICKS_PER_SLOT: u64 = 64;
 
 /// The default tick rate that the cluster attempts to achieve (160 per second).
 ///
-/// Note that the actual tick rate at any given time should be expected to drift.
+/// Note that the actual tick rate at any given time should be expected to
+/// drift.
 pub const DEFAULT_TICKS_PER_SECOND: u64 = 160;
 
 /// The expected duration of a slot (400 milliseconds).
-// Actually calculation is supposed to be derived DEFAULT_TICKS_PER_SLOT / DEFAULT_TICKS_PER_SECOND
+// Actually calculation is supposed to be derived DEFAULT_TICKS_PER_SLOT /
+// DEFAULT_TICKS_PER_SECOND
 pub const DEFAULT_MS_PER_SLOT: u64 = 1_000 * DEFAULT_TICKS_PER_SLOT / DEFAULT_TICKS_PER_SECOND;
 
 impl Sysvar for Clock {
@@ -107,8 +110,8 @@ impl Clock {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that it is safe to borrow the account data - e.g., there are
-    /// no mutable borrows of the account data.
+    /// The caller must ensure that it is safe to borrow the account data -
+    /// e.g., there are no mutable borrows of the account data.
     #[inline]
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
@@ -121,8 +124,8 @@ impl Clock {
 
     /// Return a `Clock` from the given bytes.
     ///
-    /// This method performs a length validation. The caller must ensure that `bytes` contains
-    /// a valid representation of `Clock`.
+    /// This method performs a length validation. The caller must ensure that
+    /// `bytes` contains a valid representation of `Clock`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<&Self, ProgramError> {
         if bytes.len() < Self::LEN {
@@ -137,8 +140,8 @@ impl Clock {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that `bytes` contains a valid representation of `Clock` and
-    /// that is has the expected length.
+    /// The caller must ensure that `bytes` contains a valid representation of
+    /// `Clock` and that is has the expected length.
     #[inline]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes.as_ptr() as *const Clock)
