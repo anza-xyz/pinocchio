@@ -2,7 +2,7 @@ use solana_account_view::{AccountView, Ref};
 use solana_address::Address;
 use solana_program_error::ProgramError;
 
-use super::AccountState;
+use super::{AccountState, AccountType, Multisig};
 
 use crate::ID;
 
@@ -58,13 +58,24 @@ impl TokenAccount {
     pub fn from_account_view(
         account_view: &AccountView,
     ) -> Result<Ref<TokenAccount>, ProgramError> {
-        if account_view.data_len() < Self::BASE_LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
+        let data = account_view.try_borrow()?;
+        match account_view.data_len() {
+            len if len == Self::BASE_LEN => Ok(()),
+            len if len == Multisig::LEN => Err(ProgramError::InvalidAccountData),
+            len if len > TokenAccount::BASE_LEN => {
+                let b = data[TokenAccount::BASE_LEN];
+                if b == AccountType::TokenAccount.into() || b == AccountType::Uninitialized.into() {
+                    Ok(())
+                } else {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+            }
+            _ => Err(ProgramError::InvalidAccountData),
+        }?;
         if !account_view.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
+        Ok(Ref::map(data, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -82,13 +93,24 @@ impl TokenAccount {
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
     ) -> Result<&TokenAccount, ProgramError> {
-        if account_view.data_len() < Self::BASE_LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
+        let data = account_view.borrow_unchecked();
+        match account_view.data_len() {
+            len if len == Self::BASE_LEN => Ok(()),
+            len if len == Multisig::LEN => Err(ProgramError::InvalidAccountData),
+            len if len > TokenAccount::BASE_LEN => {
+                let b = data[TokenAccount::BASE_LEN];
+                if b == AccountType::TokenAccount.into() || b == AccountType::Uninitialized.into() {
+                    Ok(())
+                } else {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+            }
+            _ => Err(ProgramError::InvalidAccountData),
+        }?;
         if account_view.owner() != &ID {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
+        Ok(Self::from_bytes_unchecked(data))
     }
 
     /// Return a `TokenAccount` from the given bytes.
