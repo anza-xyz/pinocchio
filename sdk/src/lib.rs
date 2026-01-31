@@ -327,6 +327,7 @@
 extern crate alloc;
 
 pub mod entrypoint;
+pub mod syscall_helpers;
 pub mod sysvars;
 
 // Re-export the `solana_account_view` for downstream use.
