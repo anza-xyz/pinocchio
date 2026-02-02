@@ -349,14 +349,14 @@ pub use {solana_instruction_view as instruction, solana_instruction_view::cpi};
 
 /// Maximum number of accounts that a transaction may process.
 ///
-/// This value is set to `u8::MAX - 1`, which is the theoretical maximum
+/// This value is set to `u8::MAX`, which is the theoretical maximum
 /// number of accounts that a transaction can process given that indices
 /// of accounts are represented by an `u8` value and the last
 /// value (`255`) is reserved to indicate non-duplicated accounts.
 ///
 /// The `MAX_TX_ACCOUNTS` is used to statically initialize the array of
 /// `AccountView`s when parsing accounts in an instruction.
-pub const MAX_TX_ACCOUNTS: usize = (u8::MAX - 1) as usize;
+pub const MAX_TX_ACCOUNTS: usize = u8::MAX as usize;
 
 /// `assert_eq(core::mem::align_of::<u128>(), 8)` is true for BPF but not
 /// for some host machines.
