@@ -329,8 +329,6 @@ extern crate alloc;
 pub mod entrypoint;
 pub mod sysvars;
 
-// Re-export the `solana_account_view` for downstream use.
-// Re-export the `solana_address` for downstream use.
 // Re-export the `solana_define_syscall` for downstream use.
 #[cfg(any(target_os = "solana", target_arch = "bpf"))]
 pub use solana_define_syscall::definitions as syscalls;
