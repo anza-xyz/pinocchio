@@ -1,5 +1,59 @@
 //! Macros and functions for defining the program entrypoint and setting up
 //! global handlers.
+//!
+//! When an instruction is directed at an executable program, the loader configures the program's
+//! execution environment, serializes the program's input parameters, invokes the program's entrypoint,
+//! and reports any errors encountered. The input parameters are serialized into a byte array and
+//! passed to the program's entrypoint. Each program is responsible for deserializing these parameters
+//! on-chain.
+//!
+//! The input parameters are serialized as follows (all encoding is little endian):
+//!
+//!```text
+//! ┌─ 8 bytes unsigned (u64): number of accounts
+//! │
+//! ├─ For each account:
+//! |   |
+//! │   ├─ 1 byte: indicating if this is a duplicate account, if not a duplicate then
+//! │   │          the value is 0xFF, otherwise the value is the index of the account
+//! │   │          it is a duplicate of.
+//! |   │
+//! │   ├─ If the account is a duplicate:
+//! |   |     |
+//! │   │     └─ 7 bytes of padding
+//! |   │
+//! │   └─ If the account is not a duplicate:
+//! |         |
+//! │         ├─ 1 byte boolean, true if account is a signer
+//! |         |
+//! │         ├─ 1 byte boolean, true if account is writable
+//! |         |
+//! |         ├─ 1 byte boolean, true if account is executable
+//! |         |
+//! │         ├─ 4 bytes of padding (account data length should be stored here)
+//! |         |
+//! │         ├─ 32 bytes: address of the account
+//! |         |
+//! │         ├─ 32 bytes: address of the program account owner
+//! |         |
+//! │         ├─ 8 bytes unsigned (u64): lamports held by the account
+//! |         |
+//! │         ├─ 8 bytes unsigned (u64): number of bytes of account data
+//! |         |
+//! │         ├─ <variable> bytes of account data
+//! |         |
+//! │         ├─ 10240 bytes of padding (used for resize)
+//! |         |
+//! │         ├─ <variable> bytes to align the offset to 8 bytes
+//! |         |
+//! │         └─ 8 bytes unsigned (u64): rent epoch of the account (not used)
+//! │
+//! ├─ 8 bytes unsigned (u64): number of bytes of instruction data
+//! │
+//! ├─ <variable> bytes of instruction data
+//! │
+//! └─ 32 bytes: address of the program account
+//! ```
 
 pub mod lazy;
 
@@ -273,6 +327,12 @@ macro_rules! process_n_accounts {
         if (*account).borrow_state != NON_DUP_MARKER {
             clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
+            #[cfg(feature = "resize")]
+            {
+                // Stores the data length as original data length. This is needed
+                // to handle account resizing.
+                (*account).padding = (*account).data_len as u32;
+            }
             $accounts.write(AccountView::new_unchecked(account));
             advance_input_with_account!($input, account);
         }
@@ -365,6 +425,12 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         // The first account is always non-duplicated, so process
         // it directly as such.
         let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
+        #[cfg(feature = "resize")]
+        {
+            // Stores the data length as original data length. This is needed
+            // to handle account resizing.
+            (*account).padding = (*account).data_len as u32;
+        }
         accounts.write(AccountView::new_unchecked(account));
 
         input = input.add(size_of::<u64>());
