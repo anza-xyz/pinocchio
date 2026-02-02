@@ -1,4 +1,5 @@
 name: Setup environment
+description: "Installs Rust toolchains, Solana, and Cargo components"
 
 inputs:
   cargo-cache-key:
@@ -17,22 +18,17 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v3
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'pnpm'
-
-    - name: Install Dependencies
-      run: pnpm install --frozen-lockfile
-      shell: bash
-
     - name: Set Environment Variables
       shell: bash
-      run: pnpm tsx ./scripts/setup/ci.mts
+      run: |
+        set -o allexport
+        source .github/toolchains.env
+        set +o allexport
+        echo "SOLANA_VERSION=$SOLANA_VERSION" >> $GITHUB_ENV
+        echo "TOOLCHAIN_BUILD=$TOOLCHAIN_BUILD" >> $GITHUB_ENV
+        echo "TOOLCHAIN_FORMAT=$TOOLCHAIN_FORMAT" >> $GITHUB_ENV
+        echo "TOOLCHAIN_LINT=$TOOLCHAIN_LINT" >> $GITHUB_ENV
+        echo "TOOLCHAIN_TEST=$TOOLCHAIN_TEST" >> $GITHUB_ENV
 
     - name: Install Rust 'build' Toolchain
       if: ${{ contains(inputs.toolchain, 'build') }}
@@ -115,3 +111,8 @@ runs:
           ~/.cargo/git/db/
           target/
         key: ${{ runner.os }}-${{ inputs.cargo-cache-key }}-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Install 'just'
+      uses: taiki-e/install-action@v2
+      with:
+        tool: just
