@@ -33,10 +33,11 @@ pub const MAX_HEAP_LENGTH: u32 = 256 * 1024;
 /// Value used to indicate that a serialized account is not a duplicate.
 pub const NON_DUP_MARKER: u8 = u8::MAX;
 
-/// The "static" size of an account in the input buffer.
+/// The "static" size of an account in the input buffer, less rent epoch field.
 ///
 /// This is the size of the account header plus the maximum permitted data
-/// increase.
+/// increase, accounting for static length before the variable-length data,
+/// which is followed by the rent epoch field.
 const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
