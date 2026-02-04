@@ -77,7 +77,7 @@ jobs:
 
       - name: Check semver
         run: |
-          pnpm semver ${{ inputs.crate }}
+          just semver ${{ inputs.crate }}
 
 
   publish_release:
@@ -104,10 +104,10 @@ jobs:
           solana: true
 
       - name: Build
-        run: pnpm build-sbf ${{ inputs.crate }}
+        run: just build-sbf ${{ inputs.crate }}
 
       - name: Test
-        run: pnpm test ${{ inputs.crate }}
+        run: just test ${{ inputs.crate }}
 
       - name: Set Git Author
         run: |
@@ -134,7 +134,7 @@ jobs:
             OPTIONS=""
           fi
 
-          pnpm tsx ./scripts/publish.mts ${{ inputs.crate }} $LEVEL $OPTIONS
+          just publish "${{ inputs.crate }}" "$LEVEL" $OPTIONS
 
       - name: Generate a changelog
         if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
