@@ -106,7 +106,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let expected_accounts = 3 + signers.len() + self.sources.len();
+        let expected_accounts = 3 + self.signers.len() + self.sources.len();
 
         if expected_accounts > MAX_STATIC_CPI_ACCOUNTS {
             return Err(ProgramError::InvalidArgument);
