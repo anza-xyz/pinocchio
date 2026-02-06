@@ -1,7 +1,6 @@
 use {
     crate::{
         instructions::{extensions::ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-        instructions::{extensions::ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
         write_bytes, UNINIT_BYTE,
     },
     core::{
@@ -41,10 +40,10 @@ pub struct UpdateTransferHook<'a, 'b, 'c> {
     pub signers: &'c [&'a AccountView],
 
     /// Program that authorizes the transfer.
-    pub transfer_hook_program_id: Option<&'b Address>,
+    pub transfer_hook_program: Option<&'b Address>,
 
     /// The token program.
-    pub token_program_id: &'b Address,
+    pub token_program: &'b Address,
 }
 
 impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
@@ -54,17 +53,17 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
     /// with a single owner/delegate authority.
     #[inline(always)]
     pub fn new(
-        token_program_id: &'b Address,
+        token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
-        transfer_hook_program_id: Option<&'b Address>,
+        transfer_hook_program: Option<&'b Address>,
     ) -> Self {
         Self {
             mint,
             authority,
             signers: &[],
-            transfer_hook_program_id,
-            token_program_id,
+            transfer_hook_program,
+            token_program,
         }
     }
 
@@ -72,18 +71,18 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
     /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig(
-        token_program_id: &'b Address,
+        token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
-        transfer_hook_program_id: Option<&'b Address>,
+        transfer_hook_program: Option<&'b Address>,
         signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
             mint,
             authority,
             signers,
-            transfer_hook_program_id,
-            token_program_id,
+            transfer_hook_program,
+            token_program,
         }
     }
 
@@ -145,7 +144,7 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
         // transfer_hook_program_id
         write_bytes(
             &mut instruction_data[2..34],
-            if let Some(program_id) = self.transfer_hook_program_id {
+            if let Some(program_id) = self.transfer_hook_program {
                 program_id.as_ref()
             } else {
                 &[0; 32]
@@ -155,7 +154,7 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
         //Instruction.
 
         let instruction = InstructionView {
-            program_id: self.token_program_id,
+            program_id: self.token_program,
             accounts: unsafe {
                 from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
             },
