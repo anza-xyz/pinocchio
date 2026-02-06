@@ -10,6 +10,7 @@ pub mod pausable;
 pub mod permanent_delegate;
 pub mod permissioned_burn;
 pub mod scaled_ui_amount;
+pub mod transfer_fee;
 pub mod transfer_hook;
 
 #[repr(u8)]
@@ -17,6 +18,8 @@ pub mod transfer_hook;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExtensionDiscriminator {
     MintCloseAuthority = 25,
+    TransferFee = 26,
+
     DefaultAccountState = 28,
     MemoTransfer = 30,
     InterestBearingMint = 33,
