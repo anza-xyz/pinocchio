@@ -1,2 +1,3 @@
-pub mod initialize;
+mod initialize;
+
 pub use initialize::*;

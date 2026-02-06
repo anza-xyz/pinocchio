@@ -19,14 +19,13 @@ use {
 /// Accounts expected by this instruction:
 ///
 ///   0. `[writable]` The mint to initialize.
-///
-/// Data expected by this instruction:
-///   Pubkey for the permanent delegate
 pub struct InitializePermanentDelegate<'a, 'b> {
-    /// The mint to initialize the permanent delegate
+    /// The mint to initialize.
     pub mint: &'a AccountView,
-    /// The public key for the account that can close the mint
+
+    /// Authority that may sign for `Transfer`s and `Burn`s on any account.
     pub delegate: &'b Address,
+
     /// Token Program
     pub token_program: &'b Address,
 }
@@ -34,24 +33,29 @@ pub struct InitializePermanentDelegate<'a, 'b> {
 impl InitializePermanentDelegate<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let accounts = [InstructionAccount::writable(self.mint.address())];
+        // Instruction data.
 
-        let mut data = [UNINIT_BYTE; 33];
+        let mut instruction_data = [UNINIT_BYTE; 33];
 
-        // write discriminator at index 1
-        write_bytes(
-            &mut data[..1],
-            &[ExtensionDiscriminator::PermanentDelegate as u8],
-        );
+        unsafe {
+            // discriminator
+            instruction_data
+                .get_unchecked_mut(0)
+                .write(ExtensionDiscriminator::PermanentDelegate as u8);
 
-        // write delegate address bytes at offset [1..33]
-        write_bytes(&mut data[1..33], self.delegate.to_bytes().as_ref());
+            // delegate
+            write_bytes(
+                instruction_data.get_unchecked_mut(1..33),
+                self.delegate.as_ref(),
+            );
+        }
 
-        // ix
+        // Instruction.
+
         let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &accounts,
-            data: unsafe { from_raw_parts(data.as_ptr() as _, data.len()) },
+            accounts: &[InstructionAccount::writable(self.mint.address())],
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
         };
 
         invoke(&instruction, &[self.mint])
