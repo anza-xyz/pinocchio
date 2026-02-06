@@ -98,7 +98,7 @@ impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
 
         // Instruction.
 
-        let expected_accounts = 4 + signers.len();
+        let expected_accounts = 4 + self.signers.len();
 
         let instruction = InstructionView {
             program_id: self.token_program_id,

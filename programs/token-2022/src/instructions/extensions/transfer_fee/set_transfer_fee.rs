@@ -134,7 +134,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
 
         // Instruction.
 
-        let expected_accounts = 2 + signers.len();
+        let expected_accounts = 2 + self.signers.len();
 
         let instruction = InstructionView {
             program_id: self.token_program_id,
