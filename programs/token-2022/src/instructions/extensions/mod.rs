@@ -12,6 +12,7 @@ pub mod permissioned_burn;
 pub mod scaled_ui_amount;
 pub mod transfer_fee;
 pub mod transfer_hook;
+pub mod metadata;
 
 #[repr(u8)]
 #[non_exhaustive]
