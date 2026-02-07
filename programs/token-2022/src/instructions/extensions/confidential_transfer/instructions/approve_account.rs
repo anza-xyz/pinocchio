@@ -36,10 +36,12 @@ pub struct ApproveAccount<'a> {
 impl ApproveAccount<'_> {
     const DISCRIMINATOR: u8 = 3;
 
+    #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
+    #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         let instruction_accounts = [
             InstructionAccount::writable(self.token_account.address()),
