@@ -37,18 +37,16 @@ use {
 /// 0. `[writable]` The SPL Token account
 /// 1. `[]` The corresponding SPL Token mint.
 /// 2. `[]` Instruction sysvar if `VerifyPubkeyValidity` is included in the same
-///    transaction or context state account if
-///    `VerifyPubkeyValidity` is pre-verified into a context state
-///    account.
+///    transaction or context state account if `VerifyPubkeyValidity` is
+///    pre-verified into a context state account.
 /// 3. `[signer]` The single source account owner.
 ///
 /// * Multisignature owner/delegate
 /// 0. `[writable]` The SPL Token account
 /// 1. `[]` The corresponding SPL Token mint.
 /// 2. `[]` Instruction sysvar if `VerifyPubkeyValidity` is included in the same
-///    transaction or context state account if
-///    `VerifyPubkeyValidity` is pre-verified into a context state
-///    account.
+///    transaction or context state account if `VerifyPubkeyValidity` is
+///    pre-verified into a context state account.
 /// 3. `[]` The multisig source account owner.
 /// 4. ..`[signer]` Required M signer accounts for the SPL Token Multisig
 ///    account.
@@ -187,7 +185,9 @@ impl ConfigureAccount<'_, '_, '_> {
             accounts.get_unchecked_mut(1).write(self.mint);
 
             // instruction sysvar
-            accounts.get_unchecked_mut(1).write(self.instruction_sysvar_or_context_state);
+            accounts
+                .get_unchecked_mut(1)
+                .write(self.instruction_sysvar_or_context_state);
 
             // authority
             accounts.get_unchecked_mut(2).write(self.authority);
