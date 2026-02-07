@@ -3,11 +3,21 @@
 pub mod instructions;
 pub mod state;
 
-use core::mem::MaybeUninit;
+use {
+    core::mem::MaybeUninit, solana_account_view::AccountView,
+    solana_instruction_view::InstructionAccount,
+};
 
 solana_address::declare_id!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
+const AE_CIPHERTEXT_LEN: usize = 36;
+
 const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
+
+const UNINIT_ACCOUNT_REF: MaybeUninit<&AccountView> = MaybeUninit::<&AccountView>::uninit();
+
+const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
+    MaybeUninit::<InstructionAccount>::uninit();
 
 #[inline(always)]
 fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
