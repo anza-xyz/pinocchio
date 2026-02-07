@@ -1,33 +1,34 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
-use solana_program_error::ProgramResult;
-
-use crate::{UNINIT_BYTE, instructions::ExtensionDiscriminator, write_bytes};
+use {
+    crate::{instructions::ExtensionDiscriminator, write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
+    solana_program_error::ProgramResult,
+};
 
 //extensions::ExtensionDiscriminator, write_bytes, UNINIT_BYTE};
 
 /// Initialize confidential transfers for a mint
 ///
-/// The instruction requires no signers and MUST be included within the same Transaction
-/// as `instructions::initialize_mint`. Otherwise another party can initialize the configuration.
+/// The instruction requires no signers and MUST be included within the same
+/// Transaction as `instructions::initialize_mint`. Otherwise another party can
+/// initialize the configuration.
 ///
 /// The instruction fails if the `instructions::initialize_mint`
 /// instruction has already executed for the mint.
 ///
 /// Accounts expected by this instruction:
 ///
-///     0. `[writable]` The SPL Token mint.
-///
+/// 0. `[writable]` The SPL Token mint.
 pub struct InitializeMint<'a, 'data> {
     /// Token program to invoke
     pub token_program: &'a Address,
     /// Token Mint account
     pub mint: &'a AccountView,
     /// Data required by the instruction
-    /// Authority to modify the confidential mint configuration, and to approve new account
+    /// Authority to modify the confidential mint configuration, and to approve
+    /// new account
     pub authority: Option<&'data Address>,
     /// New authority to decode any transfer amount in a confidential transfer.
     pub auditor_elgamal_pubkey: Option<&'data Address>,

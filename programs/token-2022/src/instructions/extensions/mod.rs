@@ -1,5 +1,5 @@
-pub mod memo_transfer;
 pub mod confidential_transfer;
+pub mod memo_transfer;
 
 #[repr(u8)]
 #[non_exhaustive]
