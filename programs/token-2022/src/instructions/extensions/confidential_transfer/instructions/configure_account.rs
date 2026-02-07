@@ -37,14 +37,18 @@ use {
 /// 0. `[writable]` The SPL Token account
 /// 1. `[]` The corresponding SPL Token mint.
 /// 2. `[]` Instruction sysvar if `VerifyPubkeyValidity` is included in the same
-///    transaction.
+///    transaction or context state account if
+///    `VerifyPubkeyValidity` is pre-verified into a context state
+///    account.
 /// 3. `[signer]` The single source account owner.
 ///
 /// * Multisignature owner/delegate
 /// 0. `[writable]` The SPL Token account
 /// 1. `[]` The corresponding SPL Token mint.
 /// 2. `[]` Instruction sysvar if `VerifyPubkeyValidity` is included in the same
-///    transaction.
+///    transaction or context state account if
+///    `VerifyPubkeyValidity` is pre-verified into a context state
+///    account.
 /// 3. `[]` The multisig source account owner.
 /// 4. ..`[signer]` Required M signer accounts for the SPL Token Multisig
 ///    account.
@@ -54,7 +58,7 @@ pub struct ConfigureAccount<'a, 'b, 'data> {
     /// The Token mint.
     pub mint: &'a AccountView,
     /// Instruction sysvar
-    pub instruction_sysvar: &'a AccountView,
+    pub instruction_sysvar_or_context_state: &'a AccountView,
     /// The owner of the token account.
     pub authority: &'a AccountView,
     /// The signers if the authority is a multisig.
@@ -70,6 +74,7 @@ pub struct ConfigureAccount<'a, 'b, 'data> {
     /// The decrypt-able balance (always 0) once the configure account succeeds
     pub decryptable_zero_balance: &'data [u8; AE_CIPHERTEXT_LEN],
     /// Proof instruction offset
+    /// provide 0 to use context state account
     pub proof_instruction_offset: i8,
 }
 
@@ -102,11 +107,11 @@ impl ConfigureAccount<'_, '_, '_> {
                 .get_unchecked_mut(1)
                 .write(InstructionAccount::readonly(self.mint.address()));
 
-            // instruction sysvar
+            // instruction sysvar or context state account
             instruction_accounts
                 .get_unchecked_mut(2)
                 .write(InstructionAccount::readonly(
-                    self.instruction_sysvar.address(),
+                    self.instruction_sysvar_or_context_state.address(),
                 ));
 
             // owner/delegate
@@ -182,7 +187,7 @@ impl ConfigureAccount<'_, '_, '_> {
             accounts.get_unchecked_mut(1).write(self.mint);
 
             // instruction sysvar
-            accounts.get_unchecked_mut(1).write(self.instruction_sysvar);
+            accounts.get_unchecked_mut(1).write(self.instruction_sysvar_or_context_state);
 
             // authority
             accounts.get_unchecked_mut(2).write(self.authority);
