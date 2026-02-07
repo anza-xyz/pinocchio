@@ -9,17 +9,27 @@ use {
 
 /// Initialize a new mint with a group member pointer
 ///
+/// Fails if the mint has already been initialized, so must be called before
+/// `InitializeMint`.
+///
+/// The mint must have exactly enough space allocated for the base mint (82
+/// bytes), plus 83 bytes of padding, 1 byte reserved for the account type,
+/// then space required for this extension, plus any others.
+///
 /// Accounts expected by this instruction:
 ///
-///  0. `[writable]` The mint to initialize.
+///   0. `[writable]` The mint to initialize.
 pub struct Initialize<'a, 'b> {
-    /// Mint Account
+    /// The mint to initialize.
     pub mint: &'a AccountView,
-    /// Optional authority that can set the member address
+
+    /// The address for the account that can update the group address.
     pub authority: Option<&'b Address>,
-    /// Optional account address that holds the member
+
+    /// The account address that holds the member.
     pub member_address: Option<&'b Address>,
-    /// Token Program
+
+    /// The token program.
     pub token_program: &'b Address,
 }
 
@@ -28,37 +38,43 @@ impl Initialize<'_, '_> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let accounts = [InstructionAccount::writable(self.mint.address())];
+        // Instruction data.
 
-        let mut data = [UNINIT_BYTE; 66];
+        let mut instruction_data = [UNINIT_BYTE; 66];
 
-        // Set discriminators (GroupMemberPointer + Initialize)
+        // discriminators
         write_bytes(
-            &mut data[..2],
+            &mut instruction_data[..2],
             &[
                 ExtensionDiscriminator::GroupMemberPointer as u8,
                 Initialize::DISCRIMINATOR,
             ],
         );
+        // authority
+        write_bytes(
+            &mut instruction_data[2..34],
+            if let Some(authority) = self.authority {
+                authority.as_ref()
+            } else {
+                &[0u8; 32]
+            },
+        );
+        // member_address
+        write_bytes(
+            &mut instruction_data[34..66],
+            if let Some(member_address) = self.member_address {
+                member_address.as_ref()
+            } else {
+                &[0u8; 32]
+            },
+        );
 
-        // write authority address bytes at offset  [2..34]
-        if let Some(authority) = self.authority {
-            write_bytes(&mut data[2..34], authority.to_bytes().as_ref());
-        } else {
-            write_bytes(&mut data[2..34], &[0u8; 32]);
-        }
-
-        // write member_address address bytes at offset  [34..66]
-        if let Some(member_address) = self.member_address {
-            write_bytes(&mut data[34..66], member_address.to_bytes().as_ref());
-        } else {
-            write_bytes(&mut data[34..66], &[0u8; 32]);
-        }
+        // Instruction.
 
         let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &accounts,
-            data: unsafe { from_raw_parts(data.as_ptr() as _, data.len()) },
+            accounts: &[InstructionAccount::writable(self.mint.address())],
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
         };
 
         invoke(&instruction, &[self.mint])
