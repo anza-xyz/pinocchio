@@ -9,17 +9,27 @@ use {
 
 /// Initialize a new mint with a metadata pointer
 ///
+/// Fails if the mint has already been initialized, so must be called before
+/// `InitializeMint`.
+///
+/// The mint must have exactly enough space allocated for the base mint (82
+/// bytes), plus 83 bytes of padding, 1 byte reserved for the account type,
+/// then space required for this extension, plus any others.
+///
 /// Accounts expected by this instruction:
 ///
-///  0. `[writable]` The mint to initialize.
+///   0. `[writable]` The mint to initialize.
 pub struct Initialize<'a, 'b> {
-    /// The mint to initialize with the metadata pointer extension.
+    /// The mint to initialize.
     pub mint: &'a AccountView,
-    /// Optional authority that can later update the metadata address.
+
+    /// The address for the account that can update the metadata address.
     pub authority: Option<&'b Address>,
-    /// Optional initial metadata address.
+
+    /// The account address that holds the metadata.
     pub metadata_address: Option<&'b Address>,
-    /// Token program (Token-2022).
+
+    /// The token program.
     pub token_program: &'b Address,
 }
 
@@ -28,38 +38,43 @@ impl Initialize<'_, '_> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let accounts = [InstructionAccount::writable(self.mint.address())];
+        // Instruction data.
 
-        let mut data = [UNINIT_BYTE; 66];
+        let mut instruction_data = [UNINIT_BYTE; 66];
 
-        // Encode discriminators (Metadata + Initialize)
+        // disciminators
         write_bytes(
-            &mut data[..2],
+            &mut instruction_data[..2],
             &[
                 ExtensionDiscriminator::MetadataPointer as u8,
                 Initialize::DISCRIMINATOR,
             ],
         );
+        // authority
+        write_bytes(
+            &mut instruction_data[2..34],
+            if let Some(authority) = self.authority {
+                authority.as_ref()
+            } else {
+                &[0; 32]
+            },
+        );
+        // metadata_address
+        write_bytes(
+            &mut instruction_data[34..66],
+            if let Some(metadata_address) = self.metadata_address {
+                metadata_address.as_ref()
+            } else {
+                &[0; 32]
+            },
+        );
 
-        // write authority Address bytes at offset  [2..34]
-        if let Some(authority) = self.authority {
-            write_bytes(&mut data[2..34], authority.to_bytes().as_ref());
-        } else {
-            write_bytes(&mut data[2..34], &[0; 32]);
-        }
+        // Instruction.
 
-        // write metadata_address Address bytes at offset [34..66 ]
-        if let Some(metadata_address) = self.metadata_address {
-            write_bytes(&mut data[34..66], metadata_address.to_bytes().as_ref());
-        } else {
-            write_bytes(&mut data[34..66], &[0; 32]);
-        }
-
-        // instruction
         let instruction = InstructionView {
             program_id: self.token_program,
-            data: unsafe { from_raw_parts(data.as_ptr() as _, data.len()) },
-            accounts: &accounts,
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
+            accounts: &[InstructionAccount::writable(self.mint.address())],
         };
 
         invoke(&instruction, &[self.mint])
