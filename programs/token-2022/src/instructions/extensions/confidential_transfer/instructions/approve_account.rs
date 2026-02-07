@@ -1,10 +1,13 @@
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{
-    cpi::{invoke_signed, Signer},
-    InstructionAccount, InstructionView,
+use {
+    crate::instructions::ExtensionDiscriminator,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{
+        cpi::{invoke_signed, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
 /// Approves a token account for confidential transfers.
 ///
@@ -31,6 +34,8 @@ pub struct ApproveAccount<'a> {
 }
 
 impl ApproveAccount<'_> {
+    const DISCRIMINATOR: u8 = 3;
+
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
@@ -42,10 +47,15 @@ impl ApproveAccount<'_> {
             InstructionAccount::readonly_signer(self.authority.address()),
         ];
 
+        let instruction_data = [
+            ExtensionDiscriminator::ConfidentialTransfer as u8,
+            ApproveAccount::DISCRIMINATOR,
+        ];
+
         let instruction = InstructionView {
             program_id: self.token_program,
             accounts: &instruction_accounts,
-            data: &[],
+            data: instruction_data.as_slice(),
         };
 
         invoke_signed(
