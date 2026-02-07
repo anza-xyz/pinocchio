@@ -36,9 +36,6 @@ use {
 ///   3. `[]` The source account's multisignature.
 ///   4. `..+N` `[]` The `N` signer accounts, where `N` is `1 <= N <= 11`.
 pub struct TransferCheckedWithFee<'a, 'b, 'c> {
-    /// The token program ID.
-    pub token_program_id: &'b Address,
-
     /// The source account.
     pub source: &'a AccountView,
 
@@ -64,6 +61,9 @@ pub struct TransferCheckedWithFee<'a, 'b, 'c> {
     /// on the `transfer_fee_basis_points` and `maximum_fee` of the mint.
     /// May be 0 for a mint without a configured transfer fee.
     pub fee: u64,
+
+    /// The token program ID.
+    pub token_program: &'b Address,
 }
 
 impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
@@ -75,7 +75,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     pub fn new(
-        token_program_id: &'b Address,
+        token_program: &'b Address,
         source: &'a AccountView,
         mint: &'a AccountView,
         destination: &'a AccountView,
@@ -93,7 +93,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
             amount,
             decimals,
             fee,
-            token_program_id,
+            token_program,
         }
     }
 
@@ -102,7 +102,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     pub fn with_multisig(
-        token_program_id: &'b Address,
+        token_program: &'b Address,
         source: &'a AccountView,
         mint: &'a AccountView,
         destination: &'a AccountView,
@@ -121,7 +121,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
             amount,
             decimals,
             fee,
-            token_program_id,
+            token_program,
         }
     }
 
@@ -199,7 +199,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
         let expected_accounts = 4 + self.signers.len();
 
         let instruction = InstructionView {
-            program_id: self.token_program_id,
+            program_id: self.token_program,
             accounts: unsafe {
                 from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
             },

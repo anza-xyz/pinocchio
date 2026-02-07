@@ -44,7 +44,7 @@ pub struct SetTransferFee<'a, 'b, 'c> {
     pub maximum_fee: u64,
 
     /// The token program.
-    pub token_program_id: &'b Address,
+    pub token_program: &'b Address,
 }
 
 impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
@@ -54,7 +54,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
     /// with a single owner/delegate authority.
     #[inline(always)]
     pub fn new(
-        token_program_id: &'b Address,
+        token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
         transfer_fee_basis_points: u16,
@@ -66,7 +66,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
             signers: &[],
             transfer_fee_basis_points,
             maximum_fee,
-            token_program_id,
+            token_program,
         }
     }
 
@@ -74,7 +74,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
     /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig(
-        token_program_id: &'b Address,
+        token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
         signers: &'c [&'a AccountView],
@@ -87,7 +87,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
             signers,
             transfer_fee_basis_points,
             maximum_fee,
-            token_program_id,
+            token_program,
         }
     }
 
@@ -137,7 +137,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
         let expected_accounts = 2 + self.signers.len();
 
         let instruction = InstructionView {
-            program_id: self.token_program_id,
+            program_id: self.token_program,
             accounts: unsafe {
                 from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
             },

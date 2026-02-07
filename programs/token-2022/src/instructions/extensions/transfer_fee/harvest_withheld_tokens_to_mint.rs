@@ -29,7 +29,7 @@ pub struct HarvestWithheldTokensToMint<'a, 'b, 'c> {
     pub sources: &'c [&'a AccountView],
 
     /// The token program.
-    pub token_program_id: &'b Address,
+    pub token_program: &'b Address,
 }
 
 impl HarvestWithheldTokensToMint<'_, '_, '_> {
@@ -68,7 +68,7 @@ impl HarvestWithheldTokensToMint<'_, '_, '_> {
         // Instruction.
 
         let instruction = InstructionView {
-            program_id: self.token_program_id,
+            program_id: self.token_program,
             accounts: unsafe {
                 from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
             },

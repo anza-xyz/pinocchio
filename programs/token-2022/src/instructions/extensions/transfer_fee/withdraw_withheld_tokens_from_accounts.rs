@@ -48,7 +48,7 @@ pub struct WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
     pub sources: &'c [&'a AccountView],
 
     /// Token program.
-    pub token_program_id: &'b Address,
+    pub token_program: &'b Address,
 }
 
 impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
@@ -58,7 +58,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
     /// with a single owner/delegate authority.
     #[inline(always)]
     pub fn new(
-        token_program_id: &'b Address,
+        token_program: &'b Address,
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
@@ -70,7 +70,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
             authority,
             signers: &[],
             sources,
-            token_program_id,
+            token_program,
         }
     }
 
@@ -78,7 +78,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
     /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig(
-        token_program_id: &'b Address,
+        token_program: &'b Address,
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
@@ -91,7 +91,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
             authority,
             signers,
             sources,
-            token_program_id,
+            token_program,
         }
     }
 
@@ -160,7 +160,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         // Instruction.
 
         let instruction = InstructionView {
-            program_id: self.token_program_id,
+            program_id: self.token_program,
             accounts: unsafe {
                 from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
             },
