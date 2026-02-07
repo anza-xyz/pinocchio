@@ -46,8 +46,45 @@ pub struct Update<'a, 'b, 'c> {
     pub token_program: &'b Address,
 }
 
-impl Update<'_, '_, '_> {
+impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
     pub const DISCRIMINATOR: u8 = 1;
+
+    /// Creates a new `Update` instruction with a single owner/delegate
+    /// authority.
+    #[inline(always)]
+    pub fn new(
+        token_program: &'b Address,
+        mint: &'a AccountView,
+        authority: &'a AccountView,
+        metadata_address: Option<&'b Address>,
+    ) -> Self {
+        Self {
+            mint,
+            authority,
+            signers: &[],
+            metadata_address,
+            token_program,
+        }
+    }
+
+    /// Creates a new `Update` instruction with a multisignature owner/delegate
+    /// authority and signer accounts.
+    #[inline(always)]
+    pub fn with_multisig(
+        token_program: &'b Address,
+        mint: &'a AccountView,
+        authority: &'a AccountView,
+        metadata_address: Option<&'b Address>,
+        signers: &'c [&'a AccountView],
+    ) -> Self {
+        Self {
+            mint,
+            authority,
+            signers,
+            metadata_address,
+            token_program,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
