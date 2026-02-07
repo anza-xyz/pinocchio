@@ -44,7 +44,7 @@ pub struct WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
     pub signers: &'c [&'a AccountView],
 
     /// Token program.
-    pub token_program_id: &'b Address,
+    pub token_program: &'b Address,
 }
 
 impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
@@ -101,7 +101,7 @@ impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
         let expected_accounts = 4 + self.signers.len();
 
         let instruction = InstructionView {
-            program_id: self.token_program_id,
+            program_id: self.token_program,
             accounts: unsafe {
                 from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
             },

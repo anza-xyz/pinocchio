@@ -37,7 +37,7 @@ pub struct InitializeTransferFeeConfig<'a, 'b> {
     pub maximum_fee: u64,
 
     /// Token program.
-    pub token_program_id: &'b Address,
+    pub token_program: &'b Address,
 }
 
 impl InitializeTransferFeeConfig<'_, '_> {
@@ -93,7 +93,7 @@ impl InitializeTransferFeeConfig<'_, '_> {
         // Instruction.
 
         let instruction = InstructionView {
-            program_id: self.token_program_id,
+            program_id: self.token_program,
             accounts: &[InstructionAccount::writable(self.mint.address())],
             data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, data_len) },
         };
