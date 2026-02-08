@@ -1,7 +1,8 @@
 use {
     crate::{
         instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-        write_bytes, UNINIT_ACCOUNT_REF, UNINIT_BYTE, UNINIT_INSTRUCTION_ACCOUNT,
+        write_bytes, AE_CIPHERTEXT_LEN, ELGAMAL_CIPHERTEXT_LEN, UNINIT_ACCOUNT_REF, UNINIT_BYTE,
+        UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::slice::from_raw_parts,
     solana_account_view::AccountView,
@@ -51,7 +52,7 @@ use {
 /// 7. `[]` (Optional) Range proof context state account.
 /// 8. `[]` The multisig  source account owner.
 /// 9. .. `[signer]` Required M signer accounts for the SPL Token Multisig
-pub struct Transfer<'a, 'b> {
+pub struct Transfer<'a, 'b, 'data> {
     pub source_token_account: &'a AccountView,
     pub mint: &'a AccountView,
     pub destination_token_account: &'a AccountView,
@@ -63,14 +64,22 @@ pub struct Transfer<'a, 'b> {
     pub multisig_signers: &'b [&'a AccountView],
     pub token_program: &'a Address,
 
-    /// instruction offsets of the proof; provide 0 if the
+    /// Data expected
+    ///
+    /// The new source decrypt-able balance if the transfer succeeds
+    pub new_source_decryptable_available_balance: &'data [u8; AE_CIPHERTEXT_LEN],
+    /// The transfer amount encrypted under the auditor ElGamal public key
+    pub transfer_amount_auditor_ciphertext_lo: &'data [u8; ELGAMAL_CIPHERTEXT_LEN],
+    /// The transfer amount encrypted under the auditor ElGamal public key
+    pub transfer_amount_auditor_ciphertext_hi: &'data [u8; ELGAMAL_CIPHERTEXT_LEN],
+    /// instruction offsets of the proofs; provide 0 if the
     /// instruction is included in the same transaction
     pub equality_proof_instruction_offset: i8,
     pub ciphertext_proof_instruction_offset: i8,
     pub range_proof_instruction_offset: i8,
 }
 
-impl Transfer<'_, '_> {
+impl Transfer<'_, '_, '_> {
     const DISCRIMINATOR: u8 = 7;
 
     #[inline(always)]
@@ -176,7 +185,7 @@ impl Transfer<'_, '_> {
 
         // instruction data
 
-        let mut instruction_data = [UNINIT_BYTE; 2 + 3];
+        let mut instruction_data = [UNINIT_BYTE; 2 + 36 + 64 + 64 + 1 + 1 + 1];
 
         // discriminators
         write_bytes(
@@ -187,9 +196,27 @@ impl Transfer<'_, '_> {
             ],
         );
 
+        // new source decrypt-able available balance
+        write_bytes(
+            &mut instruction_data[2..38],
+            self.new_source_decryptable_available_balance,
+        );
+
+        // transfer amount auditor cipher-text lo
+        write_bytes(
+            &mut instruction_data[38..102],
+            self.transfer_amount_auditor_ciphertext_lo,
+        );
+
+        // transfer amount auditor cipher-text hi
+        write_bytes(
+            &mut instruction_data[102..166],
+            self.transfer_amount_auditor_ciphertext_hi,
+        );
+
         // instruction offsets
         write_bytes(
-            &mut instruction_data[2..5],
+            &mut instruction_data[166..169],
             &[
                 self.equality_proof_instruction_offset as u8,
                 self.ciphertext_proof_instruction_offset as u8,
