@@ -41,8 +41,8 @@ use {
 ///   4. `[]` (Optional) Instructions sysvar if at least one of the
 ///      `zk_elgamal_proof` instructions are included in the same transaction.
 ///   5. `[]` (Optional) Equality proof context state account.
-///   6. `[]` (Optional) Transfer amount cipher-text validity proof context state
-///      account.
+///   6. `[]` (Optional) Transfer amount cipher-text validity proof context
+///      state account.
 ///   7. `[]` (Optional) Fee sigma proof context state account.
 ///   8. `[]` (Optional) Fee cipher-text validity proof context state account.
 ///   9. `[]` (Optional) Range proof context state account.
@@ -55,8 +55,8 @@ use {
 ///   4. `[]` (Optional) Instructions sysvar if at least one of the
 ///      `zk_elgamal_proof` instructions are included in the same transaction.
 ///   5. `[]` (Optional) Equality proof context state account.
-///   6. `[]` (Optional) Transfer amount cipher-text validity proof context state
-///      account.
+///   6. `[]` (Optional) Transfer amount cipher-text validity proof context
+///      state account.
 ///   7. `[]` (Optional) Fee sigma proof context state account.
 ///   8. `[]` (Optional) Fee cipher-text validity proof context state account.
 ///   9. `[]` (Optional) Range proof context state account.
