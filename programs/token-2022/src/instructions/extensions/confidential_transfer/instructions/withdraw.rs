@@ -107,9 +107,10 @@ impl Withdraw<'_, '_> {
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 6 + MAX_MULTISIG_SIGNERS];
 
+        let mut i = 0usize;
+
         // SAFETY: allocation is valid to the maximum number of accounts
         unsafe {
-            let mut i = 0usize;
             // token account
             instruction_accounts
                 .get_unchecked_mut(i)
@@ -216,7 +217,8 @@ impl Withdraw<'_, '_> {
 
         // instruction
 
-        let expected_accounts = 6 + self.signers.len();
+        // valid accounts + signer accounts
+        let expected_accounts = i + self.signers.len();
 
         let instruction = InstructionView {
             program_id: self.token_program,

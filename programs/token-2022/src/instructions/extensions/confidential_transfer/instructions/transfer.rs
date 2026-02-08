@@ -86,30 +86,33 @@ impl Transfer<'_, '_> {
 
         // insruction accounts
 
+        let mut i = 0usize;
+
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 8 + MAX_MULTISIG_SIGNERS];
 
         // SAFETY: allocation is valid to the maximum number of accounts
         unsafe {
             // source token account
             instruction_accounts
-                .get_unchecked_mut(0)
+                .get_unchecked_mut(i)
                 .write(InstructionAccount::writable(
                     self.source_token_account.address(),
                 ));
+            i += 1;
 
             // token mint
             instruction_accounts
-                .get_unchecked_mut(1)
+                .get_unchecked_mut(i)
                 .write(InstructionAccount::readonly(self.mint.address()));
+            i += 1;
 
             // destination token account
             instruction_accounts
-                .get_unchecked_mut(2)
+                .get_unchecked_mut(i)
                 .write(InstructionAccount::writable(
                     self.destination_token_account.address(),
                 ));
-
-            let mut i = 2usize;
+            i += 1;
 
             // instruction sysvar
             if let Some(instruction_sysvar_account) = self.instruction_sysvar {
@@ -196,7 +199,8 @@ impl Transfer<'_, '_> {
 
         // CPI Instruction
 
-        let expected_accounts = 8 + self.multisig_signers.len();
+        // non multisig signer accounts + multisig signers
+        let expected_accounts = i + self.multisig_signers.len();
 
         let instruction = InstructionView {
             program_id: self.token_program,
