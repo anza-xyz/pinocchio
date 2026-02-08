@@ -10,31 +10,73 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Enable the CPI Guard extension on a token account.
+/// Lock certain token operations from taking place within CPI for this
+/// Account, namely:
+/// * `Transfer` and `Burn` must go through a delegate.
+/// * `CloseAccount` can only return lamports to owner.
+/// * `SetAuthority` can only be used to remove an existing close authority.
+/// * `Approve` is disallowed entirely.
 ///
-/// Expected accounts:
+/// In addition, CPI Guard cannot be enabled or disabled via CPI.
 ///
-/// **Single authority**
-/// 0. `[writable]` The token account to enable cpi-guard.
-/// 1. `[signer]` The owner of the token account.
+/// Accounts expected by this instruction:
 ///
-/// **Multisignature authority**
-/// 0. `[writable]` The token account to enable cpi-guard.
-/// 1. `[readonly]` The multisig account that owns the token account.
-/// 2. `[signer]` M signer accounts (as required by the multisig).
-pub struct EnableCpiGuard<'a, 'b, 'c> {
-    /// The token account to enable with the CpiGuard extension.
-    pub token_account: &'a AccountView,
-    /// The owner of the token account (single or multisig).
+///   0. `[writable]` The account to update.
+///   1. `[signer]` The account's owner.
+///
+///   * Multisignature authority
+///   0. `[writable]` The account to update.
+///   1. `[]` The account's multisignature owner.
+///   2. `..2+M` `[signer]` M signer accounts.
+pub struct Enable<'a, 'b, 'c> {
+    /// The account to update.
+    pub account: &'a AccountView,
+
+    /// The account's owner.
     pub authority: &'a AccountView,
-    /// Signer accounts if the authority is a multisig.
+
+    /// The signer accounts if the authority is a multisig.
     pub signers: &'c [&'a AccountView],
-    /// Token program (Token-2022).
+
+    /// The token program.
     pub token_program: &'b Address,
 }
 
-impl EnableCpiGuard<'_, '_, '_> {
+impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
     pub const DISCRIMINATOR: u8 = 0;
+
+    /// Creates a new `Enable` instruction with a single owner/delegate
+    /// authority.
+    #[inline(always)]
+    pub fn new(
+        token_program: &'b Address,
+        account: &'a AccountView,
+        authority: &'a AccountView,
+    ) -> Self {
+        Self {
+            account,
+            authority,
+            signers: &[],
+            token_program,
+        }
+    }
+
+    /// Creates a new `Enable` instruction with a multisignature owner/delegate
+    /// authority and signer accounts.
+    #[inline(always)]
+    pub fn with_signers(
+        token_program: &'b Address,
+        account: &'a AccountView,
+        authority: &'a AccountView,
+        signers: &'c [&'a AccountView],
+    ) -> Self {
+        Self {
+            account,
+            authority,
+            signers,
+            token_program,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -43,83 +85,81 @@ impl EnableCpiGuard<'_, '_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        let &Self {
-            token_account,
-            authority,
-            signers: multisig_accounts,
-            token_program,
-            ..
-        } = self;
-
-        if multisig_accounts.len() > MAX_MULTISIG_SIGNERS {
+        if self.signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
         }
 
-        // creates an array of uninitialized InstructionAccount with 2 + MAX_MULTISIG_SIGNERS
-        // i.e. [token_account + authority](2) + signers(max_multisig_signers)
+        let expected_accounts = 2 + self.signers.len();
+
+        // Instruction accounts.
+
         const UNINIT_INSTRUCTION_ACCOUNTS: MaybeUninit<InstructionAccount> =
             MaybeUninit::<InstructionAccount>::uninit();
-        let mut accounts = [UNINIT_INSTRUCTION_ACCOUNTS; 2 + MAX_MULTISIG_SIGNERS];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNTS; 2 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY:
-        // - `accounts` is sized to 2 + MAX_MULTISIG_SIGNERS
-        // - Index 0 is always present (TokenAccount)
-        // - Index 1 is always present (Authority)
+        // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            accounts
+            // account
+            instruction_accounts
                 .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(token_account.address()));
+                .write(InstructionAccount::writable(self.account.address()));
 
-            accounts.get_unchecked_mut(1).write(InstructionAccount::new(
-                authority.address(),
-                false,
-                multisig_accounts.is_empty(),
-            ));
+            // authority
+            instruction_accounts
+                .get_unchecked_mut(1)
+                .write(InstructionAccount::new(
+                    self.authority.address(),
+                    false,
+                    self.signers.is_empty(),
+                ));
+
+            // signer accounts
+            for (account, signer) in instruction_accounts
+                .get_unchecked_mut(2..)
+                .iter_mut()
+                .zip(self.signers.iter())
+            {
+                account.write(InstructionAccount::readonly_signer(signer.address()));
+            }
         }
 
-        // add the multisig if they exist for each signer account
-        // creates a tuple of (account, signer) for each multisig i.e from index 2
-        for (account, signer) in accounts[2..].iter_mut().zip(multisig_accounts.iter()) {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
-        }
+        // Instruction.
 
-        // build instruction data for CpiGuard
-        let data = &[ExtensionDiscriminator::CpiGuard as u8, Self::DISCRIMINATOR];
-
-        let num_accounts = 2 + multisig_accounts.len();
-
-        // build instruction for CpiGuard
         let instruction = InstructionView {
-            program_id: token_program,
-            data,
+            program_id: self.token_program,
+            data: &[ExtensionDiscriminator::CpiGuard as u8, Self::DISCRIMINATOR],
             accounts: unsafe {
-                // create a slice &[] by providing the pointer to that data and the length of the data
-                slice::from_raw_parts(accounts.as_ptr() as _, num_accounts)
+                slice::from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
             },
         };
 
-        // Account view array
+        // Accounts.
+
         const UNINIT_ACCOUNT_VIEWS: MaybeUninit<&AccountView> = MaybeUninit::uninit();
-        let mut account_views = [UNINIT_ACCOUNT_VIEWS; 2 + MAX_MULTISIG_SIGNERS];
+        let mut accounts = [UNINIT_ACCOUNT_VIEWS; 2 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY:
-        // - `account_views` is sized to 2 + MAX_MULTISIG_SIGNERS
-        // - Index 0 is always present
-        // - Index 1 is always present
+        // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            account_views.get_unchecked_mut(0).write(token_account);
-            account_views.get_unchecked_mut(1).write(authority);
-        }
+            // account
+            accounts.get_unchecked_mut(0).write(self.account);
 
-        // Fill all signer accounts
-        for (account_view, signer) in account_views[2..].iter_mut().zip(multisig_accounts.iter()) {
-            account_view.write(signer);
+            // authority
+            accounts.get_unchecked_mut(1).write(self.authority);
+
+            // signer accounts
+            for (account, signer) in accounts
+                .get_unchecked_mut(2..)
+                .iter_mut()
+                .zip(self.signers.iter())
+            {
+                account.write(signer);
+            }
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
             &instruction,
             unsafe {
-                slice::from_raw_parts(account_views.as_ptr() as *const &AccountView, num_accounts)
+                slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
             },
             signers,
         )
