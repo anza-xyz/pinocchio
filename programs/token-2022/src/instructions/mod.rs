@@ -12,6 +12,7 @@ mod initialize_mint;
 mod initialize_mint_2;
 mod initialize_multisig;
 mod initialize_multisig_2;
+mod initialize_non_transferable_mint;
 mod mint_to;
 mod mint_to_checked;
 mod revoke;
@@ -25,6 +26,6 @@ pub use {
     approve::*, approve_checked::*, burn::*, burn_checked::*, close_account::*, extensions::*,
     freeze_account::*, initialize_account::*, initialize_account_2::*, initialize_account_3::*,
     initialize_mint::*, initialize_mint_2::*, initialize_multisig::*, initialize_multisig_2::*,
-    mint_to::*, mint_to_checked::*, revoke::*, set_authority::*, sync_native::*, thaw_account::*,
-    transfer::*, transfer_checked::*,
+    initialize_non_transferable_mint::*, mint_to::*, mint_to_checked::*, revoke::*,
+    set_authority::*, sync_native::*, thaw_account::*, transfer::*, transfer_checked::*,
 };
