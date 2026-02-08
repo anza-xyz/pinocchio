@@ -6,17 +6,27 @@ use {
     solana_program_error::ProgramResult,
 };
 
-/// Initialize the Default-Account-State extension on a mint.
+/// Initialize a new mint with the default state for new Accounts.
 ///
-/// Expected accounts:
+/// Fails if the mint has already been initialized, so must be called before
+/// `InitializeMint`.
 ///
-/// 0. `[writable]` The mint account to initialize.
+/// The mint must have exactly enough space allocated for the base mint (82
+/// bytes), plus 83 bytes of padding, 1 byte reserved for the account type,
+/// then space required for this extension, plus any others.
+///
+/// Accounts expected by this instruction:
+///
+///   0. `[writable]` The mint to initialize.
 pub struct Initialize<'a, 'b> {
-    /// The mint account to initialize.
-    pub mint_account: &'a AccountView,
-    /// The default account state in which new token accounts should be initialized.
+    /// The mint to initialize.
+    pub mint: &'a AccountView,
+
+    /// The default account state in which new token accounts should be
+    /// initialized.
     pub state: u8,
-    /// Token program (Token-2022).
+
+    /// The token program.
     pub token_program: &'b Address,
 }
 
@@ -25,20 +35,17 @@ impl Initialize<'_, '_> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let accounts = [InstructionAccount::writable(self.mint_account.address())];
-
-        let data = &[
-            ExtensionDiscriminator::DefaultAccountState as u8,
-            Self::DISCRIMINATOR,
-            self.state,
-        ];
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: &accounts,
-            data,
-        };
-
-        invoke(&instruction, &[self.mint_account])
+        invoke(
+            &InstructionView {
+                program_id: self.token_program,
+                accounts: &[InstructionAccount::writable(self.mint.address())],
+                data: &[
+                    ExtensionDiscriminator::DefaultAccountState as u8,
+                    Self::DISCRIMINATOR,
+                    self.state,
+                ],
+            },
+            &[self.mint],
+        )
     }
 }
