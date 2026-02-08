@@ -1,62 +1,61 @@
 use {
     crate::{instructions::extensions::ExtensionDiscriminator, write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
     solana_account_view::AccountView,
     solana_address::Address,
-    solana_instruction_view::{cpi, InstructionAccount, InstructionView},
+    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
     solana_program_error::ProgramResult,
 };
 
-/// Initialize the Pausable extension on a mint.
+/// Initialize the pausable extension for the given mint account
 ///
-/// This instruction must be called after creating the mint but before initializing it.
+/// Fails if the account has already been initialized, so must be called
+/// before `InitializeMint`.
 ///
-/// Expected accounts:
+/// Accounts expected by this instruction:
 ///
-/// 0. `[writable]` The mint account to initialize.
-pub struct InitializePausable<'a, 'b> {
+///   0. `[writable]`  The mint account to initialize.
+pub struct Initialize<'a, 'b> {
     /// The mint account to initialize.
-    ///
-    /// Note: This applies to the **Mint**, allowing the specified authority
-    /// to pause all transfer/burn operations globally.
     pub mint: &'a AccountView,
 
-    /// The address that will have the authority to pause/resume the mint.
-    pub authority: &'a Address,
+    /// The address for the account that can pause the mint.
+    pub authority: &'b Address,
 
-    /// Token program.
+    /// The token program.
     pub token_program: &'b Address,
 }
 
-impl InitializePausable<'_, '_> {
+impl Initialize<'_, '_> {
     pub const DISCRIMINATOR: u8 = 0;
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let &Self {
-            mint,
-            authority,
-            token_program,
-            ..
-        } = self;
+        // Instruction data.
 
-        let accounts = [InstructionAccount::writable(mint.address())];
+        let mut instruction_data = [UNINIT_BYTE; 34];
 
-        // build instruction data for Pausable
-        // Layout: [Extension + Sub-Instruction + Authority]
-        let mut data = [UNINIT_BYTE; 1 + 1 + 32];
-        write_bytes(&mut data[0..1], &[ExtensionDiscriminator::Pausable as u8]);
-        write_bytes(&mut data[1..2], &[Self::DISCRIMINATOR]);
-        write_bytes(&mut data[2..34], authority.as_ref());
+        // discriminators
+        write_bytes(
+            &mut instruction_data[..2],
+            &[ExtensionDiscriminator::Pausable as u8, Self::DISCRIMINATOR],
+        );
+        // authority
+        write_bytes(&mut instruction_data[2..34], self.authority.as_ref());
 
-        let data = unsafe { &*(data.as_ptr() as *const [u8; 1 + 1 + 32]) };
+        // Instruction.
 
-        // build instruction for Pausable
         let instruction = InstructionView {
-            program_id: token_program,
-            data,
-            accounts: &accounts,
+            program_id: self.token_program,
+            accounts: &[InstructionAccount::writable(self.mint.address())],
+            data: unsafe {
+                from_raw_parts(
+                    instruction_data.as_ptr() as *const _,
+                    instruction_data.len(),
+                )
+            },
         };
 
-        cpi::invoke(&instruction, &[self.mint])
+        invoke(&instruction, &[self.mint])
     }
 }
