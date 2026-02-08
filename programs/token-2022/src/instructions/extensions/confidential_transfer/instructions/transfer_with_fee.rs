@@ -90,7 +90,7 @@ pub struct TransferWithFee<'a, 'b> {
 }
 
 impl TransferWithFee<'_, '_> {
-    const DISCRIMINATOR: u8 = 12;
+    const DISCRIMINATOR: u8 = 13;
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -107,28 +107,31 @@ impl TransferWithFee<'_, '_> {
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 10 + MAX_MULTISIG_SIGNERS];
 
+        let mut i: usize = 0;
+
         // SAFETY: account allocation valid upto the maximum expected accounts
         unsafe {
             // source token account
             instruction_accounts
-                .get_unchecked_mut(0)
+                .get_unchecked_mut(i)
                 .write(InstructionAccount::writable(
                     self.source_token_account.address(),
                 ));
+            i += 1;
 
             // token mint
             instruction_accounts
-                .get_unchecked_mut(1)
+                .get_unchecked_mut(i)
                 .write(InstructionAccount::readonly(self.mint.address()));
+            i += 1;
 
             // destination token account
             instruction_accounts
-                .get_unchecked_mut(2)
+                .get_unchecked_mut(i)
                 .write(InstructionAccount::writable(
                     self.destination_token_account.address(),
                 ));
-
-            let mut i = 3usize;
+            i += 1;
 
             // instruction sysvar if provided
             if let Some(instruction_sysvar_account) = self.instruction_sysvar {
@@ -228,7 +231,8 @@ impl TransferWithFee<'_, '_> {
 
         // Instruction
 
-        let expected_accounts = 10 + self.multisig_signers.len();
+        // expected accounts = non multisig signer accounts + multisig signers
+        let expected_accounts = i + self.multisig_signers.len();
 
         let instruction = InstructionView {
             program_id: self.token_program,
