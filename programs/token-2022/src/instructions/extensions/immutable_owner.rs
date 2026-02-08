@@ -1,32 +1,37 @@
-use solana_account_view::AccountView;
-use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
-use solana_program_error::ProgramResult;
+use {
+    crate::instructions::ExtensionDiscriminator,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
+    solana_program_error::ProgramResult,
+};
 
-use crate::instructions::ExtensionDiscriminator;
-
-/// Initialize the Immutable-Owner extension on a token account.
+/// Initialize the Immutable Owner extension for the given token account
 ///
-/// Expected accounts:
+/// Fails if the account has already been initialized, so must be called
+/// before `InitializeAccount`.
 ///
-/// 0. `[writable]` The token account to initialize with immutable owner.
-pub struct InitializeImmutableOwner<'a> {
-    /// The token account to initialize with the Immutable-Owner extension.
+/// Accounts expected by this instruction:
+///
+///   0. `[writable]`  The account to initialize.
+pub struct InitializeImmutableOwner<'a, 'b> {
+    /// The token account to initialize.
     pub token_account: &'a AccountView,
+
+    /// The token program.
+    pub token_program: &'b Address,
 }
 
-impl InitializeImmutableOwner<'_> {
+impl InitializeImmutableOwner<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let accounts = [InstructionAccount::writable(self.token_account.address())];
-
-        let data = &[ExtensionDiscriminator::ImmutableOwner as u8];
-
-        let instruction = InstructionView {
-            program_id: &crate::ID,
-            accounts: &accounts,
-            data,
-        };
-
-        invoke(&instruction, &[self.token_account])
+        invoke(
+            &InstructionView {
+                program_id: self.token_program,
+                accounts: &[InstructionAccount::writable(self.token_account.address())],
+                data: &[ExtensionDiscriminator::ImmutableOwner as u8],
+            },
+            &[self.token_account],
+        )
     }
 }
