@@ -1,5 +1,5 @@
 use {
-    crate::{instructions::extensions::ExtensionDiscriminator, instructions::MAX_MULTISIG_SIGNERS},
+    crate::instructions::{extensions::ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
     core::{mem::MaybeUninit, slice},
     solana_account_view::AccountView,
     solana_address::Address,
