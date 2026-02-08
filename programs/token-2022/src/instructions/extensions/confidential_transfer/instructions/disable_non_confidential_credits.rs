@@ -37,7 +37,7 @@ pub struct DisableNonConfidentialCredits<'a, 'b> {
 }
 
 impl DisableNonConfidentialCredits<'_, '_> {
-    const DISCRIMINATOR: u8 = 11;
+    const DISCRIMINATOR: u8 = 12;
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {

@@ -47,7 +47,7 @@ pub struct ConfigureAccountWithRegistry<'a> {
 }
 
 impl ConfigureAccountWithRegistry<'_> {
-    const DISCRIMINATOR: u8 = 13;
+    const DISCRIMINATOR: u8 = 14;
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
