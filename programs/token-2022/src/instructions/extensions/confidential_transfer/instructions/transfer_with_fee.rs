@@ -1,7 +1,8 @@
 use {
     crate::{
         instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-        UNINIT_ACCOUNT_REF, UNINIT_INSTRUCTION_ACCOUNT,
+        write_bytes, AE_CIPHERTEXT_LEN, ELGAMAL_CIPHERTEXT_LEN, UNINIT_ACCOUNT_REF, UNINIT_BYTE,
+        UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::slice::from_raw_parts,
     solana_account_view::AccountView,
@@ -62,7 +63,7 @@ use {
 ///   9. `[]` (Optional) Range proof context state account.
 ///   10. `[]` The multisig  source account owner.
 ///   11. .. `[signer]` Required M signer accounts for the SPL Token Multisig
-pub struct TransferWithFee<'a, 'b> {
+pub struct TransferWithFee<'a, 'b, 'data> {
     pub source_token_account: &'a AccountView,
     pub mint: &'a AccountView,
     pub destination_token_account: &'a AccountView,
@@ -78,6 +79,12 @@ pub struct TransferWithFee<'a, 'b> {
 
     /// Data expected
     ///
+    /// The new source decryptable balance if the transfer succeeds
+    pub new_source_decryptable_available_balance: &'data [u8; AE_CIPHERTEXT_LEN],
+    /// The transfer amount encrypted under the auditor ElGamal public key
+    pub transfer_amount_auditor_ciphertext_lo: &'data [u8; ELGAMAL_CIPHERTEXT_LEN],
+    /// The transfer amount encrypted under the auditor ElGamal public key
+    pub transfer_amount_auditor_ciphertext_hi: &'data [u8; ELGAMAL_CIPHERTEXT_LEN],
     /// Relative location of the `proof instruction` to the `TransferWithFee`
     /// instruction in the transaction.
     /// If the offset is `0`, then use a context state account for the
@@ -89,7 +96,7 @@ pub struct TransferWithFee<'a, 'b> {
     pub range_proof_instruction_offset: i8,
 }
 
-impl TransferWithFee<'_, '_> {
+impl<'a, 'b, 'data> TransferWithFee<'a, 'b, 'data> {
     const DISCRIMINATOR: u8 = 13;
 
     #[inline(always)]
@@ -216,18 +223,54 @@ impl TransferWithFee<'_, '_> {
         }
 
         // instruction data
-        let instruction_data = [
-            // extension discrminator
-            ExtensionDiscriminator::ConfidentialTransfer as u8,
-            // extension-instruction discriminator
-            Self::DISCRIMINATOR,
-            // instruction offsets
-            self.equality_proof_instruction_offset as u8,
-            self.amount_ciphertext_proof_instruction_offset as u8,
-            self.fee_sigma_proof_instruction_offset as u8,
-            self.fee_ciphertext_proof_instruction_offset as u8,
-            self.range_proof_instruction_offset as u8,
-        ];
+
+        let mut instruction_data = [UNINIT_BYTE;
+            2 + AE_CIPHERTEXT_LEN + ELGAMAL_CIPHERTEXT_LEN + ELGAMAL_CIPHERTEXT_LEN + 1 + 1 + 1];
+
+        let mut offset: usize = 0;
+
+        // extension discriminator + extension instruction discriminator
+        write_bytes(
+            &mut instruction_data[offset..offset + 2],
+            &[
+                ExtensionDiscriminator::ConfidentialTransfer as u8,
+                Self::DISCRIMINATOR,
+            ],
+        );
+        offset += 2;
+
+        // new source decrypt-able available balance
+        write_bytes(
+            &mut instruction_data[offset..offset + AE_CIPHERTEXT_LEN],
+            self.new_source_decryptable_available_balance,
+        );
+        offset += AE_CIPHERTEXT_LEN;
+
+        // transfer amount auditor cipher-text lo
+        write_bytes(
+            &mut instruction_data[offset..offset + ELGAMAL_CIPHERTEXT_LEN],
+            self.transfer_amount_auditor_ciphertext_lo,
+        );
+        offset += ELGAMAL_CIPHERTEXT_LEN;
+
+        // transfer amount auditor cipher-text hi
+        write_bytes(
+            &mut instruction_data[offset..offset + ELGAMAL_CIPHERTEXT_LEN],
+            self.transfer_amount_auditor_ciphertext_hi,
+        );
+        offset += ELGAMAL_CIPHERTEXT_LEN;
+
+        // instruction offset
+        write_bytes(
+            &mut instruction_data[offset..offset + 5],
+            &[
+                self.equality_proof_instruction_offset as u8,
+                self.amount_ciphertext_proof_instruction_offset as u8,
+                self.fee_sigma_proof_instruction_offset as u8,
+                self.fee_ciphertext_proof_instruction_offset as u8,
+                self.range_proof_instruction_offset as u8,
+            ],
+        );
 
         // Instruction
 
@@ -239,7 +282,7 @@ impl TransferWithFee<'_, '_> {
             accounts: unsafe {
                 from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
             },
-            data: instruction_data.as_slice(),
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
         };
 
         // Accounts

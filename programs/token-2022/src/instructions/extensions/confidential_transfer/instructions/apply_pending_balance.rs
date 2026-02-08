@@ -1,7 +1,8 @@
 use {
     crate::{
         instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-        write_bytes, UNINIT_ACCOUNT_REF, UNINIT_BYTE, UNINIT_INSTRUCTION_ACCOUNT,
+        write_bytes, AE_CIPHERTEXT_LEN, UNINIT_ACCOUNT_REF, UNINIT_BYTE,
+        UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::slice::from_raw_parts,
     solana_account_view::AccountView,
@@ -35,7 +36,7 @@ use {
 ///   0. `[writable]` The SPL Token account.
 ///   1. `[]` The multisig account owner.
 ///   2. .. `[signer]` Required M signer accounts for the SPL Token Multisig
-pub struct ApplyPendingBalance<'a, 'b> {
+pub struct ApplyPendingBalance<'a, 'b, 'data> {
     pub token_account: &'a AccountView,
     pub owner: &'a AccountView,
     pub multisig_signers: &'b [&'a AccountView],
@@ -46,9 +47,12 @@ pub struct ApplyPendingBalance<'a, 'b> {
     /// The expected number of pending balance credits since the last successful
     /// `ApplyPendingBalance` instruction
     pub expected_pending_balance_credit_counter: u64,
+    /// The new decryptable balance if the pending balance is applied
+    /// successfully
+    pub new_decryptable_available_balance: &'data [u8; AE_CIPHERTEXT_LEN],
 }
 
-impl ApplyPendingBalance<'_, '_> {
+impl<'a, 'b, 'data> ApplyPendingBalance<'a, 'b, 'data> {
     const DISCRIMINATOR: u8 = 8;
 
     #[inline(always)]
@@ -90,7 +94,7 @@ impl ApplyPendingBalance<'_, '_> {
         }
 
         // instruction data
-        let mut instruction_data = [UNINIT_BYTE; 2 + 8];
+        let mut instruction_data = [UNINIT_BYTE; 2 + 8 + AE_CIPHERTEXT_LEN];
 
         // discriminators
         write_bytes(
@@ -105,6 +109,12 @@ impl ApplyPendingBalance<'_, '_> {
         write_bytes(
             &mut instruction_data[2..10],
             &self.expected_pending_balance_credit_counter.to_le_bytes(),
+        );
+
+        // new decrypt-able available balance
+        write_bytes(
+            &mut instruction_data[10..46],
+            self.new_decryptable_available_balance,
         );
 
         // instruction
