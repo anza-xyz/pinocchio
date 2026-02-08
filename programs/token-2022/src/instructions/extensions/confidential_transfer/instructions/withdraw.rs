@@ -1,7 +1,8 @@
 use {
     crate::{
         instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-        write_bytes, UNINIT_ACCOUNT_REF, UNINIT_BYTE, UNINIT_INSTRUCTION_ACCOUNT,
+        write_bytes, AE_CIPHERTEXT_LEN, UNINIT_ACCOUNT_REF, UNINIT_BYTE,
+        UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::slice::from_raw_parts,
     solana_account_view::AccountView,
@@ -53,7 +54,7 @@ use {
 /// 5. `[]` The multisig source account owner.
 /// 6. ...`[signer]` Required M signer accounts for the SPL Token Multisig
 ///    account.
-pub struct Withdraw<'a, 'b> {
+pub struct Withdraw<'a, 'b, 'data> {
     /// The Token account
     pub token_account: &'a AccountView,
     /// The SPL Token mint
@@ -78,6 +79,8 @@ pub struct Withdraw<'a, 'b> {
     pub amount: u64,
     /// The expected number of base 10 digits to the right of the decimal place
     pub decimals: u8,
+    /// The new decrypt-able balance if the withdrawal succeeds
+    pub new_decryptable_available_balance: &'data [u8; AE_CIPHERTEXT_LEN],
     /// Relative location of the
     /// `ProofInstruction::VerifyCiphertextCommitmentEquality` instruction
     /// to the `Withdraw` instruction in the transaction. If the offset is
@@ -89,7 +92,7 @@ pub struct Withdraw<'a, 'b> {
     pub range_proof_instruction_offset: i8,
 }
 
-impl Withdraw<'_, '_> {
+impl Withdraw<'_, '_, '_> {
     const DISCRIMINATOR: u8 = 6;
 
     #[inline(always)]
@@ -186,7 +189,7 @@ impl Withdraw<'_, '_> {
         }
 
         // instruction data
-        let mut instruction_data = [UNINIT_BYTE; 2 + 8 + 1 + 1 + 1];
+        let mut instruction_data = [UNINIT_BYTE; 2 + 8 + 1 + 36 + 1 + 1];
 
         // discriminators
         write_bytes(
@@ -200,18 +203,24 @@ impl Withdraw<'_, '_> {
         // amount
         write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
 
+        // new decrypt-able available balance
+        write_bytes(
+            &mut instruction_data[10..46],
+            self.new_decryptable_available_balance,
+        );
+
         unsafe {
             // decimals
-            instruction_data.get_unchecked_mut(10).write(self.decimals);
+            instruction_data.get_unchecked_mut(46).write(self.decimals);
 
             // equalit proof instruction offset
             instruction_data
-                .get_unchecked_mut(11)
+                .get_unchecked_mut(47)
                 .write(self.equality_proof_instruction_offset as u8);
 
             // range proof instruction offset
             instruction_data
-                .get_unchecked_mut(12)
+                .get_unchecked_mut(48)
                 .write(self.range_proof_instruction_offset as u8);
         }
 
