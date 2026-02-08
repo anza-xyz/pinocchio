@@ -7,19 +7,29 @@ use {
     solana_program_error::ProgramResult,
 };
 
-/// Initialize the Transfer Hook extension on a mint.
+/// Initialize a new mint with a transfer hook program.
 ///
-/// Expected accounts:
+/// Fails if the mint has already been initialized, so must be called before
+/// `InitializeMint`.
 ///
-/// 0. `[writable]` The mint account to initialize the Transfer Hook extension.
+/// The mint must have exactly enough space allocated for the base mint (82
+/// bytes), plus 83 bytes of padding, 1 byte reserved for the account type,
+/// then space required for this extension, plus any others.
+///
+/// Accounts expected by this instruction:
+///
+///   0. `[writable]` The mint to initialize.
 pub struct InitializeTransferHook<'a, 'b> {
-    /// Mint Account to initialize.
-    pub mint_account: &'a AccountView,
-    /// Optional authority that can set the transfer hook program id
+    /// The token mint.
+    pub mint: &'a AccountView,
+
+    /// The address for the account that can update the program id.
     pub authority: Option<&'b Address>,
-    /// Program that authorizes the transfer
+
+    /// The program id that performs logic during transfers.
     pub program_id: Option<&'b Address>,
-    /// Token Program
+
+    /// The token program.
     pub token_program: &'b Address,
 }
 
@@ -28,39 +38,45 @@ impl InitializeTransferHook<'_, '_> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let accounts = [InstructionAccount::writable(self.mint_account.address())];
+        // Instruction data.
 
-        let mut data = [UNINIT_BYTE; 66];
+        let mut instruction_data = [UNINIT_BYTE; 66];
 
-        // Encode discriminators (TransferHook + Initialize)
+        // discriminator
         write_bytes(
-            &mut data[..2],
+            &mut instruction_data[..2],
             &[
                 ExtensionDiscriminator::TransferHook as u8,
                 InitializeTransferHook::DISCRIMINATOR,
             ],
         );
+        // authority
+        write_bytes(
+            &mut instruction_data[2..34],
+            if let Some(authority) = self.authority {
+                authority.as_ref()
+            } else {
+                &[0; 32]
+            },
+        );
+        // program_id
+        write_bytes(
+            &mut instruction_data[34..66],
+            if let Some(program_id) = self.program_id {
+                program_id.as_ref()
+            } else {
+                &[0; 32]
+            },
+        );
 
-        // Set authority at offset [2..34]
-        if let Some(authority) = self.authority {
-            write_bytes(&mut data[2..34], authority.to_bytes().as_ref());
-        } else {
-            write_bytes(&mut data[2..34], &[0; 32]);
-        }
-
-        // Set program_id at offset [34..66]
-        if let Some(program_id) = self.program_id {
-            write_bytes(&mut data[34..66], program_id.to_bytes().as_ref());
-        } else {
-            write_bytes(&mut data[34..66], &[0; 32]);
-        }
+        // Instruction.
 
         let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &accounts,
-            data: unsafe { from_raw_parts(data.as_ptr() as _, data.len()) },
+            accounts: &[InstructionAccount::writable(self.mint.address())],
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
         };
 
-        invoke(&instruction, &[self.mint_account])
+        invoke(&instruction, &[self.mint])
     }
 }
