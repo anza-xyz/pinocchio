@@ -26,14 +26,17 @@ jobs:
           components: audit, miri
 
       - name: cargo-audit
-        run: pnpm cargo-audit
+        run: just audit
 
       - name: cargo-miri
-        run: pnpm miri
+        run: just miri
 
       - name: Filter members
         id: filter
-        run: pnpm tsx ./scripts/setup/members.mts
+        shell: bash
+        run: |
+          MEMBERS_JSON=$(just members | jq -R -s -c 'split(" ") | map(select(length > 0))')
+          echo "members=$MEMBERS_JSON" >> $GITHUB_OUTPUT
 
   spellcheck:
     name: Spellcheck
@@ -49,7 +52,7 @@ jobs:
           components: spellcheck
 
       - name: cargo-spellcheck
-        run: pnpm spellcheck
+        run: just spellcheck
 
   process:
     name: Check
@@ -71,19 +74,19 @@ jobs:
           solana: true
 
       - name: fmt
-        run: pnpm format ${{ matrix.member }}
+        run: just format ${{ matrix.member }}
 
       - name: clippy
-        run: pnpm clippy ${{ matrix.member }}
+        run: just clippy ${{ matrix.member }}
 
       - name: cargo-doc
-        run: pnpm doc ${{ matrix.member }}
+        run: just doc ${{ matrix.member }}
 
       - name: cargo-hack
-        run: pnpm hack ${{ matrix.member }}
+        run: just hack ${{ matrix.member }}
 
       - name: build-sbf
-        run: pnpm build-sbf ${{ matrix.member }}
+        run: just build-sbf ${{ matrix.member }}
 
       - name: test
-        run: pnpm test ${{ matrix.member }}
+        run: just test ${{ matrix.member }}

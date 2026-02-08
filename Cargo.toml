@@ -39,4 +39,4 @@ tag-message = "Publish {{crate_name}} v{{version}}"
 consolidate-commits = false
 
 [workspace.metadata.spellcheck]
-config = "scripts/setup/spellcheck.toml"
+config = "spellcheck.toml"
