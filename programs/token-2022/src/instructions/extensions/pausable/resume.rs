@@ -87,12 +87,10 @@ impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // mint
             instruction_accounts
                 .get_unchecked_mut(0)
                 .write(InstructionAccount::writable(self.mint.address()));
 
-            // authority
             instruction_accounts
                 .get_unchecked_mut(1)
                 .write(InstructionAccount::new(
@@ -101,7 +99,6 @@ impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
                     self.signers.is_empty(),
                 ));
 
-            // signer accounts
             for (account, signer) in instruction_accounts[2..]
                 .iter_mut()
                 .zip(self.signers.iter())
@@ -110,31 +107,17 @@ impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
             }
         }
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            data: &[ExtensionDiscriminator::Pausable as u8, Self::DISCRIMINATOR],
-            accounts: unsafe {
-                slice::from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
-            },
-        };
-
         // Accounts.
 
-        // Account view array
         const UNINIT_ACCOUNT_VIEWS: MaybeUninit<&AccountView> = MaybeUninit::uninit();
         let mut accounts = [UNINIT_ACCOUNT_VIEWS; 2 + MAX_MULTISIG_SIGNERS];
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // mint
             accounts.get_unchecked_mut(0).write(self.mint);
 
-            // authority
             accounts.get_unchecked_mut(1).write(self.authority);
 
-            // signer accounts
             for (account, signer) in accounts
                 .get_unchecked_mut(2..)
                 .iter_mut()
@@ -145,7 +128,15 @@ impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    slice::from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: &[ExtensionDiscriminator::Pausable as u8, Self::DISCRIMINATOR],
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe { slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )

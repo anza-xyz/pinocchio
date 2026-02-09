@@ -36,26 +36,24 @@ impl Initialize<'_, '_> {
         let mut instruction_data = [UNINIT_BYTE; 34];
 
         // discriminators
-        write_bytes(
-            &mut instruction_data[..2],
-            &[ExtensionDiscriminator::Pausable as u8, Self::DISCRIMINATOR],
-        );
+        instruction_data[0].write(ExtensionDiscriminator::Pausable as u8);
+        instruction_data[1].write(Self::DISCRIMINATOR);
         // authority
         write_bytes(&mut instruction_data[2..34], self.authority.as_ref());
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: &[InstructionAccount::writable(self.mint.address())],
-            data: unsafe {
-                from_raw_parts(
-                    instruction_data.as_ptr() as *const _,
-                    instruction_data.len(),
-                )
+        invoke(
+            &InstructionView {
+                program_id: self.token_program,
+                accounts: &[InstructionAccount::writable(self.mint.address())],
+                // SAFETY: `instruction_data` is initialized.
+                data: unsafe {
+                    from_raw_parts(
+                        instruction_data.as_ptr() as *const _,
+                        instruction_data.len(),
+                    )
+                },
             },
-        };
-
-        invoke(&instruction, &[self.mint])
+            &[self.mint],
+        )
     }
 }
