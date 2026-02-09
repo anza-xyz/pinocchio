@@ -11,14 +11,14 @@ use {
 /// Creates the native mint.
 ///
 /// This instruction only needs to be invoked once after deployment and is
-/// permissionless, Wrapped SOL (`native_mint::id()`) will not be
+/// permissionless, Wrapped SOL ([`crate::native_mint::id()`]) will not be
 /// available until this instruction is successfully executed.
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writeable,signer]` Funding account (must be a system account)
-///   1. `[writable]` The native mint account to create
-///   2. `[]` System program for mint account funding
+///   0. `[writeable,signer]` Funding account (must be a system account).
+///   1. `[writable]` The native mint account to create.
+///   2. `[]` System program for mint account funding.
 pub struct CreateNativeMint<'a, 'b> {
     /// Funding account (must be a system account).
     pub payer: &'a AccountView,
