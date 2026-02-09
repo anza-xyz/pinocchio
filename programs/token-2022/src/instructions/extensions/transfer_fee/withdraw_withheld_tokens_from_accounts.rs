@@ -64,20 +64,13 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         authority: &'a AccountView,
         sources: &'c [&'a AccountView],
     ) -> Self {
-        Self {
-            mint,
-            destination,
-            authority,
-            signers: &[],
-            sources,
-            token_program,
-        }
+        Self::with_signers(token_program, mint, destination, authority, sources, &[])
     }
 
     /// Creates a new `WithdrawWithheldTokensFromAccounts` instruction with a
     /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
-    pub fn with_multisig(
+    pub fn with_signers(
         token_program: &'b Address,
         mint: &'a AccountView,
         destination: &'a AccountView,
@@ -119,17 +112,14 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         // SAFETY: The expected number of accounts has been validated to be less than
         // the maximum allocated.
         unsafe {
-            // mint account
             instruction_accounts
                 .get_unchecked_mut(0)
                 .write(InstructionAccount::writable(self.mint.address()));
 
-            // destination account
             instruction_accounts
                 .get_unchecked_mut(1)
                 .write(InstructionAccount::writable(self.destination.address()));
 
-            // authority account (single or multisig)
             instruction_accounts
                 .get_unchecked_mut(2)
                 .write(InstructionAccount::new(
@@ -138,7 +128,6 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
                     self.signers.is_empty(),
                 ));
 
-            // multisig signer accounts
             for (instruction_account, signer) in instruction_accounts
                 .get_unchecked_mut(3..)
                 .iter_mut()
@@ -147,7 +136,6 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
                 instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
             }
 
-            // token account sources
             for (instruction_account, source) in instruction_accounts
                 .get_unchecked_mut(3 + self.signers.len()..)
                 .iter_mut()
@@ -157,20 +145,6 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
             }
         }
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: unsafe {
-                from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
-            },
-            data: &[
-                ExtensionDiscriminator::TransferFee as u8,
-                Self::DISCRIMINATOR,
-                self.sources.len() as u8,
-            ],
-        };
-
         // Accounts.
 
         let mut accounts = [UNINIT_ACCOUNT_REF; MAX_STATIC_CPI_ACCOUNTS];
@@ -178,16 +152,12 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         // SAFETY: The expected number of accounts has been validated to be less than
         // the maximum allocated.
         unsafe {
-            // mint account
             accounts.get_unchecked_mut(0).write(self.mint);
 
-            // destination account
             accounts.get_unchecked_mut(1).write(self.destination);
 
-            // authority account (single or multisig)
             accounts.get_unchecked_mut(2).write(self.authority);
 
-            // multisig signer accounts
             for (account, signer) in accounts
                 .get_unchecked_mut(3..)
                 .iter_mut()
@@ -196,7 +166,6 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
                 account.write(*signer);
             }
 
-            // token account sources
             for (account, source) in accounts
                 .get_unchecked_mut(3 + self.signers.len()..)
                 .iter_mut()
@@ -207,7 +176,19 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         }
 
         invoke_signed_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: &[
+                    ExtensionDiscriminator::TransferFee as u8,
+                    Self::DISCRIMINATOR,
+                    self.sources.len() as u8,
+                ],
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )

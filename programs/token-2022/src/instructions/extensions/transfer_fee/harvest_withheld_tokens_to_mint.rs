@@ -50,12 +50,10 @@ impl HarvestWithheldTokensToMint<'_, '_, '_> {
         // SAFETY: The expected number of accounts has been validated to be less than
         // the maximum allocated.
         unsafe {
-            // mint account
             instruction_accounts
                 .get_unchecked_mut(0)
                 .write(InstructionAccount::writable(self.mint.address()));
 
-            // token account sources
             for (instruction_account, source) in instruction_accounts
                 .get_unchecked_mut(1..)
                 .iter_mut()
@@ -65,19 +63,6 @@ impl HarvestWithheldTokensToMint<'_, '_, '_> {
             }
         }
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: unsafe {
-                from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
-            },
-            data: &[
-                ExtensionDiscriminator::TransferFee as u8,
-                Self::DISCRIMINATOR,
-            ],
-        };
-
         // Accounts.
 
         let mut accounts = [UNINIT_ACCOUNT_REF; MAX_STATIC_CPI_ACCOUNTS];
@@ -85,10 +70,8 @@ impl HarvestWithheldTokensToMint<'_, '_, '_> {
         // SAFETY: The expected number of accounts has been validated to be less than
         // the maximum allocated.
         unsafe {
-            // mint account
             accounts.get_unchecked_mut(0).write(self.mint);
 
-            // token account sources
             for (account, source) in accounts
                 .get_unchecked_mut(1..)
                 .iter_mut()
@@ -98,8 +81,20 @@ impl HarvestWithheldTokensToMint<'_, '_, '_> {
             }
         }
 
-        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(&instruction, unsafe {
-            from_raw_parts(accounts.as_ptr() as _, expected_accounts)
-        })
+        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: &[
+                    ExtensionDiscriminator::TransferFee as u8,
+                    Self::DISCRIMINATOR,
+                ],
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
+            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+        )
     }
 }

@@ -70,8 +70,8 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
     /// Instruction discriminator.
     pub const DISCRIMINATOR: u8 = 1;
 
-    /// Creates a new `TransferCheckedWithFee` instruction
-    /// with a single owner/delegate authority.
+    /// Creates a new `TransferCheckedWithFee` instruction with a single
+    /// owner/delegate authority.
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     pub fn new(
@@ -84,33 +84,33 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
         decimals: u8,
         fee: u64,
     ) -> Self {
-        Self {
+        Self::with_signers(
+            token_program,
             source,
             mint,
             destination,
             authority,
-            signers: &[],
             amount,
             decimals,
             fee,
-            token_program,
-        }
+            &[],
+        )
     }
 
-    /// Creates a new `TransferCheckedWithFee` instruction with a
-    /// multisignature owner/delegate authority and signer accounts.
+    /// Creates a new `TransferCheckedWithFee` instruction with a multisignature
+    /// owner/delegate authority and signer accounts.
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
-    pub fn with_multisig(
+    pub fn with_signers(
         token_program: &'b Address,
         source: &'a AccountView,
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        signers: &'c [&'a AccountView],
         amount: u64,
         decimals: u8,
         fee: u64,
+        signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
             source,
@@ -136,28 +136,26 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
             return Err(ProgramError::InvalidArgument);
         }
 
+        let expected_accounts = 4 + self.signers.len();
+
         // Instruction accounts.
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 4 + MAX_MULTISIG_SIGNERS];
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // source account
             instruction_accounts
                 .get_unchecked_mut(0)
                 .write(InstructionAccount::writable(self.source.address()));
 
-            // mint account
             instruction_accounts
                 .get_unchecked_mut(1)
                 .write(InstructionAccount::readonly(self.mint.address()));
 
-            // destination account
             instruction_accounts
                 .get_unchecked_mut(2)
                 .write(InstructionAccount::writable(self.destination.address()));
 
-            // authority account (single or multisig)
             instruction_accounts
                 .get_unchecked_mut(3)
                 .write(InstructionAccount::new(
@@ -166,7 +164,6 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
                     self.signers.is_empty(),
                 ));
 
-            // multisig signer accounts
             for (instruction_account, signer) in instruction_accounts
                 .get_unchecked_mut(4..)
                 .iter_mut()
@@ -176,55 +173,20 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
             }
         }
 
-        // Instruction data.
-        let mut instruction_data = [UNINIT_BYTE; 19];
-
-        // discriminator
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::TransferFee as u8,
-                Self::DISCRIMINATOR,
-            ],
-        );
-        // amount
-        write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
-        // decimals
-        unsafe { instruction_data.get_unchecked_mut(10).write(self.decimals) };
-        // fee
-        write_bytes(&mut instruction_data[11..19], &self.fee.to_le_bytes());
-
-        // Instruction.
-
-        let expected_accounts = 4 + self.signers.len();
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: unsafe {
-                from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
-            },
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
-        };
-
         // Accounts.
 
         let mut accounts = [UNINIT_ACCOUNT_REF; 4 + MAX_MULTISIG_SIGNERS];
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // source account
             accounts.get_unchecked_mut(0).write(self.source);
 
-            // mint account
             accounts.get_unchecked_mut(1).write(self.mint);
 
-            // destination account
             accounts.get_unchecked_mut(2).write(self.destination);
 
-            // authority account (single or multisig)
             accounts.get_unchecked_mut(3).write(self.authority);
 
-            // multisig signer accounts
             for (account, signer) in accounts
                 .get_unchecked_mut(4..)
                 .iter_mut()
@@ -234,8 +196,33 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
             }
         }
 
+        // Instruction data.
+
+        let mut instruction_data = [UNINIT_BYTE; 19];
+
+        // discriminators
+        instruction_data[0].write(ExtensionDiscriminator::TransferFee as u8);
+        instruction_data[1].write(Self::DISCRIMINATOR);
+        // amount
+        write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
+        // decimals
+        instruction_data[10].write(self.decimals);
+        // fee
+        write_bytes(&mut instruction_data[11..19], &self.fee.to_le_bytes());
+
         invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                // SAFETY: instruction data is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )

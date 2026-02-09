@@ -47,6 +47,7 @@ impl InitializeTransferFeeConfig<'_, '_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Instruction data.
+
         let mut instruction_data = [UNINIT_BYTE; 78];
         // Fixed part of the instruction data:
         // - discriminators
@@ -90,14 +91,14 @@ impl InitializeTransferFeeConfig<'_, '_> {
             &self.maximum_fee.to_le_bytes(),
         );
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: &[InstructionAccount::writable(self.mint.address())],
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, data_len) },
-        };
-
-        invoke(&instruction, &[self.mint])
+        invoke(
+            &InstructionView {
+                program_id: self.token_program,
+                accounts: &[InstructionAccount::writable(self.mint.address())],
+                // SAFETY: instruction data is initialized to `data_len` bytes.
+                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, data_len) },
+            },
+            &[self.mint],
+        )
     }
 }

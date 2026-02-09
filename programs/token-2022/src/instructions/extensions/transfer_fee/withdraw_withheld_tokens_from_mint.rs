@@ -47,8 +47,39 @@ pub struct WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
     pub token_program: &'b Address,
 }
 
-impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
+impl<'a, 'b, 'c> WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
     pub const DISCRIMINATOR: u8 = 2;
+
+    /// Creates a new `WithdrawWithheldTokensFromMint` instruction
+    /// with a single owner/delegate authority.
+    #[inline(always)]
+    pub fn new(
+        token_program: &'b Address,
+        mint: &'a AccountView,
+        destination: &'a AccountView,
+        authority: &'a AccountView,
+    ) -> Self {
+        Self::with_signers(token_program, mint, destination, authority, &[])
+    }
+
+    /// Creates a new `WithdrawWithheldTokensFromMint` instruction with a
+    /// multisignature owner/delegate authority and signer accounts.
+    #[inline(always)]
+    pub fn with_signers(
+        token_program: &'b Address,
+        mint: &'a AccountView,
+        destination: &'a AccountView,
+        authority: &'a AccountView,
+        signers: &'c [&'a AccountView],
+    ) -> Self {
+        Self {
+            mint,
+            destination,
+            authority,
+            signers,
+            token_program,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -61,23 +92,22 @@ impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
             return Err(ProgramError::InvalidArgument);
         }
 
+        let expected_accounts = 3 + self.signers.len();
+
         // Instruction accounts.
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 3 + MAX_MULTISIG_SIGNERS];
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // mint account
             instruction_accounts
                 .get_unchecked_mut(0)
                 .write(InstructionAccount::writable(self.mint.address()));
 
-            // destination account
             instruction_accounts
                 .get_unchecked_mut(1)
                 .write(InstructionAccount::writable(self.destination.address()));
 
-            // authority account (single or multisig)
             instruction_accounts
                 .get_unchecked_mut(2)
                 .write(InstructionAccount::new(
@@ -86,7 +116,6 @@ impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
                     self.signers.is_empty(),
                 ));
 
-            // multisig signer accounts
             for (instruction_account, signer) in instruction_accounts
                 .get_unchecked_mut(3..)
                 .iter_mut()
@@ -96,37 +125,18 @@ impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
             }
         }
 
-        // Instruction.
-
-        let expected_accounts = 4 + self.signers.len();
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: unsafe {
-                from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
-            },
-            data: &[
-                ExtensionDiscriminator::TransferFee as u8,
-                Self::DISCRIMINATOR,
-            ],
-        };
-
         // Accounts.
 
         let mut accounts = [UNINIT_ACCOUNT_REF; 3 + MAX_MULTISIG_SIGNERS];
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // mint account
             accounts.get_unchecked_mut(0).write(self.mint);
 
-            // destination account
             accounts.get_unchecked_mut(1).write(self.destination);
 
-            // authority account (single or multisig)
             accounts.get_unchecked_mut(2).write(self.authority);
 
-            // multisig signer accounts
             for (account, signer) in accounts
                 .get_unchecked_mut(3..)
                 .iter_mut()
@@ -137,7 +147,18 @@ impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: &[
+                    ExtensionDiscriminator::TransferFee as u8,
+                    Self::DISCRIMINATOR,
+                ],
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )
