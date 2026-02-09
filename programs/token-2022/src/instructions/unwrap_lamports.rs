@@ -136,16 +136,12 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // account
             accounts.get_unchecked_mut(0).write(self.account);
 
-            // destination
             accounts.get_unchecked_mut(1).write(self.destination);
 
-            // authority
             accounts.get_unchecked_mut(2).write(self.authority);
 
-            // signer acccounts
             for (account, signer) in accounts
                 .get_unchecked_mut(3..)
                 .iter_mut()
