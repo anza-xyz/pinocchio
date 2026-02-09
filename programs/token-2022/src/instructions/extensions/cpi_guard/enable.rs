@@ -53,12 +53,7 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
         account: &'a AccountView,
         authority: &'a AccountView,
     ) -> Self {
-        Self {
-            account,
-            authority,
-            signers: &[],
-            token_program,
-        }
+        Self::with_signers(token_program, account, authority, &[])
     }
 
     /// Creates a new `Enable` instruction with a multisignature owner/delegate
@@ -99,12 +94,10 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // account
             instruction_accounts
                 .get_unchecked_mut(0)
                 .write(InstructionAccount::writable(self.account.address()));
 
-            // authority
             instruction_accounts
                 .get_unchecked_mut(1)
                 .write(InstructionAccount::new(
@@ -113,7 +106,6 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
                     self.signers.is_empty(),
                 ));
 
-            // signer accounts
             for (account, signer) in instruction_accounts
                 .get_unchecked_mut(2..)
                 .iter_mut()
@@ -123,16 +115,6 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
             }
         }
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            data: &[ExtensionDiscriminator::CpiGuard as u8, Self::DISCRIMINATOR],
-            accounts: unsafe {
-                slice::from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
-            },
-        };
-
         // Accounts.
 
         const UNINIT_ACCOUNT_VIEWS: MaybeUninit<&AccountView> = MaybeUninit::uninit();
@@ -140,13 +122,10 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // account
             accounts.get_unchecked_mut(0).write(self.account);
 
-            // authority
             accounts.get_unchecked_mut(1).write(self.authority);
 
-            // signer accounts
             for (account, signer) in accounts
                 .get_unchecked_mut(2..)
                 .iter_mut()
@@ -157,7 +136,15 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    slice::from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: &[ExtensionDiscriminator::CpiGuard as u8, Self::DISCRIMINATOR],
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe {
                 slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
             },
