@@ -58,13 +58,7 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
         authority: &'a AccountView,
         rate: i16,
     ) -> Self {
-        Self {
-            mint,
-            authority,
-            signers: &[],
-            rate,
-            token_program,
-        }
+        Self::with_signers(token_program, mint, authority, rate, &[])
     }
 
     /// Creates a new `Update` instruction with a multisignature owner/delegate
@@ -128,32 +122,6 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
             }
         }
 
-        // Instruction data.
-
-        let mut instruction_data = [UNINIT_BYTE; 4];
-
-        // discriminators
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::TransferHook as u8,
-                Self::DISCRIMINATOR,
-            ],
-        );
-
-        // transfer_hook_program_id
-        write_bytes(&mut instruction_data[2..4], &self.rate.to_le_bytes());
-
-        //Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: unsafe {
-                from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
-            },
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
-        };
-
         // Accounts.
 
         const UNINIT_INFO: MaybeUninit<&AccountView> = MaybeUninit::uninit();
@@ -161,13 +129,10 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // mint
             accounts.get_unchecked_mut(0).write(self.mint);
 
-            // authority
             accounts.get_unchecked_mut(1).write(self.authority);
 
-            // signer accounts
             for (account, signer) in accounts
                 .get_unchecked_mut(2..)
                 .iter_mut()
@@ -177,8 +142,29 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
             }
         }
 
+        // Instruction data.
+
+        let mut instruction_data = [UNINIT_BYTE; 4];
+
+        // discriminators
+        instruction_data[0].write(ExtensionDiscriminator::InterestBearingMint as u8);
+        instruction_data[1].write(Self::DISCRIMINATOR);
+        // rate
+        write_bytes(&mut instruction_data[2..4], &self.rate.to_le_bytes());
+
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                // SAFETY: `instruction_data` is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe { slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )
