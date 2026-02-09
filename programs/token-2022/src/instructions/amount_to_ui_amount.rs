@@ -31,7 +31,7 @@ pub struct AmountToUiAmount<'a, 'b> {
     pub mint: &'a AccountView,
 
     /// The amount of tokens to convert.
-    amount: u64,
+    pub amount: u64,
 
     // The token program.
     pub token_program: &'b Address,

@@ -21,7 +21,7 @@ pub struct UiAmountToAmount<'a, 'b, const LENGTH: usize> {
     pub mint: &'a AccountView,
 
     /// The amount of tokens to convert.
-    amount: &'b str,
+    pub amount: &'b str,
 }
 
 impl<const LENGTH: usize> UiAmountToAmount<'_, '_, LENGTH> {

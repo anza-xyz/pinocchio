@@ -22,7 +22,7 @@ pub struct AmountToUiAmount<'a> {
     pub mint: &'a AccountView,
 
     /// The amount of tokens to convert.
-    amount: u64,
+    pub amount: u64,
 }
 
 impl AmountToUiAmount<'_> {

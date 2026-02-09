@@ -29,7 +29,7 @@ pub struct UiAmountToAmount<'a, 'b, 'c, const LENGTH: usize> {
     pub mint: &'a AccountView,
 
     /// The amount of tokens to convert.
-    amount: &'c str,
+    pub amount: &'c str,
 
     // The token program.
     pub token_program: &'b Address,
