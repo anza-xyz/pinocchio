@@ -124,16 +124,12 @@ impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // account
             accounts.get_unchecked_mut(0).write(self.account);
 
-            // destination
             accounts.get_unchecked_mut(1).write(self.destination);
 
-            // authority
             accounts.get_unchecked_mut(2).write(self.authority);
 
-            // signer acccounts
             for (account, signer) in accounts
                 .get_unchecked_mut(3..)
                 .iter_mut()
@@ -146,11 +142,13 @@ impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
             &InstructionView {
                 program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
                 accounts: unsafe {
                     from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
                 },
                 data: &[Self::DISCRIMINATOR],
             },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )
