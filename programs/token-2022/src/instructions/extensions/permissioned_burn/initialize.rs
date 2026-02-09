@@ -32,14 +32,9 @@ impl Initialize<'_, '_> {
 
         let mut instruction_data = [UNINIT_BYTE; 34];
 
-        // discriminator
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::PermissionedBurn as u8,
-                Self::DISCRIMINATOR,
-            ],
-        );
+        // discriminators
+        instruction_data[0].write(ExtensionDiscriminator::PermissionedBurn as u8);
+        instruction_data[1].write(Self::DISCRIMINATOR);
         // authority
         write_bytes(&mut instruction_data[2..34], self.authority.as_ref());
 
@@ -47,6 +42,7 @@ impl Initialize<'_, '_> {
             &InstructionView {
                 program_id: self.token_program,
                 accounts: &[InstructionAccount::writable(self.mint.address())],
+                // SAFETY: `instruction_data` is initialized.
                 data: unsafe {
                     from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
                 },

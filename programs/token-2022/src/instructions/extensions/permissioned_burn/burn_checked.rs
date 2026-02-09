@@ -169,25 +169,20 @@ impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
         // Accounts.
 
         const UNINIT_INFO: MaybeUninit<&AccountView> = MaybeUninit::uninit();
-        let mut accounts = [UNINIT_INFO; 2 + MAX_MULTISIG_SIGNERS];
+        let mut accounts = [UNINIT_INFO; 4 + MAX_MULTISIG_SIGNERS];
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            // account
             accounts.get_unchecked_mut(0).write(self.account);
 
-            // mint account
             accounts.get_unchecked_mut(1).write(self.mint);
 
-            // permissioned_burn_authority
             accounts
                 .get_unchecked_mut(2)
                 .write(self.permissioned_burn_authority);
 
-            // authority
             accounts.get_unchecked_mut(3).write(self.authority);
 
-            // signer accounts
             for (account, signer) in accounts
                 .get_unchecked_mut(4..)
                 .iter_mut()
@@ -202,26 +197,21 @@ impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
         let mut instruction_data = [UNINIT_BYTE; 11];
 
         // discriminators
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::PermissionedBurn as u8,
-                Self::DISCRIMINATOR,
-            ],
-        );
+        instruction_data[0].write(ExtensionDiscriminator::PermissionedBurn as u8);
+        instruction_data[1].write(Self::DISCRIMINATOR);
         // amount
         write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
         // decimals
         instruction_data[10].write(self.decimals);
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
                 accounts: unsafe {
                     from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
                 },
-                // SAFETY: instruction data is initialized.
+                // SAFETY: `instruction_data` is initialized.
                 data: unsafe {
                     from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
                 },
