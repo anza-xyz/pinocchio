@@ -5,9 +5,21 @@ pub mod state;
 
 use core::mem::MaybeUninit;
 
+use solana_account_view::AccountView;
+use solana_instruction_view::InstructionAccount;
+
 solana_address::declare_id!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
+const ELGAMAL_PUBKEY_LEN: usize = 32;
+const AE_CIPHERTEXT_LEN: usize = 36;
+const ELGAMAL_CIPHERTEXT_LEN: usize = 64;
+
 const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
+
+const UNINIT_ACCOUNT_REF: MaybeUninit<&AccountView> = MaybeUninit::<&AccountView>::uninit();
+
+const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
+    MaybeUninit::<InstructionAccount>::uninit();
 
 #[inline(always)]
 fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
