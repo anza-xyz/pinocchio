@@ -1,13 +1,13 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView};
-use solana_program_error::ProgramResult;
-
-use crate::{
-    instructions::ExtensionDiscriminator, write_bytes, AE_CIPHERTEXT_LEN, ELGAMAL_PUBKEY_LEN,
-    UNINIT_BYTE,
+use {
+    crate::{
+        instructions::ExtensionDiscriminator, write_bytes, AE_CIPHERTEXT_LEN, ELGAMAL_PUBKEY_LEN,
+        UNINIT_BYTE,
+    },
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
+    solana_program_error::ProgramResult,
 };
 
 /// Initializes confidential mints and burns for a mint.
@@ -29,7 +29,7 @@ pub struct InitializeMint<'a, 'data> {
     /// The token program address
     pub token_program: &'a Address,
 
-    /// Data expecteds:
+    /// Data expected:
     ///
     /// The ElGamal pubkey used to encrypt the confidential supply
     pub supply_elgamal_pubkey: &'data [u8; ELGAMAL_PUBKEY_LEN],
@@ -37,9 +37,10 @@ pub struct InitializeMint<'a, 'data> {
     pub decryptable_supply: &'data [u8; AE_CIPHERTEXT_LEN],
 }
 
-impl<'a, 'data> InitializeMint<'a, 'data> {
+impl InitializeMint<'_, '_> {
     pub const DISCRIMINATOR: u8 = 0;
 
+    #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         let mut instruction_data = [UNINIT_BYTE; 2 + 32 + 36];
 
