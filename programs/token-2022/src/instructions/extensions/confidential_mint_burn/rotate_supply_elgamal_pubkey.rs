@@ -14,7 +14,7 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Rotates the ElGamal pubkey used to encrypt confidential supply
+/// Rotates the `ElGamal` pubkey used to encrypt confidential supply
 ///
 /// The pending burn amount must be zero in order for this instruction
 /// to be processed successfully.
@@ -52,7 +52,7 @@ pub struct RotateSupplyElgamalPubkey<'a, 'b, 'data> {
 
     /// Data expected:
     ///
-    /// The new ElGamal pubkey for supply encryption
+    /// The new `ElGamal` pubkey for supply encryption
     pub new_supply_elgamal_pubkey: &'data [u8; ELGAMAL_PUBKEY_LEN],
     /// The location of the
     /// `ProofInstruction::VerifyCiphertextCiphertextEquality` instruction
@@ -124,7 +124,7 @@ impl RotateSupplyElgamalPubkey<'_, '_, '_> {
             ],
         );
 
-        // new elgamal pubkey
+        // new `ElGamal` pubkey
         write_bytes(
             &mut instruction_data[3..3 + ELGAMAL_PUBKEY_LEN],
             self.new_supply_elgamal_pubkey.as_ref(),

@@ -31,9 +31,9 @@ pub struct InitializeMint<'a, 'data> {
 
     /// Data expected:
     ///
-    /// The ElGamal pubkey used to encrypt the confidential supply
+    /// The `ElGamal` pubkey used to encrypt the confidential supply
     pub supply_elgamal_pubkey: &'data [u8; ELGAMAL_PUBKEY_LEN],
-    /// The initial 0 supply encrypted with the supply aes key
+    /// The initial 0 supply encrypted with the supply `AES` key
     pub decryptable_supply: &'data [u8; AE_CIPHERTEXT_LEN],
 }
 
