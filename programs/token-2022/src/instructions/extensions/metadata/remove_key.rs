@@ -35,22 +35,22 @@ pub struct RemoveKey<'a, 'b> {
 }
 
 impl RemoveKey<'_, '_> {
-    /// Based on spl_token_metadata_interface hash
+    /// Based on `spl_token_metadata_interface` hash.
     pub const DISCRIMINATOR: [u8; 8] = [234, 18, 32, 56, 89, 141, 37, 181];
 
-    /// Invoke the RemoveKey instruction
+    /// Invoke the `RemoveKey` instruction.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
-    /// Invoke the RemoveKey instruction with signers
+    /// Invoke the `RemoveKey` instruction with signers.
     ///
     /// Instruction data layout:
-    /// - [0..8]: instruction discriminator (8 bytes)
-    /// - [8..9]: idempotent flag (1 byte, bool as u8)
-    /// - [9..13]: key length (4 bytes, u32)
-    /// - [13..13+k]: key string (k bytes, UTF-8)
+    /// - `[0..8]`: instruction discriminator (8 bytes)
+    /// - `[8..9]`: idempotent flag (1 byte, bool as `u8`)
+    /// - `[9..13]`: key length (4 bytes, `u32`)
+    /// - `[13..13+K]`: key string (K bytes, UTF-8)
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         let ix_len = 8 // instruction discriminator

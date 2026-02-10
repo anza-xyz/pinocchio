@@ -15,15 +15,14 @@ use crate::ID;
 /// - `[..+S]`:    symbol (UTF-8)
 /// - `[..+4]`:    `uri_len` (`u32` LE)
 /// - `[..+U]`:    uri (UTF-8)
-/// - `[..+4]`:    additional_metadata_len (`u32` LE)
+/// - `[..+4]`:    `additional_metadata_len` (`u32` LE)
 /// - `[..+A]`:    additional metadata
 pub struct Metadata<'a> {
     data: &'a [u8],
 }
 
 impl<'a> Metadata<'a> {
-    /// Minimum account data size:
-    /// 32 (`update_authority`) + 32 (mint) + 4×4 (length prefixes) = 80 bytes.
+    /// Minimum account data size: `32 + 32 + 4*4 = 80` bytes.
     pub const MIN_SIZE: usize = 80;
 
     const UPDATE_AUTHORITY_OFFSET: usize = 0;
@@ -114,8 +113,8 @@ impl<'a> Metadata<'a> {
 
     /// Compute the byte offset past `n` variable-length fields (0-indexed).
     ///
-    /// For n=0 returns the start of the name length prefix.
-    /// For n=1 returns the start of the symbol length prefix, etc.
+    /// For `n=0` returns the start of the name length prefix.
+    /// For `n=1` returns the start of the symbol length prefix, etc.
     #[inline(always)]
     unsafe fn varlen_offset(&self, n: usize) -> usize {
         let mut offset = Self::FIRST_VARLEN_OFFSET;

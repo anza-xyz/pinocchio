@@ -43,25 +43,25 @@ pub struct InitializeTokenMetadata<'a, 'b> {
 }
 
 impl InitializeTokenMetadata<'_, '_> {
-    /// Based on spl_token_metadata_interface hash
+    /// Based on `spl_token_metadata_interface` hash.
     pub const DISCRIMINATOR: [u8; 8] = [210, 225, 30, 162, 88, 184, 77, 141];
 
-    /// Invoke the InitializeTokenMetadata instruction
+    /// Invoke the `InitializeTokenMetadata` instruction.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
-    /// Invoke the InitializeTokenMetadata instruction with signers
+    /// Invoke the `InitializeTokenMetadata` instruction with signers.
     ///
     /// Instruction data layout:
-    /// - [0..8]: instruction discriminator (8 bytes)
-    /// - [8..12]: name length (4 bytes, u32)
-    /// - [12..12+`n1`]: name string (`n1` bytes, UTF-8)
-    /// - [...]: symbol length (4 bytes, u32)
-    /// - [...]: symbol string (`n2` bytes, UTF-8)
-    /// - [...]: uri length (4 bytes, u32)
-    /// - [...]: uri string (`n3` bytes, UTF-8)
+    /// - `[0..8]`: instruction discriminator (8 bytes)
+    /// - `[8..12]`: name length (4 bytes, `u32`)
+    /// - `[12..12+N]`: name string (N bytes, UTF-8)
+    /// - `[..+4]`: symbol length (4 bytes, `u32`)
+    /// - `[..+S]`: symbol string (S bytes, UTF-8)
+    /// - `[..+4]`: uri length (4 bytes, `u32`)
+    /// - `[..+U]`: uri string (U bytes, UTF-8)
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         let ix_len = 8 // instruction discriminator

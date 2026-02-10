@@ -73,27 +73,27 @@ pub struct UpdateField<'a, 'b> {
 impl UpdateField<'_, '_> {
     pub const DISCRIMINATOR: [u8; 8] = [221, 233, 49, 45, 181, 202, 220, 200];
 
-    /// Invoke the UpdateField instruction
+    /// Invoke the `UpdateField` instruction.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
-    /// Invoke the UpdateField instruction with signers
+    /// Invoke the `UpdateField` instruction with signers.
     ///
-    /// Instruction data layout for Field::Key:
-    /// - [0..8]: instruction discriminator (8 bytes)
-    /// - [8..9]: field enum type (1 byte, u8)
-    /// - [9..13]: key length (4 bytes, u32) = k
-    /// - [13..13+k]: key string (k bytes, UTF-8)
-    /// - [13+k..17+k]: value length (4 bytes, u32) = v
-    /// - [17+k..17+k+v]: value string (v bytes, UTF-8)
+    /// Instruction data layout for `Field::Key`:
+    /// - `[0..8]`: instruction discriminator (8 bytes)
+    /// - `[8..9]`: field enum type (1 byte, `u8`)
+    /// - `[9..13]`: key length (4 bytes, `u32`)
+    /// - `[13..13+K]`: key string (K bytes, UTF-8)
+    /// - `[..+4]`: value length (4 bytes, `u32`)
+    /// - `[..+V]`: value string (V bytes, UTF-8)
     ///
-    /// Instruction data layout for Field::Name/Symbol/Uri:
-    /// - [0..8]: instruction discriminator (8 bytes)
-    /// - [8..9]: field enum type (1 byte, u8)
-    /// - [9..13]: value length (4 bytes, u32) = v
-    /// - [13..13+v]: value string (v bytes, UTF-8)
+    /// Instruction data layout for `Field::Name`/`Symbol`/`Uri`:
+    /// - `[0..8]`: instruction discriminator (8 bytes)
+    /// - `[8..9]`: field enum type (1 byte, `u8`)
+    /// - `[9..13]`: value length (4 bytes, `u32`)
+    /// - `[13..13+V]`: value string (V bytes, UTF-8)
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         let ix_len = 8 // instruction discriminator
