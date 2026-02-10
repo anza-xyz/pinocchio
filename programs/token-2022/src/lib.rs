@@ -8,6 +8,9 @@ use {
     solana_instruction_view::InstructionAccount,
 };
 
+use solana_account_view::AccountView;
+use solana_instruction_view::InstructionAccount;
+
 solana_address::declare_id!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
 const ELGAMAL_PUBKEY_LEN: usize = 32;
