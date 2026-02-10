@@ -28,7 +28,7 @@ use {
 ///   3. `..+M` `[signer]` M signer accounts.
 pub struct UnwrapLamports<'a, 'b, 'c> {
     /// The source account.
-    pub account: &'a AccountView,
+    pub source: &'a AccountView,
 
     /// The destination account.
     pub destination: &'a AccountView,
@@ -37,7 +37,7 @@ pub struct UnwrapLamports<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [&'a AccountView],
 
     /// The amount of lamports to transfer.
     pub amount: Option<u64>,
@@ -59,25 +59,25 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
         authority: &'a AccountView,
         amount: Option<u64>,
     ) -> Self {
-        Self::with_signers(token_program, account, destination, authority, amount, &[])
+        Self::with_multisig_signers(token_program, account, destination, authority, amount, &[])
     }
 
     /// Creates a new `UnwrapLamports` instruction with a
     /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
-    pub fn with_signers(
+    pub fn with_multisig_signers(
         token_program: &'b Address,
         account: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
         amount: Option<u64>,
-        signers: &'c [&'a AccountView],
+        multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
-            account,
+            source: account,
             destination,
             authority,
-            signers,
+            multisig_signers,
             amount,
             token_program,
         }
@@ -90,11 +90,11 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        if self.signers.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let expected_accounts = 3 + self.signers.len();
+        let expected_accounts = 3 + self.multisig_signers.len();
 
         // Instruction accounts.
 
@@ -106,7 +106,7 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
         unsafe {
             instruction_accounts
                 .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(self.account.address()));
+                .write(InstructionAccount::writable(self.source.address()));
 
             instruction_accounts
                 .get_unchecked_mut(1)
@@ -117,13 +117,13 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
                 .write(InstructionAccount::new(
                     self.authority.address(),
                     false,
-                    self.signers.is_empty(),
+                    self.multisig_signers.is_empty(),
                 ));
 
             for (account, signer) in instruction_accounts
                 .get_unchecked_mut(3..)
                 .iter_mut()
-                .zip(self.signers.iter())
+                .zip(self.multisig_signers.iter())
             {
                 account.write(InstructionAccount::readonly_signer(signer.address()));
             }
@@ -136,7 +136,7 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
 
         // SAFETY: The allocation is valid to the maximum number of accounts.
         unsafe {
-            accounts.get_unchecked_mut(0).write(self.account);
+            accounts.get_unchecked_mut(0).write(self.source);
 
             accounts.get_unchecked_mut(1).write(self.destination);
 
@@ -145,7 +145,7 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
             for (account, signer) in accounts
                 .get_unchecked_mut(3..)
                 .iter_mut()
-                .zip(self.signers.iter())
+                .zip(self.multisig_signers.iter())
             {
                 account.write(signer);
             }
@@ -156,15 +156,23 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
         let mut instruction_data = [UNINIT_BYTE; 10];
         let mut expected_data = 2;
 
-        // discriminator
-        instruction_data[0].write(Self::DISCRIMINATOR);
-        // amount
-        if let Some(amount) = self.amount {
-            instruction_data[1].write(1);
-            write_bytes(&mut instruction_data[2..10], &amount.to_le_bytes());
-            expected_data += 8;
-        } else {
-            instruction_data[1].write(0);
+        // SAFETY: The allocation is valid to the maximum data size.
+        unsafe {
+            // discriminator
+            instruction_data
+                .get_unchecked_mut(0)
+                .write(Self::DISCRIMINATOR);
+            // amount
+            if let Some(amount) = self.amount {
+                instruction_data.get_unchecked_mut(1).write(1);
+                write_bytes(
+                    instruction_data.get_unchecked_mut(2..10),
+                    &amount.to_le_bytes(),
+                );
+                expected_data += 8;
+            } else {
+                instruction_data.get_unchecked_mut(1).write(0);
+            }
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
