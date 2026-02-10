@@ -105,20 +105,20 @@ impl UpdateField<'_, '_> {
         let mut ix_data: Vec<u8> = Vec::with_capacity(ix_len);
 
         // Set 8-byte discriminator for UpdateField
-        ix_data.extend(Self::DISCRIMINATOR);
+        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
         ix_data.push(self.field.to_u8());
 
         // Set serialized key data in buffer if Field is Key type
         if let Field::Key(key) = self.field {
             let key_len = key.len() as u32;
-            ix_data.extend(key_len.to_le_bytes());
-            ix_data.extend(key.as_bytes());
+            ix_data.extend_from_slice(&key_len.to_le_bytes());
+            ix_data.extend_from_slice(key.as_bytes());
         }
 
         // Set serialized value data in buffer
         let value_len = self.value.len() as u32;
-        ix_data.extend(value_len.to_le_bytes());
-        ix_data.extend(self.value.as_bytes());
+        ix_data.extend_from_slice(&value_len.to_le_bytes());
+        ix_data.extend_from_slice(self.value.as_bytes());
 
         let instruction_accounts: [InstructionAccount; 2] = [
             InstructionAccount::writable(self.metadata.address()),

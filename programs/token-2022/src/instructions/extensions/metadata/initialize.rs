@@ -73,22 +73,22 @@ impl InitializeTokenMetadata<'_, '_> {
                 + self.uri.len();
         let mut ix_data: Vec<u8> = Vec::with_capacity(ix_len);
 
-        ix_data.extend(Self::DISCRIMINATOR);
+        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
 
         // Set name length and name data bytes
         let name_len = self.name.len() as u32;
-        ix_data.extend(&name_len.to_le_bytes());
-        ix_data.extend(self.name.as_bytes());
+        ix_data.extend_from_slice(&name_len.to_le_bytes());
+        ix_data.extend_from_slice(self.name.as_bytes());
 
         // Set symbol length and symbol data bytes
         let symbol_len = self.symbol.len() as u32;
-        ix_data.extend(&symbol_len.to_le_bytes());
-        ix_data.extend(self.symbol.as_bytes());
+        ix_data.extend_from_slice(&symbol_len.to_le_bytes());
+        ix_data.extend_from_slice(self.symbol.as_bytes());
 
         // Set uri length and uri data bytes
         let uri_len = self.uri.len() as u32;
-        ix_data.extend(&uri_len.to_le_bytes());
-        ix_data.extend(self.uri.as_bytes());
+        ix_data.extend_from_slice(&uri_len.to_le_bytes());
+        ix_data.extend_from_slice(self.uri.as_bytes());
 
         let instruction_accounts: [InstructionAccount; 4] = [
             InstructionAccount::writable(self.metadata.address()),

@@ -61,15 +61,15 @@ impl RemoveKey<'_, '_> {
         let mut ix_data: Vec<u8> = Vec::with_capacity(ix_len);
 
         // Set 8-byte discriminator for RemoveKey
-        ix_data.extend(Self::DISCRIMINATOR);
+        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
 
         // Set idempotent flag
         ix_data.push(self.idempotent as u8);
 
         // Set serialized key data
         let key_len = self.key.len() as u32;
-        ix_data.extend(&key_len.to_le_bytes());
-        ix_data.extend(self.key.as_bytes());
+        ix_data.extend_from_slice(&key_len.to_le_bytes());
+        ix_data.extend_from_slice(self.key.as_bytes());
 
         // Create account metas
         let instruction_accounts: [InstructionAccount; 2] = [
