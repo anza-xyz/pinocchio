@@ -23,7 +23,7 @@ use solana_program_error::ProgramResult;
 ///   1. `[]` Update authority
 ///   2. `[]` Mint
 ///   3. `[SIGNER]` Mint authority
-pub struct InitializeTokenMetadata<'a, 'b> {
+pub struct InitializeMetadata<'a, 'b> {
     /// The metadata account to initialize
     pub metadata: &'a AccountView,
     /// The authority that can update the metadata
@@ -42,17 +42,17 @@ pub struct InitializeTokenMetadata<'a, 'b> {
     pub token_program: &'b Address,
 }
 
-impl InitializeTokenMetadata<'_, '_> {
+impl InitializeMetadata<'_, '_> {
     /// Based on `spl_token_metadata_interface` hash.
     pub const DISCRIMINATOR: [u8; 8] = [210, 225, 30, 162, 88, 184, 77, 141];
 
-    /// Invoke the `InitializeTokenMetadata` instruction.
+    /// Invoke the `InitializeMetadata` instruction.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
-    /// Invoke the `InitializeTokenMetadata` instruction with signers.
+    /// Invoke the `InitializeMetadata` instruction with signers.
     ///
     /// Instruction data layout:
     /// - `[0..8]`: instruction discriminator (8 bytes)
