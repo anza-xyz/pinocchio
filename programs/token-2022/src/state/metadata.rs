@@ -276,6 +276,28 @@ mod tests {
     }
 
     #[test]
+    fn test_from_bytes_empty_fields() {
+        let update_authority = [1u8; 32];
+        let mint = [2u8; 32];
+
+        let bytes = create_test_metadata_bytes(&update_authority, &mint, "", "", "", &[]);
+
+        assert_eq!(bytes.len(), Metadata::MIN_SIZE);
+
+        let metadata = Metadata::from_bytes(&bytes).unwrap();
+
+        assert_eq!(
+            metadata.update_authority(),
+            &Address::from(update_authority)
+        );
+        assert_eq!(metadata.mint(), &Address::from(mint));
+        assert_eq!(metadata.name(), "");
+        assert_eq!(metadata.symbol(), "");
+        assert_eq!(metadata.uri(), "");
+        assert_eq!(metadata.additional_metadata(), &[]);
+    }
+
+    #[test]
     fn test_from_bytes_overflow_len() {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&[0u8; 64]);

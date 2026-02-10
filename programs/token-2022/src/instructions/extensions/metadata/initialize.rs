@@ -1,3 +1,7 @@
+// NOTE: Metadata interface instructions use `Vec` for instruction data because
+// the payload contains variable-length strings whose total size is not known at
+// compile time.  The rest of the crate uses stack-allocated `UNINIT_BYTE` arrays,
+// which is possible only when the maximum data size is bounded and small.
 extern crate alloc;
 
 use alloc::vec::Vec;

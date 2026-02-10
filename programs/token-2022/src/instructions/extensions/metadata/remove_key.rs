@@ -1,3 +1,7 @@
+// NOTE: Metadata interface instructions use `Vec` for instruction data because
+// the payload contains variable-length strings whose total size is not known at
+// compile time.  The rest of the crate uses stack-allocated `UNINIT_BYTE` arrays,
+// which is possible only when the maximum data size is bounded and small.
 extern crate alloc;
 
 use alloc::vec::Vec;
@@ -68,14 +72,14 @@ impl RemoveKey<'_, '_> {
         ix_data.extend(self.key.as_bytes());
 
         // Create account metas
-        let account_metas: [InstructionAccount; 2] = [
+        let instruction_accounts: [InstructionAccount; 2] = [
             InstructionAccount::writable(self.metadata.address()),
             InstructionAccount::readonly_signer(self.update_authority.address()),
         ];
 
         let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &ix_data,
         };
 

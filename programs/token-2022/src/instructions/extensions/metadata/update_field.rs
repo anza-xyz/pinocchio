@@ -1,3 +1,7 @@
+// NOTE: Metadata interface instructions use `Vec` for instruction data because
+// the payload contains variable-length strings whose total size is not known at
+// compile time.  The rest of the crate uses stack-allocated `UNINIT_BYTE` arrays,
+// which is possible only when the maximum data size is bounded and small.
 extern crate alloc;
 
 use alloc::vec::Vec;
@@ -9,9 +13,11 @@ use solana_instruction_view::{
 };
 use solana_program_error::ProgramResult;
 
-/// Field type for metadata updates
+/// Field type for metadata updates.
+///
+/// The `#[repr(u8)]` controls the in-memory discriminant only;
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy)]
 pub enum Field<'a> {
     /// The name field, corresponding to `Metadata.name`
     Name = 0,
@@ -114,14 +120,14 @@ impl UpdateField<'_, '_> {
         ix_data.extend(value_len.to_le_bytes());
         ix_data.extend(self.value.as_bytes());
 
-        let account_metas: [InstructionAccount; 2] = [
+        let instruction_accounts: [InstructionAccount; 2] = [
             InstructionAccount::writable(self.metadata.address()),
             InstructionAccount::readonly_signer(self.update_authority.address()),
         ];
 
         let instruction = InstructionView {
             program_id: self.token_program,
-            accounts: &account_metas,
+            accounts: &instruction_accounts,
             data: &ix_data,
         };
 
