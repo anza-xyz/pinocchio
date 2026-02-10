@@ -138,9 +138,13 @@ impl<'a> Metadata<'a> {
 
     /// Return the token name.
     ///
-    /// The Token-2022 program guarantees valid UTF-8 for this field.
+    /// # Safety
+    ///
+    /// The caller must ensure that the underlying bytes contain valid UTF-8
+    /// for this field. Data written by the Token-2022 program is guaranteed
+    /// to be valid UTF-8.
     #[inline(always)]
-    pub fn name(&self) -> &str {
+    pub unsafe fn name(&self) -> &str {
         unsafe {
             let offset = self.varlen_offset(0);
             let len = self.read_len_at(offset);
@@ -153,9 +157,13 @@ impl<'a> Metadata<'a> {
 
     /// Return the token symbol.
     ///
-    /// The Token-2022 program guarantees valid UTF-8 for this field.
+    /// # Safety
+    ///
+    /// The caller must ensure that the underlying bytes contain valid UTF-8
+    /// for this field. Data written by the Token-2022 program is guaranteed
+    /// to be valid UTF-8.
     #[inline(always)]
-    pub fn symbol(&self) -> &str {
+    pub unsafe fn symbol(&self) -> &str {
         unsafe {
             let offset = self.varlen_offset(1);
             let len = self.read_len_at(offset);
@@ -168,9 +176,13 @@ impl<'a> Metadata<'a> {
 
     /// Return the token URI.
     ///
-    /// The Token-2022 program guarantees valid UTF-8 for this field.
+    /// # Safety
+    ///
+    /// The caller must ensure that the underlying bytes contain valid UTF-8
+    /// for this field. Data written by the Token-2022 program is guaranteed
+    /// to be valid UTF-8.
     #[inline(always)]
-    pub fn uri(&self) -> &str {
+    pub unsafe fn uri(&self) -> &str {
         unsafe {
             let offset = self.varlen_offset(2);
             let len = self.read_len_at(offset);
@@ -251,9 +263,9 @@ mod tests {
             &Address::from(update_authority)
         );
         assert_eq!(metadata.mint(), &Address::from(mint));
-        assert_eq!(metadata.name(), name);
-        assert_eq!(metadata.symbol(), symbol);
-        assert_eq!(metadata.uri(), uri);
+        assert_eq!(unsafe { metadata.name() }, name);
+        assert_eq!(unsafe { metadata.symbol() }, symbol);
+        assert_eq!(unsafe { metadata.uri() }, uri);
         assert_eq!(metadata.additional_metadata(), additional_metadata);
     }
 
@@ -290,9 +302,9 @@ mod tests {
             &Address::from(update_authority)
         );
         assert_eq!(metadata.mint(), &Address::from(mint));
-        assert_eq!(metadata.name(), "");
-        assert_eq!(metadata.symbol(), "");
-        assert_eq!(metadata.uri(), "");
+        assert_eq!(unsafe { metadata.name() }, "");
+        assert_eq!(unsafe { metadata.symbol() }, "");
+        assert_eq!(unsafe { metadata.uri() }, "");
         assert_eq!(metadata.additional_metadata(), &[]);
     }
 
