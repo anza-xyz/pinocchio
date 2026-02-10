@@ -7,13 +7,13 @@ use crate::ID;
 /// Zero-copy view into token metadata account data.
 ///
 /// On-chain data layout:
-/// - `[0..32]`:   update_authority (`Address`)
+/// - `[0..32]`:   `update_authority` (`Address`)
 /// - `[32..64]`:  mint (`Address`)
-/// - `[64..68]`:  name_len (`u32` LE)
+/// - `[64..68]`:  `name_len` (`u32` LE)
 /// - `[68..68+N]`: name (UTF-8)
-/// - `[..+4]`:    symbol_len (`u32` LE)
+/// - `[..+4]`:    `symbol_len` (`u32` LE)
 /// - `[..+S]`:    symbol (UTF-8)
-/// - `[..+4]`:    uri_len (`u32` LE)
+/// - `[..+4]`:    `uri_len` (`u32` LE)
 /// - `[..+U]`:    uri (UTF-8)
 /// - `[..+4]`:    additional_metadata_len (`u32` LE)
 /// - `[..+A]`:    additional metadata
@@ -23,7 +23,7 @@ pub struct Metadata<'a> {
 
 impl<'a> Metadata<'a> {
     /// Minimum account data size:
-    /// 32 (update_authority) + 32 (mint) + 4×4 (length prefixes) = 80 bytes.
+    /// 32 (`update_authority`) + 32 (mint) + 4×4 (length prefixes) = 80 bytes.
     pub const MIN_SIZE: usize = 80;
 
     const UPDATE_AUTHORITY_OFFSET: usize = 0;

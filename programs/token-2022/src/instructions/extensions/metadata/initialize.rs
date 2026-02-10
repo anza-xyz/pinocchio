@@ -53,11 +53,11 @@ impl InitializeTokenMetadata<'_, '_> {
     /// Instruction data layout:
     /// - [0..8]: instruction discriminator (8 bytes)
     /// - [8..12]: name length (4 bytes, u32)
-    /// - [12..12+n1]: name string (n1 bytes, UTF-8)
+    /// - [12..12+`n1`]: name string (`n1` bytes, UTF-8)
     /// - [...]: symbol length (4 bytes, u32)
-    /// - [...]: symbol string (n2 bytes, UTF-8)
+    /// - [...]: symbol string (`n2` bytes, UTF-8)
     /// - [...]: uri length (4 bytes, u32)
-    /// - [...]: uri string (n3 bytes, UTF-8)
+    /// - [...]: uri string (`n3` bytes, UTF-8)
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         let ix_len = 8 // instruction discriminator
