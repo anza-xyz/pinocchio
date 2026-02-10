@@ -71,7 +71,7 @@ impl RemoveKey<'_, '_> {
         ix_data.extend_from_slice(&key_len.to_le_bytes());
         ix_data.extend_from_slice(self.key.as_bytes());
 
-        // Create account metas
+        // Create instruction accounts
         let instruction_accounts: [InstructionAccount; 2] = [
             InstructionAccount::writable(self.metadata.address()),
             InstructionAccount::readonly_signer(self.update_authority.address()),

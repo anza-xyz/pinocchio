@@ -145,14 +145,12 @@ impl<'a> Metadata<'a> {
     /// to be valid UTF-8.
     #[inline(always)]
     pub unsafe fn name(&self) -> &str {
-        unsafe {
-            let offset = self.varlen_offset(0);
-            let len = self.read_len_at(offset);
-            core::str::from_utf8_unchecked(core::slice::from_raw_parts(
-                self.data.as_ptr().add(offset + 4),
-                len,
-            ))
-        }
+        let offset = self.varlen_offset(0);
+        let len = self.read_len_at(offset);
+        core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+            self.data.as_ptr().add(offset + 4),
+            len,
+        ))
     }
 
     /// Return the token symbol.
@@ -164,14 +162,12 @@ impl<'a> Metadata<'a> {
     /// to be valid UTF-8.
     #[inline(always)]
     pub unsafe fn symbol(&self) -> &str {
-        unsafe {
-            let offset = self.varlen_offset(1);
-            let len = self.read_len_at(offset);
-            core::str::from_utf8_unchecked(core::slice::from_raw_parts(
-                self.data.as_ptr().add(offset + 4),
-                len,
-            ))
-        }
+        let offset = self.varlen_offset(1);
+        let len = self.read_len_at(offset);
+        core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+            self.data.as_ptr().add(offset + 4),
+            len,
+        ))
     }
 
     /// Return the token URI.
@@ -183,14 +179,12 @@ impl<'a> Metadata<'a> {
     /// to be valid UTF-8.
     #[inline(always)]
     pub unsafe fn uri(&self) -> &str {
-        unsafe {
-            let offset = self.varlen_offset(2);
-            let len = self.read_len_at(offset);
-            core::str::from_utf8_unchecked(core::slice::from_raw_parts(
-                self.data.as_ptr().add(offset + 4),
-                len,
-            ))
-        }
+        let offset = self.varlen_offset(2);
+        let len = self.read_len_at(offset);
+        core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+            self.data.as_ptr().add(offset + 4),
+            len,
+        ))
     }
 
     /// Return the additional metadata as raw bytes.
