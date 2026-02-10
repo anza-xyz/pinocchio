@@ -26,7 +26,7 @@ pub struct InitializePermanentDelegate<'a, 'b> {
     /// Authority that may sign for `Transfer`s and `Burn`s on any account.
     pub delegate: &'b Address,
 
-    /// Token Program
+    /// The token program.
     pub token_program: &'b Address,
 }
 
@@ -37,27 +37,21 @@ impl InitializePermanentDelegate<'_, '_> {
 
         let mut instruction_data = [UNINIT_BYTE; 33];
 
-        unsafe {
-            // discriminator
-            instruction_data
-                .get_unchecked_mut(0)
-                .write(ExtensionDiscriminator::PermanentDelegate as u8);
+        // discriminator
+        instruction_data[0].write(ExtensionDiscriminator::PermanentDelegate as u8);
+        // delegate
+        write_bytes(&mut instruction_data[1..33], self.delegate.as_ref());
 
-            // delegate
-            write_bytes(
-                instruction_data.get_unchecked_mut(1..33),
-                self.delegate.as_ref(),
-            );
-        }
-
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: &[InstructionAccount::writable(self.mint.address())],
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
-        };
-
-        invoke(&instruction, &[self.mint])
+        invoke(
+            &InstructionView {
+                program_id: self.token_program,
+                accounts: &[InstructionAccount::writable(self.mint.address())],
+                // SAFETY: `instruction_data` is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            &[self.mint],
+        )
     }
 }
