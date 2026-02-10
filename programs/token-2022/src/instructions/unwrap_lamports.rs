@@ -98,57 +98,39 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
 
         // Instruction accounts.
 
-        const UNINIT_INSTRUCTION_ACCOUNTS: MaybeUninit<InstructionAccount> =
-            MaybeUninit::<InstructionAccount>::uninit();
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNTS; 3 + MAX_MULTISIG_SIGNERS];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            instruction_accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(self.source.address()));
+        instruction_accounts[0].write(InstructionAccount::writable(self.source.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(1)
-                .write(InstructionAccount::writable(self.destination.address()));
+        instruction_accounts[1].write(InstructionAccount::writable(self.destination.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(2)
-                .write(InstructionAccount::new(
-                    self.authority.address(),
-                    false,
-                    self.multisig_signers.is_empty(),
-                ));
+        instruction_accounts[2].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
 
-            for (account, signer) in instruction_accounts
-                .get_unchecked_mut(3..)
-                .iter_mut()
-                .zip(self.multisig_signers.iter())
-            {
-                account.write(InstructionAccount::readonly_signer(signer.address()));
-            }
+        for (account, signer) in instruction_accounts[3..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            account.write(InstructionAccount::readonly_signer(signer.address()));
         }
 
         // Accounts.
 
-        const UNINIT_INFO: MaybeUninit<&AccountView> = MaybeUninit::uninit();
-        let mut accounts = [UNINIT_INFO; 3 + MAX_MULTISIG_SIGNERS];
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            accounts.get_unchecked_mut(0).write(self.source);
+        accounts[0].write(self.source);
 
-            accounts.get_unchecked_mut(1).write(self.destination);
+        accounts[1].write(self.destination);
 
-            accounts.get_unchecked_mut(2).write(self.authority);
+        accounts[2].write(self.authority);
 
-            for (account, signer) in accounts
-                .get_unchecked_mut(3..)
-                .iter_mut()
-                .zip(self.multisig_signers.iter())
-            {
-                account.write(signer);
-            }
+        for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
+            account.write(signer);
         }
 
         // Instruction data.
@@ -156,23 +138,15 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
         let mut instruction_data = [UNINIT_BYTE; 10];
         let mut expected_data = 2;
 
-        // SAFETY: The allocation is valid to the maximum data size.
-        unsafe {
-            // discriminator
-            instruction_data
-                .get_unchecked_mut(0)
-                .write(Self::DISCRIMINATOR);
-            // amount
-            if let Some(amount) = self.amount {
-                instruction_data.get_unchecked_mut(1).write(1);
-                write_bytes(
-                    instruction_data.get_unchecked_mut(2..10),
-                    &amount.to_le_bytes(),
-                );
-                expected_data += 8;
-            } else {
-                instruction_data.get_unchecked_mut(1).write(0);
-            }
+        // discriminator
+        instruction_data[0].write(Self::DISCRIMINATOR);
+        // amount
+        if let Some(amount) = self.amount {
+            instruction_data[1].write(1);
+            write_bytes(&mut instruction_data[2..10], &amount.to_le_bytes());
+            expected_data += 8;
+        } else {
+            instruction_data[1].write(0);
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
