@@ -1,13 +1,15 @@
 //! Macros and functions for defining the program entrypoint and setting up
 //! global handlers.
 //!
-//! When an instruction is directed at an executable program, the loader configures the program's
-//! execution environment, serializes the program's input parameters, invokes the program's entrypoint,
-//! and reports any errors encountered. The input parameters are serialized into a byte array and
-//! passed to the program's entrypoint. Each program is responsible for deserializing these parameters
-//! on-chain.
+//! When an instruction is directed at an executable program, the loader
+//! configures the program's execution environment, serializes the program's
+//! input parameters, invokes the program's entrypoint, and reports any errors
+//! encountered. The input parameters are serialized into a byte array and
+//! passed to the program's entrypoint. Each program is responsible for
+//! deserializing these parameters on-chain.
 //!
-//! The input parameters are serialized as follows (all encoding is little endian):
+//! The input parameters are serialized as follows (all encoding is little
+//! endian):
 //!
 //!```text
 //! ┌─ 8 bytes unsigned (u64): number of accounts
@@ -329,7 +331,7 @@ macro_rules! process_n_accounts {
         } else {
             #[cfg(feature = "resize")]
             {
-                // Stores the data length as original data length. This is needed
+                // Stores the data length in the `padding` field. This is needed
                 // to handle account resizing.
                 (*account).padding = (*account).data_len as u32;
             }
@@ -427,7 +429,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
         #[cfg(feature = "resize")]
         {
-            // Stores the data length as original data length. This is needed
+            // Stores the data length in the `padding` field. This is needed
             // to handle account resizing.
             (*account).padding = (*account).data_len as u32;
         }

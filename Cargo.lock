@@ -127,7 +127,7 @@ dependencies = [
  "pinocchio",
  "solana-account-view",
  "solana-address",
- "solana-define-syscall",
+ "solana-define-syscall 4.0.1",
  "solana-instruction-view",
  "solana-program-error",
 ]
@@ -231,10 +231,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha2-const-stable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9"
+
+[[package]]
 name = "solana-account-view"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f37ca34c37f92ee341b73d5ce7c8ef5bb38e9a87955b4bd343c63fa18b149215"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 dependencies = [
  "solana-address",
  "solana-program-error",
@@ -242,14 +247,14 @@ dependencies = [
 
 [[package]]
 name = "solana-address"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e37320fd2945c5d654b2c6210624a52d66c3f1f73b653ed211ab91a703b35bdd"
+version = "2.1.0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 dependencies = [
  "curve25519-dalek",
  "five8",
  "five8_const",
- "solana-define-syscall",
+ "sha2-const-stable",
+ "solana-define-syscall 5.0.0",
  "solana-program-error",
  "solana-sha256-hasher",
 ]
@@ -261,37 +266,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57e5b1c0bc1d4a4d10c88a4100499d954c09d3fecfae4912c1a074dff68b1738"
 
 [[package]]
+name = "solana-define-syscall"
+version = "5.0.0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
+
+[[package]]
 name = "solana-hash"
 version = "4.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b6100d68f90726ddb4d2ac7d00e8b6cf9ce8e4ccdfbb9112b1d766045753241"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 
 [[package]]
 name = "solana-instruction-view"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60147e4d0a4620013df40bf30a86dd299203ff12fcb8b593cd51014fce0875d8"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 dependencies = [
  "solana-account-view",
  "solana-address",
- "solana-define-syscall",
+ "solana-define-syscall 5.0.0",
  "solana-program-error",
 ]
 
 [[package]]
 name = "solana-program-error"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1af32c995a7b692a915bb7414d5f8e838450cf7c70414e763d8abcae7b51f28"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 
 [[package]]
 name = "solana-sha256-hasher"
 version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db7dc3011ea4c0334aaaa7e7128cb390ecf546b28d412e9bf2064680f57f588f"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 dependencies = [
  "sha2",
- "solana-define-syscall",
+ "solana-define-syscall 5.0.0",
  "solana-hash",
 ]
 

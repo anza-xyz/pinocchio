@@ -40,3 +40,9 @@ consolidate-commits = false
 
 [workspace.metadata.spellcheck]
 config = "scripts/setup/spellcheck.toml"
+
+[patch.crates-io]
+solana-account-view = { git = "https://github.com/febo/solana-sdk.git", branch = "remove-resize" }
+solana-address = { git = "https://github.com/febo/solana-sdk.git", branch = "remove-resize" }
+solana-instruction-view = { git = "https://github.com/febo/solana-sdk.git", branch = "remove-resize" }
+solana-program-error = { git = "https://github.com/febo/solana-sdk.git", branch = "remove-resize" }

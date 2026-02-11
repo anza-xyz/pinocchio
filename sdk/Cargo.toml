@@ -39,4 +39,4 @@ solana-define-syscall = { workspace = true }
 
 [dev-dependencies]
 solana-address = { workspace = true, features = ["decode"] }
-pinocchio = { path = ".", features = ["alloc"] }
+pinocchio = { path = ".", features = ["alloc", "resize"] }
