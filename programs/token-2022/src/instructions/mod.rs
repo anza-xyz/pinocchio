@@ -21,6 +21,7 @@ mod sync_native;
 mod thaw_account;
 mod transfer;
 mod transfer_checked;
+mod unwrap_lamports;
 
 pub use {
     approve::*, approve_checked::*, burn::*, burn_checked::*, close_account::*, extensions::*,
@@ -28,4 +29,5 @@ pub use {
     initialize_mint::*, initialize_mint_2::*, initialize_multisig::*, initialize_multisig_2::*,
     initialize_non_transferable_mint::*, mint_to::*, mint_to_checked::*, revoke::*,
     set_authority::*, sync_native::*, thaw_account::*, transfer::*, transfer_checked::*,
+    unwrap_lamports::*,
 };
