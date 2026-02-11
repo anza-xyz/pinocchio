@@ -53,7 +53,7 @@ impl<'a> Metadata<'a> {
 
     /// Read a variable-length field slice starting at `offset`.
     ///
-    /// Returns the field bytes and the offset past the field (length prefix + data).
+    /// Returns the field bytes and the offset past the field `(length prefix + data)`.
     #[inline(always)]
     unsafe fn read_field(data: &'a [u8], offset: usize) -> (&'a [u8], usize) {
         let len = Self::read_len_at(data, offset);
