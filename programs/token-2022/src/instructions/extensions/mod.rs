@@ -1,3 +1,4 @@
+pub mod confidential_transfer;
 pub mod default_account_state;
 pub mod group_member_pointer;
 pub mod group_pointer;
@@ -10,6 +11,7 @@ pub mod transfer_hook;
 #[repr(u8)]
 #[non_exhaustive]
 pub enum ExtensionDiscriminator {
+    ConfidentialTransfer = 27,
     DefaultAccountState = 28,
     MemoTransfer = 30,
     PermanentDelegate = 35,
