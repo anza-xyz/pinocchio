@@ -4,6 +4,7 @@ pub mod group_pointer;
 pub mod memo_transfer;
 pub mod metadata_pointer;
 pub mod permanent_delegate;
+pub mod scaled_ui_amount;
 pub mod transfer_hook;
 
 #[repr(u8)]
@@ -16,4 +17,5 @@ pub enum ExtensionDiscriminator {
     MetadataPointer = 39,
     GroupPointer = 40,
     GroupMemberPointer = 41,
+    ScaledUiAmount = 43,
 }
