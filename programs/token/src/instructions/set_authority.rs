@@ -1,13 +1,13 @@
 use {
-    crate::{write_bytes, UNINIT_BYTE},
-    core::slice::from_raw_parts,
+    crate::{instructions::MAX_MULTISIG_SIGNERS, write_bytes, UNINIT_BYTE},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
-        cpi::{invoke_signed, Signer},
+        cpi::{invoke_signed_with_bounds, Signer},
         InstructionAccount, InstructionView,
     },
-    solana_program_error::ProgramResult,
+    solana_program_error::{ProgramError, ProgramResult},
 };
 
 #[repr(u8)]
@@ -22,20 +22,58 @@ pub enum AuthorityType {
 /// Sets a new authority of a mint or account.
 ///
 /// ### Accounts:
+///   * Single authority
 ///   0. `[WRITE]` The mint or account to change the authority of.
 ///   1. `[SIGNER]` The current authority of the mint or account.
-pub struct SetAuthority<'a> {
+///
+///   * Multisignature authority
+///   0. `[WRITE]` The mint or account to change the authority of.
+///   1. `[]` The current multisignature authority of the mint or account.
+///   2. ..2+M `[SIGNER]` M signer accounts
+pub struct SetAuthority<'a, 'b> {
     /// Account (Mint or Token)
     pub account: &'a AccountView,
     /// Authority of the Account.
     pub authority: &'a AccountView,
+    /// Multisignature signers.
+    pub multisig_signers: &'b [&'a AccountView],
     /// The type of authority to update.
     pub authority_type: AuthorityType,
     /// The new authority
     pub new_authority: Option<&'a Address>,
 }
 
-impl SetAuthority<'_> {
+impl<'a, 'b> SetAuthority<'a, 'b> {
+    /// Creates a new `SetAuthority` instruction with a single authority.
+    #[inline(always)]
+    pub fn new(
+        account: &'a AccountView,
+        authority: &'a AccountView,
+        authority_type: AuthorityType,
+        new_authority: Option<&'a Address>,
+    ) -> Self {
+        Self::with_multisig_signers(account, authority, authority_type, new_authority, &[])
+    }
+
+    /// Creates a new `SetAuthority` instruction with a
+    /// multisignature authority and signer accounts.
+    #[inline(always)]
+    pub fn with_multisig_signers(
+        account: &'a AccountView,
+        authority: &'a AccountView,
+        authority_type: AuthorityType,
+        new_authority: Option<&'a Address>,
+        multisig_signers: &'b [&'a AccountView],
+    ) -> Self {
+        Self {
+            account,
+            authority,
+            multisig_signers,
+            authority_type,
+            new_authority,
+        }
+    }
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -43,17 +81,51 @@ impl SetAuthority<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // Instruction accounts
-        let instruction_accounts: [InstructionAccount; 2] = [
-            InstructionAccount::writable(self.account.address()),
-            InstructionAccount::readonly_signer(self.authority.address()),
-        ];
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
+            Err(ProgramError::InvalidArgument)?;
+        }
 
-        // instruction data
+        let expected_accounts = 2 + self.multisig_signers.len();
+
+        // Instruction accounts.
+
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
+
+        instruction_accounts[0].write(InstructionAccount::writable(self.account.address()));
+
+        instruction_accounts[1].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
+
+        for (account, signer) in instruction_accounts[2..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            account.write(InstructionAccount::readonly_signer(signer.address()));
+        }
+
+        // Accounts.
+
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
+
+        accounts[0].write(self.account);
+
+        accounts[1].write(self.authority);
+
+        for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
+            account.write(signer);
+        }
+
+        // Instruction data.
         // - [0]: instruction discriminator (1 byte, u8)
         // - [1]: authority_type (1 byte, u8)
         // - [2]: new_authority presence flag (1 byte, AuthorityType)
         // - [3..35] new_authority (optional, 32 bytes, Address)
+
         let mut instruction_data = [UNINIT_BYTE; 35];
         let mut length = instruction_data.len();
 
@@ -72,12 +144,16 @@ impl SetAuthority<'_> {
             length = 3;
         }
 
-        let instruction = InstructionView {
-            program_id: &crate::ID,
-            accounts: &instruction_accounts,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
-        };
-
-        invoke_signed(&instruction, &[self.account, self.authority], signers)
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+            &InstructionView {
+                program_id: &crate::ID,
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
+            },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            signers,
+        )
     }
 }

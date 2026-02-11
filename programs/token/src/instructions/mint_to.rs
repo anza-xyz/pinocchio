@@ -1,32 +1,71 @@
 use {
-    crate::{write_bytes, UNINIT_BYTE},
-    core::slice::from_raw_parts,
+    crate::{instructions::MAX_MULTISIG_SIGNERS, write_bytes, UNINIT_BYTE},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_instruction_view::{
-        cpi::{invoke_signed, Signer},
+        cpi::{invoke_signed_with_bounds, Signer},
         InstructionAccount, InstructionView,
     },
-    solana_program_error::ProgramResult,
+    solana_program_error::{ProgramError, ProgramResult},
 };
 
 /// Mints new tokens to an account.
 ///
 /// ### Accounts:
+///   * Single mint authority
 ///   0. `[WRITE]` The mint.
 ///   1. `[WRITE]` The account to mint tokens to.
 ///   2. `[SIGNER]` The mint's minting authority.
-pub struct MintTo<'a> {
+///
+///   * Multisignature mint authority
+///   0. `[WRITE]` The mint.
+///   1. `[WRITE]` The account to mint tokens to.
+///   2. `[]` The mint's multisignature minting authority.
+///   3. ..3+M `[SIGNER]` M signer accounts
+pub struct MintTo<'a, 'b> {
     /// Mint Account.
     pub mint: &'a AccountView,
     /// Token Account.
     pub account: &'a AccountView,
     /// Mint Authority
     pub mint_authority: &'a AccountView,
+    /// Multisignature signers.
+    pub multisig_signers: &'b [&'a AccountView],
     /// Amount
     pub amount: u64,
 }
 
-impl MintTo<'_> {
+impl<'a, 'b> MintTo<'a, 'b> {
+    /// Creates a new `MintTo` instruction with a single mint authority.
+    #[inline(always)]
+    pub fn new(
+        mint: &'a AccountView,
+        account: &'a AccountView,
+        mint_authority: &'a AccountView,
+        amount: u64,
+    ) -> Self {
+        Self::with_multisig_signers(mint, account, mint_authority, amount, &[])
+    }
+
+    /// Creates a new `MintTo` instruction with a
+    /// multisignature mint authority and signer accounts.
+    #[inline(always)]
+    pub fn with_multisig_signers(
+        mint: &'a AccountView,
+        account: &'a AccountView,
+        mint_authority: &'a AccountView,
+        amount: u64,
+        multisig_signers: &'b [&'a AccountView],
+    ) -> Self {
+        Self {
+            mint,
+            account,
+            mint_authority,
+            multisig_signers,
+            amount,
+        }
+    }
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -34,16 +73,53 @@ impl MintTo<'_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        // Instruction accounts
-        let instruction_accounts: [InstructionAccount; 3] = [
-            InstructionAccount::writable(self.mint.address()),
-            InstructionAccount::writable(self.account.address()),
-            InstructionAccount::readonly_signer(self.mint_authority.address()),
-        ];
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
+            Err(ProgramError::InvalidArgument)?;
+        }
 
-        // Instruction data layout:
+        let expected_accounts = 3 + self.multisig_signers.len();
+
+        // Instruction accounts.
+
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
+
+        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
+
+        instruction_accounts[1].write(InstructionAccount::writable(self.account.address()));
+
+        instruction_accounts[2].write(InstructionAccount::new(
+            self.mint_authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
+
+        for (account, signer) in instruction_accounts[3..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            account.write(InstructionAccount::readonly_signer(signer.address()));
+        }
+
+        // Accounts.
+
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
+
+        accounts[0].write(self.mint);
+
+        accounts[1].write(self.account);
+
+        accounts[2].write(self.mint_authority);
+
+        for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
+            account.write(signer);
+        }
+
+        // Instruction data.
         // - [0]: instruction discriminator (1 byte, u8)
         // - [1..9]: amount (8 bytes, u64)
+
         let mut instruction_data = [UNINIT_BYTE; 9];
 
         // Set discriminator as u8 at offset [0]
@@ -51,15 +127,15 @@ impl MintTo<'_> {
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 
-        let instruction = InstructionView {
-            program_id: &crate::ID,
-            accounts: &instruction_accounts,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
-        };
-
-        invoke_signed(
-            &instruction,
-            &[self.mint, self.account, self.mint_authority],
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
+            &InstructionView {
+                program_id: &crate::ID,
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
+            },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )
     }
