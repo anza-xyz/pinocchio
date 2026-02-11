@@ -1,3 +1,5 @@
+use core::slice::from_raw_parts;
+
 use solana_account_view::AccountView;
 use solana_address::Address;
 use solana_instruction_view::{
@@ -118,7 +120,7 @@ impl InitializeMetadata<'_, '_> {
         let instruction = InstructionView {
             program_id: self.token_program,
             accounts: &instruction_accounts,
-            data: unsafe { core::slice::from_raw_parts(ix_data.as_ptr() as *const u8, ix_len) },
+            data: unsafe { from_raw_parts(ix_data.as_ptr() as _, ix_len) },
         };
 
         invoke_signed(
