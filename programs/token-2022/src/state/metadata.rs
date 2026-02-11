@@ -18,7 +18,23 @@ use crate::ID;
 /// - `[..+4]`:    `additional_metadata_len` (`u32` LE)
 /// - `[..+A]`:    additional metadata
 pub struct Metadata<'a> {
-    data: &'a [u8],
+    /// Authority that can update the metadata.
+    pub update_authority: &'a Address,
+
+    /// Mint associated with this metadata.
+    pub mint: &'a Address,
+
+    /// Token name (raw bytes, UTF-8 guaranteed by Token-2022 program).
+    pub name: &'a [u8],
+
+    /// Token symbol (raw bytes, UTF-8 guaranteed by Token-2022 program).
+    pub symbol: &'a [u8],
+
+    /// Token URI (raw bytes, UTF-8 guaranteed by Token-2022 program).
+    pub uri: &'a [u8],
+
+    /// Additional metadata (raw key-value pairs).
+    pub additional_metadata: &'a [u8],
 }
 
 impl<'a> Metadata<'a> {
@@ -28,6 +44,25 @@ impl<'a> Metadata<'a> {
     const UPDATE_AUTHORITY_OFFSET: usize = 0;
     const MINT_OFFSET: usize = 32;
     const FIRST_VARLEN_OFFSET: usize = 64;
+
+    /// Read a `u32` length prefix at the given byte offset.
+    #[inline(always)]
+    unsafe fn read_len_at(data: &[u8], offset: usize) -> usize {
+        u32::from_le_bytes(*(data.as_ptr().add(offset) as *const [u8; 4])) as usize
+    }
+
+    /// Read a variable-length field slice starting at `offset`.
+    ///
+    /// Returns the field bytes and the offset past the field (length prefix + data).
+    #[inline(always)]
+    unsafe fn read_field(data: &'a [u8], offset: usize) -> (&'a [u8], usize) {
+        let len = Self::read_len_at(data, offset);
+        let start = offset + 4;
+        (
+            core::slice::from_raw_parts(data.as_ptr().add(start), len),
+            start + len,
+        )
+    }
 
     /// Return a `Metadata` from the given account view.
     ///
@@ -61,10 +96,11 @@ impl<'a> Metadata<'a> {
         }
 
         // Walk the 4 variable-length fields (name, symbol, uri, additional_metadata)
-        // to ensure all declared lengths fit within the data.
+        // to ensure all declared lengths fit within the data and capture slices.
         let mut offset = Self::FIRST_VARLEN_OFFSET;
+        let mut fields: [&[u8]; 4] = [&[]; 4];
 
-        for _ in 0..4 {
+        for field in &mut fields {
             if offset
                 .checked_add(4)
                 .ok_or(ProgramError::InvalidAccountData)?
@@ -80,16 +116,29 @@ impl<'a> Metadata<'a> {
                 data[offset + 3],
             ]) as usize;
 
+            let start = offset + 4;
+
             offset = offset
                 .checked_add(4 + field_len)
                 .ok_or(ProgramError::InvalidAccountData)?;
+
+            if offset > data.len() {
+                return Err(ProgramError::InvalidAccountData);
+            }
+
+            *field = &data[start..start + field_len];
         }
 
-        if offset > data.len() {
-            return Err(ProgramError::InvalidAccountData);
-        }
-
-        Ok(Metadata { data })
+        Ok(Metadata {
+            update_authority: unsafe {
+                &*(data.as_ptr().add(Self::UPDATE_AUTHORITY_OFFSET) as *const Address)
+            },
+            mint: unsafe { &*(data.as_ptr().add(Self::MINT_OFFSET) as *const Address) },
+            name: fields[0],
+            symbol: fields[1],
+            uri: fields[2],
+            additional_metadata: fields[3],
+        })
     }
 
     /// Create a `Metadata` view without any validation.
@@ -102,99 +151,53 @@ impl<'a> Metadata<'a> {
     /// uri fields, so data from a valid account is safe to read as `&str`.
     #[inline(always)]
     pub unsafe fn from_bytes_unchecked(data: &'a [u8]) -> Self {
-        Metadata { data }
-    }
+        let (name, offset) = Self::read_field(data, Self::FIRST_VARLEN_OFFSET);
+        let (symbol, offset) = Self::read_field(data, offset);
+        let (uri, offset) = Self::read_field(data, offset);
+        let (additional_metadata, _) = Self::read_field(data, offset);
 
-    /// Read a `u32` length prefix at the given byte offset.
-    #[inline(always)]
-    unsafe fn read_len_at(&self, offset: usize) -> usize {
-        u32::from_le_bytes(*(self.data.as_ptr().add(offset) as *const [u8; 4])) as usize
-    }
-
-    /// Compute the byte offset past `n` variable-length fields (0-indexed).
-    ///
-    /// For `n=0` returns the start of the name length prefix.
-    /// For `n=1` returns the start of the symbol length prefix, etc.
-    #[inline(always)]
-    unsafe fn varlen_offset(&self, n: usize) -> usize {
-        let mut offset = Self::FIRST_VARLEN_OFFSET;
-        for _ in 0..n {
-            offset += 4 + self.read_len_at(offset);
+        Metadata {
+            update_authority: &*(data.as_ptr().add(Self::UPDATE_AUTHORITY_OFFSET)
+                as *const Address),
+            mint: &*(data.as_ptr().add(Self::MINT_OFFSET) as *const Address),
+            name,
+            symbol,
+            uri,
+            additional_metadata,
         }
-        offset
     }
 
-    /// Return the authority that can update the metadata.
-    #[inline(always)]
-    pub fn update_authority(&self) -> &Address {
-        unsafe { &*(self.data.as_ptr().add(Self::UPDATE_AUTHORITY_OFFSET) as *const Address) }
-    }
-
-    /// Return the mint associated with this metadata.
-    #[inline(always)]
-    pub fn mint(&self) -> &Address {
-        unsafe { &*(self.data.as_ptr().add(Self::MINT_OFFSET) as *const Address) }
-    }
-
-    /// Return the token name.
+    /// Return the token name as a UTF-8 string.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the underlying bytes contain valid UTF-8
-    /// for this field. Data written by the Token-2022 program is guaranteed
-    /// to be valid UTF-8.
+    /// The caller must ensure that the underlying bytes contain valid UTF-8.
+    /// Data written by the Token-2022 program is guaranteed to be valid UTF-8.
     #[inline(always)]
-    pub unsafe fn name(&self) -> &str {
-        let offset = self.varlen_offset(0);
-        let len = self.read_len_at(offset);
-        core::str::from_utf8_unchecked(core::slice::from_raw_parts(
-            self.data.as_ptr().add(offset + 4),
-            len,
-        ))
+    pub unsafe fn name_as_str(&self) -> &str {
+        core::str::from_utf8_unchecked(self.name)
     }
 
-    /// Return the token symbol.
+    /// Return the token symbol as a UTF-8 string.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the underlying bytes contain valid UTF-8
-    /// for this field. Data written by the Token-2022 program is guaranteed
-    /// to be valid UTF-8.
+    /// The caller must ensure that the underlying bytes contain valid UTF-8.
+    /// Data written by the Token-2022 program is guaranteed to be valid UTF-8.
     #[inline(always)]
-    pub unsafe fn symbol(&self) -> &str {
-        let offset = self.varlen_offset(1);
-        let len = self.read_len_at(offset);
-        core::str::from_utf8_unchecked(core::slice::from_raw_parts(
-            self.data.as_ptr().add(offset + 4),
-            len,
-        ))
+    pub unsafe fn symbol_as_str(&self) -> &str {
+        core::str::from_utf8_unchecked(self.symbol)
     }
 
-    /// Return the token URI.
+    /// Return the token URI as a UTF-8 string.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the underlying bytes contain valid UTF-8
-    /// for this field. Data written by the Token-2022 program is guaranteed
-    /// to be valid UTF-8.
+    /// The caller must ensure that the underlying bytes contain valid UTF-8.
+    /// Data written by the Token-2022 program is guaranteed to be valid UTF-8.
     #[inline(always)]
-    pub unsafe fn uri(&self) -> &str {
-        let offset = self.varlen_offset(2);
-        let len = self.read_len_at(offset);
-        core::str::from_utf8_unchecked(core::slice::from_raw_parts(
-            self.data.as_ptr().add(offset + 4),
-            len,
-        ))
-    }
-
-    /// Return the additional metadata as raw bytes.
-    #[inline(always)]
-    pub fn additional_metadata(&self) -> &[u8] {
-        unsafe {
-            let offset = self.varlen_offset(3);
-            let len = self.read_len_at(offset);
-            core::slice::from_raw_parts(self.data.as_ptr().add(offset + 4), len)
-        }
+    pub unsafe fn uri_as_str(&self) -> &str {
+        core::str::from_utf8_unchecked(self.uri)
     }
 }
 
@@ -252,15 +255,12 @@ mod tests {
 
         let metadata = Metadata::from_bytes(&bytes).unwrap();
 
-        assert_eq!(
-            metadata.update_authority(),
-            &Address::from(update_authority)
-        );
-        assert_eq!(metadata.mint(), &Address::from(mint));
-        assert_eq!(unsafe { metadata.name() }, name);
-        assert_eq!(unsafe { metadata.symbol() }, symbol);
-        assert_eq!(unsafe { metadata.uri() }, uri);
-        assert_eq!(metadata.additional_metadata(), additional_metadata);
+        assert_eq!(metadata.update_authority, &Address::from(update_authority));
+        assert_eq!(metadata.mint, &Address::from(mint));
+        assert_eq!(unsafe { metadata.name_as_str() }, name);
+        assert_eq!(unsafe { metadata.symbol_as_str() }, symbol);
+        assert_eq!(unsafe { metadata.uri_as_str() }, uri);
+        assert_eq!(metadata.additional_metadata, additional_metadata);
     }
 
     #[test]
@@ -291,15 +291,12 @@ mod tests {
 
         let metadata = Metadata::from_bytes(&bytes).unwrap();
 
-        assert_eq!(
-            metadata.update_authority(),
-            &Address::from(update_authority)
-        );
-        assert_eq!(metadata.mint(), &Address::from(mint));
-        assert_eq!(unsafe { metadata.name() }, "");
-        assert_eq!(unsafe { metadata.symbol() }, "");
-        assert_eq!(unsafe { metadata.uri() }, "");
-        assert_eq!(metadata.additional_metadata(), &[]);
+        assert_eq!(metadata.update_authority, &Address::from(update_authority));
+        assert_eq!(metadata.mint, &Address::from(mint));
+        assert_eq!(unsafe { metadata.name_as_str() }, "");
+        assert_eq!(unsafe { metadata.symbol_as_str() }, "");
+        assert_eq!(unsafe { metadata.uri_as_str() }, "");
+        assert_eq!(metadata.additional_metadata, &[] as &[u8]);
     }
 
     #[test]
@@ -311,5 +308,54 @@ mod tests {
         bytes.extend_from_slice(&[0u8; 12]);
 
         assert!(Metadata::from_bytes(&bytes).is_err());
+    }
+
+    #[test]
+    fn test_from_bytes_unchecked_matches_from_bytes() {
+        let update_authority = [7u8; 32];
+        let mint = [8u8; 32];
+        let name = "Unchecked Token";
+        let symbol = "UCK";
+        let uri = "https://example.com/uck.json";
+        let additional_metadata = b"extra:data";
+
+        let bytes = create_test_metadata_bytes(
+            &update_authority,
+            &mint,
+            name,
+            symbol,
+            uri,
+            additional_metadata,
+        );
+
+        let checked = Metadata::from_bytes(&bytes).unwrap();
+        let unchecked = unsafe { Metadata::from_bytes_unchecked(&bytes) };
+
+        assert_eq!(checked.update_authority, unchecked.update_authority);
+        assert_eq!(checked.mint, unchecked.mint);
+        assert_eq!(checked.name, unchecked.name);
+        assert_eq!(checked.symbol, unchecked.symbol);
+        assert_eq!(checked.uri, unchecked.uri);
+        assert_eq!(checked.additional_metadata, unchecked.additional_metadata);
+    }
+
+    #[test]
+    fn test_from_bytes_trailing_data() {
+        let update_authority = [3u8; 32];
+        let mint = [4u8; 32];
+
+        let mut bytes =
+            create_test_metadata_bytes(&update_authority, &mint, "TK", "T", "https://t", &[]);
+
+        // Append trailing bytes (e.g. token-2022 extensions after metadata)
+        bytes.extend_from_slice(&[0xFFu8; 64]);
+
+        let metadata = Metadata::from_bytes(&bytes).unwrap();
+
+        assert_eq!(metadata.update_authority, &Address::from(update_authority));
+        assert_eq!(unsafe { metadata.name_as_str() }, "TK");
+        assert_eq!(unsafe { metadata.symbol_as_str() }, "T");
+        assert_eq!(unsafe { metadata.uri_as_str() }, "https://t");
+        assert_eq!(metadata.additional_metadata, &[] as &[u8]);
     }
 }
