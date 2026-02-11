@@ -1,17 +1,13 @@
-// NOTE: Metadata interface instructions use `Vec` for instruction data because
-// the payload contains variable-length strings whose total size is not known at
-// compile time.  The rest of the crate uses stack-allocated `UNINIT_BYTE` arrays,
-// which is possible only when the maximum data size is bounded and small.
-extern crate alloc;
-
-use alloc::vec::Vec;
 use solana_account_view::AccountView;
 use solana_address::Address;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
     InstructionAccount, InstructionView,
 };
-use solana_program_error::ProgramResult;
+use solana_program_error::{ProgramError, ProgramResult};
+
+use super::constants::MAX_IX_DATA;
+use crate::{write_bytes, UNINIT_BYTE};
 
 /// Field type for metadata updates.
 ///
@@ -96,29 +92,44 @@ impl UpdateField<'_, '_> {
     /// - `[13..13+V]`: value string (V bytes, UTF-8)
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        let ix_len = 8 // instruction discriminator
-            + 1 // field type
-            + self.field.key_size()
-            + 4 // value length
-            + self.value.len();
+        let ix_len = 8 + 1 + self.field.key_size() + 4 + self.value.len();
 
-        let mut ix_data: Vec<u8> = Vec::with_capacity(ix_len);
+        if ix_len > MAX_IX_DATA {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        let mut ix_data = [UNINIT_BYTE; MAX_IX_DATA];
+        let mut offset = 0;
 
         // Set 8-byte discriminator for UpdateField
-        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
-        ix_data.push(self.field.to_u8());
+        write_bytes(&mut ix_data[offset..offset + 8], &Self::DISCRIMINATOR);
+        offset += 8;
+
+        // Set field type
+        write_bytes(&mut ix_data[offset..offset + 1], &[self.field.to_u8()]);
+        offset += 1;
 
         // Set serialized key data in buffer if Field is Key type
         if let Field::Key(key) = self.field {
-            let key_len = key.len() as u32;
-            ix_data.extend_from_slice(&key_len.to_le_bytes());
-            ix_data.extend_from_slice(key.as_bytes());
+            write_bytes(
+                &mut ix_data[offset..offset + 4],
+                &(key.len() as u32).to_le_bytes(),
+            );
+            offset += 4;
+            write_bytes(&mut ix_data[offset..offset + key.len()], key.as_bytes());
+            offset += key.len();
         }
 
         // Set serialized value data in buffer
-        let value_len = self.value.len() as u32;
-        ix_data.extend_from_slice(&value_len.to_le_bytes());
-        ix_data.extend_from_slice(self.value.as_bytes());
+        write_bytes(
+            &mut ix_data[offset..offset + 4],
+            &(self.value.len() as u32).to_le_bytes(),
+        );
+        offset += 4;
+        write_bytes(
+            &mut ix_data[offset..offset + self.value.len()],
+            self.value.as_bytes(),
+        );
 
         let instruction_accounts: [InstructionAccount; 2] = [
             InstructionAccount::writable(self.metadata.address()),
@@ -128,7 +139,7 @@ impl UpdateField<'_, '_> {
         let instruction = InstructionView {
             program_id: self.token_program,
             accounts: &instruction_accounts,
-            data: &ix_data,
+            data: unsafe { core::slice::from_raw_parts(ix_data.as_ptr() as *const u8, ix_len) },
         };
 
         invoke_signed(

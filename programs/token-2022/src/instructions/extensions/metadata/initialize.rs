@@ -1,17 +1,13 @@
-// NOTE: Metadata interface instructions use `Vec` for instruction data because
-// the payload contains variable-length strings whose total size is not known at
-// compile time.  The rest of the crate uses stack-allocated `UNINIT_BYTE` arrays,
-// which is possible only when the maximum data size is bounded and small.
-extern crate alloc;
-
-use alloc::vec::Vec;
 use solana_account_view::AccountView;
 use solana_address::Address;
 use solana_instruction_view::{
     cpi::{invoke_signed, Signer},
     InstructionAccount, InstructionView,
 };
-use solana_program_error::ProgramResult;
+use solana_program_error::{ProgramError, ProgramResult};
+
+use super::constants::MAX_IX_DATA;
+use crate::{write_bytes, UNINIT_BYTE};
 
 /// Initialize token metadata for a Token-2022 mint.
 ///
@@ -64,31 +60,53 @@ impl InitializeMetadata<'_, '_> {
     /// - `[..+U]`: uri string (U bytes, UTF-8)
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        let ix_len = 8 // instruction discriminator
-                + 4 // name length
-                + self.name.len()
-                + 4 // symbol length
-                + self.symbol.len()
-                + 4 // uri length
-                + self.uri.len();
-        let mut ix_data: Vec<u8> = Vec::with_capacity(ix_len);
+        let ix_len = 8 + 4 + self.name.len() + 4 + self.symbol.len() + 4 + self.uri.len();
 
-        ix_data.extend_from_slice(&Self::DISCRIMINATOR);
+        if ix_len > MAX_IX_DATA {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        let mut ix_data = [UNINIT_BYTE; MAX_IX_DATA];
+        let mut offset = 0;
+
+        // Set 8-byte discriminator
+        write_bytes(&mut ix_data[offset..offset + 8], &Self::DISCRIMINATOR);
+        offset += 8;
 
         // Set name length and name data bytes
-        let name_len = self.name.len() as u32;
-        ix_data.extend_from_slice(&name_len.to_le_bytes());
-        ix_data.extend_from_slice(self.name.as_bytes());
+        write_bytes(
+            &mut ix_data[offset..offset + 4],
+            &(self.name.len() as u32).to_le_bytes(),
+        );
+        offset += 4;
+        write_bytes(
+            &mut ix_data[offset..offset + self.name.len()],
+            self.name.as_bytes(),
+        );
+        offset += self.name.len();
 
         // Set symbol length and symbol data bytes
-        let symbol_len = self.symbol.len() as u32;
-        ix_data.extend_from_slice(&symbol_len.to_le_bytes());
-        ix_data.extend_from_slice(self.symbol.as_bytes());
+        write_bytes(
+            &mut ix_data[offset..offset + 4],
+            &(self.symbol.len() as u32).to_le_bytes(),
+        );
+        offset += 4;
+        write_bytes(
+            &mut ix_data[offset..offset + self.symbol.len()],
+            self.symbol.as_bytes(),
+        );
+        offset += self.symbol.len();
 
         // Set uri length and uri data bytes
-        let uri_len = self.uri.len() as u32;
-        ix_data.extend_from_slice(&uri_len.to_le_bytes());
-        ix_data.extend_from_slice(self.uri.as_bytes());
+        write_bytes(
+            &mut ix_data[offset..offset + 4],
+            &(self.uri.len() as u32).to_le_bytes(),
+        );
+        offset += 4;
+        write_bytes(
+            &mut ix_data[offset..offset + self.uri.len()],
+            self.uri.as_bytes(),
+        );
 
         let instruction_accounts: [InstructionAccount; 4] = [
             InstructionAccount::writable(self.metadata.address()),
@@ -100,7 +118,7 @@ impl InitializeMetadata<'_, '_> {
         let instruction = InstructionView {
             program_id: self.token_program,
             accounts: &instruction_accounts,
-            data: &ix_data,
+            data: unsafe { core::slice::from_raw_parts(ix_data.as_ptr() as *const u8, ix_len) },
         };
 
         invoke_signed(
