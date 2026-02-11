@@ -33,7 +33,7 @@ dependencies = [
  "pinocchio",
  "solana-account-view",
  "solana-address",
- "solana-define-syscall",
+ "solana-define-syscall 4.0.1",
  "solana-instruction-view",
  "solana-program-error",
 ]
@@ -89,8 +89,7 @@ dependencies = [
 [[package]]
 name = "solana-account-view"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f37ca34c37f92ee341b73d5ce7c8ef5bb38e9a87955b4bd343c63fa18b149215"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 dependencies = [
  "solana-address",
  "solana-program-error",
@@ -98,13 +97,12 @@ dependencies = [
 
 [[package]]
 name = "solana-address"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e37320fd2945c5d654b2c6210624a52d66c3f1f73b653ed211ab91a703b35bdd"
+version = "2.1.0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 dependencies = [
  "five8",
  "five8_const",
- "solana-define-syscall",
+ "solana-define-syscall 5.0.0",
  "solana-program-error",
 ]
 
@@ -115,19 +113,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57e5b1c0bc1d4a4d10c88a4100499d954c09d3fecfae4912c1a074dff68b1738"
 
 [[package]]
+name = "solana-define-syscall"
+version = "5.0.0"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
+
+[[package]]
 name = "solana-instruction-view"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60147e4d0a4620013df40bf30a86dd299203ff12fcb8b593cd51014fce0875d8"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"
 dependencies = [
  "solana-account-view",
  "solana-address",
- "solana-define-syscall",
+ "solana-define-syscall 5.0.0",
  "solana-program-error",
 ]
 
 [[package]]
 name = "solana-program-error"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1af32c995a7b692a915bb7414d5f8e838450cf7c70414e763d8abcae7b51f28"
+source = "git+https://github.com/febo/solana-sdk.git?branch=remove-resize#90246d8534266fc62561c7d1df80dae64df5b2ac"

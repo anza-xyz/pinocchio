@@ -6,7 +6,7 @@ use {
         address::declare_id,
         cpi::Signer,
         sysvars::{rent::Rent, Sysvar},
-        AccountView, Address, ProgramResult,
+        AccountView, Address, ProgramResult, Resize,
     },
 };
 
