@@ -369,9 +369,9 @@ const BPF_ALIGN_OF_U128: usize = 8;
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = 0;
 
-/// Trait to indicate that an account can be resized.
 #[cfg(feature = "resize")]
-pub trait Resize {
+/// Trait to indicate that an account can be resized.
+pub trait Resize: sealed::Sealed {
     /// Resize (either truncating or zero extending) the account's data.
     ///
     /// The account data can be increased by up to
@@ -404,6 +404,10 @@ pub trait Resize {
     /// borrows to the account data.
     unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError>;
 }
+
+// Only AccountView is "sealed", so only it can implement `Resize`.
+#[cfg(feature = "resize")]
+impl sealed::Sealed for AccountView {}
 
 #[cfg(feature = "resize")]
 impl Resize for AccountView {
@@ -442,6 +446,15 @@ impl Resize for AccountView {
 
         Ok(())
     }
+}
+
+#[cfg(feature = "resize")]
+mod sealed {
+    // Not `pub`, so other crates cannot name/implement it.
+    //
+    // This is used to "seal" the `Resize` trait, preventing external crates from
+    // implementing it for types other than `AccountView`.
+    pub trait Sealed {}
 }
 
 /// Module with functions to provide hints to the compiler about how code
