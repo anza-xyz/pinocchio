@@ -1,4 +1,5 @@
 pub mod default_account_state;
+pub mod group_member_pointer;
 pub mod group_pointer;
 pub mod memo_transfer;
 pub mod metadata_pointer;
@@ -14,4 +15,5 @@ pub enum ExtensionDiscriminator {
     TransferHook = 36,
     MetadataPointer = 39,
     GroupPointer = 40,
+    GroupMemberPointer = 41,
 }
