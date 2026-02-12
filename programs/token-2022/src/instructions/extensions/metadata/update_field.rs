@@ -69,6 +69,7 @@ pub struct UpdateField<'a, 'b> {
 }
 
 impl UpdateField<'_, '_> {
+    /// Based on `spl_token_metadata_interface` hash.
     pub const DISCRIMINATOR: [u8; 8] = [221, 233, 49, 45, 181, 202, 220, 200];
 
     /// Invoke the `UpdateField` instruction.

@@ -199,6 +199,78 @@ impl<'a> Metadata<'a> {
     pub unsafe fn uri_as_str(&self) -> &str {
         core::str::from_utf8_unchecked(self.uri)
     }
+
+    /// Returns an iterator over the additional metadata key-value pairs.
+    ///
+    /// Each pair is serialized on-chain as:
+    /// - `key_len` (`u32` LE) + key bytes (UTF-8)
+    /// - `value_len` (`u32` LE) + value bytes (UTF-8)
+    ///
+    /// The iterator stops when the remaining data is too short to contain
+    /// another complete pair.
+    #[inline(always)]
+    pub fn additional_metadata_iter(&self) -> AdditionalMetadataIterator<'a> {
+        AdditionalMetadataIterator {
+            data: self.additional_metadata,
+            offset: 0,
+        }
+    }
+}
+
+/// Zero-copy iterator over additional metadata key-value pairs.
+///
+/// Yields `(&[u8], &[u8])` for each (key, value) pair. Stops when the
+/// remaining bytes cannot form a complete pair.
+pub struct AdditionalMetadataIterator<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> Iterator for AdditionalMetadataIterator<'a> {
+    type Item = (&'a [u8], &'a [u8]);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let remaining = self.data.len() - self.offset;
+
+        // Need at least 4 (key_len) + 4 (value_len) = 8 bytes for an empty pair.
+        if remaining < 8 {
+            return None;
+        }
+
+        let key_len = u32::from_le_bytes([
+            self.data[self.offset],
+            self.data[self.offset + 1],
+            self.data[self.offset + 2],
+            self.data[self.offset + 3],
+        ]) as usize;
+
+        let key_start = self.offset + 4;
+        let key_end = key_start.checked_add(key_len)?;
+
+        if key_end + 4 > self.data.len() {
+            return None;
+        }
+
+        let value_len = u32::from_le_bytes([
+            self.data[key_end],
+            self.data[key_end + 1],
+            self.data[key_end + 2],
+            self.data[key_end + 3],
+        ]) as usize;
+
+        let value_start = key_end + 4;
+        let value_end = value_start.checked_add(value_len)?;
+
+        if value_end > self.data.len() {
+            return None;
+        }
+
+        let key = &self.data[key_start..key_end];
+        let value = &self.data[value_start..value_end];
+        self.offset = value_end;
+
+        Some((key, value))
+    }
 }
 
 #[cfg(test)]
@@ -207,13 +279,24 @@ mod tests {
     extern crate alloc;
     use alloc::vec::Vec;
 
+    fn serialize_additional_metadata(pairs: &[(&str, &str)]) -> Vec<u8> {
+        let mut buf = Vec::new();
+        for (key, value) in pairs {
+            buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
+            buf.extend_from_slice(key.as_bytes());
+            buf.extend_from_slice(&(value.len() as u32).to_le_bytes());
+            buf.extend_from_slice(value.as_bytes());
+        }
+        buf
+    }
+
     fn create_test_metadata_bytes(
         update_authority: &[u8; 32],
         mint: &[u8; 32],
         name: &str,
         symbol: &str,
         uri: &str,
-        additional_metadata: &[u8],
+        additional_metadata: &[(&str, &str)],
     ) -> Vec<u8> {
         let mut bytes = Vec::new();
 
@@ -229,8 +312,9 @@ mod tests {
         bytes.extend_from_slice(&(uri.len() as u32).to_le_bytes());
         bytes.extend_from_slice(uri.as_bytes());
 
-        bytes.extend_from_slice(&(additional_metadata.len() as u32).to_le_bytes());
-        bytes.extend_from_slice(additional_metadata);
+        let additional = serialize_additional_metadata(additional_metadata);
+        bytes.extend_from_slice(&(additional.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&additional);
 
         bytes
     }
@@ -242,16 +326,9 @@ mod tests {
         let name = "My Token";
         let symbol = "MTK";
         let uri = "https://metadata.example.com/token.json";
-        let additional_metadata = b"key1:value1;key2:value2";
+        let pairs = &[("key1", "value1"), ("key2", "value2")];
 
-        let bytes = create_test_metadata_bytes(
-            &update_authority,
-            &mint,
-            name,
-            symbol,
-            uri,
-            additional_metadata,
-        );
+        let bytes = create_test_metadata_bytes(&update_authority, &mint, name, symbol, uri, pairs);
 
         let metadata = Metadata::from_bytes(&bytes).unwrap();
 
@@ -260,7 +337,11 @@ mod tests {
         assert_eq!(unsafe { metadata.name_as_str() }, name);
         assert_eq!(unsafe { metadata.symbol_as_str() }, symbol);
         assert_eq!(unsafe { metadata.uri_as_str() }, uri);
-        assert_eq!(metadata.additional_metadata, additional_metadata);
+
+        let kv: Vec<_> = metadata.additional_metadata_iter().collect();
+        assert_eq!(kv.len(), 2);
+        assert_eq!(kv[0], (b"key1" as &[u8], b"value1" as &[u8]));
+        assert_eq!(kv[1], (b"key2" as &[u8], b"value2" as &[u8]));
     }
 
     #[test]
@@ -297,6 +378,7 @@ mod tests {
         assert_eq!(unsafe { metadata.symbol_as_str() }, "");
         assert_eq!(unsafe { metadata.uri_as_str() }, "");
         assert_eq!(metadata.additional_metadata, &[] as &[u8]);
+        assert_eq!(metadata.additional_metadata_iter().count(), 0);
     }
 
     #[test]
@@ -317,16 +399,9 @@ mod tests {
         let name = "Unchecked Token";
         let symbol = "UCK";
         let uri = "https://example.com/uck.json";
-        let additional_metadata = b"extra:data";
+        let pairs = &[("extra", "data")];
 
-        let bytes = create_test_metadata_bytes(
-            &update_authority,
-            &mint,
-            name,
-            symbol,
-            uri,
-            additional_metadata,
-        );
+        let bytes = create_test_metadata_bytes(&update_authority, &mint, name, symbol, uri, pairs);
 
         let checked = Metadata::from_bytes(&bytes).unwrap();
         let unchecked = unsafe { Metadata::from_bytes_unchecked(&bytes) };
@@ -357,5 +432,49 @@ mod tests {
         assert_eq!(unsafe { metadata.symbol_as_str() }, "T");
         assert_eq!(unsafe { metadata.uri_as_str() }, "https://t");
         assert_eq!(metadata.additional_metadata, &[] as &[u8]);
+    }
+
+    #[test]
+    fn test_additional_metadata_iterator() {
+        let pairs = &[
+            ("trait_type", "Background"),
+            ("value", "Blue"),
+            ("display_type", "string"),
+        ];
+        let bytes = create_test_metadata_bytes(&[0u8; 32], &[0u8; 32], "", "", "", pairs);
+        let metadata = Metadata::from_bytes(&bytes).unwrap();
+
+        let kv: Vec<_> = metadata.additional_metadata_iter().collect();
+        assert_eq!(kv.len(), 3);
+        assert_eq!(kv[0], (b"trait_type" as &[u8], b"Background" as &[u8]));
+        assert_eq!(kv[1], (b"value" as &[u8], b"Blue" as &[u8]));
+        assert_eq!(kv[2], (b"display_type" as &[u8], b"string" as &[u8]));
+    }
+
+    #[test]
+    fn test_additional_metadata_iterator_truncated() {
+        let mut additional = Vec::new();
+        // One valid pair
+        additional.extend_from_slice(&3u32.to_le_bytes());
+        additional.extend_from_slice(b"key");
+        additional.extend_from_slice(&3u32.to_le_bytes());
+        additional.extend_from_slice(b"val");
+        // Truncated second pair (key_len present but no data)
+        additional.extend_from_slice(&10u32.to_le_bytes());
+
+        // Build metadata bytes manually with raw additional_metadata blob
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&[0u8; 64]); // authority + mint
+        for _ in 0..3 {
+            bytes.extend_from_slice(&0u32.to_le_bytes()); // name, symbol, uri
+        }
+        bytes.extend_from_slice(&(additional.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&additional);
+
+        let metadata = Metadata::from_bytes(&bytes).unwrap();
+        let kv: Vec<_> = metadata.additional_metadata_iter().collect();
+        // Only the first complete pair is yielded
+        assert_eq!(kv.len(), 1);
+        assert_eq!(kv[0], (b"key" as &[u8], b"val" as &[u8]));
     }
 }
