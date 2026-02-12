@@ -42,10 +42,10 @@ impl Initialize<'_, '_> {
 
         let mut instruction_data = [UNINIT_BYTE; 36];
 
-        // discriminators
         instruction_data[0].write(ExtensionDiscriminator::InterestBearingMint as u8);
+
         instruction_data[1].write(Self::DISCRIMINATOR);
-        // rate_authority
+
         write_bytes(
             &mut instruction_data[2..34],
             if let Some(rate_authority) = self.rate_authority {
@@ -54,7 +54,7 @@ impl Initialize<'_, '_> {
                 &[0; 32]
             },
         );
-        // rate
+
         write_bytes(&mut instruction_data[34..36], &self.rate.to_le_bytes());
 
         invoke(
