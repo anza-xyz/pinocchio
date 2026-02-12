@@ -203,8 +203,8 @@ impl<'a> Metadata<'a> {
     /// Returns an iterator over the additional metadata key-value pairs.
     ///
     /// Each pair is serialized on-chain as:
-    /// - `key_len` (`u32` LE) + key bytes (UTF-8)
-    /// - `value_len` (`u32` LE) + value bytes (UTF-8)
+    /// - `key_len (u32 LE) + key bytes (UTF-8)`
+    /// - `value_len (u32 LE) + value bytes (UTF-8)`
     ///
     /// The iterator stops when the remaining data is too short to contain
     /// another complete pair.
