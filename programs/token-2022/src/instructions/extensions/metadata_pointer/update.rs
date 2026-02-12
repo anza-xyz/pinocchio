@@ -37,7 +37,7 @@ pub struct Update<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// The signer accounts when `authority` is a multisig.
-    pub signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [&'a AccountView],
 
     /// The new account address that holds the metadata.
     pub metadata_address: Option<&'b Address>,
@@ -58,29 +58,23 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
         authority: &'a AccountView,
         metadata_address: Option<&'b Address>,
     ) -> Self {
-        Self {
-            mint,
-            authority,
-            signers: &[],
-            metadata_address,
-            token_program,
-        }
+        Self::with_multisig_signers(token_program, mint, authority, metadata_address, &[])
     }
 
     /// Creates a new `Update` instruction with a multisignature owner/delegate
     /// authority and signer accounts.
     #[inline(always)]
-    pub fn with_multisig(
+    pub fn with_multisig_signers(
         token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
         metadata_address: Option<&'b Address>,
-        signers: &'c [&'a AccountView],
+        multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
             mint,
             authority,
-            signers,
+            multisig_signers,
             metadata_address,
             token_program,
         }
@@ -93,55 +87,53 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        if self.signers.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             Err(ProgramError::InvalidArgument)?;
         }
 
+        let expected_accounts = 2 + self.multisig_signers.len();
+
         // Instruction accounts.
 
-        const UNINIT_INSTRUCTION_ACCOUNTS: MaybeUninit<InstructionAccount> =
-            MaybeUninit::<InstructionAccount>::uninit();
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNTS; 2 + MAX_MULTISIG_SIGNERS];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The expected number of accounts has been validated to be less than
-        // the maximum allocated.
-        unsafe {
-            // mint
-            instruction_accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(self.mint.address()));
+        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
 
-            // authority
-            instruction_accounts
-                .get_unchecked_mut(1)
-                .write(InstructionAccount::new(
-                    self.authority.address(),
-                    false,
-                    self.signers.is_empty(),
-                ));
+        instruction_accounts[1].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
 
-            for (account, signer) in instruction_accounts
-                .get_unchecked_mut(2..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                account.write(InstructionAccount::readonly_signer(signer.address()));
-            }
+        for (account, signer) in instruction_accounts[2..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            account.write(InstructionAccount::readonly_signer(signer.address()));
+        }
+
+        // Accounts.
+
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
+
+        accounts[0].write(self.mint);
+
+        accounts[1].write(self.authority);
+
+        for (account_view, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
+            account_view.write(signer);
         }
 
         // Instruction data.
 
         let mut instruction_data = [UNINIT_BYTE; 34];
 
-        // discriminators
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::MetadataPointer as u8,
-                Update::DISCRIMINATOR,
-            ],
-        );
-        // metadata_address
+        instruction_data[0].write(ExtensionDiscriminator::MetadataPointer as u8);
+
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
         write_bytes(
             &mut instruction_data[2..34],
             if let Some(address) = self.metadata_address {
@@ -151,48 +143,22 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
             },
         );
 
-        let expected_accounts = 2 + self.signers.len();
-
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
-            accounts: unsafe {
-                slice::from_raw_parts(
-                    instruction_accounts.as_ptr() as *const InstructionAccount,
-                    expected_accounts,
-                )
-            },
-        };
-
-        // Accounts.
-
-        const UNINIT_ACCOUNT_VIEWS: MaybeUninit<&AccountView> =
-            MaybeUninit::<&AccountView>::uninit();
-        let mut accounts = [UNINIT_ACCOUNT_VIEWS; 2 + MAX_MULTISIG_SIGNERS];
-
-        // SAFETY: The expected number of accounts has been validated to be less than
-        // the maximum allocated.
-        unsafe {
-            // mint
-            accounts.get_unchecked_mut(0).write(self.mint);
-
-            // authority
-            accounts.get_unchecked_mut(1).write(self.authority);
-
-            // signer accounts
-            for (account_view, signer) in accounts
-                .get_unchecked_mut(2..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                account_view.write(signer);
-            }
-        }
-
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    slice::from_raw_parts(
+                        instruction_accounts.as_ptr() as *const InstructionAccount,
+                        expected_accounts,
+                    )
+                },
+                // SAFETY: instruction data is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe {
                 slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
             },

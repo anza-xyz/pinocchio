@@ -30,14 +30,14 @@ use {
 ///   1. `[]` The mint's transfer hook authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
 pub struct UpdateTransferHook<'a, 'b, 'c> {
-    /// The token mint.
+    /// The mint.
     pub mint: &'a AccountView,
 
-    /// The mint's `withdraw_withheld_authority` or multisig.
+    /// The transfer hook authority.
     pub authority: &'a AccountView,
 
-    /// Multisignature owner/delegate.
-    pub signers: &'c [&'a AccountView],
+    /// The signer accounts when `authority` is a multisig.
+    pub multisig_signers: &'c [&'a AccountView],
 
     /// Program that authorizes the transfer.
     pub transfer_hook_program: Option<&'b Address>,
@@ -49,8 +49,8 @@ pub struct UpdateTransferHook<'a, 'b, 'c> {
 impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
     pub const DISCRIMINATOR: u8 = 1;
 
-    /// Creates a new `UpdateTransferHook` instruction
-    /// with a single owner/delegate authority.
+    /// Creates a new `UpdateTransferHook` instruction with a single
+    /// owner/delegate authority.
     #[inline(always)]
     pub fn new(
         token_program: &'b Address,
@@ -58,29 +58,23 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
         authority: &'a AccountView,
         transfer_hook_program: Option<&'b Address>,
     ) -> Self {
-        Self {
-            mint,
-            authority,
-            signers: &[],
-            transfer_hook_program,
-            token_program,
-        }
+        Self::with_multisig_signers(token_program, mint, authority, transfer_hook_program, &[])
     }
 
-    /// Creates a new `UpdateTransferHook` instruction with a
-    /// multisignature owner/delegate authority and signer accounts.
+    /// Creates a new `UpdateTransferHook` instruction with a multisignature
+    /// owner/delegate authority and signer accounts.
     #[inline(always)]
-    pub fn with_multisig(
+    pub fn with_multisig_signers(
         token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
         transfer_hook_program: Option<&'b Address>,
-        signers: &'c [&'a AccountView],
+        multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
             mint,
             authority,
-            signers,
+            multisig_signers,
             transfer_hook_program,
             token_program,
         }
@@ -93,73 +87,31 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        if self.signers.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let expected_accounts = 2 + self.signers.len();
+        let expected_accounts = 2 + self.multisig_signers.len();
 
         // Instruction accounts.
 
-        const UNINIT_INSTRUCTION_ACCOUNTS: MaybeUninit<InstructionAccount> =
-            MaybeUninit::<InstructionAccount>::uninit();
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNTS; 2 + MAX_MULTISIG_SIGNERS];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            instruction_accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(self.mint.address()));
+        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(1)
-                .write(InstructionAccount::new(
-                    self.authority.address(),
-                    false,
-                    self.signers.is_empty(),
-                ));
+        instruction_accounts[1].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
 
-            for (account, signer) in instruction_accounts
-                .get_unchecked_mut(2..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                account.write(InstructionAccount::readonly_signer(signer.address()));
-            }
+        for (account, signer) in instruction_accounts[2..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            account.write(InstructionAccount::readonly_signer(signer.address()));
         }
-
-        // Instruction data.
-
-        let mut instruction_data = [UNINIT_BYTE; 34];
-
-        // discriminators
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::TransferHook as u8,
-                Self::DISCRIMINATOR,
-            ],
-        );
-
-        // transfer_hook_program_id
-        write_bytes(
-            &mut instruction_data[2..34],
-            if let Some(program_id) = self.transfer_hook_program {
-                program_id.as_ref()
-            } else {
-                &[0; 32]
-            },
-        );
-
-        //Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: unsafe {
-                from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
-            },
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
-        };
 
         // Accounts.
 
@@ -178,14 +130,42 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
             for (account, signer) in accounts
                 .get_unchecked_mut(2..)
                 .iter_mut()
-                .zip(self.signers.iter())
+                .zip(self.multisig_signers.iter())
             {
                 account.write(signer);
             }
         }
 
+        // Instruction data.
+
+        let mut instruction_data = [UNINIT_BYTE; 34];
+
+        instruction_data[0].write(ExtensionDiscriminator::TransferHook as u8);
+
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
+        write_bytes(
+            &mut instruction_data[2..34],
+            if let Some(program_id) = self.transfer_hook_program {
+                program_id.as_ref()
+            } else {
+                &[0; 32]
+            },
+        );
+
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                // SAFETY: instruction data is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe { slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )

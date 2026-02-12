@@ -10,31 +10,64 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Disable the Memo-Transfer extension on a token account.
+/// Stop requiring memos for transfers into this Account.
 ///
-/// Expected accounts:
+/// Implicitly initializes the extension in the case where it is not
+/// present.
 ///
-/// **Single authority**
-/// 0. `[writable]` The token account to disable memo transfer.
-/// 1. `[signer]` The owner of the token account.
+/// Accounts expected by this instruction:
 ///
-/// **Multisignature authority**
-/// 0. `[writable]` The token account to disable memo transfer.
-/// 1. `[readonly]` The multisig account that owns the token account.
-/// 2. `[signer]` M signer accounts (as required by the multisig).
+///   0. `[writable]` The account to update.
+///   1. `[signer]` The account's owner.
+///
+///   * Multisignature authority
+///   0. `[writable]` The account to update.
+///   1. `[]`  The account's multisignature owner.
+///   2. `..2+M` `[signer]` M signer accounts.
 pub struct Disable<'a, 'b, 'c> {
-    /// The token account to disable with the Memo-Transfer extension.
-    pub token_account: &'a AccountView,
-    /// The owner of the token account (single or multisig).
+    /// The account to update.
+    pub account: &'a AccountView,
+
+    /// The account's owner.
     pub authority: &'a AccountView,
+
     /// Signer accounts if the authority is a multisig.
-    pub signers: &'c [&'a AccountView],
-    /// Token program (Token-2022).
+    pub multisig_signers: &'c [&'a AccountView],
+
+    /// The token program.
     pub token_program: &'b Address,
 }
 
-impl Disable<'_, '_, '_> {
+impl<'a, 'b, 'c> Disable<'a, 'b, 'c> {
     pub const DISCRIMINATOR: u8 = 1;
+
+    /// Creates a new `Disable` instruction with a single owner/delegate
+    /// authority.
+    #[inline(always)]
+    pub fn new(
+        token_program: &'b Address,
+        account: &'a AccountView,
+        authority: &'a AccountView,
+    ) -> Self {
+        Self::with_multisig_signers(token_program, account, authority, &[])
+    }
+
+    /// Creates a new `Disable` instruction with a multisignature owner/delegate
+    /// authority and signer accounts.
+    #[inline(always)]
+    pub fn with_multisig_signers(
+        token_program: &'b Address,
+        account: &'a AccountView,
+        authority: &'a AccountView,
+        multisig_signers: &'c [&'a AccountView],
+    ) -> Self {
+        Self {
+            account,
+            authority,
+            multisig_signers,
+            token_program,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -43,85 +76,60 @@ impl Disable<'_, '_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        let &Self {
-            token_account,
-            authority,
-            signers: multisig_accounts,
-            token_program,
-            ..
-        } = self;
-
-        if multisig_accounts.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
         }
 
-        const UNINIT_INSTRUCTION_ACCOUNTS: MaybeUninit<InstructionAccount> =
-            MaybeUninit::<InstructionAccount>::uninit();
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNTS; 2 + MAX_MULTISIG_SIGNERS];
+        let expected_accounts = 2 + self.multisig_signers.len();
 
-        unsafe {
-            // SAFETY:
-            // - `instruction_accounts` is sized to 2 + MAX_MULTISIG_SIGNERS
+        // Instruction accounts.
 
-            // - Index 0 is always present (TokenAccount)
-            instruction_accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(token_account.address()));
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
 
-            // - Index 1 is always present (Authority)
-            instruction_accounts
-                .get_unchecked_mut(1)
-                .write(InstructionAccount::new(
-                    authority.address(),
-                    false,
-                    multisig_accounts.is_empty(),
-                ));
-        }
+        instruction_accounts[0].write(InstructionAccount::writable(self.account.address()));
+
+        instruction_accounts[1].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
 
         for (instruction_account, signer) in instruction_accounts[2..]
             .iter_mut()
-            .zip(multisig_accounts.iter())
+            .zip(self.multisig_signers.iter())
         {
             instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
         }
 
-        let data = &[
-            ExtensionDiscriminator::MemoTransfer as u8,
-            Self::DISCRIMINATOR,
-        ];
+        // Accounts.
 
-        let num_accounts = 2 + multisig_accounts.len();
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
 
-        let instruction = InstructionView {
-            program_id: token_program,
-            data,
-            accounts: unsafe {
-                slice::from_raw_parts(instruction_accounts.as_ptr() as _, num_accounts)
-            },
-        };
+        accounts[0].write(self.account);
 
-        // Account view array
-        const UNINIT_ACCOUNT_VIEWS: MaybeUninit<&AccountView> = MaybeUninit::uninit();
-        let mut account_views = [UNINIT_ACCOUNT_VIEWS; 2 + MAX_MULTISIG_SIGNERS];
+        accounts[1].write(self.authority);
 
-        unsafe {
-            // SAFETY:
-            // - `account_views` is sized to 2 + MAX_MULTISIG_SIGNERS
-            // - Index 0 is always present
-            account_views.get_unchecked_mut(0).write(token_account);
-            // - Index 1 is always present
-            account_views.get_unchecked_mut(1).write(authority);
-        }
-
-        // Fill signer accounts
-        for (account_view, signer) in account_views[2..].iter_mut().zip(multisig_accounts.iter()) {
+        for (account_view, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
             account_view.write(signer);
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    slice::from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: &[
+                    ExtensionDiscriminator::MemoTransfer as u8,
+                    Self::DISCRIMINATOR,
+                ],
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
             unsafe {
-                slice::from_raw_parts(account_views.as_ptr() as *const &AccountView, num_accounts)
+                slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
             },
             signers,
         )

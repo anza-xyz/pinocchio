@@ -42,15 +42,10 @@ impl Initialize<'_, '_> {
 
         let mut instruction_data = [UNINIT_BYTE; 66];
 
-        // disciminators
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::MetadataPointer as u8,
-                Initialize::DISCRIMINATOR,
-            ],
-        );
-        // authority
+        instruction_data[0].write(ExtensionDiscriminator::MetadataPointer as u8);
+
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
         write_bytes(
             &mut instruction_data[2..34],
             if let Some(authority) = self.authority {
@@ -59,7 +54,7 @@ impl Initialize<'_, '_> {
                 &[0; 32]
             },
         );
-        // metadata_address
+
         write_bytes(
             &mut instruction_data[34..66],
             if let Some(metadata_address) = self.metadata_address {
@@ -69,14 +64,16 @@ impl Initialize<'_, '_> {
             },
         );
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
-            accounts: &[InstructionAccount::writable(self.mint.address())],
-        };
-
-        invoke(&instruction, &[self.mint])
+        invoke(
+            &InstructionView {
+                program_id: self.token_program,
+                accounts: &[InstructionAccount::writable(self.mint.address())],
+                // SAFETY: instruction data is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            &[self.mint],
+        )
     }
 }
