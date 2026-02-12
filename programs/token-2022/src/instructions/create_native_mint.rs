@@ -16,7 +16,7 @@ use {
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writeable,signer]` Funding account (must be a system account).
+///   0. `[writable,signer]` Funding account (must be a system account).
 ///   1. `[writable]` The native mint account to create.
 ///   2. `[]` System program for mint account funding.
 pub struct CreateNativeMint<'a, 'b> {
@@ -34,7 +34,7 @@ pub struct CreateNativeMint<'a, 'b> {
 }
 
 impl CreateNativeMint<'_, '_> {
-    pub const DISCRIMINATOR: u8 = 32;
+    pub const DISCRIMINATOR: u8 = 31;
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
