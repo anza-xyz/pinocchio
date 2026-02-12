@@ -19,10 +19,8 @@ use {
 /// 2. `[signer]` Authority.
 /// 3. ..`3+M` `[signer]` M signer accounts.
 pub struct WidthdrawExcessLamports<'a, 'b, 'c> {
-    /// Account to withdraw from.
-    ///
-    /// This account can be a mint, token, or multisig account.
-    pub account: &'a AccountView,
+    /// Source account owned by the token program.
+    pub source: &'a AccountView,
 
     /// Destination account to receive the withdrawn lamports.
     pub destination: &'a AccountView,
@@ -30,10 +28,10 @@ pub struct WidthdrawExcessLamports<'a, 'b, 'c> {
     /// The owner/authority account.
     pub authority: &'a AccountView,
 
-    /// Multisignature owner/authority.
-    pub signers: &'c [&'a AccountView],
+    /// The signer accounts if the authority is a multisig.
+    pub multisig_signers: &'c [&'a AccountView],
 
-    /// Token Program
+    /// The token progrm.
     pub token_program: &'b Address,
 }
 
@@ -45,11 +43,11 @@ impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
     #[inline(always)]
     pub fn new(
         token_program: &'b Address,
-        account: &'a AccountView,
+        source: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
     ) -> Self {
-        Self::with_signers(token_program, account, destination, authority, &[])
+        Self::with_signers(token_program, source, destination, authority, &[])
     }
 
     /// Creates a new `WidthdrawExcessLamports` instruction with a
@@ -57,16 +55,16 @@ impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
     #[inline(always)]
     pub fn with_signers(
         token_program: &'b Address,
-        account: &'a AccountView,
+        source: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        signers: &'c [&'a AccountView],
+        multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
-            account,
+            source,
             destination,
             authority,
-            signers,
+            multisig_signers,
             token_program,
         }
     }
@@ -78,65 +76,47 @@ impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        if self.signers.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let expected_accounts = 3 + self.signers.len();
+        let expected_accounts = 3 + self.multisig_signers.len();
 
         // Instruction accounts.
 
-        const UNINIT_INSTRUCTION_ACCOUNTS: MaybeUninit<InstructionAccount> =
-            MaybeUninit::<InstructionAccount>::uninit();
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNTS; 3 + MAX_MULTISIG_SIGNERS];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            instruction_accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(self.account.address()));
+        instruction_accounts[0].write(InstructionAccount::writable(self.source.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(1)
-                .write(InstructionAccount::writable(self.destination.address()));
+        instruction_accounts[1].write(InstructionAccount::writable(self.destination.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(2)
-                .write(InstructionAccount::new(
-                    self.authority.address(),
-                    false,
-                    self.signers.is_empty(),
-                ));
+        instruction_accounts[2].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
 
-            for (account, signer) in instruction_accounts
-                .get_unchecked_mut(3..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                account.write(InstructionAccount::readonly_signer(signer.address()));
-            }
+        for (account, signer) in instruction_accounts[3..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            account.write(InstructionAccount::readonly_signer(signer.address()));
         }
 
         // Accounts.
 
-        const UNINIT_INFO: MaybeUninit<&AccountView> = MaybeUninit::uninit();
-        let mut accounts = [UNINIT_INFO; 3 + MAX_MULTISIG_SIGNERS];
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            accounts.get_unchecked_mut(0).write(self.account);
+        accounts[0].write(self.source);
 
-            accounts.get_unchecked_mut(1).write(self.destination);
+        accounts[1].write(self.destination);
 
-            accounts.get_unchecked_mut(2).write(self.authority);
+        accounts[2].write(self.authority);
 
-            for (account, signer) in accounts
-                .get_unchecked_mut(3..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                account.write(signer);
-            }
+        for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
+            account.write(signer);
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
