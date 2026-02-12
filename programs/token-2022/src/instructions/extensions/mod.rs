@@ -1,3 +1,4 @@
+pub mod confidential_transfer_fee;
 pub mod default_account_state;
 pub mod group_member_pointer;
 pub mod group_pointer;
@@ -20,6 +21,7 @@ pub enum ExtensionDiscriminator {
     InterestBearingMint = 33,
     PermanentDelegate = 35,
     TransferHook = 36,
+    ConfidentialTransferFee = 37,
     MetadataPointer = 39,
     GroupPointer = 40,
     GroupMemberPointer = 41,
