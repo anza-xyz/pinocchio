@@ -31,7 +31,7 @@ pub struct WidthdrawExcessLamports<'a, 'b, 'c> {
     /// The signer accounts if the authority is a multisig.
     pub multisig_signers: &'c [&'a AccountView],
 
-    /// The token progrm.
+    /// The token program.
     pub token_program: &'b Address,
 }
 
