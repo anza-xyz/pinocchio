@@ -36,7 +36,7 @@ use {
 ///   4. `..4+M` `[signer]` M signer accounts for the multisig.
 pub struct Burn<'a, 'b, 'c> {
     /// The source account to burn from.
-    pub source: &'a AccountView,
+    pub account: &'a AccountView,
 
     /// The token mint.
     pub mint: &'a AccountView,
@@ -95,7 +95,7 @@ impl<'a, 'b, 'c> Burn<'a, 'b, 'c> {
         multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
-            source: account,
+            account,
             mint,
             permissioned_burn_authority,
             authority,
@@ -123,7 +123,7 @@ impl<'a, 'b, 'c> Burn<'a, 'b, 'c> {
         let mut instruction_accounts =
             [const { MaybeUninit::<InstructionAccount>::uninit() }; 4 + MAX_MULTISIG_SIGNERS];
 
-        instruction_accounts[0].write(InstructionAccount::writable(self.source.address()));
+        instruction_accounts[0].write(InstructionAccount::writable(self.account.address()));
 
         instruction_accounts[1].write(InstructionAccount::writable(self.mint.address()));
 
@@ -149,7 +149,7 @@ impl<'a, 'b, 'c> Burn<'a, 'b, 'c> {
         let mut accounts =
             [const { MaybeUninit::<&AccountView>::uninit() }; 4 + MAX_MULTISIG_SIGNERS];
 
-        accounts[0].write(self.source);
+        accounts[0].write(self.account);
 
         accounts[1].write(self.mint);
 
