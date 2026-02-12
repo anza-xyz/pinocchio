@@ -12,7 +12,6 @@ solana_address::declare_id!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
 const ELGAMAL_PUBKEY_LEN: usize = 32;
 const AE_CIPHERTEXT_LEN: usize = 36;
-const ELGAMAL_CIPHERTEXT_LEN: usize = 64;
 
 const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
 

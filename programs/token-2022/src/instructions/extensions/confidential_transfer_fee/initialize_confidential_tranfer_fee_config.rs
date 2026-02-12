@@ -31,12 +31,11 @@ pub struct InitializeConfidentialTransferFeeConfig<'a, 'data> {
     /// confidential transfer fee authority
     pub authority: Option<&'data Address>,
 
-    /// ElGamal public key used to encrypt withheld fees.
+    /// `ElGamal` public key used to encrypt withheld fees.
     pub withdraw_withheld_authority_elgamal_pubkey: &'data [u8; ELGAMAL_PUBKEY_LEN],
 }
 
 impl InitializeConfidentialTransferFeeConfig<'_, '_> {
-    /// Discrminator value for this instruction
     pub const DISCRIMINATOR: u8 = 0;
 
     #[inline(always)]
