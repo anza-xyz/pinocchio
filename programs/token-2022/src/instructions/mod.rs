@@ -3,6 +3,7 @@ mod approve_checked;
 mod burn;
 mod burn_checked;
 mod close_account;
+mod create_native_mint;
 mod extensions;
 mod freeze_account;
 mod initialize_account;
@@ -25,10 +26,10 @@ mod unwrap_lamports;
 mod withdraw_excess_lamports;
 
 pub use {
-    approve::*, approve_checked::*, burn::*, burn_checked::*, close_account::*, extensions::*,
-    freeze_account::*, initialize_account::*, initialize_account_2::*, initialize_account_3::*,
-    initialize_mint::*, initialize_mint_2::*, initialize_multisig::*, initialize_multisig_2::*,
-    initialize_non_transferable_mint::*, mint_to::*, mint_to_checked::*, revoke::*,
-    set_authority::*, sync_native::*, thaw_account::*, transfer::*, transfer_checked::*,
-    unwrap_lamports::*, withdraw_excess_lamports::*,
+    approve::*, approve_checked::*, burn::*, burn_checked::*, close_account::*,
+    create_native_mint::*, extensions::*, freeze_account::*, initialize_account::*,
+    initialize_account_2::*, initialize_account_3::*, initialize_mint::*, initialize_mint_2::*,
+    initialize_multisig::*, initialize_multisig_2::*, initialize_non_transferable_mint::*,
+    mint_to::*, mint_to_checked::*, revoke::*, set_authority::*, sync_native::*, thaw_account::*,
+    transfer::*, transfer_checked::*, unwrap_lamports::*, withdraw_excess_lamports::*,
 };
