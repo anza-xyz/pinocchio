@@ -59,7 +59,7 @@ impl Account {
             return Err(ProgramError::InvalidAccountData);
         }
         if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
@@ -83,7 +83,7 @@ impl Account {
             return Err(ProgramError::InvalidAccountData);
         }
         if account_view.owner() != &ID {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
@@ -102,14 +102,17 @@ impl Account {
         &*(bytes.as_ptr() as *const Account)
     }
 
+    #[inline(always)]
     pub fn mint(&self) -> &Address {
         &self.mint
     }
 
+    #[inline(always)]
     pub fn owner(&self) -> &Address {
         &self.owner
     }
 
+    #[inline(always)]
     pub fn amount(&self) -> u64 {
         u64::from_le_bytes(self.amount)
     }
@@ -119,6 +122,7 @@ impl Account {
         self.delegate_flag[0] == 1
     }
 
+    #[inline(always)]
     pub fn delegate(&self) -> Option<&Address> {
         if self.has_delegate() {
             Some(self.delegate_unchecked())
@@ -135,8 +139,8 @@ impl Account {
     }
 
     #[inline(always)]
-    pub fn state(&self) -> AccountState {
-        self.state.into()
+    pub fn state(&self) -> Result<AccountState, ProgramError> {
+        AccountState::try_from(self.state)
     }
 
     #[inline(always)]
@@ -144,6 +148,7 @@ impl Account {
         self.is_native[0] == 1
     }
 
+    #[inline(always)]
     pub fn native_amount(&self) -> Option<u64> {
         if self.is_native() {
             Some(self.native_amount_unchecked())
@@ -161,6 +166,7 @@ impl Account {
         u64::from_le_bytes(self.native_amount)
     }
 
+    #[inline(always)]
     pub fn delegated_amount(&self) -> u64 {
         u64::from_le_bytes(self.delegated_amount)
     }
@@ -170,6 +176,7 @@ impl Account {
         self.close_authority_flag[0] == 1
     }
 
+    #[inline(always)]
     pub fn close_authority(&self) -> Option<&Address> {
         if self.has_close_authority() {
             Some(self.close_authority_unchecked())
