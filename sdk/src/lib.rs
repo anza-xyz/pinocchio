@@ -397,4 +397,17 @@ pub mod hint {
             false
         }
     }
+
+    macro_rules! assume_unchecked {
+        ($cond:expr) => {
+            assume_unchecked($cond, "")
+        };
+
+        ($cond:expr, $msg:literal) => {
+            if !$cond {
+                #[cfg(debug_assertions)]
+                assert!($cond, "{} failed: {}", stringify!($cond), $msg);
+            }
+        };
+    }
 }
