@@ -12,6 +12,7 @@ pub mod transfer_hook;
 
 #[repr(u8)]
 #[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExtensionDiscriminator {
     MintCloseAuthority = 25,
     DefaultAccountState = 28,
