@@ -25,6 +25,8 @@ pub struct UiAmountToAmount<'a, 'b, const LENGTH: usize> {
 }
 
 impl<const LENGTH: usize> UiAmountToAmount<'_, '_, LENGTH> {
+    pub const DISCRIMINATOR: u8 = 24;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Reserve 1 byte for the instruction discriminator, and the rest for
@@ -39,9 +41,8 @@ impl<const LENGTH: usize> UiAmountToAmount<'_, '_, LENGTH> {
 
         let mut instruction_data = [UNINIT_BYTE; LENGTH];
 
-        // discriminator
-        instruction_data[0].write(24);
-        // amount
+        instruction_data[0].write(Self::DISCRIMINATOR);
+
         write_bytes(&mut instruction_data[1..], self.amount.as_bytes());
 
         invoke(

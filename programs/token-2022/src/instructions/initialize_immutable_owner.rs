@@ -22,13 +22,15 @@ pub struct InitializeImmutableOwner<'a, 'b> {
 }
 
 impl InitializeImmutableOwner<'_, '_> {
+    pub const DISCRIMINATOR: u8 = 22;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         invoke(
             &InstructionView {
                 program_id: self.token_program,
                 accounts: &[InstructionAccount::writable(self.account.address())],
-                data: &[22],
+                data: &[Self::DISCRIMINATOR],
             },
             &[self.account],
         )

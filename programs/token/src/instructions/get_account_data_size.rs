@@ -19,13 +19,15 @@ pub struct GetAccountDataSize<'a> {
 }
 
 impl GetAccountDataSize<'_> {
+    pub const DISCRIMINATOR: u8 = 21;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         invoke(
             &InstructionView {
                 program_id: &crate::ID,
                 accounts: &[InstructionAccount::readonly(self.mint.address())],
-                data: &[21],
+                data: &[Self::DISCRIMINATOR],
             },
             &[self.mint],
         )

@@ -38,15 +38,16 @@ pub struct AmountToUiAmount<'a, 'b> {
 }
 
 impl AmountToUiAmount<'_, '_> {
+    pub const DISCRIMINATOR: u8 = 23;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Instruction data.
 
         let mut instruction_data = [UNINIT_BYTE; 9];
 
-        // discriminator
-        instruction_data[0].write(23);
-        // amount
+        instruction_data[0].write(Self::DISCRIMINATOR);
+
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 
         invoke(
