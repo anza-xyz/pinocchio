@@ -5,7 +5,10 @@ pub mod lazy;
 
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
-pub use lazy::{InstructionContext, MaybeAccount};
+pub use lazy::{
+    AssumeNeverDup, AssumeSize, CheckNonDup, CheckSize, DataGuard, DupGuard, InstructionContext,
+    MaybeAccount, NoGuards,
+};
 use {
     crate::{
         account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},

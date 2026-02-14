@@ -398,16 +398,14 @@ pub mod hint {
         }
     }
 
-    macro_rules! assume_unchecked {
-        ($cond:expr) => {
-            assume_unchecked($cond, "")
-        };
+    #[inline(always)]
+    pub(crate) unsafe fn assume_unchecked(cond: bool, _msg: &str) {
+        #[cfg(debug_assertions)]
+        assert!(cond, "{}", _msg);
 
-        ($cond:expr, $msg:literal) => {
-            if !$cond {
-                #[cfg(debug_assertions)]
-                assert!($cond, "{} failed: {}", stringify!($cond), $msg);
-            }
-        };
+        #[cfg(not(debug_assertions))]
+        if !cond {
+            core::hint::unreachable_unchecked();
+        }
     }
 }

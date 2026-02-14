@@ -5,6 +5,7 @@ use crate::{
     account::{AccountView, RuntimeAccount},
     entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
     error::ProgramError,
+    hint::{assume_unchecked, unlikely},
     Address, BPF_ALIGN_OF_U128,
 };
 
@@ -80,6 +81,235 @@ macro_rules! lazy_program_entrypoint {
     };
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+#[cold]
+fn cold<T>(t: T) -> T {
+    t
+}
+
+// ---------------------------------------------------------------------------
+// Guard traits
+// ---------------------------------------------------------------------------
+
+/// Dup guard: controls how duplicate accounts are handled.
+///
+/// The associated `Output` type determines the return type of
+/// [`InstructionContext::next_account_guarded`]:
+/// - Guards that allow duplicates return [`MaybeAccount`].
+/// - Guards that reject or assume non-duplicate return [`AccountView`].
+///
+/// # Safety
+///
+/// Incorrect implementations cause undefined behavior inside
+/// [`InstructionContext::read_account_unchecked`]:
+///
+/// - `check_dup` must be consistent with `borrow_state`: if it returns `Ok`
+///   when `*borrow_state != NON_DUP_MARKER`, the duplicate branch calls
+///   `wrap_dup`. Guards that assume non-dup (e.g. [`AssumeNeverDup`]) hit UB
+///   in `wrap_dup` in that case.
+/// - `wrap_dup` must be safe to call whenever `check_dup` returns `Ok` and
+///   the account is a duplicate.
+/// - `wrap_account` must be safe to call whenever `check_dup` returns `Ok`
+///   and the account is not a duplicate.
+pub unsafe trait DupGuard {
+    type Output;
+
+    /// # Safety
+    ///
+    /// `borrow_state` must point to a valid `RuntimeAccount::borrow_state`.
+    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError>;
+
+    fn wrap_account(account: AccountView) -> Self::Output;
+    fn wrap_dup(dup_index: u8) -> Self::Output;
+}
+
+/// Data guard: controls how account data is validated and how the buffer
+/// pointer is advanced.
+///
+/// # Safety
+///
+/// `advance_buffer` must return a pointer exactly past the account's data
+/// (including alignment padding). Returning a wrong pointer corrupts all
+/// subsequent reads (UB). The default implementation reads `data_len` at
+/// runtime and is always correct. Overrides must compute the same result.
+pub unsafe trait DataGuard {
+    /// # Safety
+    ///
+    /// `account` must point to a valid `RuntimeAccount`.
+    unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError>;
+
+    /// # Safety
+    ///
+    /// `account` must point to a valid `RuntimeAccount` and `buffer` must
+    /// point past the account header (8-byte offset already applied).
+    #[inline(always)]
+    unsafe fn advance_buffer(&self, account: *const RuntimeAccount, buffer: *mut u8) -> *mut u8 {
+        let buf = buffer.add(STATIC_ACCOUNT_DATA + (*account).data_len as usize);
+        ((buf as usize + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1)) as *mut u8
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Guard types
+// ---------------------------------------------------------------------------
+
+/// No-op guard: permits duplicates and skips data validation.
+pub struct NoGuards;
+
+unsafe impl DupGuard for NoGuards {
+    type Output = MaybeAccount;
+
+    #[inline(always)]
+    unsafe fn check_dup(&self, _borrow_state: *const u8) -> Result<(), ProgramError> {
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn wrap_account(account: AccountView) -> MaybeAccount {
+        MaybeAccount::Account(account)
+    }
+
+    #[inline(always)]
+    fn wrap_dup(dup_index: u8) -> MaybeAccount {
+        MaybeAccount::Duplicated(dup_index)
+    }
+}
+
+unsafe impl DataGuard for NoGuards {
+    #[inline(always)]
+    unsafe fn check_account(&self, _account: *const RuntimeAccount) -> Result<(), ProgramError> {
+        Ok(())
+    }
+}
+
+/// Assumes the next account is never a duplicate.
+///
+/// Returns [`AccountView`] directly. The duplicate branch is eliminated.
+/// Passing a duplicate account is UB (`assume_unchecked` in `check_dup`,
+/// `unreachable_unchecked` in `wrap_dup`).
+pub struct AssumeNeverDup(());
+
+impl AssumeNeverDup {
+    /// # Safety
+    ///
+    /// The caller must guarantee that the next account is not a duplicate.
+    #[inline(always)]
+    pub unsafe fn new() -> Self {
+        Self(())
+    }
+}
+
+unsafe impl DupGuard for AssumeNeverDup {
+    type Output = AccountView;
+
+    #[inline(always)]
+    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
+        assume_unchecked(*borrow_state == NON_DUP_MARKER, "expected non-duplicate account");
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn wrap_account(account: AccountView) -> AccountView {
+        account
+    }
+
+    #[inline(always)]
+    fn wrap_dup(_: u8) -> AccountView {
+        unsafe { core::hint::unreachable_unchecked() }
+    }
+}
+
+/// Checks at runtime that the next account is not a duplicate.
+///
+/// Returns [`AccountView`] on success. Returns
+/// [`ProgramError::AccountBorrowFailed`] on duplicate.
+pub struct CheckNonDup;
+
+unsafe impl DupGuard for CheckNonDup {
+    type Output = AccountView;
+
+    #[inline(always)]
+    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
+        if *borrow_state != NON_DUP_MARKER {
+            return Err(cold(ProgramError::AccountBorrowFailed));
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn wrap_account(account: AccountView) -> AccountView {
+        account
+    }
+
+    #[inline(always)]
+    fn wrap_dup(_: u8) -> AccountView {
+        unreachable!()
+    }
+}
+
+/// Checks at runtime that the account's data length matches `expected_size`.
+///
+/// Returns [`ProgramError::InvalidAccountData`] on size mismatch.
+pub struct CheckSize {
+    expected_size: usize,
+}
+
+impl CheckSize {
+    #[inline(always)]
+    pub fn new(expected_size: usize) -> Self {
+        Self { expected_size }
+    }
+}
+
+unsafe impl DataGuard for CheckSize {
+    #[inline(always)]
+    unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
+        if (*account).data_len as usize != self.expected_size {
+            return Err(cold(ProgramError::InvalidAccountData));
+        }
+        Ok(())
+    }
+}
+
+/// Assumes the account's data length is exactly `N` bytes.
+///
+/// Enables compile-time buffer stride computation. Wrong `N` corrupts the
+/// buffer cursor (UB).
+pub struct AssumeSize<const N: usize>(());
+
+impl<const N: usize> AssumeSize<N> {
+    /// # Safety
+    ///
+    /// The caller must guarantee that the next account's `data_len == N`.
+    #[inline(always)]
+    pub unsafe fn new() -> Self {
+        Self(())
+    }
+}
+
+// STATIC_ACCOUNT_DATA must be aligned for AssumeSize to compute const advances.
+const _: () = assert!(STATIC_ACCOUNT_DATA % BPF_ALIGN_OF_U128 == 0);
+
+unsafe impl<const N: usize> DataGuard for AssumeSize<N> {
+    #[inline(always)]
+    unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
+        assume_unchecked((*account).data_len as usize == N, "unexpected account data length");
+        Ok(())
+    }
+
+    #[inline(always)]
+    unsafe fn advance_buffer(&self, _account: *const RuntimeAccount, buffer: *mut u8) -> *mut u8 {
+        if N == 0 || N % BPF_ALIGN_OF_U128 == 0 {
+            buffer.add(STATIC_ACCOUNT_DATA + N)
+        } else {
+            buffer.add(STATIC_ACCOUNT_DATA + N + BPF_ALIGN_OF_U128 - N % BPF_ALIGN_OF_U128)
+        }
+    }
+}
+
 /// Context to access data from the input buffer for the instruction.
 ///
 /// This is a wrapper around the input buffer that provides methods to read the
@@ -116,6 +346,7 @@ impl InstructionContext {
     /// [SVM documentation]: https://solana.com/docs/programs/faq#input-parameter-serialization
     #[inline(always)]
     pub unsafe fn new_unchecked(input: *mut u8) -> Self {
+        assume_unchecked(input.align_offset(BPF_ALIGN_OF_U128) == 0, "input buffer not aligned");
         Self {
             // SAFETY: The first 8 bytes of the input buffer represent the
             // number of accounts when serialized by the SVM loader, which is read
@@ -130,7 +361,7 @@ impl InstructionContext {
     /// Reads the next account for the instruction.
     ///
     /// The account is represented as a [`MaybeAccount`], since it can either
-    /// represent and [`AccountView`] or the index of a duplicated account. It
+    /// represent an [`AccountView`] or the index of a duplicated account. It
     /// is up to the caller to handle the mapping back to the source
     /// account.
     ///
@@ -140,12 +371,7 @@ impl InstructionContext {
     /// no remaining accounts.
     #[inline(always)]
     pub fn next_account(&mut self) -> Result<MaybeAccount, ProgramError> {
-        self.remaining = self
-            .remaining
-            .checked_sub(1)
-            .ok_or(ProgramError::NotEnoughAccountKeys)?;
-
-        Ok(unsafe { self.read_account() })
+        self.next_account_guarded(&NoGuards, &NoGuards)
     }
 
     /// Returns the next account for the instruction.
@@ -161,7 +387,36 @@ impl InstructionContext {
     /// undefined behavior.
     #[inline(always)]
     pub unsafe fn next_account_unchecked(&mut self) -> MaybeAccount {
-        self.read_account()
+        // Note: intentionally does NOT decrement remaining.
+        self.read_account_unchecked(&NoGuards, &NoGuards)
+            .unwrap_unchecked()
+    }
+
+    /// Reads the next account with caller-chosen guard combination.
+    ///
+    /// The return type is determined by the [`DupGuard::Output`] associated
+    /// type: guards that permit duplicates return [`MaybeAccount`], while
+    /// guards that reject or assume non-duplicate return [`AccountView`].
+    ///
+    /// # Error
+    ///
+    /// Returns a [`ProgramError::NotEnoughAccountKeys`] error if there are
+    /// no remaining accounts. Guard-specific errors are also possible
+    /// (e.g. [`CheckNonDup`] returns [`ProgramError::AccountBorrowFailed`]
+    /// on duplicate, [`CheckSize`] returns
+    /// [`ProgramError::InvalidAccountData`] on size mismatch).
+    #[inline(always)]
+    pub fn next_account_guarded<D: DupGuard, S: DataGuard>(
+        &mut self,
+        dup_guard: &D,
+        data_guard: &S,
+    ) -> Result<D::Output, ProgramError> {
+        if unlikely(self.remaining == 0) {
+            return Err(cold(ProgramError::NotEnoughAccountKeys));
+        }
+        self.remaining -= 1;
+
+        unsafe { self.read_account_unchecked(dup_guard, data_guard) }
     }
 
     /// Returns the number of remaining accounts.
@@ -179,8 +434,8 @@ impl InstructionContext {
     /// error.
     #[inline(always)]
     pub fn instruction_data(&self) -> Result<&[u8], ProgramError> {
-        if self.remaining > 0 {
-            return Err(ProgramError::InvalidInstructionData);
+        if unlikely(self.remaining > 0) {
+            return Err(cold(ProgramError::InvalidInstructionData));
         }
 
         Ok(unsafe { self.instruction_data_unchecked() })
@@ -208,8 +463,8 @@ impl InstructionContext {
     /// error.
     #[inline(always)]
     pub fn program_id(&self) -> Result<&Address, ProgramError> {
-        if self.remaining > 0 {
-            return Err(ProgramError::InvalidInstructionData);
+        if unlikely(self.remaining > 0) {
+            return Err(cold(ProgramError::InvalidInstructionData));
         }
 
         Ok(unsafe { self.program_id_unchecked() })
@@ -228,28 +483,30 @@ impl InstructionContext {
         &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Address)
     }
 
-    /// Read an account from the input buffer.
-    ///
-    /// This can only be called with a buffer that was serialized by the runtime
-    /// as it assumes a specific memory layout.
-    #[allow(clippy::cast_ptr_alignment, clippy::missing_safety_doc)]
+    #[allow(clippy::cast_ptr_alignment)]
     #[inline(always)]
-    unsafe fn read_account(&mut self) -> MaybeAccount {
+    unsafe fn read_account_unchecked<D: DupGuard, S: DataGuard>(
+        &mut self,
+        dup_guard: &D,
+        data_guard: &S,
+    ) -> Result<D::Output, ProgramError> {
+        assume_unchecked(self.buffer.align_offset(BPF_ALIGN_OF_U128) == 0, "buffer not aligned");
         let account: *mut RuntimeAccount = self.buffer as *mut RuntimeAccount;
+
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicate account
         //   - duplicate marker + 7 bytes of padding in case of a duplicate account
         self.buffer = self.buffer.add(core::mem::size_of::<u64>());
 
-        if (*account).borrow_state == NON_DUP_MARKER {
-            self.buffer = self.buffer.add(STATIC_ACCOUNT_DATA);
-            self.buffer = self.buffer.add((*account).data_len as usize);
-            self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
+        let borrow_ptr = &(*account).borrow_state as *const u8;
+        dup_guard.check_dup(borrow_ptr)?;
 
-            MaybeAccount::Account(AccountView::new_unchecked(account))
+        if *borrow_ptr == NON_DUP_MARKER {
+            data_guard.check_account(account)?;
+            self.buffer = data_guard.advance_buffer(account, self.buffer);
+            Ok(D::wrap_account(AccountView::new_unchecked(account)))
         } else {
-            // The caller will handle the mapping to the original account.
-            MaybeAccount::Duplicated((*account).borrow_state)
+            Ok(D::wrap_dup((*account).borrow_state))
         }
     }
 }
@@ -268,9 +525,9 @@ pub enum MaybeAccount {
 impl MaybeAccount {
     /// Extracts the wrapped [`AccountView`].
     ///
-    /// It is up to the caller to guarantee that the [`MaybeAccount`] really is
-    /// in an [`MaybeAccount::Account`]. Calling this method when the
-    /// variant is a [`MaybeAccount::Duplicated`] will result in a panic.
+    /// # Panics
+    ///
+    /// Panics if the [`MaybeAccount`] is a [`MaybeAccount::Duplicated`].
     #[inline(always)]
     pub fn assume_account(self) -> AccountView {
         let MaybeAccount::Account(account) = self else {
@@ -278,4 +535,5 @@ impl MaybeAccount {
         };
         account
     }
+
 }
