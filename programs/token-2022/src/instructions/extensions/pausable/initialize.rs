@@ -35,10 +35,10 @@ impl Initialize<'_, '_> {
 
         let mut instruction_data = [UNINIT_BYTE; 34];
 
-        // discriminators
         instruction_data[0].write(ExtensionDiscriminator::Pausable as u8);
+
         instruction_data[1].write(Self::DISCRIMINATOR);
-        // authority
+
         write_bytes(&mut instruction_data[2..34], self.authority.as_ref());
 
         invoke(
