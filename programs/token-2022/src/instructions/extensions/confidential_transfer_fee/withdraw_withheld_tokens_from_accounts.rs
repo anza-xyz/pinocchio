@@ -101,6 +101,11 @@ impl WithdrawWithheldTokensFromAccounts<'_, '_, '_> {
     pub const DISCRIMINATOR: u8 = 2;
 
     #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
+    #[inline(always)]
     pub fn invoke_signed(&self, signers_seeds: &[Signer]) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
