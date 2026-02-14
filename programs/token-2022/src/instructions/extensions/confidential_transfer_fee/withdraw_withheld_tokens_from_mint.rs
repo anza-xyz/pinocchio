@@ -1,16 +1,17 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{
-    cpi::{invoke_signed_with_bounds, Signer},
-    InstructionAccount, InstructionView,
-};
-use solana_program_error::{ProgramError, ProgramResult};
-
-use crate::{
-    instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-    write_bytes, AE_CIPHERTEXT_LEN, UNINIT_ACCOUNT_REF, UNINIT_BYTE, UNINIT_INSTRUCTION_ACCOUNT,
+use {
+    crate::{
+        instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
+        write_bytes, AE_CIPHERTEXT_LEN, UNINIT_ACCOUNT_REF, UNINIT_BYTE,
+        UNINIT_INSTRUCTION_ACCOUNT,
+    },
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{
+        cpi::{invoke_signed_with_bounds, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::{ProgramError, ProgramResult},
 };
 
 /// Transfer all withheld confidential tokens in the mint to an account.
@@ -91,39 +92,55 @@ impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 4 + MAX_MULTISIG_SIGNERS];
         let mut accounts = [UNINIT_ACCOUNT_REF; 4 + MAX_MULTISIG_SIGNERS];
 
-        // The token mint
-        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
-        accounts[0].write(self.mint);
+        // SAFETY: The allocation is valid to the maximum number of accounts.
+        unsafe {
+            // The token mint
+            instruction_accounts
+                .get_unchecked_mut(0)
+                .write(InstructionAccount::writable(self.mint.address()));
+            accounts.get_unchecked_mut(0).write(self.mint);
 
-        // The receiver token account
-        instruction_accounts[1].write(InstructionAccount::writable(
-            self.receiver_account.address(),
-        ));
-        accounts[1].write(self.receiver_account);
+            // The receiver token account
+            instruction_accounts
+                .get_unchecked_mut(1)
+                .write(InstructionAccount::writable(
+                    self.receiver_account.address(),
+                ));
+            accounts.get_unchecked_mut(1).write(self.receiver_account);
 
-        // The instruction sysvar or context state account for
-        // `VerifyCiphertextCiphertextEquality`
-        instruction_accounts[2].write(InstructionAccount::readonly(
-            self.instruction_sysvar_or_context_state.address(),
-        ));
-        accounts[2].write(self.instruction_sysvar_or_context_state);
+            // The instruction sysvar or context state account for
+            // `VerifyCiphertextCiphertextEquality`
+            instruction_accounts
+                .get_unchecked_mut(2)
+                .write(InstructionAccount::readonly(
+                    self.instruction_sysvar_or_context_state.address(),
+                ));
+            accounts
+                .get_unchecked_mut(2)
+                .write(self.instruction_sysvar_or_context_state);
 
-        // The mint's withdraw withheld authority
-        instruction_accounts[3].write(InstructionAccount::new(
-            self.withdraw_withheld_authority.address(),
-            false,
-            self.multisig_signers.is_empty(),
-        ));
-        accounts[3].write(self.withdraw_withheld_authority);
+            // The mint's withdraw withheld authority
+            instruction_accounts
+                .get_unchecked_mut(3)
+                .write(InstructionAccount::new(
+                    self.withdraw_withheld_authority.address(),
+                    false,
+                    self.multisig_signers.is_empty(),
+                ));
+            accounts
+                .get_unchecked_mut(3)
+                .write(self.withdraw_withheld_authority);
 
-        // The multisig signers
-        for ((insn_account, account), signer) in instruction_accounts[4..]
-            .iter_mut()
-            .zip(accounts[4..].iter_mut())
-            .zip(self.multisig_signers.iter())
-        {
-            insn_account.write(InstructionAccount::readonly_signer(signer.address()));
-            account.write(*signer);
+            // The multisig signers
+            for ((insn_account, account), signer) in instruction_accounts
+                .get_unchecked_mut(4..)
+                .iter_mut()
+                .zip(accounts.get_unchecked_mut(4..).iter_mut())
+                .zip(self.multisig_signers.iter())
+            {
+                insn_account.write(InstructionAccount::readonly_signer(signer.address()));
+                account.write(*signer);
+            }
         }
 
         // instruction data
@@ -139,8 +156,12 @@ impl WithdrawWithheldTokensFromMint<'_, '_, '_> {
             ],
         );
 
-        // instruction offset
-        instruction_data[2].write(self.proof_instruction_offset as u8);
+        unsafe {
+            // instruction offset
+            instruction_data
+                .get_unchecked_mut(2)
+                .write(self.proof_instruction_offset as u8);
+        }
 
         // new `Decryptable` available balance
         write_bytes(
