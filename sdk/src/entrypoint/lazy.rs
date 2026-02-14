@@ -207,7 +207,10 @@ unsafe impl DupGuard for AssumeNeverDup {
 
     #[inline(always)]
     unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
-        assume_unchecked(*borrow_state == NON_DUP_MARKER, "expected non-duplicate account");
+        assume_unchecked(
+            *borrow_state == NON_DUP_MARKER,
+            "expected non-duplicate account",
+        );
         Ok(())
     }
 
@@ -296,7 +299,10 @@ const _: () = assert!(STATIC_ACCOUNT_DATA % BPF_ALIGN_OF_U128 == 0);
 unsafe impl<const N: usize> DataGuard for AssumeSize<N> {
     #[inline(always)]
     unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
-        assume_unchecked((*account).data_len as usize == N, "unexpected account data length");
+        assume_unchecked(
+            (*account).data_len as usize == N,
+            "unexpected account data length",
+        );
         Ok(())
     }
 
@@ -346,7 +352,10 @@ impl InstructionContext {
     /// [SVM documentation]: https://solana.com/docs/programs/faq#input-parameter-serialization
     #[inline(always)]
     pub unsafe fn new_unchecked(input: *mut u8) -> Self {
-        assume_unchecked(input.align_offset(BPF_ALIGN_OF_U128) == 0, "input buffer not aligned");
+        assume_unchecked(
+            input.align_offset(BPF_ALIGN_OF_U128) == 0,
+            "input buffer not aligned",
+        );
         Self {
             // SAFETY: The first 8 bytes of the input buffer represent the
             // number of accounts when serialized by the SVM loader, which is read
@@ -490,7 +499,10 @@ impl InstructionContext {
         dup_guard: &D,
         data_guard: &S,
     ) -> Result<D::Output, ProgramError> {
-        assume_unchecked(self.buffer.align_offset(BPF_ALIGN_OF_U128) == 0, "buffer not aligned");
+        assume_unchecked(
+            self.buffer.align_offset(BPF_ALIGN_OF_U128) == 0,
+            "buffer not aligned",
+        );
         let account: *mut RuntimeAccount = self.buffer as *mut RuntimeAccount;
 
         // Adds an 8-bytes offset for:
@@ -535,5 +547,4 @@ impl MaybeAccount {
         };
         account
     }
-
 }
