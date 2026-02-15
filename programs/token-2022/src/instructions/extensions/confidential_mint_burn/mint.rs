@@ -116,76 +116,106 @@ impl Mint<'_, '_, '_> {
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 7 + MAX_MULTISIG_SIGNERS];
 
-        // token account
-        instruction_accounts[i].write(InstructionAccount::writable(self.token_account.address()));
-        accounts[i].write(self.token_account);
-        i += 1;
-
-        // token mint
-        instruction_accounts[i].write(InstructionAccount::writable(self.mint.address()));
-        accounts[i].write(self.mint);
-        i += 1;
-
-        // instruction sysvar if any `zk_elgamal_proof` program
-        // instruction are included in the same transaction
-        if let Some(instruction_sysvar_account) = self.intruction_sysvar {
-            instruction_accounts[i].write(InstructionAccount::readonly(
-                instruction_sysvar_account.address(),
-            ));
-            accounts[i].write(instruction_sysvar_account);
+        // SAFETY: Allocations are valid to the maximum number of accounts
+        unsafe {
+            // token account
+            instruction_accounts
+                .get_unchecked_mut(i)
+                .write(InstructionAccount::writable(self.token_account.address()));
+            accounts.get_unchecked_mut(i).write(self.token_account);
             i += 1;
-        }
 
-        // context state account for `VerifyCiphertextCommitmentEquality` proof
-        if let Some(commitment_equality_proof_context_account) =
-            self.commitment_equality_proof_context
-        {
-            instruction_accounts[i].write(InstructionAccount::readonly(
-                commitment_equality_proof_context_account.address(),
-            ));
-            accounts[i].write(commitment_equality_proof_context_account);
+            // token mint
+            instruction_accounts
+                .get_unchecked_mut(i)
+                .write(InstructionAccount::writable(self.mint.address()));
+            accounts.get_unchecked_mut(i).write(self.mint);
             i += 1;
-        }
 
-        // context state account for `VerifyBatchedGroupedCiphertext3HandlesValidty`
-        // proof
-        if let Some(batched_group_validity_proof_context_account) =
-            self.batched_group_validity_proof_context
-        {
-            instruction_accounts[i].write(InstructionAccount::readonly(
-                batched_group_validity_proof_context_account.address(),
-            ));
-            accounts[i].write(batched_group_validity_proof_context_account);
+            // instruction sysvar if any `zk_elgamal_proof` program
+            // instruction are included in the same transaction
+            if let Some(instruction_sysvar_account) = self.intruction_sysvar {
+                instruction_accounts
+                    .get_unchecked_mut(i)
+                    .write(InstructionAccount::readonly(
+                        instruction_sysvar_account.address(),
+                    ));
+                accounts
+                    .get_unchecked_mut(i)
+                    .write(instruction_sysvar_account);
+                i += 1;
+            }
+
+            // context state account for `VerifyCiphertextCommitmentEquality` proof
+            if let Some(commitment_equality_proof_context_account) =
+                self.commitment_equality_proof_context
+            {
+                instruction_accounts
+                    .get_unchecked_mut(i)
+                    .write(InstructionAccount::readonly(
+                        commitment_equality_proof_context_account.address(),
+                    ));
+                accounts
+                    .get_unchecked_mut(i)
+                    .write(commitment_equality_proof_context_account);
+                i += 1;
+            }
+
+            // context state account for `VerifyBatchedGroupedCiphertext3HandlesValidty`
+            // proof
+            if let Some(batched_group_validity_proof_context_account) =
+                self.batched_group_validity_proof_context
+            {
+                instruction_accounts
+                    .get_unchecked_mut(i)
+                    .write(InstructionAccount::readonly(
+                        batched_group_validity_proof_context_account.address(),
+                    ));
+                accounts
+                    .get_unchecked_mut(i)
+                    .write(batched_group_validity_proof_context_account);
+                i += 1;
+            }
+
+            // context state account for `VerifyBatchedRangeProofU128` proof
+            if let Some(batched_range_proof_context_account) = self.batched_range_proof_context {
+                instruction_accounts
+                    .get_unchecked_mut(i)
+                    .write(InstructionAccount::readonly(
+                        batched_range_proof_context_account.address(),
+                    ));
+                accounts
+                    .get_unchecked_mut(i)
+                    .write(batched_range_proof_context_account);
+                i += 1;
+            }
+
+            // The mint authority
+            instruction_accounts
+                .get_unchecked_mut(i)
+                .write(InstructionAccount::new(
+                    self.authority.address(),
+                    false,
+                    self.multisig_signers.is_empty(),
+                ));
+            accounts.get_unchecked_mut(i).write(self.authority);
             i += 1;
-        }
 
-        // context state account for `VerifyBatchedRangeProofU128` proof
-        if let Some(batched_range_proof_context_account) = self.batched_range_proof_context {
-            instruction_accounts[i].write(InstructionAccount::readonly(
-                batched_range_proof_context_account.address(),
-            ));
-            accounts[i].write(batched_range_proof_context_account);
-            i += 1;
-        }
-
-        // The mint authority
-        instruction_accounts[i].write(InstructionAccount::new(
-            self.authority.address(),
-            false,
-            self.multisig_signers.is_empty(),
-        ));
-        accounts[i].write(self.authority);
-        i += 1;
-
-        // the multisig signers
-        for (account, signer) in instruction_accounts[i..]
-            .iter_mut()
-            .zip(self.multisig_signers.iter())
-        {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
-        }
-        for (account, signer) in accounts[i..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(*signer);
+            // the multisig signers
+            for (account, signer) in instruction_accounts
+                .get_unchecked_mut(i..)
+                .iter_mut()
+                .zip(self.multisig_signers.iter())
+            {
+                account.write(InstructionAccount::readonly_signer(signer.address()));
+            }
+            for (account, signer) in accounts
+                .get_unchecked_mut(i..)
+                .iter_mut()
+                .zip(self.multisig_signers.iter())
+            {
+                account.write(*signer);
+            }
         }
 
         // instruction data

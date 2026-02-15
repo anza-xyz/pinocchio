@@ -47,22 +47,30 @@ impl ApplyPendingBurn<'_, '_> {
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 2 + MAX_MULTISIG_SIGNERS];
 
-        // the token mint
-        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
+        // SAFETY: Allocations are valid to the maximum number of accounts
+        unsafe {
+            // the token mint
+            instruction_accounts
+                .get_unchecked_mut(0)
+                .write(InstructionAccount::writable(self.mint.address()));
 
-        // the token mint authority
-        instruction_accounts[1].write(InstructionAccount {
-            address: self.authority.address(),
-            is_writable: false,
-            is_signer: self.multisig_signers.is_empty(),
-        });
+            // the token mint authority
+            instruction_accounts
+                .get_unchecked_mut(1)
+                .write(InstructionAccount {
+                    address: self.authority.address(),
+                    is_writable: false,
+                    is_signer: self.multisig_signers.is_empty(),
+                });
 
-        // the multisig signers
-        for (account, signer) in instruction_accounts[2..]
-            .iter_mut()
-            .zip(self.multisig_signers.iter())
-        {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            // the multisig signers
+            for (account, signer) in instruction_accounts
+                .get_unchecked_mut(2..)
+                .iter_mut()
+                .zip(self.multisig_signers.iter())
+            {
+                account.write(InstructionAccount::readonly_signer(signer.address()));
+            }
         }
 
         // instruction data
@@ -86,15 +94,22 @@ impl ApplyPendingBurn<'_, '_> {
         // Cpi Accounts
         let mut accounts = [UNINIT_ACCOUNT_REF; 2 + MAX_MULTISIG_SIGNERS];
 
-        // token mint
-        accounts[0].write(self.mint);
+        // SAFETY: Allocations are valid to the maximum number of accounts
+        unsafe {
+            // token mint
+            accounts.get_unchecked_mut(0).write(self.mint);
 
-        // token mint authority
-        accounts[1].write(self.authority);
+            // token mint authority
+            accounts.get_unchecked_mut(1).write(self.authority);
 
-        // the multisig signers
-        for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(*signer);
+            // the multisig signers
+            for (account, signer) in accounts
+                .get_unchecked_mut(2..)
+                .iter_mut()
+                .zip(self.multisig_signers.iter())
+            {
+                account.write(*signer);
+            }
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(

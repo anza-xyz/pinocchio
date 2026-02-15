@@ -130,8 +130,12 @@ impl RotateSupplyElgamalPubkey<'_, '_, '_> {
             self.new_supply_elgamal_pubkey.as_ref(),
         );
 
-        // instruction offset
-        instruction_data[34].write(self.proof_instruction_offset as u8);
+        unsafe {
+            // instruction offset
+            instruction_data
+                .get_unchecked_mut(34)
+                .write(self.proof_instruction_offset as u8);
+        }
 
         // instruction
 
@@ -149,17 +153,26 @@ impl RotateSupplyElgamalPubkey<'_, '_, '_> {
 
         let mut accounts = [UNINIT_ACCOUNT_REF; 3 + MAX_MULTISIG_SIGNERS];
 
-        // token mint
-        accounts[0].write(self.mint);
+        // SAFETY: Allocations are valid to the maximum number of accounts
+        unsafe {
+            // token mint
+            accounts.get_unchecked_mut(0).write(self.mint);
 
-        // instruction sysvar or context state
-        accounts[1].write(self.instruction_sysvar_or_context_state);
+            // instruction sysvar or context state
+            accounts
+                .get_unchecked_mut(1)
+                .write(self.instruction_sysvar_or_context_state);
 
-        // confidential mint authority
-        accounts[2].write(self.authority);
+            // confidential mint authority
+            accounts.get_unchecked_mut(2).write(self.authority);
 
-        for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(*signer);
+            for (account, signer) in accounts
+                .get_unchecked_mut(3..)
+                .iter_mut()
+                .zip(self.multisig_signers.iter())
+            {
+                account.write(*signer);
+            }
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(

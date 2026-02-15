@@ -44,11 +44,18 @@ impl InitializeMint<'_, '_> {
     pub fn invoke(&self) -> ProgramResult {
         let mut instruction_data = [UNINIT_BYTE; 2 + 32 + 36];
 
-        // extension discriminator
-        instruction_data[0].write(ExtensionDiscriminator::ConfidentialMintBurn as u8);
+        // SAFETY: Allocations are valid to the maximum number of bytes
+        unsafe {
+            // extension discriminator
+            instruction_data
+                .get_unchecked_mut(0)
+                .write(ExtensionDiscriminator::ConfidentialMintBurn as u8);
 
-        // extension instruction discrminator
-        instruction_data[1].write(Self::DISCRIMINATOR);
+            // extension instruction discrminator
+            instruction_data
+                .get_unchecked_mut(1)
+                .write(Self::DISCRIMINATOR);
+        }
 
         // supply elgamal pubkey
         write_bytes(
