@@ -1,0 +1,17 @@
+[package]
+name = "pinocchio-small-oracle-opt"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pinocchio_small_oracle"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = { workspace = true }
+pinocchio-small-oracle-shared-types = { path = "../shared-types" }
+
+[dev-dependencies]
+mollusk-svm = "0.0.12"
+solana-sdk = "2.1"
+pinocchio-small-oracle-shared-bench = { path = "../shared-bench" }

@@ -9,7 +9,7 @@ members = [
     "sdk",
 ]
 exclude = [
-    "cu_bench/small-oracle",
+    "cu_bench",
 ]
 
 [workspace.package]
