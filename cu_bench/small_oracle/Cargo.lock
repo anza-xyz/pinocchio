@@ -243,9 +243,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.10.0"
+version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
+checksum = "843867be96c8daad0d758b57df9392b6d8d271134fce549de6ce169ff98a92af"
 dependencies = [
  "serde_core",
 ]
@@ -1305,9 +1305,9 @@ dependencies = [
 
 [[package]]
 name = "keccak"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc2af9a1119c51f12a14607e783cb977bde58bc069ff0c3da1095e635d70654"
+checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
 dependencies = [
  "cpufeatures",
 ]
@@ -1701,52 +1701,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "pinocchio-small-oracle-manual"
+name = "pinocchio-small-oracle"
 version = "0.1.0"
 dependencies = [
  "mollusk-svm",
  "pinocchio",
- "pinocchio-small-oracle-shared-bench",
- "pinocchio-small-oracle-shared-types",
  "solana-sdk",
-]
-
-[[package]]
-name = "pinocchio-small-oracle-naive"
-version = "0.1.0"
-dependencies = [
- "mollusk-svm",
- "pinocchio",
- "pinocchio-small-oracle-shared-bench",
- "pinocchio-small-oracle-shared-types",
- "solana-sdk",
-]
-
-[[package]]
-name = "pinocchio-small-oracle-opt"
-version = "0.1.0"
-dependencies = [
- "mollusk-svm",
- "pinocchio",
- "pinocchio-small-oracle-shared-bench",
- "pinocchio-small-oracle-shared-types",
- "solana-sdk",
-]
-
-[[package]]
-name = "pinocchio-small-oracle-shared-bench"
-version = "0.1.0"
-dependencies = [
- "mollusk-svm",
- "pinocchio-small-oracle-shared-types",
- "solana-sdk",
-]
-
-[[package]]
-name = "pinocchio-small-oracle-shared-types"
-version = "0.1.0"
-dependencies = [
- "pinocchio",
 ]
 
 [[package]]
@@ -1889,7 +1849,7 @@ version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
- "bitflags 2.10.0",
+ "bitflags 2.11.0",
 ]
 
 [[package]]
@@ -2300,9 +2260,9 @@ dependencies = [
 
 [[package]]
 name = "solana-address"
-version = "2.1.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "998227476aed49e1c63dec0e89341b768a2cf3bd22913c3ed8baa985cda882c9"
+checksum = "68c5d02824391b072dc5cd0aaa85fb0af9784a21d23286a767994d1e8a322131"
 dependencies = [
  "solana-define-syscall 5.0.0",
  "solana-program-error 3.0.0",
@@ -2623,7 +2583,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0dafc2d84e57dbfe32583fe915962bd2ca3af6be496628a871db3c3d697b38d7"
 dependencies = [
  "bincode",
- "bitflags 2.10.0",
+ "bitflags 2.11.0",
  "cfg_eval",
  "serde",
  "serde_derive",
@@ -2660,7 +2620,7 @@ checksum = "9040decf2f295d35da22557eeab3768ab8dfca8aed9afe668663c8fa0e97d60e"
 dependencies = [
  "base64 0.22.1",
  "bincode",
- "bitflags 2.10.0",
+ "bitflags 2.11.0",
  "blake3",
  "borsh 0.10.4",
  "borsh 1.6.0",
@@ -2864,7 +2824,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "524604d94185c189616296e5b7da1014cc96d1e446bd2b26f247f00708b9225a"
 dependencies = [
  "bincode",
- "bitflags 2.10.0",
+ "bitflags 2.11.0",
  "borsh 1.6.0",
  "bs58",
  "bytemuck",

@@ -7,14 +7,13 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 
-use pinocchio_small_oracle_shared_types::{SMALL_ORACLE_ACCOUNT_SIZE, SMALL_ORACLE_VALUE_SIZE};
+use pinocchio_small_oracle::{SMALL_ORACLE_ACCOUNT_SIZE, SMALL_ORACLE_VALUE_SIZE};
 
-pub const PROGRAM_ID: Pubkey = Pubkey::new_from_array([
+const PROGRAM_ID: Pubkey = Pubkey::new_from_array([
     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
     0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
 ]);
-
-pub const VALUE_TO_WRITE: u64 = 42;
+const VALUE_TO_WRITE: u64 = 42;
 
 fn deploy_path(deploy_binary: &str, caller_manifest_dir: &str) -> String {
     let mut caller_path = PathBuf::from(caller_manifest_dir);
@@ -40,22 +39,18 @@ fn deploy_path(deploy_binary: &str, caller_manifest_dir: &str) -> String {
     }
 
     panic!(
-        "Could not find {deploy_binary}. Build with `make sbf` (from cu_bench root) and rerun tests."
+        "Could not find {deploy_binary}. Build with `make sbf` and rerun tests."
     );
 }
 
-pub fn run_cu_benchmark(variant_name: &str, caller_manifest_dir: &str, deploy_binary: &str) {
-    let mollusk = Mollusk::new(
-        &PROGRAM_ID,
-        &deploy_path(deploy_binary, caller_manifest_dir),
-    );
+fn run_cu_benchmark(variant_name: &str, caller_manifest_dir: &str, deploy_binary: &str) {
+    let mollusk = Mollusk::new(&PROGRAM_ID, &deploy_path(deploy_binary, caller_manifest_dir));
 
     let authority = Pubkey::new_unique();
     let state_pubkey = Pubkey::new_unique();
 
     let state_account = {
-        let mut account =
-            AccountSharedData::new(1_000_000_000, SMALL_ORACLE_ACCOUNT_SIZE, &PROGRAM_ID);
+        let mut account = AccountSharedData::new(1_000_000_000, SMALL_ORACLE_ACCOUNT_SIZE, &PROGRAM_ID);
         let mut data = Vec::with_capacity(SMALL_ORACLE_ACCOUNT_SIZE);
         data.extend_from_slice(&authority.to_bytes());
         data.extend_from_slice(&0u64.to_le_bytes());
@@ -106,4 +101,22 @@ pub fn run_cu_benchmark(variant_name: &str, caller_manifest_dir: &str, deploy_bi
             .unwrap(),
     );
     assert_eq!(result_value, VALUE_TO_WRITE);
+}
+
+#[cfg(feature = "opt")]
+#[test]
+fn test_update_value_cu() {
+    run_cu_benchmark("OPT", env!("CARGO_MANIFEST_DIR"), "pinocchio_small_oracle");
+}
+
+#[cfg(feature = "naive")]
+#[test]
+fn test_update_value_cu() {
+    run_cu_benchmark("NAIVE", env!("CARGO_MANIFEST_DIR"), "pinocchio_small_oracle");
+}
+
+#[cfg(feature = "manual")]
+#[test]
+fn test_update_value_cu() {
+    run_cu_benchmark("MANUAL", env!("CARGO_MANIFEST_DIR"), "pinocchio_small_oracle");
 }
