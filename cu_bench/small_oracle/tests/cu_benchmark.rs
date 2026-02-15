@@ -38,7 +38,9 @@ fn deploy_path(deploy_binary: &str, caller_manifest_dir: &str) -> String {
         }
     }
 
-    panic!("Could not find {deploy_binary}. Build with `make sbf` and rerun tests.");
+    panic!(
+        "Could not find {deploy_binary}. Build with `make test-opt` (or `make test-naive`/`make test-manual`) and rerun tests."
+    );
 }
 
 fn run_cu_benchmark(variant_name: &str, caller_manifest_dir: &str, deploy_binary: &str) {
