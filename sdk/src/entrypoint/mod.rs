@@ -3,11 +3,14 @@
 
 pub mod lazy;
 
+#[cfg(test)]
+mod test_utils;
+
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
 pub use lazy::{
-    AssumeNeverDup, AssumeSize, CheckNonDup, CheckSize, DataGuard, DupGuard, InstructionContext,
-    MaybeAccount, NoGuards,
+    AssumeNeverDup, AssumeSize, AssumeLikeType, CheckLikeType, CheckNonDup, CheckSize, DataGuard,
+    DupGuard, InstructionContext, MaybeAccount, NoGuards,
 };
 use {
     crate::{
@@ -772,175 +775,12 @@ mod alloc {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        ::alloc::{
-            alloc::{alloc, dealloc, handle_alloc_error},
-            vec,
-        },
-        core::{
-            alloc::Layout,
-            ptr::{copy_nonoverlapping, null_mut},
-        },
+        super::{test_utils::*, *},
+        core::ptr::null_mut,
     };
-
-    /// The mock program ID used for testing.
-    const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
 
     /// An uninitialized account view.
     const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
-
-    /// Struct representing a memory region with a specific alignment.
-    struct AlignedMemory {
-        ptr: *mut u8,
-        layout: Layout,
-    }
-
-    impl AlignedMemory {
-        pub fn new(len: usize) -> Self {
-            let layout = Layout::from_size_align(len, BPF_ALIGN_OF_U128).unwrap();
-            // SAFETY: `align` is set to `BPF_ALIGN_OF_U128`.
-            unsafe {
-                let ptr = alloc(layout);
-                if ptr.is_null() {
-                    handle_alloc_error(layout);
-                }
-                AlignedMemory { ptr, layout }
-            }
-        }
-
-        /// Write data to the memory region at the specified offset.
-        ///
-        /// # Safety
-        ///
-        /// The caller must ensure that the `data` length does not exceed the
-        /// remaining space in the memory region starting from the
-        /// `offset`.
-        pub unsafe fn write(&mut self, data: &[u8], offset: usize) {
-            copy_nonoverlapping(data.as_ptr(), self.ptr.add(offset), data.len());
-        }
-
-        /// Return a mutable pointer to the memory region.
-        pub fn as_mut_ptr(&mut self) -> *mut u8 {
-            self.ptr
-        }
-    }
-
-    impl Drop for AlignedMemory {
-        fn drop(&mut self) {
-            unsafe {
-                dealloc(self.ptr, self.layout);
-            }
-        }
-    }
-
-    /// Creates an input buffer with a specified number of accounts and
-    /// instruction data.
-    ///
-    /// This function mimics the input buffer created by the SVM loader.  Each
-    /// account created has zeroed data, apart from the `data_len` field,
-    /// which is set to the index of the account.
-    ///
-    /// # Safety
-    ///
-    /// The returned `AlignedMemory` should only be used within the test
-    /// context.
-    unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemory {
-        let mut input = AlignedMemory::new(1_000_000_000);
-        // Number of accounts.
-        input.write(&(accounts as u64).to_le_bytes(), 0);
-        let mut offset = size_of::<u64>();
-
-        for i in 0..accounts {
-            // Account data.
-            let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
-            account[0] = NON_DUP_MARKER;
-            // Set the accounts data length. The actual account data is zeroed.
-            account[80..88].copy_from_slice(&i.to_le_bytes());
-            input.write(&account, offset);
-            offset += account.len();
-            // Padding for the account data to align to `BPF_ALIGN_OF_U128`.
-            let padding_for_data = (i + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1);
-            input.write(&vec![0u8; padding_for_data], offset);
-            offset += padding_for_data;
-        }
-
-        // Instruction data length.
-        input.write(&instruction_data.len().to_le_bytes(), offset);
-        offset += size_of::<u64>();
-        // Instruction data.
-        input.write(instruction_data, offset);
-        offset += instruction_data.len();
-        // Program ID (mock).
-        input.write(MOCK_PROGRAM_ID.as_array(), offset);
-
-        input
-    }
-
-    /// Creates an input buffer with a specified number of accounts, including
-    /// duplicated accounts, and instruction data.
-    ///
-    /// This function differs from `create_input` in that it creates accounts
-    /// with a marker indicating that they are duplicated. There will be
-    /// `accounts - duplicated` unique accounts, and the remaining
-    /// `duplicated` accounts will be duplicates of the last unique account.
-    ///
-    /// This function mimics the input buffer created by the SVM loader.  Each
-    /// account created has zeroed data, apart from the `data_len` field,
-    /// which is set to the index of the account.
-    ///
-    /// # Safety
-    ///
-    /// The returned `AlignedMemory` should only be used within the test
-    /// context.
-    unsafe fn create_input_with_duplicates(
-        accounts: usize,
-        instruction_data: &[u8],
-        duplicated: usize,
-    ) -> AlignedMemory {
-        let mut input = AlignedMemory::new(1_000_000_000);
-        // Number of accounts.
-        input.write(&(accounts as u64).to_le_bytes(), 0);
-        let mut offset = size_of::<u64>();
-
-        if accounts > 0 {
-            assert!(
-                duplicated < accounts,
-                "Duplicated accounts must be less than total accounts"
-            );
-            let unique = accounts - duplicated;
-
-            for i in 0..unique {
-                // Account data.
-                let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
-                account[0] = NON_DUP_MARKER;
-                // Set the accounts data length. The actual account data is zeroed.
-                account[80..88].copy_from_slice(&i.to_le_bytes());
-                input.write(&account, offset);
-                offset += account.len();
-                // Padding for the account data to align to `BPF_ALIGN_OF_U128`.
-                let padding_for_data = (i + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1);
-                input.write(&vec![0u8; padding_for_data], offset);
-                offset += padding_for_data;
-            }
-
-            // Remaining accounts are duplicated of the last unique account.
-            for _ in unique..accounts {
-                input.write(&[(unique - 1) as u8, 0, 0, 0, 0, 0, 0, 0], offset);
-                offset += size_of::<u64>();
-            }
-        }
-
-        // Instruction data length.
-        input.write(&instruction_data.len().to_le_bytes(), offset);
-        offset += size_of::<u64>();
-        // Instruction data.
-        input.write(instruction_data, offset);
-        offset += instruction_data.len();
-        // Program ID (mock).
-        input.write(MOCK_PROGRAM_ID.as_array(), offset);
-
-        input
-    }
 
     /// Asserts that the accounts slice contains the expected number of accounts
     /// and that each account's data length matches its index.

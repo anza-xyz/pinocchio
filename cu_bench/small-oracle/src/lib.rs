@@ -2,7 +2,7 @@
 
 use pinocchio::{
     address::{address_eq, Address},
-    entrypoint::{AssumeNeverDup, AssumeSize, InstructionContext},
+    entrypoint::lazy::{AssumeNeverDup, CheckLikeType, InstructionContext},
     error::ProgramError,
     lazy_program_entrypoint, no_allocator, nostd_panic_handler, ProgramResult,
 };
@@ -34,18 +34,20 @@ fn process_instruction(mut context: InstructionContext) -> ProgramResult {
         hard_exit("expected exactly 2 accounts");
     }
 
-    let authority =
-        unsafe { context.next_account_guarded(&AssumeNeverDup::new(), &AssumeSize::<0>::new()) }?;
+    // Can assume never dup since first account
+    let authority = unsafe {
+        context.next_account_guarded(&AssumeNeverDup::new(), &CheckLikeType::<()>::new())
+    }?;
 
     if !authority.is_signer() {
         hard_exit("missing required signature");
     }
 
+    // can assume not dup. only two accounts. if dup account, it's zero sized (was never an oracle account)
+    // and we can't write bad data. at worst ub could lead to code path manipulating the signer's account in some
+    // undesireable way but that is problem of the signer
     let state = unsafe {
-        context.next_account_guarded(
-            &AssumeNeverDup::new(),
-            &AssumeSize::<{ core::mem::size_of::<SmallOracle>() }>::new(),
-        )
+        context.next_account_guarded(&AssumeNeverDup::new(), &CheckLikeType::<SmallOracle>::new())
     }?;
 
     let state_data = unsafe { state.borrow_unchecked_mut() };

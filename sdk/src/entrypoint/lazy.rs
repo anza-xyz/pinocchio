@@ -292,6 +292,14 @@ impl<const N: usize> AssumeSize<N> {
         Self(())
     }
 }
+#[inline(always)]
+const fn const_advance_buffer(by: usize, buffer: *mut u8) -> *mut u8 {
+    if by == 0 || by % BPF_ALIGN_OF_U128 == 0 {
+        unsafe { buffer.add(STATIC_ACCOUNT_DATA + by) }
+    } else {
+        unsafe { buffer.add(STATIC_ACCOUNT_DATA + by + BPF_ALIGN_OF_U128 - by % BPF_ALIGN_OF_U128) }
+    }
+}
 
 // STATIC_ACCOUNT_DATA must be aligned for AssumeSize to compute const advances.
 const _: () = assert!(STATIC_ACCOUNT_DATA % BPF_ALIGN_OF_U128 == 0);
@@ -308,11 +316,69 @@ unsafe impl<const N: usize> DataGuard for AssumeSize<N> {
 
     #[inline(always)]
     unsafe fn advance_buffer(&self, _account: *const RuntimeAccount, buffer: *mut u8) -> *mut u8 {
-        if N == 0 || N % BPF_ALIGN_OF_U128 == 0 {
-            buffer.add(STATIC_ACCOUNT_DATA + N)
-        } else {
-            buffer.add(STATIC_ACCOUNT_DATA + N + BPF_ALIGN_OF_U128 - N % BPF_ALIGN_OF_U128)
+        const_advance_buffer(N, buffer)
+    }
+}
+
+pub struct CheckLikeType<T>(core::marker::PhantomData<T>);
+
+impl<T> CheckLikeType<T> {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self(core::marker::PhantomData)
+    }
+}
+
+impl<T> Default for CheckLikeType<T> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+unsafe impl<T> DataGuard for CheckLikeType<T> {
+    #[inline(always)]
+    unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
+        const { assert!(core::mem::align_of::<T>() <= BPF_ALIGN_OF_U128) };
+        if (*account).data_len as usize != core::mem::size_of::<T>() {
+            return Err(cold(ProgramError::InvalidAccountData));
         }
+        Ok(())
+    }
+
+    #[inline(always)]
+    unsafe fn advance_buffer(&self, _account: *const RuntimeAccount, buffer: *mut u8) -> *mut u8 {
+        const_advance_buffer(core::mem::size_of::<T>(), buffer)
+    }
+}
+
+pub struct AssumeLikeType<T>(core::marker::PhantomData<T>);
+
+impl<T> AssumeLikeType<T> {
+    /// # Safety
+    ///
+    /// The caller must guarantee that the next account's `data_len ==
+    /// size_of::<T>()` and the data is properly initialized.
+    #[inline(always)]
+    pub unsafe fn new() -> Self {
+        Self(core::marker::PhantomData)
+    }
+}
+
+unsafe impl<T> DataGuard for AssumeLikeType<T> {
+    #[inline(always)]
+    unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
+        const { assert!(core::mem::align_of::<T>() <= BPF_ALIGN_OF_U128) };
+        assume_unchecked(
+            (*account).data_len as usize == core::mem::size_of::<T>(),
+            "unexpected account data length",
+        );
+        Ok(())
+    }
+
+    #[inline(always)]
+    unsafe fn advance_buffer(&self, _account: *const RuntimeAccount, buffer: *mut u8) -> *mut u8 {
+        const_advance_buffer(core::mem::size_of::<T>(), buffer)
     }
 }
 
@@ -414,6 +480,14 @@ impl InstructionContext {
     /// (e.g. [`CheckNonDup`] returns [`ProgramError::AccountBorrowFailed`]
     /// on duplicate, [`CheckSize`] returns
     /// [`ProgramError::InvalidAccountData`] on size mismatch).
+    ///
+    /// # Note
+    ///
+    /// On guard error (`DupGuard` or `DataGuard`) neither the internal cursor
+    /// nor the remaining count are modified. The context can be reused after
+    /// a guard error. This does not apply to logic errors such as calling
+    /// the method when `remaining` is already zero — that returns
+    /// `NotEnoughAccountKeys` without modifying state either.
     #[inline(always)]
     pub fn next_account_guarded<D: DupGuard, S: DataGuard>(
         &mut self,
@@ -423,9 +497,9 @@ impl InstructionContext {
         if unlikely(self.remaining == 0) {
             return Err(cold(ProgramError::NotEnoughAccountKeys));
         }
+        let output = unsafe { self.read_account_unchecked(dup_guard, data_guard) }?;
         self.remaining -= 1;
-
-        unsafe { self.read_account_unchecked(dup_guard, data_guard) }
+        Ok(output)
     }
 
     /// Returns the number of remaining accounts.
@@ -505,19 +579,18 @@ impl InstructionContext {
         );
         let account: *mut RuntimeAccount = self.buffer as *mut RuntimeAccount;
 
-        // Adds an 8-bytes offset for:
-        //   - rent epoch in case of a non-duplicate account
-        //   - duplicate marker + 7 bytes of padding in case of a duplicate account
-        self.buffer = self.buffer.add(core::mem::size_of::<u64>());
-
         let borrow_ptr = &(*account).borrow_state as *const u8;
         dup_guard.check_dup(borrow_ptr)?;
 
+        // 8-byte header: borrow_state..resize_delta (non-dup) or dup_marker+padding (dup).
+        let after_header = self.buffer.add(core::mem::size_of::<u64>());
+
         if *borrow_ptr == NON_DUP_MARKER {
             data_guard.check_account(account)?;
-            self.buffer = data_guard.advance_buffer(account, self.buffer);
+            self.buffer = data_guard.advance_buffer(account, after_header);
             Ok(D::wrap_account(AccountView::new_unchecked(account)))
         } else {
+            self.buffer = after_header;
             Ok(D::wrap_dup((*account).borrow_state))
         }
     }
@@ -546,5 +619,221 @@ impl MaybeAccount {
             panic!("Duplicated account")
         };
         account
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        crate::entrypoint::test_utils::{
+            create_input, create_input_custom, create_input_with_duplicates, AccountDesc,
+            MOCK_PROGRAM_ID,
+        },
+        crate::error::ProgramError,
+    };
+
+    const IX_DATA: [u8; 8] = [0xAB; 8];
+
+    #[repr(C)]
+    struct MyType {
+        _a: u64,
+        _b: u64,
+    }
+
+    #[test]
+    fn test_dup_guard_error_leaves_context_untouched() {
+        let mut input = unsafe { create_input_with_duplicates(3, &IX_DATA, 2) };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let remaining_before = ctx.remaining();
+
+        let acct = ctx
+            .next_account_guarded(&CheckNonDup, &NoGuards)
+            .unwrap();
+        assert_eq!(ctx.remaining(), remaining_before - 1);
+        assert_eq!(acct.data_len(), 0);
+
+        let remaining_before_dup = ctx.remaining();
+        let err = ctx
+            .next_account_guarded(&CheckNonDup, &NoGuards)
+            .unwrap_err();
+        assert_eq!(err, ProgramError::AccountBorrowFailed);
+        assert_eq!(ctx.remaining(), remaining_before_dup);
+
+        let maybe = ctx.next_account_guarded(&NoGuards, &NoGuards).unwrap();
+        assert!(matches!(maybe, MaybeAccount::Duplicated(0)));
+    }
+
+    #[test]
+    fn test_size_guard_error_leaves_context_untouched() {
+        let mut input = unsafe {
+            create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA)
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let remaining_before = ctx.remaining();
+
+        let err = ctx
+            .next_account_guarded(&NoGuards, &CheckSize::new(64))
+            .unwrap_err();
+        assert_eq!(err, ProgramError::InvalidAccountData);
+        assert_eq!(ctx.remaining(), remaining_before);
+
+        let acct = ctx
+            .next_account_guarded(&NoGuards, &CheckSize::new(32))
+            .unwrap()
+            .assume_account();
+        assert_eq!(acct.data_len(), 32);
+    }
+
+    #[test]
+    fn test_multiple_guard_errors_then_success() {
+        let mut input = unsafe {
+            create_input_custom(&[AccountDesc::NonDup { data_len: 100 }], &IX_DATA)
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let remaining_before = ctx.remaining();
+
+        for wrong in [0, 1, 50, 99, 101, 200] {
+            let err = ctx
+                .next_account_guarded(&NoGuards, &CheckSize::new(wrong))
+                .unwrap_err();
+            assert_eq!(err, ProgramError::InvalidAccountData);
+            assert_eq!(ctx.remaining(), remaining_before);
+        }
+
+        let acct = ctx
+            .next_account_guarded(&NoGuards, &CheckSize::new(100))
+            .unwrap()
+            .assume_account();
+        assert_eq!(acct.data_len(), 100);
+    }
+
+    #[test]
+    fn test_happy_path_advances_correctly() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 16 },
+                    AccountDesc::NonDup { data_len: 64 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        assert_eq!(ctx.remaining(), 2);
+
+        let a0 = ctx.next_account().unwrap().assume_account();
+        assert_eq!(a0.data_len(), 16);
+        assert_eq!(ctx.remaining(), 1);
+
+        let a1 = ctx.next_account().unwrap().assume_account();
+        assert_eq!(a1.data_len(), 64);
+        assert_eq!(ctx.remaining(), 0);
+
+        let data = ctx.instruction_data().unwrap();
+        assert_eq!(data, &IX_DATA);
+
+        let pid = ctx.program_id().unwrap();
+        assert_eq!(pid, &MOCK_PROGRAM_ID);
+    }
+
+    #[test]
+    fn test_not_enough_account_keys() {
+        let mut input = unsafe { create_input(0, &IX_DATA) };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        assert_eq!(ctx.remaining(), 0);
+
+        let err = ctx.next_account().unwrap_err();
+        assert_eq!(err, ProgramError::NotEnoughAccountKeys);
+        assert_eq!(ctx.remaining(), 0);
+    }
+
+    #[test]
+    fn test_check_like_type_rejects_wrong_size() {
+        // data_len = 32 but MyType is 16 bytes
+        let mut input = unsafe {
+            create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA)
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let err = ctx
+            .next_account_guarded(&NoGuards, &CheckLikeType::<MyType>::new())
+            .unwrap_err();
+        assert_eq!(err, ProgramError::InvalidAccountData);
+        assert_eq!(ctx.remaining(), 1);
+    }
+
+    #[test]
+    fn test_check_like_type_accepts_correct_size() {
+        let type_size = core::mem::size_of::<MyType>();
+        let mut input = unsafe {
+            create_input_custom(&[AccountDesc::NonDup { data_len: type_size }], &IX_DATA)
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let acct = ctx
+            .next_account_guarded(&NoGuards, &CheckLikeType::<MyType>::new())
+            .unwrap()
+            .assume_account();
+        assert_eq!(acct.data_len(), type_size);
+    }
+
+    #[test]
+    fn test_assume_like_type_accepts_correct_size() {
+        let type_size = core::mem::size_of::<MyType>();
+        let mut input = unsafe {
+            create_input_custom(&[AccountDesc::NonDup { data_len: type_size }], &IX_DATA)
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let guard = unsafe { AssumeLikeType::<MyType>::new() };
+        let acct = ctx
+            .next_account_guarded(&NoGuards, &guard)
+            .unwrap()
+            .assume_account();
+        assert_eq!(acct.data_len(), type_size);
+        assert_eq!(ctx.remaining(), 0);
+
+        let data = ctx.instruction_data().unwrap();
+        assert_eq!(data, &IX_DATA);
+    }
+
+    #[test]
+    fn test_create_input_custom_with_dup() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 48 },
+                    AccountDesc::Dup { original_index: 0 },
+                    AccountDesc::NonDup { data_len: 24 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        assert_eq!(ctx.remaining(), 3);
+
+        let a0 = ctx.next_account().unwrap().assume_account();
+        assert_eq!(a0.data_len(), 48);
+
+        let maybe = ctx.next_account().unwrap();
+        assert!(matches!(maybe, MaybeAccount::Duplicated(0)));
+
+        let a2 = ctx.next_account().unwrap().assume_account();
+        assert_eq!(a2.data_len(), 24);
+
+        assert_eq!(ctx.remaining(), 0);
+
+        let data = ctx.instruction_data().unwrap();
+        assert_eq!(data, &IX_DATA);
+
+        let pid = ctx.program_id().unwrap();
+        assert_eq!(pid, &MOCK_PROGRAM_ID);
     }
 }
