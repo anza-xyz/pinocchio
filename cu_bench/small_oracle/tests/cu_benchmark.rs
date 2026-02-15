@@ -38,19 +38,21 @@ fn deploy_path(deploy_binary: &str, caller_manifest_dir: &str) -> String {
         }
     }
 
-    panic!(
-        "Could not find {deploy_binary}. Build with `make sbf` and rerun tests."
-    );
+    panic!("Could not find {deploy_binary}. Build with `make sbf` and rerun tests.");
 }
 
 fn run_cu_benchmark(variant_name: &str, caller_manifest_dir: &str, deploy_binary: &str) {
-    let mollusk = Mollusk::new(&PROGRAM_ID, &deploy_path(deploy_binary, caller_manifest_dir));
+    let mollusk = Mollusk::new(
+        &PROGRAM_ID,
+        &deploy_path(deploy_binary, caller_manifest_dir),
+    );
 
     let authority = Pubkey::new_unique();
     let state_pubkey = Pubkey::new_unique();
 
     let state_account = {
-        let mut account = AccountSharedData::new(1_000_000_000, SMALL_ORACLE_ACCOUNT_SIZE, &PROGRAM_ID);
+        let mut account =
+            AccountSharedData::new(1_000_000_000, SMALL_ORACLE_ACCOUNT_SIZE, &PROGRAM_ID);
         let mut data = Vec::with_capacity(SMALL_ORACLE_ACCOUNT_SIZE);
         data.extend_from_slice(&authority.to_bytes());
         data.extend_from_slice(&0u64.to_le_bytes());
@@ -112,11 +114,19 @@ fn test_update_value_cu() {
 #[cfg(feature = "naive")]
 #[test]
 fn test_update_value_cu() {
-    run_cu_benchmark("NAIVE", env!("CARGO_MANIFEST_DIR"), "pinocchio_small_oracle");
+    run_cu_benchmark(
+        "NAIVE",
+        env!("CARGO_MANIFEST_DIR"),
+        "pinocchio_small_oracle",
+    );
 }
 
 #[cfg(feature = "manual")]
 #[test]
 fn test_update_value_cu() {
-    run_cu_benchmark("MANUAL", env!("CARGO_MANIFEST_DIR"), "pinocchio_small_oracle");
+    run_cu_benchmark(
+        "MANUAL",
+        env!("CARGO_MANIFEST_DIR"),
+        "pinocchio_small_oracle",
+    );
 }
