@@ -141,6 +141,14 @@ pub unsafe trait DataGuard {
     /// `account` must point to a valid `RuntimeAccount`.
     unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError>;
 
+    /// Hint to the compiler that account data has the validated size.
+    ///
+    /// Called after `check_account` succeeds. Implementations may use
+    /// `assume_unchecked`, so `size` must equal the value validated by
+    /// `check_account` — passing an incorrect value is UB.
+    #[inline(always)]
+    fn inform_size(&self, _size: usize) {}
+
     /// # Safety
     ///
     /// `account` must point to a valid `RuntimeAccount` and `buffer` must
@@ -281,6 +289,14 @@ unsafe impl DataGuard for CheckSize {
         }
         Ok(())
     }
+
+    #[inline(always)]
+    fn inform_size(&self, size: usize) {
+        // Safety: we already checked the size in account validation
+        unsafe {
+            assume_unchecked(size == self.expected_size, "unexpected account data length");
+        }
+    }
 }
 
 /// Assumes the account data length is exactly `N` bytes.
@@ -323,6 +339,13 @@ unsafe impl<const N: usize> DataGuard for AssumeSize<N> {
     }
 
     #[inline(always)]
+    fn inform_size(&self, _size: usize) {
+        unsafe {
+            assume_unchecked(_size == N, "unexpected account data length");
+        }
+    }
+
+    #[inline(always)]
     unsafe fn advance_buffer(&self, _account: *const RuntimeAccount, buffer: *mut u8) -> *mut u8 {
         const_advance_buffer(N, buffer)
     }
@@ -360,6 +383,17 @@ unsafe impl<T> DataGuard for CheckLikeType<T> {
     }
 
     #[inline(always)]
+    fn inform_size(&self, _size: usize) {
+        // SAFETY: we already checked the size in account validation
+        unsafe {
+            assume_unchecked(
+                _size == core::mem::size_of::<T>(),
+                "unexpected account data length",
+            );
+        }
+    }
+
+    #[inline(always)]
     unsafe fn advance_buffer(&self, _account: *const RuntimeAccount, buffer: *mut u8) -> *mut u8 {
         const_advance_buffer(core::mem::size_of::<T>(), buffer)
     }
@@ -393,6 +427,17 @@ unsafe impl<T> DataGuard for AssumeLikeType<T> {
             "unexpected account data length",
         );
         Ok(())
+    }
+
+    #[inline(always)]
+    fn inform_size(&self, _size: usize) {
+        // Safety: we already checked the size in account validation
+        unsafe {
+            assume_unchecked(
+                _size == core::mem::size_of::<T>(),
+                "unexpected account data length",
+            );
+        }
     }
 
     #[inline(always)]
@@ -549,6 +594,10 @@ impl InstructionContext {
     pub unsafe fn instruction_data_unchecked(&self) -> &[u8] {
         let data_len = *(self.buffer as *const usize);
         let data = self.buffer.add(core::mem::size_of::<u64>());
+        assume_unchecked(
+            (data as *const u64).is_aligned(),
+            "instruction data not aligned",
+        );
         core::slice::from_raw_parts(data, data_len)
     }
 
@@ -603,7 +652,13 @@ impl InstructionContext {
         if *borrow_ptr == NON_DUP_MARKER {
             data_guard.check_account(account)?;
             self.buffer = data_guard.advance_buffer(account, after_header);
-            Ok(D::wrap_account(AccountView::new_unchecked(account)))
+            let account = AccountView::new_unchecked(account);
+            assume_unchecked(
+                (account.data_ptr() as *const u64).is_aligned(),
+                "account data not aligned",
+            );
+            data_guard.inform_size(account.data_len());
+            Ok(D::wrap_account(account))
         } else {
             self.buffer = after_header;
             Ok(D::wrap_dup((*account).borrow_state))
