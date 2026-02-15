@@ -9,7 +9,7 @@ mod test_utils;
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
 pub use lazy::{
-    AssumeNeverDup, AssumeSize, AssumeLikeType, CheckLikeType, CheckNonDup, CheckSize, DataGuard,
+    AssumeLikeType, AssumeNeverDup, AssumeSize, CheckLikeType, CheckNonDup, CheckSize, DataGuard,
     DupGuard, InstructionContext, MaybeAccount, NoGuards,
 };
 use {

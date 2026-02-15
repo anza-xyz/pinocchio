@@ -12,7 +12,7 @@ use crate::{
 /// Declare the lazy program entrypoint.
 ///
 /// This entrypoint is defined as *lazy* because it does not read the accounts
-/// upfront. Instead, it provides an [`InstructionContext`] to the access input
+/// upfront. Instead, it provides an [`InstructionContext`] to access input
 /// information on demand. This is useful when the program needs more control
 /// over the compute units it uses. The trade-off is that the program is
 /// responsible for managing potential duplicated accounts and set up a `global
@@ -156,7 +156,11 @@ pub unsafe trait DataGuard {
 // Guard types
 // ---------------------------------------------------------------------------
 
-/// No-op guard: permits duplicates and skips data validation.
+/// Default pass-through guard for the lazy iterator.
+///
+/// - Returns `MaybeAccount` so duplicates stay visible.
+/// - Performs no additional validation on duplicate status or data length.
+/// - `next_account` is implemented as `next_account_guarded(&NoGuards, &NoGuards)`.
 pub struct NoGuards;
 
 unsafe impl DupGuard for NoGuards {
@@ -207,6 +211,7 @@ unsafe impl DupGuard for AssumeNeverDup {
 
     #[inline(always)]
     unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
+        // SAFETY: `AssumeNeverDup` does not check duplicates in release; UB if hit as duplicate.
         assume_unchecked(
             *borrow_state == NON_DUP_MARKER,
             "expected non-duplicate account",
@@ -229,6 +234,7 @@ unsafe impl DupGuard for AssumeNeverDup {
 ///
 /// Returns [`AccountView`] on success. Returns
 /// [`ProgramError::AccountBorrowFailed`] on duplicate.
+/// This is the runtime duplicate checker.
 pub struct CheckNonDup;
 
 unsafe impl DupGuard for CheckNonDup {
@@ -253,7 +259,7 @@ unsafe impl DupGuard for CheckNonDup {
     }
 }
 
-/// Checks at runtime that the account's data length matches `expected_size`.
+/// Checks account data length against a concrete expected byte length.
 ///
 /// Returns [`ProgramError::InvalidAccountData`] on size mismatch.
 pub struct CheckSize {
@@ -277,7 +283,7 @@ unsafe impl DataGuard for CheckSize {
     }
 }
 
-/// Assumes the account's data length is exactly `N` bytes.
+/// Assumes the account data length is exactly `N` bytes.
 ///
 /// Enables compile-time buffer stride computation. Wrong `N` corrupts the
 /// buffer cursor (UB).
@@ -307,6 +313,8 @@ const _: () = assert!(STATIC_ACCOUNT_DATA % BPF_ALIGN_OF_U128 == 0);
 unsafe impl<const N: usize> DataGuard for AssumeSize<N> {
     #[inline(always)]
     unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
+        // SAFETY: The caller must have already validated `data_len == N`;
+        // otherwise this fast path can miscompute the next cursor position.
         assume_unchecked(
             (*account).data_len as usize == N,
             "unexpected account data length",
@@ -320,6 +328,11 @@ unsafe impl<const N: usize> DataGuard for AssumeSize<N> {
     }
 }
 
+/// Checks account data length for a concrete Rust type.
+///
+/// - Asserts `align_of::<T>() <= BPF_ALIGN_OF_U128` at compile time.
+/// - Returns `InvalidAccountData` when `data_len != size_of::<T>()`.
+/// - Advances the cursor by `size_of::<T>()` plus alignment padding.
 pub struct CheckLikeType<T>(core::marker::PhantomData<T>);
 
 impl<T> CheckLikeType<T> {
@@ -352,6 +365,10 @@ unsafe impl<T> DataGuard for CheckLikeType<T> {
     }
 }
 
+/// Assumes account data length is exactly `size_of::<T>()` and skips the size
+/// check in release.
+///
+/// Use only when the protocol guarantees the invariant upstream.
 pub struct AssumeLikeType<T>(core::marker::PhantomData<T>);
 
 impl<T> AssumeLikeType<T> {
@@ -369,6 +386,8 @@ unsafe impl<T> DataGuard for AssumeLikeType<T> {
     #[inline(always)]
     unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
         const { assert!(core::mem::align_of::<T>() <= BPF_ALIGN_OF_U128) };
+        // SAFETY: The caller must guarantee the next account has
+        // `data_len == size_of::<T>()`; this removes the runtime size check.
         assume_unchecked(
             (*account).data_len as usize == core::mem::size_of::<T>(),
             "unexpected account data length",
@@ -405,12 +424,10 @@ impl InstructionContext {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the input buffer is valid, i.e., it
-    /// represents the program input parameters serialized by the SVM
-    /// loader. The SVM loader serializes the input parameters aligned to
-    /// `8` bytes, with the first `8` bytes representing the number of
-    /// accounts, followed by the accounts themselves, the instruction data
-    /// and the program id.
+    /// The caller must ensure that the input buffer is valid SVM input:
+    /// serialized as number-of-accounts, account headers/payloads, instruction
+    /// data length/data, and program id, and aligned as required by the
+    /// runtime representation.
     ///
     /// More information on the input buffer format can be found in the
     /// [SVM documentation].
@@ -418,17 +435,13 @@ impl InstructionContext {
     /// [SVM documentation]: https://solana.com/docs/programs/faq#input-parameter-serialization
     #[inline(always)]
     pub unsafe fn new_unchecked(input: *mut u8) -> Self {
+        // SAFETY: `input` must be a valid SVM buffer and aligned for `BPF_ALIGN_OF_U128`.
         assume_unchecked(
             input.align_offset(BPF_ALIGN_OF_U128) == 0,
             "input buffer not aligned",
         );
         Self {
-            // SAFETY: The first 8 bytes of the input buffer represent the
-            // number of accounts when serialized by the SVM loader, which is read
-            // when the context is created.
             buffer: unsafe { input.add(core::mem::size_of::<u64>()) },
-            // SAFETY: Read the number of accounts from the input buffer serialized
-            // by the SVM loader.
             remaining: unsafe { *(input as *const u64) },
         }
     }
@@ -504,7 +517,8 @@ impl InstructionContext {
 
     /// Returns the number of remaining accounts.
     ///
-    /// This value is decremented each time [`Self::next_account`] is called.
+    /// This value is decremented by [`next_account`] and
+    /// [`next_account_guarded`] when successful.
     #[inline(always)]
     pub fn remaining(&self) -> u64 {
         self.remaining
@@ -534,7 +548,6 @@ impl InstructionContext {
     #[inline(always)]
     pub unsafe fn instruction_data_unchecked(&self) -> &[u8] {
         let data_len = *(self.buffer as *const usize);
-        // shadowing the input to avoid leaving it in an inconsistent position
         let data = self.buffer.add(core::mem::size_of::<u64>());
         core::slice::from_raw_parts(data, data_len)
     }
@@ -573,6 +586,8 @@ impl InstructionContext {
         dup_guard: &D,
         data_guard: &S,
     ) -> Result<D::Output, ProgramError> {
+        // SAFETY: The caller must guarantee `self.buffer` points at a serialized
+        // `RuntimeAccount` header and is aligned to `BPF_ALIGN_OF_U128` before use.
         assume_unchecked(
             self.buffer.align_offset(BPF_ALIGN_OF_U128) == 0,
             "buffer not aligned",
@@ -648,9 +663,7 @@ mod tests {
 
         let remaining_before = ctx.remaining();
 
-        let acct = ctx
-            .next_account_guarded(&CheckNonDup, &NoGuards)
-            .unwrap();
+        let acct = ctx.next_account_guarded(&CheckNonDup, &NoGuards).unwrap();
         assert_eq!(ctx.remaining(), remaining_before - 1);
         assert_eq!(acct.data_len(), 0);
 
@@ -667,9 +680,8 @@ mod tests {
 
     #[test]
     fn test_size_guard_error_leaves_context_untouched() {
-        let mut input = unsafe {
-            create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA)
-        };
+        let mut input =
+            unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA) };
         let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
 
         let remaining_before = ctx.remaining();
@@ -689,9 +701,8 @@ mod tests {
 
     #[test]
     fn test_multiple_guard_errors_then_success() {
-        let mut input = unsafe {
-            create_input_custom(&[AccountDesc::NonDup { data_len: 100 }], &IX_DATA)
-        };
+        let mut input =
+            unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 100 }], &IX_DATA) };
         let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
 
         let remaining_before = ctx.remaining();
@@ -756,9 +767,8 @@ mod tests {
     #[test]
     fn test_check_like_type_rejects_wrong_size() {
         // data_len = 32 but MyType is 16 bytes
-        let mut input = unsafe {
-            create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA)
-        };
+        let mut input =
+            unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA) };
         let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
 
         let err = ctx
@@ -772,7 +782,12 @@ mod tests {
     fn test_check_like_type_accepts_correct_size() {
         let type_size = core::mem::size_of::<MyType>();
         let mut input = unsafe {
-            create_input_custom(&[AccountDesc::NonDup { data_len: type_size }], &IX_DATA)
+            create_input_custom(
+                &[AccountDesc::NonDup {
+                    data_len: type_size,
+                }],
+                &IX_DATA,
+            )
         };
         let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
 
@@ -787,7 +802,12 @@ mod tests {
     fn test_assume_like_type_accepts_correct_size() {
         let type_size = core::mem::size_of::<MyType>();
         let mut input = unsafe {
-            create_input_custom(&[AccountDesc::NonDup { data_len: type_size }], &IX_DATA)
+            create_input_custom(
+                &[AccountDesc::NonDup {
+                    data_len: type_size,
+                }],
+                &IX_DATA,
+            )
         };
         let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
 
