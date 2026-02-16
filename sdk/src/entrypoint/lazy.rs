@@ -201,7 +201,7 @@ unsafe impl DataGuard for NoGuards {
 ///
 /// Returns [`AccountView`] directly. The duplicate branch is eliminated.
 /// Passing a duplicate account is UB (`assume_unchecked` in `check_dup`,
-/// `unreachable_unchecked` in `wrap_dup`).
+/// `assume_unchecked` in `wrap_dup`).
 pub struct AssumeNeverDup(());
 
 impl AssumeNeverDup {
@@ -234,7 +234,50 @@ unsafe impl DupGuard for AssumeNeverDup {
 
     #[inline(always)]
     fn wrap_dup(_: u8) -> AccountView {
-        unsafe { core::hint::unreachable_unchecked() }
+        unsafe { assume_unchecked(false, "unexpected duplicate account") }
+        unreachable!()
+    }
+}
+
+/// Assumes the next account is always a duplicate.
+///
+/// Returns `u8` (the dup index) directly. The non-duplicate branch is eliminated.
+/// Passing a non-duplicate account is UB (`assume_unchecked` in `check_dup`,
+/// `assume_unchecked` in `wrap_account`).
+pub struct AssumeDup(());
+
+impl AssumeDup {
+    /// # Safety
+    ///
+    /// The caller must guarantee that the next account is a duplicate.
+    #[inline(always)]
+    pub unsafe fn new() -> Self {
+        Self(())
+    }
+}
+
+unsafe impl DupGuard for AssumeDup {
+    type Output = u8;
+
+    #[inline(always)]
+    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
+        // SAFETY: `AssumeDup` does not check duplicates in release; UB if hit as non-duplicate.
+        assume_unchecked(
+            *borrow_state != NON_DUP_MARKER,
+            "expected duplicate account",
+        );
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn wrap_account(_: AccountView) -> u8 {
+        unsafe { assume_unchecked(false, "unexpected nonduplicate account") }
+        unreachable!()
+    }
+
+    #[inline(always)]
+    fn wrap_dup(dup_index: u8) -> u8 {
+        dup_index
     }
 }
 
@@ -263,7 +306,48 @@ unsafe impl DupGuard for CheckNonDup {
 
     #[inline(always)]
     fn wrap_dup(_: u8) -> AccountView {
-        unreachable!()
+        AssumeNeverDup::wrap_dup(0) // dummy index for error case
+    }
+}
+
+/// Checks at runtime that the next account is a duplicate.
+///
+/// Returns `u8` (the dup index) on success. Returns
+/// [`ProgramError::AccountBorrowFailed`] on non-duplicate.
+pub struct CheckDup;
+
+impl CheckDup {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for CheckDup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+unsafe impl DupGuard for CheckDup {
+    type Output = u8;
+
+    #[inline(always)]
+    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
+        if *borrow_state == NON_DUP_MARKER {
+            return Err(cold(ProgramError::AccountBorrowFailed));
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn wrap_account(account: AccountView) -> u8 {
+        AssumeDup::wrap_account(account)
+    }
+
+    #[inline(always)]
+    fn wrap_dup(dup_index: u8) -> u8 {
+        AssumeDup::wrap_dup(dup_index)
     }
 }
 
@@ -488,6 +572,27 @@ impl InstructionContext {
         Self {
             buffer: unsafe { input.add(core::mem::size_of::<u64>()) },
             remaining: unsafe { *(input as *const u64) },
+        }
+    }
+
+    /// Creates a new [`InstructionContext`] for the input buffer with a
+    /// caller-provided remaining account count (ignores the count in the buffer).
+    ///
+    /// # Safety
+    ///
+    /// Same requirements as [`new_unchecked`](Self::new_unchecked), plus the
+    /// caller must guarantee that `remaining` matches the actual number of
+    /// accounts left to read from the buffer.
+    #[inline(always)]
+    pub unsafe fn new_with_remaining_unchecked(input: *mut u8, remaining: u64) -> Self {
+        // SAFETY: `input` must be a valid SVM buffer and aligned for `BPF_ALIGN_OF_U128`.
+        assume_unchecked(
+            input.align_offset(BPF_ALIGN_OF_U128) == 0,
+            "input buffer not aligned",
+        );
+        Self {
+            buffer: unsafe { input.add(core::mem::size_of::<u64>()) },
+            remaining,
         }
     }
 
@@ -903,6 +1008,111 @@ mod tests {
         let a2 = ctx.next_account().unwrap().assume_account();
         assert_eq!(a2.data_len(), 24);
 
+        assert_eq!(ctx.remaining(), 0);
+
+        let data = ctx.instruction_data().unwrap();
+        assert_eq!(data, &IX_DATA);
+
+        let pid = ctx.program_id().unwrap();
+        assert_eq!(pid, &MOCK_PROGRAM_ID);
+    }
+
+    #[test]
+    fn test_check_dup_accepts_duplicate() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 48 },
+                    AccountDesc::Dup { original_index: 0 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let a0 = ctx
+            .next_account_guarded(&NoGuards, &NoGuards)
+            .unwrap()
+            .assume_account();
+        assert_eq!(a0.data_len(), 48);
+
+        let dup_idx = ctx.next_account_guarded(&CheckDup, &NoGuards).unwrap();
+        assert_eq!(dup_idx, 0);
+    }
+
+    #[test]
+    fn test_check_dup_rejects_non_duplicate() {
+        let mut input =
+            unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 16 }], &IX_DATA) };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let err = ctx.next_account_guarded(&CheckDup, &NoGuards).unwrap_err();
+        assert_eq!(err, ProgramError::AccountBorrowFailed);
+        assert_eq!(ctx.remaining(), 1);
+    }
+
+    #[test]
+    fn test_assume_never_dup_on_non_duplicate() {
+        let mut input =
+            unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA) };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let guard = unsafe { AssumeNeverDup::new() };
+        let acct = ctx.next_account_guarded(&guard, &NoGuards).unwrap();
+        assert_eq!(acct.data_len(), 32);
+        assert_eq!(ctx.remaining(), 0);
+    }
+
+    #[test]
+    fn test_assume_dup_on_duplicate() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 48 },
+                    AccountDesc::Dup { original_index: 0 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let _a0 = ctx
+            .next_account_guarded(&NoGuards, &NoGuards)
+            .unwrap()
+            .assume_account();
+
+        let guard = unsafe { AssumeDup::new() };
+        let dup_idx = ctx.next_account_guarded(&guard, &NoGuards).unwrap();
+        assert_eq!(dup_idx, 0);
+    }
+
+    #[test]
+    fn test_new_with_remaining_unchecked() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 16 },
+                    AccountDesc::NonDup { data_len: 32 },
+                    AccountDesc::NonDup { data_len: 64 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx =
+            unsafe { InstructionContext::new_with_remaining_unchecked(input.as_mut_ptr(), 3) };
+
+        assert_eq!(ctx.remaining(), 3);
+
+        let a0 = ctx.next_account().unwrap().assume_account();
+        assert_eq!(a0.data_len(), 16);
+        assert_eq!(ctx.remaining(), 2);
+
+        let a1 = ctx.next_account().unwrap().assume_account();
+        assert_eq!(a1.data_len(), 32);
+        assert_eq!(ctx.remaining(), 1);
+
+        let a2 = ctx.next_account().unwrap().assume_account();
+        assert_eq!(a2.data_len(), 64);
         assert_eq!(ctx.remaining(), 0);
 
         let data = ctx.instruction_data().unwrap();
