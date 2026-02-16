@@ -10,18 +10,18 @@ use solana_program_error::ProgramError;
 /// [`from_bytes_unchecked`](Metadata::from_bytes_unchecked).
 ///
 /// On-chain data layout (inside the Token-2022 TLV entry):
-/// - `[0..32]`:   `update_authority` (`Address`)
-/// - `[32..64]`:  `mint` (`Address`)
-/// - `[64..68]`:  `name_len` (`u32` LE)
-/// - `[68..68+N]`: name (UTF-8)
-/// - `[..+4]`:    `symbol_len` (`u32` LE)
-/// - `[..+S]`:    symbol (UTF-8)
-/// - `[..+4]`:    `uri_len` (`u32` LE)
-/// - `[..+U]`:    uri (UTF-8)
-/// - `[..+4]`:    `pair_count` (`u32` LE) — number of key-value pairs
+/// - `[0..32]:   update_authority (Address)`
+/// - `[32..64]:  mint (Address)`
+/// - `[64..68]:  name_len (u32 LE)`
+/// - `[68..68+N]: name (UTF-8)`
+/// - `[..+4]:    symbol_len (u32 LE)`
+/// - `[..+S]:    symbol (UTF-8)`
+/// - `[..+4]:    uri_len (u32 LE)`
+/// - `[..+U]:    uri (UTF-8)`
+/// - `[..+4]:    pair_count (u32 LE) -- number of key-value pairs`
 /// - For each pair:
-///   - `key_len` (`u32` LE) + key (UTF-8)
-///   - `value_len` (`u32` LE) + value (UTF-8)
+///   - `key_len (u32 LE) + key (UTF-8)`
+///   - `value_len (u32 LE) + value (UTF-8)`
 pub struct Metadata<'a> {
     /// Authority that can update the metadata.
     update_authority: &'a Address,
