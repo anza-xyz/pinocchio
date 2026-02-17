@@ -657,6 +657,12 @@ impl InstructionContext {
         &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Address)
     }
 
+    /// Returns the current buffer cursor position.
+    #[inline(always)]
+    pub fn cursor(&self) -> *mut u8 {
+        self.buffer
+    }
+
     #[allow(clippy::cast_ptr_alignment)]
     #[inline(always)]
     unsafe fn read_account_unchecked<D: DupGuard, S: DataGuard>(
