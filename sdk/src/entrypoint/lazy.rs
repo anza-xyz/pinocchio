@@ -103,27 +103,43 @@ fn cold<T>(t: T) -> T {
 ///
 /// # Safety
 ///
-/// Incorrect implementations cause undefined behavior inside
-/// [`InstructionContext::read_account_unchecked`]:
-///
-/// - `check_dup` must be consistent with `borrow_state`: if it returns `Ok`
-///   when `*borrow_state != NON_DUP_MARKER`, the duplicate branch calls
-///   `wrap_dup`. Guards that assume non-dup (e.g. [`AssumeNeverDup`]) hit UB
-///   in `wrap_dup` in that case.
-/// - `wrap_dup` must be safe to call whenever `check_dup` returns `Ok` and
-///   the account is a duplicate.
-/// - `wrap_account` must be safe to call whenever `check_dup` returns `Ok`
-///   and the account is not a duplicate.
+/// Implementations must correctly read and advance the buffer according to
+/// the account's duplicate status. The returned `*mut u8` must point to the
+/// next account header (or instruction data if this was the last account).
 pub unsafe trait DupGuard {
     type Output;
 
+    /// Reads and wraps the account, advancing the buffer.
+    ///
+    /// Returns `(output, new_buffer_position)` on success.
+    ///
     /// # Safety
     ///
-    /// `borrow_state` must point to a valid `RuntimeAccount::borrow_state`.
-    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError>;
+    /// - `account` must point to a valid `RuntimeAccount`.
+    /// - `after_header` must point 8 bytes past `account` (the post-header position).
+    unsafe fn resolve<S: DataGuard>(
+        &self,
+        account: *mut RuntimeAccount,
+        after_header: *mut u8,
+        data_guard: &S,
+    ) -> Result<(Self::Output, *mut u8), ProgramError>;
+}
 
-    fn wrap_account(account: AccountView) -> Self::Output;
-    fn wrap_dup(dup_index: u8) -> Self::Output;
+#[inline(always)]
+unsafe fn read_non_dup_account<S: DataGuard>(
+    account: *mut RuntimeAccount,
+    after_header: *mut u8,
+    data_guard: &S,
+) -> Result<(AccountView, *mut u8), ProgramError> {
+    data_guard.check_account(account)?;
+    let new_buf = data_guard.advance_buffer(account, after_header);
+    let acct = AccountView::new_unchecked(account);
+    assume_unchecked(
+        (acct.data_ptr() as *const u64).is_aligned(),
+        "account data not aligned",
+    );
+    data_guard.inform_size(acct.data_len());
+    Ok((acct, new_buf))
 }
 
 /// Data guard: controls how account data is validated and how the buffer
@@ -175,18 +191,19 @@ unsafe impl DupGuard for NoGuards {
     type Output = MaybeAccount;
 
     #[inline(always)]
-    unsafe fn check_dup(&self, _borrow_state: *const u8) -> Result<(), ProgramError> {
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn wrap_account(account: AccountView) -> MaybeAccount {
-        MaybeAccount::Account(account)
-    }
-
-    #[inline(always)]
-    fn wrap_dup(dup_index: u8) -> MaybeAccount {
-        MaybeAccount::Duplicated(dup_index)
+    unsafe fn resolve<S: DataGuard>(
+        &self,
+        account: *mut RuntimeAccount,
+        after_header: *mut u8,
+        data_guard: &S,
+    ) -> Result<(MaybeAccount, *mut u8), ProgramError> {
+        let borrow_state = (*account).borrow_state;
+        if borrow_state == NON_DUP_MARKER {
+            let (acct, buf) = read_non_dup_account(account, after_header, data_guard)?;
+            Ok((MaybeAccount::Account(acct), buf))
+        } else {
+            Ok((MaybeAccount::Duplicated(borrow_state), after_header))
+        }
     }
 }
 
@@ -199,9 +216,10 @@ unsafe impl DataGuard for NoGuards {
 
 /// Assumes the next account is never a duplicate.
 ///
-/// Returns [`AccountView`] directly. The duplicate branch is eliminated.
-/// Passing a duplicate account is UB (`assume_unchecked` in `check_dup`,
-/// `assume_unchecked` in `wrap_dup`).
+/// Returns [`AccountView`] directly. The duplicate branch does not exist.
+/// Passing a duplicate account triggers a `debug_assert` in debug builds;
+/// in release the dup header is misinterpreted as a full account, corrupting
+/// the buffer cursor.
 pub struct AssumeNeverDup(());
 
 impl AssumeNeverDup {
@@ -218,66 +236,18 @@ unsafe impl DupGuard for AssumeNeverDup {
     type Output = AccountView;
 
     #[inline(always)]
-    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
-        // SAFETY: `AssumeNeverDup` does not check duplicates in release; UB if hit as duplicate.
-        assume_unchecked(
-            *borrow_state == NON_DUP_MARKER,
-            "expected non-duplicate account",
+    unsafe fn resolve<S: DataGuard>(
+        &self,
+        account: *mut RuntimeAccount,
+        after_header: *mut u8,
+        data_guard: &S,
+    ) -> Result<(AccountView, *mut u8), ProgramError> {
+        debug_assert_eq!(
+            (*account).borrow_state,
+            NON_DUP_MARKER,
+            "expected non-duplicate account"
         );
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn wrap_account(account: AccountView) -> AccountView {
-        account
-    }
-
-    #[inline(always)]
-    fn wrap_dup(_: u8) -> AccountView {
-        unsafe { assume_unchecked(false, "unexpected duplicate account") }
-        unreachable!()
-    }
-}
-
-/// Assumes the next account is always a duplicate.
-///
-/// Returns `u8` (the dup index) directly. The non-duplicate branch is eliminated.
-/// Passing a non-duplicate account is UB (`assume_unchecked` in `check_dup`,
-/// `assume_unchecked` in `wrap_account`).
-pub struct AssumeDup(());
-
-impl AssumeDup {
-    /// # Safety
-    ///
-    /// The caller must guarantee that the next account is a duplicate.
-    #[inline(always)]
-    pub unsafe fn new() -> Self {
-        Self(())
-    }
-}
-
-unsafe impl DupGuard for AssumeDup {
-    type Output = u8;
-
-    #[inline(always)]
-    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
-        // SAFETY: `AssumeDup` does not check duplicates in release; UB if hit as non-duplicate.
-        assume_unchecked(
-            *borrow_state != NON_DUP_MARKER,
-            "expected duplicate account",
-        );
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn wrap_account(_: AccountView) -> u8 {
-        unsafe { assume_unchecked(false, "unexpected nonduplicate account") }
-        unreachable!()
-    }
-
-    #[inline(always)]
-    fn wrap_dup(dup_index: u8) -> u8 {
-        dup_index
+        read_non_dup_account(account, after_header, data_guard)
     }
 }
 
@@ -292,62 +262,16 @@ unsafe impl DupGuard for CheckNonDup {
     type Output = AccountView;
 
     #[inline(always)]
-    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
-        if *borrow_state != NON_DUP_MARKER {
+    unsafe fn resolve<S: DataGuard>(
+        &self,
+        account: *mut RuntimeAccount,
+        after_header: *mut u8,
+        data_guard: &S,
+    ) -> Result<(AccountView, *mut u8), ProgramError> {
+        if (*account).borrow_state != NON_DUP_MARKER {
             return Err(cold(ProgramError::AccountBorrowFailed));
         }
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn wrap_account(account: AccountView) -> AccountView {
-        account
-    }
-
-    #[inline(always)]
-    fn wrap_dup(_: u8) -> AccountView {
-        AssumeNeverDup::wrap_dup(0) // dummy index for error case
-    }
-}
-
-/// Checks at runtime that the next account is a duplicate.
-///
-/// Returns `u8` (the dup index) on success. Returns
-/// [`ProgramError::AccountBorrowFailed`] on non-duplicate.
-pub struct CheckDup;
-
-impl CheckDup {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for CheckDup {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-unsafe impl DupGuard for CheckDup {
-    type Output = u8;
-
-    #[inline(always)]
-    unsafe fn check_dup(&self, borrow_state: *const u8) -> Result<(), ProgramError> {
-        if *borrow_state == NON_DUP_MARKER {
-            return Err(cold(ProgramError::AccountBorrowFailed));
-        }
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn wrap_account(account: AccountView) -> u8 {
-        AssumeDup::wrap_account(account)
-    }
-
-    #[inline(always)]
-    fn wrap_dup(dup_index: u8) -> u8 {
-        AssumeDup::wrap_dup(dup_index)
+        read_non_dup_account(account, after_header, data_guard)
     }
 }
 
@@ -740,34 +664,15 @@ impl InstructionContext {
         dup_guard: &D,
         data_guard: &S,
     ) -> Result<D::Output, ProgramError> {
-        // SAFETY: The caller must guarantee `self.buffer` points at a serialized
-        // `RuntimeAccount` header and is aligned to `BPF_ALIGN_OF_U128` before use.
         assume_unchecked(
             self.buffer.align_offset(BPF_ALIGN_OF_U128) == 0,
             "buffer not aligned",
         );
         let account: *mut RuntimeAccount = self.buffer as *mut RuntimeAccount;
-
-        let borrow_ptr = &(*account).borrow_state as *const u8;
-        dup_guard.check_dup(borrow_ptr)?;
-
-        // 8-byte header: borrow_state..resize_delta (non-dup) or dup_marker+padding (dup).
         let after_header = self.buffer.add(core::mem::size_of::<u64>());
-
-        if *borrow_ptr == NON_DUP_MARKER {
-            data_guard.check_account(account)?;
-            self.buffer = data_guard.advance_buffer(account, after_header);
-            let account = AccountView::new_unchecked(account);
-            assume_unchecked(
-                (account.data_ptr() as *const u64).is_aligned(),
-                "account data not aligned",
-            );
-            data_guard.inform_size(account.data_len());
-            Ok(D::wrap_account(account))
-        } else {
-            self.buffer = after_header;
-            Ok(D::wrap_dup((*account).borrow_state))
-        }
+        let (output, new_buffer) = dup_guard.resolve(account, after_header, data_guard)?;
+        self.buffer = new_buffer;
+        Ok(output)
     }
 }
 
@@ -1018,40 +923,6 @@ mod tests {
     }
 
     #[test]
-    fn test_check_dup_accepts_duplicate() {
-        let mut input = unsafe {
-            create_input_custom(
-                &[
-                    AccountDesc::NonDup { data_len: 48 },
-                    AccountDesc::Dup { original_index: 0 },
-                ],
-                &IX_DATA,
-            )
-        };
-        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
-
-        let a0 = ctx
-            .next_account_guarded(&NoGuards, &NoGuards)
-            .unwrap()
-            .assume_account();
-        assert_eq!(a0.data_len(), 48);
-
-        let dup_idx = ctx.next_account_guarded(&CheckDup, &NoGuards).unwrap();
-        assert_eq!(dup_idx, 0);
-    }
-
-    #[test]
-    fn test_check_dup_rejects_non_duplicate() {
-        let mut input =
-            unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 16 }], &IX_DATA) };
-        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
-
-        let err = ctx.next_account_guarded(&CheckDup, &NoGuards).unwrap_err();
-        assert_eq!(err, ProgramError::AccountBorrowFailed);
-        assert_eq!(ctx.remaining(), 1);
-    }
-
-    #[test]
     fn test_assume_never_dup_on_non_duplicate() {
         let mut input =
             unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA) };
@@ -1061,29 +932,6 @@ mod tests {
         let acct = ctx.next_account_guarded(&guard, &NoGuards).unwrap();
         assert_eq!(acct.data_len(), 32);
         assert_eq!(ctx.remaining(), 0);
-    }
-
-    #[test]
-    fn test_assume_dup_on_duplicate() {
-        let mut input = unsafe {
-            create_input_custom(
-                &[
-                    AccountDesc::NonDup { data_len: 48 },
-                    AccountDesc::Dup { original_index: 0 },
-                ],
-                &IX_DATA,
-            )
-        };
-        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
-
-        let _a0 = ctx
-            .next_account_guarded(&NoGuards, &NoGuards)
-            .unwrap()
-            .assume_account();
-
-        let guard = unsafe { AssumeDup::new() };
-        let dup_idx = ctx.next_account_guarded(&guard, &NoGuards).unwrap();
-        assert_eq!(dup_idx, 0);
     }
 
     #[test]

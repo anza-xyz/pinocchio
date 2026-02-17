@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use mollusk_svm::{result::Check, Mollusk};
 use solana_sdk::{
     account::{AccountSharedData, ReadableAccount},
@@ -15,39 +13,17 @@ const PROGRAM_ID: Pubkey = Pubkey::new_from_array([
 ]);
 const VALUE_TO_WRITE: u64 = 42;
 
-fn deploy_path(deploy_binary: &str, caller_manifest_dir: &str) -> String {
-    let mut caller_path = PathBuf::from(caller_manifest_dir);
-    if !caller_path.is_absolute() {
-        caller_path = std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join(&caller_path);
-    }
-
-    let caller_path = caller_path.canonicalize().unwrap_or_else(|_| caller_path);
-
-    for ancestor in caller_path.ancestors() {
-        let deploy_dir = ancestor.join("target").join("deploy");
-        let bare_binary_path = deploy_dir.join(deploy_binary);
-        if bare_binary_path.exists() {
-            return bare_binary_path.to_string_lossy().into_owned();
-        }
-
-        let so_binary_path = deploy_dir.join(format!("{deploy_binary}.so"));
-        if so_binary_path.exists() {
-            return bare_binary_path.to_string_lossy().into_owned();
-        }
-    }
-
-    panic!(
-        "Could not find {deploy_binary}. Build with `make test-opt` (or `make test-naive`/`make test-manual`) and rerun tests."
+fn deploy_path(deploy_binary: &str) -> String {
+    let path = format!("{}/target/deploy/{deploy_binary}.so", env!("CARGO_MANIFEST_DIR"));
+    assert!(
+        std::path::Path::new(&path).exists(),
+        "Could not find {path}. Build with `make test-opt` (or `make test-naive`/`make test-manual`) first."
     );
+    path
 }
 
-fn run_cu_benchmark(variant_name: &str, caller_manifest_dir: &str, deploy_binary: &str) {
-    let mollusk = Mollusk::new(
-        &PROGRAM_ID,
-        &deploy_path(deploy_binary, caller_manifest_dir),
-    );
+fn run_cu_benchmark(variant_name: &str, deploy_path: &str) {
+    let mollusk = Mollusk::new(&PROGRAM_ID, deploy_path);
 
     let authority = Pubkey::new_unique();
     let state_pubkey = Pubkey::new_unique();
@@ -110,25 +86,17 @@ fn run_cu_benchmark(variant_name: &str, caller_manifest_dir: &str, deploy_binary
 #[cfg(feature = "opt")]
 #[test]
 fn test_update_value_cu() {
-    run_cu_benchmark("OPT", env!("CARGO_MANIFEST_DIR"), "pinocchio_small_oracle");
+    run_cu_benchmark("OPT", &deploy_path("pinocchio_small_oracle"));
 }
 
 #[cfg(feature = "naive")]
 #[test]
 fn test_update_value_cu() {
-    run_cu_benchmark(
-        "NAIVE",
-        env!("CARGO_MANIFEST_DIR"),
-        "pinocchio_small_oracle",
-    );
+    run_cu_benchmark("NAIVE", &deploy_path("pinocchio_small_oracle"));
 }
 
 #[cfg(feature = "manual")]
 #[test]
 fn test_update_value_cu() {
-    run_cu_benchmark(
-        "MANUAL",
-        env!("CARGO_MANIFEST_DIR"),
-        "pinocchio_small_oracle",
-    );
+    run_cu_benchmark("MANUAL", &deploy_path("pinocchio_small_oracle"));
 }
