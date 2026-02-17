@@ -941,6 +941,46 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "expected non-duplicate account")]
+    fn test_assume_never_dup_panics_on_dup() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 0 },
+                    AccountDesc::Dup { original_index: 0 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+        let _ = ctx.next_account().unwrap();
+        let guard = unsafe { AssumeNeverDup::new() };
+        let _ = ctx.next_account_guarded(&guard, &NoGuards);
+    }
+
+    #[test]
+    fn test_cursor_advances_with_accounts() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 0 },
+                    AccountDesc::NonDup { data_len: 32 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+        let before = ctx.cursor();
+        ctx.next_account().unwrap();
+        let after_first = ctx.cursor();
+        assert!(after_first > before);
+        ctx.next_account().unwrap();
+        let after_second = ctx.cursor();
+        assert!(after_second > after_first);
+    }
+
+    #[test]
     fn test_new_with_remaining_unchecked() {
         let mut input = unsafe {
             create_input_custom(
