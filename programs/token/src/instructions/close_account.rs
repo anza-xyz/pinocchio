@@ -21,7 +21,7 @@ use {
 ///   0. `[WRITE]` The account to close.
 ///   1. `[WRITE]` The destination account.
 ///   2. `[]` The account's multisignature owner.
-///   3. ..3+M `[SIGNER]` M signer accounts
+///   3. `..3+M` `[SIGNER]` M signer accounts
 pub struct CloseAccount<'a, 'b> {
     /// Token Account.
     pub account: &'a AccountView,

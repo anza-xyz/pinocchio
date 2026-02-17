@@ -21,7 +21,7 @@ use {
 ///   0. `[WRITE]` The mint.
 ///   1. `[WRITE]` The account to mint tokens to.
 ///   2. `[]` The mint's multisignature minting authority.
-///   3. ..3+M `[SIGNER]` M signer accounts
+///   3. `..3+M` `[SIGNER]` M signer accounts
 pub struct MintToChecked<'a, 'b> {
     /// Mint Account.
     pub mint: &'a AccountView,

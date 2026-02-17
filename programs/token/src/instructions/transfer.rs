@@ -21,7 +21,7 @@ use {
 ///   0. `[WRITE]` Sender account
 ///   1. `[WRITE]` Recipient account
 ///   2. `[]` Authority account (multisig)
-///   3. ..3+M `[SIGNER]` M signer accounts
+///   3. `..3+M` `[SIGNER]` M signer accounts
 pub struct Transfer<'a, 'b> {
     /// Sender account.
     pub from: &'a AccountView,

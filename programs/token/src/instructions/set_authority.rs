@@ -29,28 +29,28 @@ pub enum AuthorityType {
 ///   * Multisignature authority
 ///   0. `[WRITE]` The mint or account to change the authority of.
 ///   1. `[]` The current multisignature authority of the mint or account.
-///   2. ..2+M `[SIGNER]` M signer accounts
-pub struct SetAuthority<'a, 'b> {
+///   2. `..2+M` `[SIGNER]` M signer accounts
+pub struct SetAuthority<'a, 'b, 'c> {
     /// Account (Mint or Token)
     pub account: &'a AccountView,
     /// Authority of the Account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'c [&'a AccountView],
     /// The type of authority to update.
     pub authority_type: AuthorityType,
     /// The new authority
-    pub new_authority: Option<&'a Address>,
+    pub new_authority: Option<&'b Address>,
 }
 
-impl<'a, 'b> SetAuthority<'a, 'b> {
+impl<'a, 'b, 'c> SetAuthority<'a, 'b, 'c> {
     /// Creates a new `SetAuthority` instruction with a single authority.
     #[inline(always)]
     pub fn new(
         account: &'a AccountView,
         authority: &'a AccountView,
         authority_type: AuthorityType,
-        new_authority: Option<&'a Address>,
+        new_authority: Option<&'b Address>,
     ) -> Self {
         Self::with_multisig_signers(account, authority, authority_type, new_authority, &[])
     }
@@ -62,8 +62,8 @@ impl<'a, 'b> SetAuthority<'a, 'b> {
         account: &'a AccountView,
         authority: &'a AccountView,
         authority_type: AuthorityType,
-        new_authority: Option<&'a Address>,
-        multisig_signers: &'b [&'a AccountView],
+        new_authority: Option<&'b Address>,
+        multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
             account,

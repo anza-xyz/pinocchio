@@ -23,7 +23,7 @@ use {
 ///   1. `[]` The token mint.
 ///   2. `[]` The delegate.
 ///   3. `[]` The source account's multisignature owner.
-///   4. ..4+M `[SIGNER]` M signer accounts
+///   4. `..4+M` `[SIGNER]` M signer accounts
 pub struct ApproveChecked<'a, 'b> {
     /// Source Account.
     pub source: &'a AccountView,
@@ -42,7 +42,8 @@ pub struct ApproveChecked<'a, 'b> {
 }
 
 impl<'a, 'b> ApproveChecked<'a, 'b> {
-    /// Creates a new `ApproveChecked` instruction with a single owner authority.
+    /// Creates a new `ApproveChecked` instruction with a single owner
+    /// authority.
     #[inline(always)]
     pub fn new(
         source: &'a AccountView,

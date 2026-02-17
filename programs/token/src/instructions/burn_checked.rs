@@ -21,7 +21,7 @@ use {
 ///   0. `[WRITE]` The account to burn from.
 ///   1. `[WRITE]` The token mint.
 ///   2. `[]` The account's multisignature owner/delegate.
-///   3. ..3+M `[SIGNER]` M signer accounts
+///   3. `..3+M` `[SIGNER]` M signer accounts
 pub struct BurnChecked<'a, 'b> {
     /// Source of the Burn Account
     pub account: &'a AccountView,

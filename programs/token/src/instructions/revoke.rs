@@ -19,7 +19,7 @@ use {
 ///   * Multisignature owner
 ///   0. `[WRITE]` The source account.
 ///   1. `[]` The source account's multisignature owner.
-///   2. ..2+M `[SIGNER]` M signer accounts
+///   2. `..2+M` `[SIGNER]` M signer accounts
 pub struct Revoke<'a, 'b> {
     /// Source Account.
     pub source: &'a AccountView,

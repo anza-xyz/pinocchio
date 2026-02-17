@@ -21,7 +21,7 @@ use {
 ///   0. `[WRITE]` The account to thaw.
 ///   1. `[]` The token mint.
 ///   2. `[]` The mint's multisignature freeze authority.
-///   3. ..3+M `[SIGNER]` M signer accounts
+///   3. `..3+M` `[SIGNER]` M signer accounts
 pub struct ThawAccount<'a, 'b> {
     /// Token Account to thaw.
     pub account: &'a AccountView,

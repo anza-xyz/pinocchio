@@ -21,7 +21,7 @@ use {
 ///   0. `[WRITE]` The token account.
 ///   1. `[]` The delegate.
 ///   2. `[]` The source account's multisignature owner.
-///   3. ..3+M `[SIGNER]` M signer accounts
+///   3. `..3+M` `[SIGNER]` M signer accounts
 pub struct Approve<'a, 'b> {
     /// Source Account.
     pub source: &'a AccountView,

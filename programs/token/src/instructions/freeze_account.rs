@@ -21,7 +21,7 @@ use {
 ///   0. `[WRITE]` The account to freeze.
 ///   1. `[]` The token mint.
 ///   2. `[]` The mint's multisignature freeze authority.
-///   3. ..3+M `[SIGNER]` M signer accounts
+///   3. `..3+M` `[SIGNER]` M signer accounts
 pub struct FreezeAccount<'a, 'b> {
     /// Token Account to freeze.
     pub account: &'a AccountView,
@@ -34,7 +34,8 @@ pub struct FreezeAccount<'a, 'b> {
 }
 
 impl<'a, 'b> FreezeAccount<'a, 'b> {
-    /// Creates a new `FreezeAccount` instruction with a single freeze authority.
+    /// Creates a new `FreezeAccount` instruction with a single freeze
+    /// authority.
     #[inline(always)]
     pub fn new(
         account: &'a AccountView,

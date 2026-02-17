@@ -23,7 +23,7 @@ use {
 ///   1. `[]` The token mint.
 ///   2. `[WRITE]` The destination account.
 ///   3. `[]` The source account's multisignature owner/delegate.
-///   4. ..4+M `[SIGNER]` M signer accounts
+///   4. `..4+M` `[SIGNER]` M signer accounts
 pub struct TransferChecked<'a, 'b> {
     /// Sender account.
     pub from: &'a AccountView,
