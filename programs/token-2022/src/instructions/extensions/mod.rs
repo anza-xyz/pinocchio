@@ -1,3 +1,4 @@
+pub mod confidential_mint_burn;
 pub mod default_account_state;
 pub mod group_member_pointer;
 pub mod group_pointer;
@@ -23,6 +24,7 @@ pub enum ExtensionDiscriminator {
     MetadataPointer = 39,
     GroupPointer = 40,
     GroupMemberPointer = 41,
+    ConfidentialMintBurn = 42,
     ScaledUiAmount = 43,
     PermissionedBurn = 46,
 }
