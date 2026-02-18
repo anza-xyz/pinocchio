@@ -15,6 +15,8 @@ manual = []
 
 [dependencies]
 pinocchio = { path = "../../sdk", default-features = false }
+bytemuck = { version = "1", features = ["derive"] }
+solana-address = { version = "2.0", features = ["copy", "bytemuck"] }
 
 [dev-dependencies]
 mollusk-svm = "0.0.12"

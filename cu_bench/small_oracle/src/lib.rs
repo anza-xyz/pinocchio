@@ -1,6 +1,7 @@
 #![allow(unused_imports, unexpected_cfgs, dead_code)]
 #![no_std]
 
+use bytemuck::{Pod, Zeroable};
 use pinocchio::{
     address::{address_eq, Address},
     entrypoint::{
@@ -12,7 +13,7 @@ use pinocchio::{
 };
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, Pod, Zeroable, Copy)]
 pub struct SmallOracle {
     pub authority: Address,
     pub data: u64,
@@ -76,7 +77,7 @@ fn process_instruction(mut context: LazyInstructionContext) -> ProgramResult {
     };
 
     let state_data = unsafe { state.borrow_unchecked_mut() };
-    let state = unsafe { cast_state_data_aligned(state_data) };
+    let state: &mut SmallOracle = bytemuck::from_bytes_mut(state_data);
 
     if !address_eq(&state.authority, authority.address()) {
         hard_exit("illegal owner");
@@ -87,7 +88,7 @@ fn process_instruction(mut context: LazyInstructionContext) -> ProgramResult {
         hard_exit("invalid instruction data");
     }
 
-    let value = u64::from_le_bytes(data.try_into().unwrap());
+    let value = *bytemuck::from_bytes::<u64>(data);
     state.data = value;
 
     Ok(())

@@ -1704,8 +1704,10 @@ dependencies = [
 name = "pinocchio-small-oracle"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "mollusk-svm",
  "pinocchio",
+ "solana-address",
  "solana-sdk",
 ]
 
@@ -2264,6 +2266,8 @@ version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68c5d02824391b072dc5cd0aaa85fb0af9784a21d23286a767994d1e8a322131"
 dependencies = [
+ "bytemuck",
+ "bytemuck_derive",
  "solana-define-syscall 5.0.0",
  "solana-program-error 3.0.0",
 ]
