@@ -254,8 +254,8 @@ unsafe impl DupGuard for AssumeNeverDup {
 /// Checks at runtime that the next account is not a duplicate.
 ///
 /// Returns [`AccountView`] on success. Returns
-/// [`ProgramError::AccountBorrowFailed`] on duplicate.
-/// This is the runtime duplicate checker.
+/// [`ProgramError::AccountBorrowFailed`] when a duplicate is encountered
+/// (there is no dedicated duplicate-account error in [`ProgramError`]).
 pub struct CheckNonDup;
 
 unsafe impl DupGuard for CheckNonDup {
@@ -1035,6 +1035,42 @@ mod tests {
 
         let a2 = ctx.next_account().unwrap().assume_account();
         assert_eq!(a2.data_len(), 64);
+        assert_eq!(ctx.remaining(), 0);
+
+        let data = ctx.instruction_data().unwrap();
+        assert_eq!(data, &IX_DATA);
+
+        let pid = ctx.program_id().unwrap();
+        assert_eq!(pid, &MOCK_PROGRAM_ID);
+    }
+
+    #[test]
+    fn test_assume_size_advances_cursor_correctly() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 32 },
+                    AccountDesc::NonDup { data_len: 64 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        let guard_a = unsafe { AssumeSize::<32>::new() };
+        let a0 = ctx
+            .next_account_guarded(&NoGuards, &guard_a)
+            .unwrap()
+            .assume_account();
+        assert_eq!(a0.data_len(), 32);
+
+        let guard_b = unsafe { AssumeSize::<64>::new() };
+        let a1 = ctx
+            .next_account_guarded(&NoGuards, &guard_b)
+            .unwrap()
+            .assume_account();
+        assert_eq!(a1.data_len(), 64);
+
         assert_eq!(ctx.remaining(), 0);
 
         let data = ctx.instruction_data().unwrap();
