@@ -72,4 +72,5 @@ getters
 PRNG
 middleware
 MiB
+pausable
 permissioned
