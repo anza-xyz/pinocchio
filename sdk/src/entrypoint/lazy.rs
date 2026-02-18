@@ -217,9 +217,9 @@ unsafe impl DataGuard for NoGuards {
 /// Assumes the next account is never a duplicate.
 ///
 /// Returns [`AccountView`] directly. The duplicate branch does not exist.
-/// Passing a duplicate account triggers a `debug_assert` in debug builds;
-/// in release the dup header is misinterpreted as a full account, corrupting
-/// the buffer cursor.
+/// Passing a duplicate account causes undefined behavior: the debug build
+/// asserts, but in release the buffer pointer and remaining count become
+/// inconsistent with the actual buffer layout.
 pub struct AssumeNeverDup(());
 
 impl AssumeNeverDup {
@@ -739,11 +739,13 @@ mod tests {
         assert_eq!(acct.data_len(), 0);
 
         let remaining_before_dup = ctx.remaining();
+        let cursor_before_dup = ctx.cursor();
         let err = ctx
             .next_account_guarded(&CheckNonDup, &NoGuards)
             .unwrap_err();
         assert_eq!(err, ProgramError::AccountBorrowFailed);
         assert_eq!(ctx.remaining(), remaining_before_dup);
+        assert_eq!(ctx.cursor(), cursor_before_dup);
 
         let maybe = ctx.next_account_guarded(&NoGuards, &NoGuards).unwrap();
         assert!(matches!(maybe, MaybeAccount::Duplicated(0)));
@@ -756,12 +758,14 @@ mod tests {
         let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
 
         let remaining_before = ctx.remaining();
+        let cursor_before = ctx.cursor();
 
         let err = ctx
             .next_account_guarded(&NoGuards, &CheckSize::new(64))
             .unwrap_err();
         assert_eq!(err, ProgramError::InvalidAccountData);
         assert_eq!(ctx.remaining(), remaining_before);
+        assert_eq!(ctx.cursor(), cursor_before);
 
         let acct = ctx
             .next_account_guarded(&NoGuards, &CheckSize::new(32))
@@ -833,6 +837,30 @@ mod tests {
         let err = ctx.next_account().unwrap_err();
         assert_eq!(err, ProgramError::NotEnoughAccountKeys);
         assert_eq!(ctx.remaining(), 0);
+    }
+
+    #[test]
+    fn test_instruction_data_fails_when_accounts_remain() {
+        let mut input = unsafe {
+            create_input_custom(
+                &[
+                    AccountDesc::NonDup { data_len: 0 },
+                    AccountDesc::NonDup { data_len: 0 },
+                ],
+                &IX_DATA,
+            )
+        };
+        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
+
+        // Read only first account, leave second unread
+        let _ = ctx.next_account().unwrap();
+        assert_eq!(ctx.remaining(), 1);
+
+        // instruction_data() should fail because accounts remain
+        let err = ctx.instruction_data().unwrap_err();
+        assert_eq!(err, ProgramError::InvalidInstructionData);
+        // Verify state unchanged
+        assert_eq!(ctx.remaining(), 1);
     }
 
     #[test]

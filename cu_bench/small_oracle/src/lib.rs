@@ -96,35 +96,35 @@ fn process_instruction(mut context: LazyInstructionContext) -> ProgramResult {
 #[cfg(feature = "naive")]
 fn process_instruction(mut context: InstructionContext) -> ProgramResult {
     if context.remaining() != 2 {
-        return Err(ProgramError::NotEnoughAccountKeys);
+        hard_exit("expected exactly 2 accounts");
     }
 
     let authority = context.next_account()?.assume_account();
 
     if authority.data_len() != 0 {
-        return Err(ProgramError::InvalidAccountData);
+        hard_exit("invalid authority account data");
     }
 
     if !authority.is_signer() {
-        return Err(ProgramError::MissingRequiredSignature);
+        hard_exit("missing required signature");
     }
 
     let state = context.next_account()?.assume_account();
     let state_data = unsafe { state.borrow_unchecked_mut() };
 
     if state_data.len() != SMALL_ORACLE_ACCOUNT_SIZE {
-        return Err(ProgramError::InvalidAccountData);
+        hard_exit("invalid account data");
     }
 
     let state_ref = unsafe { cast_state_data(state_data) };
 
     if !is_authority_match(state_ref, authority.address()) {
-        return Err(ProgramError::IllegalOwner);
+        hard_exit("illegal owner");
     }
 
     let data = context.instruction_data()?;
     if data.len() != SMALL_ORACLE_VALUE_SIZE {
-        return Err(ProgramError::InvalidInstructionData);
+        hard_exit("invalid instruction data");
     }
 
     let value = u64::from_le_bytes(data.try_into().unwrap());

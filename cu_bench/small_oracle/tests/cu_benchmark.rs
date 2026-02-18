@@ -14,10 +14,13 @@ const PROGRAM_ID: Pubkey = Pubkey::new_from_array([
 const VALUE_TO_WRITE: u64 = 42;
 
 fn deploy_path(deploy_binary: &str) -> String {
-    let path = format!("{}/target/deploy/{deploy_binary}.so", env!("CARGO_MANIFEST_DIR"));
+    let path = format!(
+        "{}/target/deploy/{deploy_binary}",
+        env!("CARGO_MANIFEST_DIR")
+    );
     assert!(
-        std::path::Path::new(&path).exists(),
-        "Could not find {path}. Build with `make test-opt` (or `make test-naive`/`make test-manual`) first."
+        std::path::Path::new(&format!("{path}.so")).exists(),
+        "Could not find {path}.so. Build with `make test-opt` (or `make test-naive`/`make test-manual`) first."
     );
     path
 }
