@@ -81,11 +81,6 @@ macro_rules! lazy_program_entrypoint {
     };
 }
 
-#[cold]
-fn cold<T>(t: T) -> T {
-    t
-}
-
 /// Dup guard: controls how duplicate accounts are handled.
 ///
 /// The associated `Output` type determines the return type of
@@ -238,9 +233,8 @@ unsafe impl DupGuard for AssumeNeverDup {
 
 /// Checks at runtime that the next account is not a duplicate.
 ///
-/// Returns [`AccountView`] on success. Returns
-/// [`ProgramError::AccountBorrowFailed`] when a duplicate is encountered
-/// (there is no dedicated duplicate-account error in [`ProgramError`]).
+/// Returns [`AccountView`] on success, or
+/// [`ProgramError::AccountBorrowFailed`] on duplicate.
 pub struct CheckNonDup;
 
 unsafe impl DupGuard for CheckNonDup {
@@ -254,7 +248,7 @@ unsafe impl DupGuard for CheckNonDup {
         data_guard: &S,
     ) -> Result<(AccountView, *mut u8), ProgramError> {
         if (*account).borrow_state != NON_DUP_MARKER {
-            return Err(cold(ProgramError::AccountBorrowFailed));
+            return Err(ProgramError::AccountBorrowFailed);
         }
         read_non_dup_account(account, after_header, data_guard)
     }
@@ -278,7 +272,7 @@ unsafe impl DataGuard for CheckSize {
     #[inline(always)]
     unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
         if (*account).data_len as usize != self.expected_size {
-            return Err(cold(ProgramError::InvalidAccountData));
+            return Err(ProgramError::InvalidAccountData);
         }
         Ok(())
     }
@@ -370,7 +364,7 @@ unsafe impl<T> DataGuard for CheckLikeType<T> {
     unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
         const { assert!(core::mem::align_of::<T>() <= BPF_ALIGN_OF_U128) };
         if (*account).data_len as usize != core::mem::size_of::<T>() {
-            return Err(cold(ProgramError::InvalidAccountData));
+            return Err(ProgramError::InvalidAccountData);
         }
         Ok(())
     }
@@ -537,11 +531,7 @@ impl InstructionContext {
     ///
     /// # Note
     ///
-    /// On guard error (`DupGuard` or `DataGuard`) neither the internal cursor
-    /// nor the remaining count are modified. The context can be reused after
-    /// a guard error. This does not apply to logic errors such as calling
-    /// the method when `remaining` is already zero — that returns
-    /// `NotEnoughAccountKeys` without modifying state either.
+    /// All error paths leave the cursor and remaining count unmodified.
     #[inline(always)]
     pub fn next_account_guarded<D: DupGuard, S: DataGuard>(
         &mut self,
@@ -549,7 +539,7 @@ impl InstructionContext {
         data_guard: &S,
     ) -> Result<D::Output, ProgramError> {
         if unlikely(self.remaining == 0) {
-            return Err(cold(ProgramError::NotEnoughAccountKeys));
+            return Err(ProgramError::NotEnoughAccountKeys);
         }
         let output = unsafe { self.read_account_unchecked(dup_guard, data_guard) }?;
         self.remaining -= 1;
