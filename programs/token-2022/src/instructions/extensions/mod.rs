@@ -1,3 +1,4 @@
+pub mod cpi_guard;
 pub mod default_account_state;
 pub mod group_member_pointer;
 pub mod group_pointer;
@@ -19,6 +20,7 @@ pub enum ExtensionDiscriminator {
     DefaultAccountState = 28,
     MemoTransfer = 30,
     InterestBearingMint = 33,
+    CpiGuard = 34,
     PermanentDelegate = 35,
     TransferHook = 36,
     MetadataPointer = 39,
