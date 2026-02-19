@@ -1,9 +1,6 @@
 use {
-    crate::{
-        instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-        UNINIT_ACCOUNT_REF, UNINIT_INSTRUCTION_ACCOUNT,
-    },
-    core::slice::from_raw_parts,
+    crate::instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
@@ -34,7 +31,7 @@ pub struct SetTransferFee<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [&'a AccountView],
 
     /// Amount of transfer collected as fees, expressed as basis points of
     /// the transfer amount
@@ -60,7 +57,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
         transfer_fee_basis_points: u16,
         maximum_fee: u64,
     ) -> Self {
-        Self::with_signers(
+        Self::with_multisig_signers(
             token_program,
             mint,
             authority,
@@ -73,18 +70,18 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
     /// Creates a new `SetTransferFee` instruction with a multisignature
     /// owner/delegate authority and signer accounts.
     #[inline(always)]
-    pub fn with_signers(
+    pub fn with_multisig_signers(
         token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
         transfer_fee_basis_points: u16,
         maximum_fee: u64,
-        signers: &'c [&'a AccountView],
+        multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
             mint,
             authority,
-            signers,
+            multisig_signers,
             transfer_fee_basis_points,
             maximum_fee,
             token_program,
@@ -98,56 +95,43 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        if self.signers.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let expected_accounts = 2 + self.signers.len();
+        let expected_accounts = 2 + self.multisig_signers.len();
 
         // Instruction accounts.
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 2 + MAX_MULTISIG_SIGNERS];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            instruction_accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(self.mint.address()));
+        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(1)
-                .write(InstructionAccount::new(
-                    self.authority.address(),
-                    false,
-                    self.signers.is_empty(),
-                ));
+        instruction_accounts[1].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
 
-            for (instruction_account, signer) in instruction_accounts
-                .get_unchecked_mut(2..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
-            }
+        for (instruction_account, signer) in instruction_accounts[2..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
         }
 
         // Accounts.
 
-        let mut accounts = [UNINIT_ACCOUNT_REF; 2 + MAX_MULTISIG_SIGNERS];
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            accounts.get_unchecked_mut(0).write(self.mint);
+        accounts[0].write(self.mint);
 
-            accounts.get_unchecked_mut(1).write(self.authority);
+        accounts[1].write(self.authority);
 
-            for (account, signer) in accounts
-                .get_unchecked_mut(2..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                account.write(*signer);
-            }
+        for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
+            account.write(*signer);
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(

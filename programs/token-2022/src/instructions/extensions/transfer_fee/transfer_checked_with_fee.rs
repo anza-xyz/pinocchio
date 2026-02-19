@@ -1,9 +1,9 @@
 use {
     crate::{
         instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-        write_bytes, UNINIT_ACCOUNT_REF, UNINIT_BYTE, UNINIT_INSTRUCTION_ACCOUNT,
+        write_bytes, UNINIT_BYTE,
     },
-    core::slice::from_raw_parts,
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
@@ -49,7 +49,7 @@ pub struct TransferCheckedWithFee<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [&'a AccountView],
 
     /// The amount of tokens to transfer.
     pub amount: u64,
@@ -84,7 +84,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
         decimals: u8,
         fee: u64,
     ) -> Self {
-        Self::with_signers(
+        Self::with_multisig_signers(
             token_program,
             source,
             mint,
@@ -101,7 +101,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
     /// owner/delegate authority and signer accounts.
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
-    pub fn with_signers(
+    pub fn with_multisig_signers(
         token_program: &'b Address,
         source: &'a AccountView,
         mint: &'a AccountView,
@@ -110,14 +110,14 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
         amount: u64,
         decimals: u8,
         fee: u64,
-        signers: &'c [&'a AccountView],
+        multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
             source,
             mint,
             destination,
             authority,
-            signers,
+            multisig_signers,
             amount,
             decimals,
             fee,
@@ -132,82 +132,65 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        if self.signers.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let expected_accounts = 4 + self.signers.len();
+        let expected_accounts = 4 + self.multisig_signers.len();
 
         // Instruction accounts.
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; 4 + MAX_MULTISIG_SIGNERS];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 4 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            instruction_accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(self.source.address()));
+        instruction_accounts[0].write(InstructionAccount::writable(self.source.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(1)
-                .write(InstructionAccount::readonly(self.mint.address()));
+        instruction_accounts[1].write(InstructionAccount::readonly(self.mint.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(2)
-                .write(InstructionAccount::writable(self.destination.address()));
+        instruction_accounts[2].write(InstructionAccount::writable(self.destination.address()));
 
-            instruction_accounts
-                .get_unchecked_mut(3)
-                .write(InstructionAccount::new(
-                    self.authority.address(),
-                    false,
-                    self.signers.is_empty(),
-                ));
+        instruction_accounts[3].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
 
-            for (instruction_account, signer) in instruction_accounts
-                .get_unchecked_mut(4..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
-            }
+        for (instruction_account, signer) in instruction_accounts[4..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
         }
 
         // Accounts.
 
-        let mut accounts = [UNINIT_ACCOUNT_REF; 4 + MAX_MULTISIG_SIGNERS];
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; 4 + MAX_MULTISIG_SIGNERS];
 
-        // SAFETY: The allocation is valid to the maximum number of accounts.
-        unsafe {
-            accounts.get_unchecked_mut(0).write(self.source);
+        accounts[0].write(self.source);
 
-            accounts.get_unchecked_mut(1).write(self.mint);
+        accounts[1].write(self.mint);
 
-            accounts.get_unchecked_mut(2).write(self.destination);
+        accounts[2].write(self.destination);
 
-            accounts.get_unchecked_mut(3).write(self.authority);
+        accounts[3].write(self.authority);
 
-            for (account, signer) in accounts
-                .get_unchecked_mut(4..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                account.write(*signer);
-            }
+        for (account, signer) in accounts[4..].iter_mut().zip(self.multisig_signers.iter()) {
+            account.write(*signer);
         }
 
         // Instruction data.
 
         let mut instruction_data = [UNINIT_BYTE; 19];
 
-        // discriminators
         instruction_data[0].write(ExtensionDiscriminator::TransferFee as u8);
+
         instruction_data[1].write(Self::DISCRIMINATOR);
-        // amount
+
         write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
-        // decimals
+
         instruction_data[10].write(self.decimals);
-        // fee
+
         write_bytes(&mut instruction_data[11..19], &self.fee.to_le_bytes());
 
         invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }>(

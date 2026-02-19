@@ -56,36 +56,32 @@ impl InitializeTransferFeeConfig<'_, '_> {
         // - 2 bytes for each optional authority
         let mut data_len = 2 + 2 + 8 + 2;
 
-        // discriminators
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::TransferFee as u8,
-                Self::DISCRIMINATOR,
-            ],
-        );
-        // transfer_fee_config_authority
+        instruction_data[0].write(ExtensionDiscriminator::TransferFee as u8);
+
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
         if let Some(authority) = self.transfer_fee_config_authority {
             instruction_data[2].write(1);
             write_bytes(&mut instruction_data[3..35], authority.as_ref());
+            // Add 32 bytes for the authority.
             data_len += size_of::<Address>();
         } else {
             instruction_data[2].write(0);
         }
-        // withdraw_withheld_authority
         if let Some(authority) = self.withdraw_withheld_authority {
             instruction_data[35].write(1);
             write_bytes(&mut instruction_data[36..68], authority.as_ref());
+            // Add 32 bytes for the authority.
             data_len += size_of::<Address>();
         } else {
             instruction_data[35].write(0);
         }
-        // transfer_fee_basis_points
+
         write_bytes(
             &mut instruction_data[68..70],
             &self.transfer_fee_basis_points.to_le_bytes(),
         );
-        // maximum_fee
+
         write_bytes(
             &mut instruction_data[70..78],
             &self.maximum_fee.to_le_bytes(),

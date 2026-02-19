@@ -1,9 +1,6 @@
 use {
-    crate::{
-        instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
-        UNINIT_ACCOUNT_REF, UNINIT_INSTRUCTION_ACCOUNT,
-    },
-    core::slice::from_raw_parts,
+    crate::instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
@@ -42,7 +39,7 @@ pub struct WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Multisignature signer accounts.
-    pub signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [&'a AccountView],
 
     /// Source accounts to withdraw from.
     pub sources: &'c [&'a AccountView],
@@ -64,25 +61,25 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         authority: &'a AccountView,
         sources: &'c [&'a AccountView],
     ) -> Self {
-        Self::with_signers(token_program, mint, destination, authority, sources, &[])
+        Self::with_multisig_signers(token_program, mint, destination, authority, sources, &[])
     }
 
     /// Creates a new `WithdrawWithheldTokensFromAccounts` instruction with a
     /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
-    pub fn with_signers(
+    pub fn with_multisig_signers(
         token_program: &'b Address,
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
         sources: &'c [&'a AccountView],
-        signers: &'c [&'a AccountView],
+        multisig_signers: &'c [&'a AccountView],
     ) -> Self {
         Self {
             mint,
             destination,
             authority,
-            signers,
+            multisig_signers,
             sources,
             token_program,
         }
@@ -95,11 +92,11 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        if self.signers.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let expected_accounts = 3 + self.signers.len() + self.sources.len();
+        let expected_accounts = 3 + self.multisig_signers.len() + self.sources.len();
 
         if expected_accounts > MAX_STATIC_CPI_ACCOUNTS {
             return Err(ProgramError::InvalidArgument);
@@ -107,37 +104,31 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
 
         // Instruction accounts.
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_STATIC_CPI_ACCOUNTS];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_STATIC_CPI_ACCOUNTS];
+
+        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
+
+        instruction_accounts[1].write(InstructionAccount::writable(self.destination.address()));
+
+        instruction_accounts[2].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
+
+        for (instruction_account, signer) in instruction_accounts[3..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
+            instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
+        }
 
         // SAFETY: The expected number of accounts has been validated to be less than
         // the maximum allocated.
         unsafe {
-            instruction_accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(self.mint.address()));
-
-            instruction_accounts
-                .get_unchecked_mut(1)
-                .write(InstructionAccount::writable(self.destination.address()));
-
-            instruction_accounts
-                .get_unchecked_mut(2)
-                .write(InstructionAccount::new(
-                    self.authority.address(),
-                    false,
-                    self.signers.is_empty(),
-                ));
-
-            for (instruction_account, signer) in instruction_accounts
-                .get_unchecked_mut(3..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
-            }
-
             for (instruction_account, source) in instruction_accounts
-                .get_unchecked_mut(3 + self.signers.len()..)
+                .get_unchecked_mut(3 + self.multisig_signers.len()..)
                 .iter_mut()
                 .zip(self.sources.iter())
             {
@@ -147,27 +138,24 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
 
         // Accounts.
 
-        let mut accounts = [UNINIT_ACCOUNT_REF; MAX_STATIC_CPI_ACCOUNTS];
+        let mut accounts =
+            [const { MaybeUninit::<&AccountView>::uninit() }; MAX_STATIC_CPI_ACCOUNTS];
+
+        accounts[0].write(self.mint);
+
+        accounts[1].write(self.destination);
+
+        accounts[2].write(self.authority);
+
+        for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
+            account.write(*signer);
+        }
 
         // SAFETY: The expected number of accounts has been validated to be less than
         // the maximum allocated.
         unsafe {
-            accounts.get_unchecked_mut(0).write(self.mint);
-
-            accounts.get_unchecked_mut(1).write(self.destination);
-
-            accounts.get_unchecked_mut(2).write(self.authority);
-
-            for (account, signer) in accounts
-                .get_unchecked_mut(3..)
-                .iter_mut()
-                .zip(self.signers.iter())
-            {
-                account.write(*signer);
-            }
-
             for (account, source) in accounts
-                .get_unchecked_mut(3 + self.signers.len()..)
+                .get_unchecked_mut(3 + self.multisig_signers.len()..)
                 .iter_mut()
                 .zip(self.sources.iter())
             {
