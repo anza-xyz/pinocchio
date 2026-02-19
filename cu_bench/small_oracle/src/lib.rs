@@ -84,9 +84,6 @@ fn process_instruction(mut context: LazyInstructionContext) -> ProgramResult {
     }
 
     let data = unsafe { context.instruction_data_unchecked() };
-    if data.len() != SMALL_ORACLE_VALUE_SIZE {
-        hard_exit("invalid instruction data");
-    }
 
     let value = *bytemuck::from_bytes::<u64>(data);
     state.data = value;
