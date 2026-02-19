@@ -254,38 +254,6 @@ unsafe impl DupGuard for CheckNonDup {
     }
 }
 
-/// Checks account data length against an expected byte length.
-///
-/// Returns [`ProgramError::InvalidAccountData`] on size mismatch.
-pub struct CheckSize {
-    expected_size: usize,
-}
-
-impl CheckSize {
-    #[inline(always)]
-    pub fn new(expected_size: usize) -> Self {
-        Self { expected_size }
-    }
-}
-
-unsafe impl DataGuard for CheckSize {
-    #[inline(always)]
-    unsafe fn check_account(&self, account: *const RuntimeAccount) -> Result<(), ProgramError> {
-        if (*account).data_len as usize != self.expected_size {
-            return Err(ProgramError::InvalidAccountData);
-        }
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn inform_size(&self, size: usize) {
-        // Safety: we already checked the size in account validation
-        unsafe {
-            assume_unchecked(size == self.expected_size, "unexpected account data length");
-        }
-    }
-}
-
 /// Assumes the account data length is exactly `N` bytes.
 ///
 /// Enables compile-time buffer stride computation. Wrong `N` corrupts the
@@ -707,52 +675,6 @@ mod tests {
 
         let maybe = ctx.next_account_guarded(&NoGuards, &NoGuards).unwrap();
         assert!(matches!(maybe, MaybeAccount::Duplicated(0)));
-    }
-
-    #[test]
-    fn test_size_guard_error_leaves_context_untouched() {
-        let mut input =
-            unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 32 }], &IX_DATA) };
-        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
-
-        let remaining_before = ctx.remaining();
-        let cursor_before = ctx.cursor();
-
-        let err = ctx
-            .next_account_guarded(&NoGuards, &CheckSize::new(64))
-            .unwrap_err();
-        assert_eq!(err, ProgramError::InvalidAccountData);
-        assert_eq!(ctx.remaining(), remaining_before);
-        assert_eq!(ctx.cursor(), cursor_before);
-
-        let acct = ctx
-            .next_account_guarded(&NoGuards, &CheckSize::new(32))
-            .unwrap()
-            .assume_account();
-        assert_eq!(acct.data_len(), 32);
-    }
-
-    #[test]
-    fn test_multiple_guard_errors_then_success() {
-        let mut input =
-            unsafe { create_input_custom(&[AccountDesc::NonDup { data_len: 100 }], &IX_DATA) };
-        let mut ctx = unsafe { InstructionContext::new_unchecked(input.as_mut_ptr()) };
-
-        let remaining_before = ctx.remaining();
-
-        for wrong in [0, 1, 50, 99, 101, 200] {
-            let err = ctx
-                .next_account_guarded(&NoGuards, &CheckSize::new(wrong))
-                .unwrap_err();
-            assert_eq!(err, ProgramError::InvalidAccountData);
-            assert_eq!(ctx.remaining(), remaining_before);
-        }
-
-        let acct = ctx
-            .next_account_guarded(&NoGuards, &CheckSize::new(100))
-            .unwrap()
-            .assume_account();
-        assert_eq!(acct.data_len(), 100);
     }
 
     #[test]

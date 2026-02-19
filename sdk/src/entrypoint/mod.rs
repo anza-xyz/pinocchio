@@ -9,8 +9,8 @@ mod test_utils;
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
 pub use lazy::{
-    AssumeLikeType, AssumeNeverDup, AssumeSize, CheckLikeType, CheckNonDup, CheckSize, DataGuard,
-    DupGuard, InstructionContext, MaybeAccount, NoGuards,
+    AssumeLikeType, AssumeNeverDup, AssumeSize, CheckLikeType, CheckNonDup, DataGuard, DupGuard,
+    InstructionContext, MaybeAccount, NoGuards,
 };
 use {
     crate::{
