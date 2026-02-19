@@ -81,18 +81,10 @@ macro_rules! lazy_program_entrypoint {
     };
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 #[cold]
 fn cold<T>(t: T) -> T {
     t
 }
-
-// ---------------------------------------------------------------------------
-// Guard traits
-// ---------------------------------------------------------------------------
 
 /// Dup guard: controls how duplicate accounts are handled.
 ///
@@ -176,15 +168,8 @@ pub unsafe trait DataGuard {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Guard types
-// ---------------------------------------------------------------------------
-
-/// Default pass-through guard for the lazy iterator.
-///
-/// - Returns `MaybeAccount` so duplicates stay visible.
-/// - Performs no additional validation on duplicate status or data length.
-/// - `next_account` is implemented as `next_account_guarded(&NoGuards, &NoGuards)`.
+/// Default pass-through guard. `next_account` delegates to
+/// `next_account_guarded(&NoGuards, &NoGuards)`.
 pub struct NoGuards;
 
 unsafe impl DupGuard for NoGuards {
@@ -275,7 +260,7 @@ unsafe impl DupGuard for CheckNonDup {
     }
 }
 
-/// Checks account data length against a concrete expected byte length.
+/// Checks account data length against an expected byte length.
 ///
 /// Returns [`ProgramError::InvalidAccountData`] on size mismatch.
 pub struct CheckSize {
@@ -477,10 +462,12 @@ impl InstructionContext {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the input buffer is valid SVM input:
-    /// serialized as number-of-accounts, account headers/payloads, instruction
-    /// data length/data, and program id, and aligned as required by the
-    /// runtime representation.
+    /// The caller must ensure that the input buffer is valid, i.e., it
+    /// represents the program input parameters serialized by the SVM
+    /// loader. The SVM loader serializes the input parameters aligned to
+    /// `8` bytes, with the first `8` bytes representing the number of
+    /// accounts, followed by the accounts themselves, the instruction data
+    /// and the program id.
     ///
     /// More information on the input buffer format can be found in the
     /// [SVM documentation].
@@ -494,29 +481,13 @@ impl InstructionContext {
             "input buffer not aligned",
         );
         Self {
+            // SAFETY: The first 8 bytes of the input buffer represent the
+            // number of accounts when serialized by the SVM loader, which is read
+            // when the context is created.
             buffer: unsafe { input.add(core::mem::size_of::<u64>()) },
+            // SAFETY: Read the number of accounts from the input buffer serialized
+            // by the SVM loader.
             remaining: unsafe { *(input as *const u64) },
-        }
-    }
-
-    /// Creates a new [`InstructionContext`] for the input buffer with a
-    /// caller-provided remaining account count (ignores the count in the buffer).
-    ///
-    /// # Safety
-    ///
-    /// Same requirements as [`new_unchecked`](Self::new_unchecked), plus the
-    /// caller must guarantee that `remaining` matches the actual number of
-    /// accounts left to read from the buffer.
-    #[inline(always)]
-    pub unsafe fn new_with_remaining_unchecked(input: *mut u8, remaining: u64) -> Self {
-        // SAFETY: `input` must be a valid SVM buffer and aligned for `BPF_ALIGN_OF_U128`.
-        assume_unchecked(
-            input.align_offset(BPF_ALIGN_OF_U128) == 0,
-            "input buffer not aligned",
-        );
-        Self {
-            buffer: unsafe { input.add(core::mem::size_of::<u64>()) },
-            remaining,
         }
     }
 
@@ -549,7 +520,6 @@ impl InstructionContext {
     /// undefined behavior.
     #[inline(always)]
     pub unsafe fn next_account_unchecked(&mut self) -> MaybeAccount {
-        // Note: intentionally does NOT decrement remaining.
         self.read_account_unchecked(&NoGuards, &NoGuards)
             .unwrap_unchecked()
     }
@@ -562,11 +532,8 @@ impl InstructionContext {
     ///
     /// # Error
     ///
-    /// Returns a [`ProgramError::NotEnoughAccountKeys`] error if there are
-    /// no remaining accounts. Guard-specific errors are also possible
-    /// (e.g. [`CheckNonDup`] returns [`ProgramError::AccountBorrowFailed`]
-    /// on duplicate, [`CheckSize`] returns
-    /// [`ProgramError::InvalidAccountData`] on size mismatch).
+    /// Returns [`ProgramError::NotEnoughAccountKeys`] if no accounts remain.
+    /// Other errors are guard-specific.
     ///
     /// # Note
     ///
@@ -605,8 +572,8 @@ impl InstructionContext {
     /// error.
     #[inline(always)]
     pub fn instruction_data(&self) -> Result<&[u8], ProgramError> {
-        if unlikely(self.remaining > 0) {
-            return Err(cold(ProgramError::InvalidInstructionData));
+        if self.remaining > 0 {
+            return Err(ProgramError::InvalidInstructionData);
         }
 
         Ok(unsafe { self.instruction_data_unchecked() })
@@ -622,6 +589,7 @@ impl InstructionContext {
     #[inline(always)]
     pub unsafe fn instruction_data_unchecked(&self) -> &[u8] {
         let data_len = *(self.buffer as *const usize);
+        // shadowing the input to avoid leaving it in an inconsistent position
         let data = self.buffer.add(core::mem::size_of::<u64>());
         assume_unchecked(
             (data as *const u64).is_aligned(),
@@ -637,8 +605,8 @@ impl InstructionContext {
     /// error.
     #[inline(always)]
     pub fn program_id(&self) -> Result<&Address, ProgramError> {
-        if unlikely(self.remaining > 0) {
-            return Err(cold(ProgramError::InvalidInstructionData));
+        if self.remaining > 0 {
+            return Err(ProgramError::InvalidInstructionData);
         }
 
         Ok(unsafe { self.program_id_unchecked() })
@@ -696,9 +664,9 @@ pub enum MaybeAccount {
 impl MaybeAccount {
     /// Extracts the wrapped [`AccountView`].
     ///
-    /// # Panics
-    ///
-    /// Panics if the [`MaybeAccount`] is a [`MaybeAccount::Duplicated`].
+    /// It is up to the caller to guarantee that the [`MaybeAccount`] really is
+    /// in an [`MaybeAccount::Account`]. Calling this method when the
+    /// variant is a [`MaybeAccount::Duplicated`] will result in a panic.
     #[inline(always)]
     pub fn assume_account(self) -> AccountView {
         let MaybeAccount::Account(account) = self else {
@@ -1006,42 +974,6 @@ mod tests {
         ctx.next_account().unwrap();
         let after_second = ctx.cursor();
         assert!(after_second > after_first);
-    }
-
-    #[test]
-    fn test_new_with_remaining_unchecked() {
-        let mut input = unsafe {
-            create_input_custom(
-                &[
-                    AccountDesc::NonDup { data_len: 16 },
-                    AccountDesc::NonDup { data_len: 32 },
-                    AccountDesc::NonDup { data_len: 64 },
-                ],
-                &IX_DATA,
-            )
-        };
-        let mut ctx =
-            unsafe { InstructionContext::new_with_remaining_unchecked(input.as_mut_ptr(), 3) };
-
-        assert_eq!(ctx.remaining(), 3);
-
-        let a0 = ctx.next_account().unwrap().assume_account();
-        assert_eq!(a0.data_len(), 16);
-        assert_eq!(ctx.remaining(), 2);
-
-        let a1 = ctx.next_account().unwrap().assume_account();
-        assert_eq!(a1.data_len(), 32);
-        assert_eq!(ctx.remaining(), 1);
-
-        let a2 = ctx.next_account().unwrap().assume_account();
-        assert_eq!(a2.data_len(), 64);
-        assert_eq!(ctx.remaining(), 0);
-
-        let data = ctx.instruction_data().unwrap();
-        assert_eq!(data, &IX_DATA);
-
-        let pid = ctx.program_id().unwrap();
-        assert_eq!(pid, &MOCK_PROGRAM_ID);
     }
 
     #[test]
