@@ -1,4 +1,4 @@
-#![allow(unused_imports, unexpected_cfgs, dead_code)]
+#![allow(unused_imports, unexpected_cfgs)]
 #![no_std]
 
 use bytemuck::{Pod, Zeroable};
@@ -25,23 +25,6 @@ pub const SMALL_ORACLE_VALUE_SIZE: usize = core::mem::size_of::<u64>();
 #[inline(always)]
 pub unsafe fn cast_state_data(state_data: &mut [u8]) -> &mut SmallOracle {
     &mut *(state_data.as_mut_ptr() as *mut SmallOracle)
-}
-
-#[inline(always)]
-pub unsafe fn cast_state_data_aligned(state_data: &mut [u8]) -> &mut SmallOracle {
-    debug_assert_eq!(state_data.len(), core::mem::size_of::<SmallOracle>());
-    debug_assert_eq!(
-        state_data
-            .as_ptr()
-            .align_offset(core::mem::align_of::<SmallOracle>()),
-        0
-    );
-    cast_state_data(state_data)
-}
-
-#[inline(always)]
-fn is_authority_match(state: &SmallOracle, authority: &Address) -> bool {
-    address_eq(&state.authority, authority)
 }
 
 lazy_program_entrypoint!(process_instruction);
@@ -116,7 +99,7 @@ fn process_instruction(mut context: InstructionContext) -> ProgramResult {
 
     let state_ref = unsafe { cast_state_data(state_data) };
 
-    if !is_authority_match(state_ref, authority.address()) {
+    if !address_eq(&state_ref.authority, authority.address()) {
         hard_exit("illegal owner");
     }
 
@@ -164,7 +147,7 @@ fn process_instruction(mut context: InstructionContext) -> ProgramResult {
 
     let state_ref = unsafe { cast_state_data(state_data) };
 
-    if !is_authority_match(state_ref, authority.address()) {
+    if !address_eq(&state_ref.authority, authority.address()) {
         hard_exit("illegal owner");
     }
 
