@@ -40,3 +40,6 @@ pub use {
     set_authority::*, sync_native::*, thaw_account::*, transfer::*, transfer_checked::*,
     ui_amount_to_amount::*, unwrap_lamports::*, withdraw_excess_lamports::*,
 };
+
+/// The maximum number of available extensions.
+const MAX_EXTENSION_COUNT: usize = 28;

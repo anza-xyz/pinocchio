@@ -1,14 +1,14 @@
 use {
-    crate::{instructions::ExtensionDiscriminator, UNINIT_BYTE},
+    crate::{
+        instructions::{ExtensionDiscriminator, MAX_EXTENSION_COUNT},
+        UNINIT_BYTE,
+    },
     core::slice::from_raw_parts,
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
     solana_program_error::{ProgramError, ProgramResult},
 };
-
-/// The maximum number of available extensions.
-const MAX_EXTENSION_COUNT: usize = 28;
 
 /// Gets the required size of an account for the given mint as a
 /// little-endian `u64`.
