@@ -19,6 +19,7 @@ mod initialize_multisig_2;
 mod initialize_non_transferable_mint;
 mod mint_to;
 mod mint_to_checked;
+mod reallocate;
 mod revoke;
 mod set_authority;
 mod sync_native;
@@ -35,7 +36,10 @@ pub use {
     get_account_data_size::*, initialize_account::*, initialize_account_2::*,
     initialize_account_3::*, initialize_immutable_owner::*, initialize_mint::*,
     initialize_mint_2::*, initialize_multisig::*, initialize_multisig_2::*,
-    initialize_non_transferable_mint::*, mint_to::*, mint_to_checked::*, revoke::*,
+    initialize_non_transferable_mint::*, mint_to::*, mint_to_checked::*, reallocate::*, revoke::*,
     set_authority::*, sync_native::*, thaw_account::*, transfer::*, transfer_checked::*,
     ui_amount_to_amount::*, unwrap_lamports::*, withdraw_excess_lamports::*,
 };
+
+/// The maximum number of available extensions.
+const MAX_EXTENSION_COUNT: usize = 28;
