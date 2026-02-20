@@ -37,9 +37,8 @@ impl InitializePermanentDelegate<'_, '_> {
 
         let mut instruction_data = [UNINIT_BYTE; 33];
 
-        // discriminator
         instruction_data[0].write(ExtensionDiscriminator::PermanentDelegate as u8);
-        // delegate
+
         write_bytes(&mut instruction_data[1..33], self.delegate.as_ref());
 
         invoke(

@@ -1,5 +1,5 @@
 use {
-    crate::instructions::extensions::ExtensionDiscriminator,
+    crate::{instructions::extensions::ExtensionDiscriminator, state::AccountState},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
@@ -24,7 +24,7 @@ pub struct Initialize<'a, 'b> {
 
     /// The default account state in which new token accounts should be
     /// initialized.
-    pub state: u8,
+    pub state: AccountState,
 
     /// The token program.
     pub token_program: &'b Address,
@@ -42,7 +42,7 @@ impl Initialize<'_, '_> {
                 data: &[
                     ExtensionDiscriminator::DefaultAccountState as u8,
                     Self::DISCRIMINATOR,
-                    self.state,
+                    self.state as u8,
                 ],
             },
             &[self.mint],

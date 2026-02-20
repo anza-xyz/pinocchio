@@ -20,7 +20,7 @@ use {
 ///
 ///   0. `[writable]` The mint to initialize.
 pub struct InitializeTransferHook<'a, 'b> {
-    /// The token mint.
+    /// The mint to initialize.
     pub mint: &'a AccountView,
 
     /// The address for the account that can update the program id.
@@ -42,15 +42,10 @@ impl InitializeTransferHook<'_, '_> {
 
         let mut instruction_data = [UNINIT_BYTE; 66];
 
-        // discriminator
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::TransferHook as u8,
-                InitializeTransferHook::DISCRIMINATOR,
-            ],
-        );
-        // authority
+        instruction_data[0].write(ExtensionDiscriminator::TransferHook as u8);
+
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
         write_bytes(
             &mut instruction_data[2..34],
             if let Some(authority) = self.authority {
@@ -59,7 +54,7 @@ impl InitializeTransferHook<'_, '_> {
                 &[0; 32]
             },
         );
-        // program_id
+
         write_bytes(
             &mut instruction_data[34..66],
             if let Some(program_id) = self.program_id {
@@ -69,14 +64,16 @@ impl InitializeTransferHook<'_, '_> {
             },
         );
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: &[InstructionAccount::writable(self.mint.address())],
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
-        };
-
-        invoke(&instruction, &[self.mint])
+        invoke(
+            &InstructionView {
+                program_id: self.token_program,
+                accounts: &[InstructionAccount::writable(self.mint.address())],
+                // SAFETY: instruction data is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            &[self.mint],
+        )
     }
 }

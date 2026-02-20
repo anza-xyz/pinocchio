@@ -3,7 +3,10 @@ use {
         instructions::{extensions::ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
         write_bytes, UNINIT_BYTE,
     },
-    core::{mem::MaybeUninit, slice},
+    core::{
+        mem::MaybeUninit,
+        slice::{self, from_raw_parts},
+    },
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
@@ -13,35 +16,89 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Update the multiplier for the Scaled UI Amount extension on a mint account.
+/// Update the multiplier. Only supported for mints that include the
+/// `ScaledUiAmount` extension.
 ///
-/// Expected accounts:
+/// Fails if the multiplier is less than or equal to 0 or if it's
+/// [subnormal](https://en.wikipedia.org/wiki/Subnormal_number).
 ///
-/// **Single authority**
-/// 0. `[writable]` The mint account with the Scaled UI Amount extension.
-/// 1. `[signer]` The multiplier authority.
+/// The authority provides a new multiplier and a UNIX timestamp on which
+/// it should take effect. If the timestamp is before the current time,
+/// immediately sets the multiplier.
 ///
-/// **Multisignature authority**
-/// 0. `[writable]` The mint account with the Scaled UI Amount extension.
-/// 1. `[readonly]` The multisig account that is the multiplier authority.
-/// 2. `[signer]` M signer accounts (as required by the multisig).
+/// Accounts expected by this instruction:
+///
+///   * Single authority
+///   0. `[writable]` The mint.
+///   1. `[signer]` The multiplier authority.
+///
+///   * Multisignature authority
+///   0. `[writable]` The mint.
+///   1. `[]` The mint's multisignature multiplier authority.
+///   2. `..2+M` `[signer]` M signer accounts.
 pub struct UpdateMultiplier<'a, 'b, 'c> {
-    /// The mint account with the Scaled UI Amount extension.
-    pub mint_account: &'a AccountView,
-    /// The multiplier authority (single or multisig).
+    /// The mint.
+    pub mint: &'a AccountView,
+
+    /// The multiplier authority.
     pub authority: &'a AccountView,
+
     /// Signer accounts if the authority is a multisig.
-    pub signers: &'c [&'a AccountView],
-    /// The new multiplier value.
+    pub multisig_signers: &'c [&'a AccountView],
+
+    /// The new multiplier.
     pub multiplier: f64,
+
     /// Timestamp at which the new multiplier will take effect.
     pub effective_timestamp: i64,
-    /// Token program (Token-2022).
+
+    /// The token program.
     pub token_program: &'b Address,
 }
 
-impl UpdateMultiplier<'_, '_, '_> {
+impl<'a, 'b, 'c> UpdateMultiplier<'a, 'b, 'c> {
     pub const DISCRIMINATOR: u8 = 1;
+
+    /// Creates a new `UpdateMultiplier` instruction with a single
+    /// owner/delegate authority.
+    #[inline(always)]
+    pub fn new(
+        token_program: &'b Address,
+        mint: &'a AccountView,
+        authority: &'a AccountView,
+        multiplier: f64,
+        effective_timestamp: i64,
+    ) -> Self {
+        Self::with_multisig_signers(
+            token_program,
+            mint,
+            authority,
+            multiplier,
+            effective_timestamp,
+            &[],
+        )
+    }
+
+    /// Creates a new `UpdateMultiplier` instruction with a multisignature
+    /// owner/delegate authority and signer accounts.
+    #[inline(always)]
+    pub fn with_multisig_signers(
+        token_program: &'b Address,
+        mint: &'a AccountView,
+        authority: &'a AccountView,
+        multiplier: f64,
+        effective_timestamp: i64,
+        multisig_signers: &'c [&'a AccountView],
+    ) -> Self {
+        Self {
+            mint,
+            authority,
+            multisig_signers,
+            multiplier,
+            effective_timestamp,
+            token_program,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -50,79 +107,68 @@ impl UpdateMultiplier<'_, '_, '_> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        let &Self {
-            mint_account,
-            authority,
-            signers: multisig_accounts,
-            token_program,
-            ..
-        } = self;
-
-        if multisig_accounts.len() > MAX_MULTISIG_SIGNERS {
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
         }
 
-        const UNINIT_INSTRUCTION_ACCOUNTS: MaybeUninit<InstructionAccount> =
-            MaybeUninit::<InstructionAccount>::uninit();
-        let mut accounts = [UNINIT_INSTRUCTION_ACCOUNTS; 2 + MAX_MULTISIG_SIGNERS];
+        let expected_accounts = 2 + self.multisig_signers.len();
 
-        // SAFETY:
-        // - `instruction_accounts` is sized to 2 + MAX_MULTISIG_SIGNERS
-        // Index 0 and 1 are always present
-        unsafe {
-            accounts
-                .get_unchecked_mut(0)
-                .write(InstructionAccount::writable(mint_account.address()));
+        // Instruction accounts.
 
-            accounts.get_unchecked_mut(1).write(InstructionAccount::new(
-                authority.address(),
-                false,
-                multisig_accounts.is_empty(),
-            ));
-        }
+        let mut accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
 
-        for (account, signer) in accounts[2..].iter_mut().zip(multisig_accounts.iter()) {
+        accounts[0].write(InstructionAccount::writable(self.mint.address()));
+
+        accounts[1].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
+
+        for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
             account.write(InstructionAccount::readonly_signer(signer.address()));
         }
 
-        let mut data = [UNINIT_BYTE; 18];
+        // Accounts.
+
+        let mut accounts = [MaybeUninit::<&AccountView>::uninit(); 2 + MAX_MULTISIG_SIGNERS];
+
+        accounts[0].write(self.mint);
+
+        accounts[1].write(self.authority);
+
+        for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
+            account.write(signer);
+        }
+
+        // Instruction data.
+
+        let mut instruction_data = [UNINIT_BYTE; 18];
+
+        instruction_data[0].write(ExtensionDiscriminator::ScaledUiAmount as u8);
+
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
+        write_bytes(&mut instruction_data[2..10], &self.multiplier.to_le_bytes());
+
         write_bytes(
-            &mut data[0..1],
-            &[ExtensionDiscriminator::ScaledUiAmount as u8],
+            &mut instruction_data[10..18],
+            &self.effective_timestamp.to_le_bytes(),
         );
-        write_bytes(&mut data[1..2], &[Self::DISCRIMINATOR]);
-        write_bytes(&mut data[2..10], &self.multiplier.to_le_bytes());
-        write_bytes(&mut data[10..18], &self.effective_timestamp.to_le_bytes());
-        let data = unsafe { &*(data.as_ptr() as *const [u8; 18]) };
-
-        let num_accounts = 2 + multisig_accounts.len();
-
-        let instruction = InstructionView {
-            program_id: token_program,
-            data,
-            accounts: unsafe { slice::from_raw_parts(accounts.as_ptr() as _, num_accounts) },
-        };
-
-        // Account view array
-        const UNINIT_ACCOUNT_VIEWS: MaybeUninit<&AccountView> = MaybeUninit::uninit();
-        let mut account_views = [UNINIT_ACCOUNT_VIEWS; 2 + MAX_MULTISIG_SIGNERS];
-
-        // SAFETY:
-        // - `account_views` is sized to 2 + MAX_MULTISIG_SIGNERS
-        // Index 0 and 1 are always present
-        unsafe {
-            account_views.get_unchecked_mut(0).write(mint_account);
-            account_views.get_unchecked_mut(1).write(authority);
-        }
-
-        // Fill signer accounts
-        for (account_view, signer) in account_views[2..].iter_mut().zip(multisig_accounts.iter()) {
-            account_view.write(signer);
-        }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
-            &instruction,
-            unsafe { slice::from_raw_parts(account_views.as_ptr() as _, num_accounts) },
+            &InstructionView {
+                program_id: self.token_program,
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+                // SAFETY: instruction data is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
+            unsafe { slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
             signers,
         )
     }

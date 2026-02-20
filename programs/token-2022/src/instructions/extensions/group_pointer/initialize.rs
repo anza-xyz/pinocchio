@@ -42,15 +42,10 @@ impl Initialize<'_, '_> {
 
         let mut instruction_data = [UNINIT_BYTE; 66];
 
-        // discriminators
-        write_bytes(
-            &mut instruction_data[..2],
-            &[
-                ExtensionDiscriminator::GroupPointer as u8,
-                Self::DISCRIMINATOR,
-            ],
-        );
-        // authority
+        instruction_data[0].write(ExtensionDiscriminator::GroupPointer as u8);
+
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
         write_bytes(
             &mut instruction_data[2..34],
             if let Some(authority) = self.authority {
@@ -59,7 +54,7 @@ impl Initialize<'_, '_> {
                 &[0u8; 32]
             },
         );
-        // group_address
+
         write_bytes(
             &mut instruction_data[34..66],
             if let Some(group_address) = self.group_address {
@@ -69,14 +64,16 @@ impl Initialize<'_, '_> {
             },
         );
 
-        // Instruction.
-
-        let instruction = InstructionView {
-            program_id: self.token_program,
-            accounts: &[InstructionAccount::writable(self.mint.address())],
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len()) },
-        };
-
-        invoke(&instruction, &[self.mint])
+        invoke(
+            &InstructionView {
+                program_id: self.token_program,
+                accounts: &[InstructionAccount::writable(self.mint.address())],
+                // SAFETY: instruction data is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
+            },
+            &[self.mint],
+        )
     }
 }
