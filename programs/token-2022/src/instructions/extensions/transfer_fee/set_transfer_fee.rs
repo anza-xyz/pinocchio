@@ -1,5 +1,8 @@
 use {
-    crate::instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
+    crate::{
+        instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
+        write_bytes, UNINIT_BYTE,
+    },
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
@@ -134,6 +137,23 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
             account.write(*signer);
         }
 
+        // Instruction data.
+
+        let mut instruction_data = [UNINIT_BYTE; 12];
+
+        instruction_data[0].write(ExtensionDiscriminator::TransferFee as u8);
+
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
+        write_bytes(
+            &mut instruction_data[2..4],
+            &self.transfer_fee_basis_points.to_le_bytes(),
+        );
+        write_bytes(
+            &mut instruction_data[4..12],
+            &self.maximum_fee.to_le_bytes(),
+        );
+
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
             &InstructionView {
                 program_id: self.token_program,
@@ -141,10 +161,10 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
                 accounts: unsafe {
                     from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
                 },
-                data: &[
-                    ExtensionDiscriminator::TransferFee as u8,
-                    Self::DISCRIMINATOR,
-                ],
+                // SAFETY: instruction data is initialized.
+                data: unsafe {
+                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+                },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
             unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },

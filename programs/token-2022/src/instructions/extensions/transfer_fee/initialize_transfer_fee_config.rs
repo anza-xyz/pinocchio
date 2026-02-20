@@ -49,12 +49,9 @@ impl InitializeTransferFeeConfig<'_, '_> {
         // Instruction data.
 
         let mut instruction_data = [UNINIT_BYTE; 78];
-        // Fixed part of the instruction data:
-        // - discriminators
-        // - transfer_fee_basis_points
-        // - maximum_fee
-        // - 2 bytes for each optional authority
-        let mut data_len = 2 + 2 + 8 + 2;
+        // At the start, data length is 2 bytes for the instruction and extension
+        // discriminators, plus 1 byte for the optional transfer fee authority.
+        let mut data_len = 2 + 1;
 
         instruction_data[0].write(ExtensionDiscriminator::TransferFee as u8);
 
@@ -69,23 +66,38 @@ impl InitializeTransferFeeConfig<'_, '_> {
             instruction_data[2].write(0);
         }
         if let Some(authority) = self.withdraw_withheld_authority {
-            instruction_data[35].write(1);
-            write_bytes(&mut instruction_data[36..68], authority.as_ref());
-            // Add 32 bytes for the authority.
-            data_len += size_of::<Address>();
+            // SAFETY: `instruction_data` is allocated to the maximum expected length.
+            unsafe {
+                instruction_data.get_unchecked_mut(data_len).write(1);
+                write_bytes(
+                    instruction_data.get_unchecked_mut(data_len + 1..),
+                    authority.as_ref(),
+                );
+            }
+            data_len += 1 + size_of::<Address>();
         } else {
-            instruction_data[35].write(0);
+            // SAFETY: `instruction_data` is allocated to the maximum expected length.
+            unsafe { instruction_data.get_unchecked_mut(data_len).write(0) };
+            data_len += 1;
         }
 
-        write_bytes(
-            &mut instruction_data[68..70],
-            &self.transfer_fee_basis_points.to_le_bytes(),
-        );
+        // SAFETY: `instruction_data` is allocated to the maximum expected length.
+        unsafe {
+            write_bytes(
+                instruction_data.get_unchecked_mut(data_len..),
+                &self.transfer_fee_basis_points.to_le_bytes(),
+            );
+        }
+        data_len += 2;
 
-        write_bytes(
-            &mut instruction_data[70..78],
-            &self.maximum_fee.to_le_bytes(),
-        );
+        // SAFETY: `instruction_data` is allocated to the maximum expected length.
+        unsafe {
+            write_bytes(
+                instruction_data.get_unchecked_mut(data_len..),
+                &self.maximum_fee.to_le_bytes(),
+            );
+        }
+        data_len += 8;
 
         invoke(
             &InstructionView {
