@@ -8,6 +8,9 @@ members = [
     "programs/token-2022",
     "sdk",
 ]
+exclude = [
+    "cu_bench",
+]
 
 [workspace.package]
 edition = "2021"
