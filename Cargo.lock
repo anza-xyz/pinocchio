@@ -181,6 +181,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pinocchio-zk-elgamal-proof"
+version = "0.1.0"
+dependencies = [
+ "solana-account-view",
+ "solana-address",
+ "solana-instruction-view",
+ "solana-program-error",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
