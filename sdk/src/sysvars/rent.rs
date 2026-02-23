@@ -2,10 +2,6 @@
 //!
 //! This is required for the rent sysvar implementation.
 
-// This is necessary since `sol_get_rent_sysvar` is deprecated but still used here.
-// It can be removed once the implementation uses `get_sysvar` instead.
-#![allow(deprecated)]
-
 use {
     crate::{
         account::{AccountView, Ref},
@@ -131,6 +127,7 @@ impl Rent {
         if unlikely(account_view.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
+        // SAFETY: Account data for Rent sysvar has fixed layout; we validated the address and borrow.
         Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
@@ -311,7 +308,9 @@ impl Rent {
     /// `true`` if the account is rent exempt, `false`` otherwise.
     #[inline]
     pub fn is_exempt(&self, lamports: u64, data_len: usize) -> bool {
-        lamports >= self.minimum_balance(data_len)
+        self.try_minimum_balance(data_len)
+            .map(|min| lamports >= min)
+            .unwrap_or(false)
     }
 }
 

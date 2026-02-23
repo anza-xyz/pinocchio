@@ -145,6 +145,8 @@ impl InstructionContext {
             .checked_sub(1)
             .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
+        // SAFETY: We just decremented remaining; the deserialization contract ensures
+        // the input buffer has at least one more account view to read.
         Ok(unsafe { self.read_account() })
     }
 
@@ -183,6 +185,7 @@ impl InstructionContext {
             return Err(ProgramError::InvalidInstructionData);
         }
 
+        // SAFETY: All accounts have been read (remaining == 0), so instruction_data_unchecked is valid.
         Ok(unsafe { self.instruction_data_unchecked() })
     }
 
@@ -212,6 +215,7 @@ impl InstructionContext {
             return Err(ProgramError::InvalidInstructionData);
         }
 
+        // SAFETY: All accounts have been read (remaining == 0), so program_id_unchecked is valid.
         Ok(unsafe { self.program_id_unchecked() })
     }
 

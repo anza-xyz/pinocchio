@@ -198,6 +198,8 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     // Create an array of uninitialized account views.
     let mut accounts = [UNINIT; MAX_ACCOUNTS];
 
+    // SAFETY: `deserialize` expects the runtime-provided input and our uninit array;
+    // the runtime guarantees valid layout and length for the current invocation.
     let (program_id, count, instruction_data) =
         unsafe { deserialize::<MAX_ACCOUNTS>(input, &mut accounts) };
 
@@ -205,6 +207,7 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     // they are initialized so we cast the pointer to a slice of `[AccountView]`.
     match process_instruction(
         program_id,
+        // SAFETY: `deserialize` above initialized exactly `count` elements at the start of `accounts`.
         unsafe { from_raw_parts(accounts.as_ptr() as _, count) },
         instruction_data,
     ) {
@@ -638,6 +641,7 @@ macro_rules! no_allocator {
 #[derive(Clone, Debug)]
 pub struct NoAllocator;
 
+// SAFETY: alloc always panics; dealloc is a no-op. No memory is ever allocated or freed.
 unsafe impl GlobalAlloc for NoAllocator {
     #[inline]
     unsafe fn alloc(&self, _: Layout) -> *mut u8 {
@@ -708,6 +712,8 @@ mod alloc {
     // `BumpAllocator::end`. Any other use may overflow and is thus unsupported
     // and at one's own risk.
     #[allow(clippy::arithmetic_side_effects)]
+    // SAFETY: alloc/dealloc only touch the [start, end) range; the runtime
+    // reserves this region and enforces the heap limit. Realloc is not implemented.
     unsafe impl GlobalAlloc for BumpAllocator {
         /// Allocates memory as described by the given `layout` using a forward
         /// bump allocator.
@@ -767,6 +773,7 @@ mod alloc {
 }
 
 #[cfg(test)]
+#[allow(clippy::undocumented_unsafe_blocks, clippy::multiple_unsafe_ops_per_block)]
 mod tests {
     use {
         super::*,
@@ -824,6 +831,7 @@ mod tests {
 
     impl Drop for AlignedMemory {
         fn drop(&mut self) {
+            // SAFETY: We own self.ptr and self.layout from allocation; dealloc is the matching free.
             unsafe {
                 dealloc(self.ptr, self.layout);
             }
