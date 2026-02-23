@@ -1,3 +1,5 @@
+use solana_program_error::ProgramError;
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AccountState {
@@ -14,13 +16,15 @@ pub enum AccountState {
     Frozen,
 }
 
-impl From<u8> for AccountState {
-    fn from(value: u8) -> Self {
+impl TryFrom<u8> for AccountState {
+    type Error = ProgramError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => AccountState::Uninitialized,
-            1 => AccountState::Initialized,
-            2 => AccountState::Frozen,
-            _ => panic!("invalid account state value: {value}"),
+            0 => Ok(AccountState::Uninitialized),
+            1 => Ok(AccountState::Initialized),
+            2 => Ok(AccountState::Frozen),
+            _ => Err(ProgramError::InvalidAccountData),
         }
     }
 }
