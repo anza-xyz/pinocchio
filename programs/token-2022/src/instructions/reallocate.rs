@@ -30,7 +30,7 @@ use {
 ///   1. `[signer, writable]` The payer account to fund reallocation
 ///   2. `[]` System program for reallocation funding
 ///   3. `[]` The account's multisignature owner/delegate.
-///   4. ..`4+M` `[signer]` M signer accounts.ne
+///   4. ..`4+M` `[signer]` M signer accounts.
 pub struct Reallocate<'a, 'b, 'c, 'd> {
     /// The account to reallocate.
     pub account: &'a AccountView,
