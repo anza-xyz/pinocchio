@@ -1,5 +1,7 @@
 //! Tests focusing on low-level `slot_hashes::raw` helpers.
 
+#![allow(clippy::undocumented_unsafe_blocks, clippy::multiple_unsafe_ops_per_block)]
+
 use super::{raw, *};
 
 #[test]
