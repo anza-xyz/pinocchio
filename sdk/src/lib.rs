@@ -332,6 +332,12 @@ pub mod sysvars;
 // Re-export the `solana_define_syscall` for downstream use.
 #[cfg(any(target_os = "solana", target_arch = "bpf"))]
 pub use solana_define_syscall::definitions as syscalls;
+#[cfg(feature = "resize")]
+use {
+    core::ptr::write_bytes,
+    solana_account_view::{RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
+    solana_program_error::ProgramError,
+};
 // Re-export for downstream use:
 //   - `solana_account_view`
 //   - `solana_address`
@@ -362,6 +368,93 @@ const BPF_ALIGN_OF_U128: usize = 8;
 
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = 0;
+
+#[cfg(feature = "resize")]
+/// Trait to indicate that an account can be resized.
+pub trait Resize: sealed::Sealed {
+    /// Resize (either truncating or zero extending) the account's data.
+    ///
+    /// The account data can be increased by up to
+    /// [`MAX_PERMITTED_DATA_INCREASE`] bytes within an instruction.
+    ///
+    /// # Important
+    ///
+    /// This method makes assumptions about the layout and location of memory
+    /// referenced by `RuntimeAccount` fields. It should only be called for
+    /// instances of `AccountView` that were created by the runtime and received
+    /// in the `process_instruction` entrypoint of a program.
+    fn resize(&self, new_len: usize) -> Result<(), ProgramError>;
+
+    /// Resize (either truncating or zero extending) the account's data.
+    ///
+    /// The account data can be increased by up to
+    /// [`MAX_PERMITTED_DATA_INCREASE`] bytes within an instruction.
+    ///
+    /// # Important
+    ///
+    /// This method makes assumptions about the layout and location of memory
+    /// referenced by `RuntimeAccount` fields. It should only be called for
+    /// instances of `AccountView` that were created by the runtime and received
+    /// in the `process_instruction` entrypoint of a program.
+    ///
+    /// # Safety
+    ///
+    /// This method is unsafe because it does not check if the account data is
+    /// already borrowed. The caller must guarantee that there are no active
+    /// borrows to the account data.
+    unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError>;
+}
+
+// Only AccountView is "sealed", so only it can implement `Resize`.
+#[cfg(feature = "resize")]
+impl sealed::Sealed for AccountView {}
+
+#[cfg(feature = "resize")]
+impl Resize for AccountView {
+    fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
+        // Check whether the account data is already borrowed.
+        self.check_borrow_mut()?;
+
+        unsafe { self.resize_unchecked(new_len) }
+    }
+
+    unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError> {
+        // Return early if length hasn't changed.
+        if new_len == self.data_len() {
+            return Ok(());
+        }
+
+        let account = self.account_ptr() as *mut RuntimeAccount;
+        let original_data_len = unsafe { (*account).padding as usize };
+        // Return early if the length increase from the original serialized data
+        // length is too large and would result in an out-of-bounds allocation.
+        if new_len.saturating_sub(original_data_len) > MAX_PERMITTED_DATA_INCREASE {
+            return Err(ProgramError::InvalidRealloc);
+        }
+
+        if new_len > self.data_len() {
+            unsafe {
+                write_bytes(
+                    self.data_ptr().add(self.data_len()),
+                    0,
+                    new_len.saturating_sub(self.data_len()),
+                );
+            }
+        }
+
+        unsafe { (*account).data_len = new_len as u64 };
+
+        Ok(())
+    }
+}
+
+// Not `pub`, so other crates cannot name nor implement its trait.
+#[cfg(feature = "resize")]
+mod sealed {
+    // This is used to "seal" the `Resize` trait, preventing external crates from
+    // implementing it for types other than `AccountView`.
+    pub trait Sealed {}
+}
 
 /// Module with functions to provide hints to the compiler about how code
 /// should be optimized.
@@ -396,5 +489,83 @@ pub mod hint {
         } else {
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, solana_account_view::NOT_BORROWED};
+    #[test]
+    fn test_resize() {
+        struct TestAccount {
+            _raw: *mut RuntimeAccount,
+        }
+
+        // 8-bytes aligned account data.
+        let mut data = [0u64; 100 * size_of::<u64>()];
+
+        // Set the borrow state.
+        data[0] = NOT_BORROWED as u64;
+        // Set the initial data length to 100.
+        //
+        // (dup_marker, signer, writable, executable and padding)
+        data[0] = u64::from_le_bytes([255, 0, 0, 0, 100, 0, 0, 0]);
+        // `data_len`
+        data[10] = 100;
+
+        let runtime_account = data.as_mut_ptr() as *mut RuntimeAccount;
+
+        let test_account = TestAccount {
+            _raw: runtime_account,
+        };
+        // SAFETY: A reference to `AccountView` that points to the same memory
+        // as `runtime_account`.
+        let account = unsafe { &*(&test_account as *const _ as *const AccountView) };
+
+        assert_eq!(account.data_len(), 100);
+        assert_eq!(unsafe { (*runtime_account).padding }, 100);
+
+        // We should be able to get the data pointer whenever as long as we don't use
+        // it while the data is borrowed.
+        let data_ptr_before = account.data_ptr();
+
+        // increase the size.
+
+        account.resize(200).unwrap();
+
+        let data_ptr_after = account.data_ptr();
+        // The data pointer should point to the same address regardless of the
+        // reallocation
+        assert_eq!(data_ptr_before, data_ptr_after);
+
+        assert_eq!(account.data_len(), 200);
+
+        // decrease the size.
+
+        account.resize(0).unwrap();
+
+        assert_eq!(account.data_len(), 0);
+
+        // Invalid reallocation.
+
+        let invalid_realloc = account.resize(10_000_000_001);
+        assert!(invalid_realloc.is_err());
+
+        // Reset to its original size.
+
+        account.resize(100).unwrap();
+
+        assert_eq!(account.data_len(), 100);
+
+        // Consecutive resizes.
+
+        account.resize(200).unwrap();
+        account.resize(50).unwrap();
+        account.resize(500).unwrap();
+
+        assert_eq!(account.data_len(), 500);
+
+        let data = account.try_borrow().unwrap();
+        assert_eq!(data.len(), 500);
     }
 }
