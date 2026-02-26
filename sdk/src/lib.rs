@@ -397,4 +397,15 @@ pub mod hint {
             false
         }
     }
+
+    #[inline(always)]
+    pub(crate) unsafe fn assume_unchecked(cond: bool, _msg: &str) {
+        #[cfg(debug_assertions)]
+        assert!(cond, "{}", _msg);
+
+        #[cfg(not(debug_assertions))]
+        if !cond {
+            core::hint::unreachable_unchecked();
+        }
+    }
 }
