@@ -153,6 +153,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pinocchio-record"
+version = "0.1.0"
+dependencies = [
+ "pinocchio",
+ "solana-address",
+]
+
+[[package]]
 name = "pinocchio-system"
 version = "0.5.0"
 dependencies = [
