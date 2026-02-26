@@ -448,10 +448,9 @@ impl Resize for AccountView {
     }
 }
 
+// Not `pub`, so other crates cannot name nor implement its trait.
 #[cfg(feature = "resize")]
 mod sealed {
-    // Not `pub`, so other crates cannot name/implement it.
-    //
     // This is used to "seal" the `Resize` trait, preventing external crates from
     // implementing it for types other than `AccountView`.
     pub trait Sealed {}
