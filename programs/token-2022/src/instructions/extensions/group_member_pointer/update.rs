@@ -95,18 +95,21 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
 
         // Instruction accounts.
 
-        let mut accounts =
+        let mut instruction_accounts =
             [const { MaybeUninit::<InstructionAccount>::uninit() }; 2 + MAX_MULTISIG_SIGNERS];
 
-        accounts[0].write(InstructionAccount::writable(self.mint.address()));
+        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
 
-        accounts[1].write(InstructionAccount::new(
+        instruction_accounts[1].write(InstructionAccount::new(
             self.authority.address(),
             false,
             self.multisig_signers.is_empty(),
         ));
 
-        for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
+        for (account, signer) in instruction_accounts[2..]
+            .iter_mut()
+            .zip(self.multisig_signers.iter())
+        {
             account.write(InstructionAccount::readonly_signer(signer.address()));
         }
 
@@ -145,7 +148,7 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
                 accounts: unsafe {
-                    slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts)
+                    slice::from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
                 },
                 // SAFETY: instruction data is initialized.
                 data: unsafe {
