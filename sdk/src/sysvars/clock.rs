@@ -1,9 +1,5 @@
 //! Information about the network's clock, ticks, slots, etc.
 
-// This is necessary since `sol_get_clock_sysvar` is deprecated but still used here.
-// It can be removed once the implementation uses `get_sysvar` instead.
-#![allow(deprecated)]
-
 use crate::{
     account::{AccountView, Ref},
     error::ProgramError,
@@ -98,6 +94,7 @@ impl Clock {
         if unlikely(account_view.address() != &CLOCK_ID) {
             return Err(ProgramError::InvalidArgument);
         }
+        // SAFETY: Account data for Clock sysvar has fixed layout; we validated the address and borrow.
         Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))

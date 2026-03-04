@@ -1,3 +1,5 @@
+#![allow(clippy::undocumented_unsafe_blocks, clippy::multiple_unsafe_ops_per_block)]
+
 use {
     super::test_utils::*,
     crate::{

@@ -55,9 +55,10 @@ where
     #[inline(always)]
     pub fn load_current_index(&self) -> u16 {
         let len = self.data.len();
-        // SAFETY: The last 2 bytes of the Instructions sysvar data represents the
-        // current instruction index.
-        unsafe { u16::from_le_bytes(*(self.data.as_ptr().add(len - 2) as *const [u8; 2])) }
+        // SAFETY: len is from self.data; offset len - 2 is in bounds for the current instruction index.
+        let ptr = unsafe { self.data.as_ptr().add(len - 2) as *const [u8; 2] };
+        // SAFETY: ptr points to the last 2 bytes of Instructions sysvar data (valid layout).
+        unsafe { u16::from_le_bytes(*ptr) }
     }
 
     /// Creates and returns an `IntrospectedInstruction` for the instruction at
@@ -216,13 +217,14 @@ impl IntrospectedInstruction<'_> {
         // instruction.
         let num_accounts = self.num_account_metas();
 
-        // SAFETY: The program ID is located after the instruction accounts.
-        unsafe {
-            &*(self
-                .raw
+        // SAFETY: raw and offset are within the instruction layout (validated by num_account_metas).
+        let ptr = unsafe {
+            self.raw
                 .add(size_of::<u16>() + num_accounts * size_of::<IntrospectedInstructionAccount>())
-                as *const Address)
-        }
+                as *const Address
+        };
+        // SAFETY: ptr points to the program ID field in the instruction layout.
+        unsafe { &*ptr }
     }
 
     /// Get the instruction data of the `Instruction`.
@@ -233,18 +235,16 @@ impl IntrospectedInstruction<'_> {
         let offset =
             self.num_account_metas() * size_of::<IntrospectedInstructionAccount>() + ADDRESS_BYTES;
 
-        // SAFETY: The instruction data length is located after the program ID.
-        let data_len = u16::from_le_bytes(unsafe {
-            *(self.raw.add(size_of::<u16>() + offset) as *const [u8; 2])
-        });
+        // SAFETY: offset is derived from instruction layout; pointer stays within instruction data.
+        let len_ptr =
+            unsafe { self.raw.add(size_of::<u16>() + offset) as *const [u8; 2] };
+        // SAFETY: len_ptr points to the 2-byte length field in the instruction layout.
+        let data_len = u16::from_le_bytes(unsafe { *len_ptr });
 
-        // SAFETY: The instruction data is located after the data length.
-        unsafe {
-            core::slice::from_raw_parts(
-                self.raw.add(size_of::<u16>() + offset + size_of::<u16>()),
-                data_len as usize,
-            )
-        }
+        // SAFETY: offset and layout ensure the pointer stays within the instruction buffer.
+        let data_ptr = unsafe { self.raw.add(size_of::<u16>() + offset + size_of::<u16>()) };
+        // SAFETY: data_ptr and data_len match the instruction layout (data length then data bytes).
+        unsafe { core::slice::from_raw_parts(data_ptr, data_len as usize) }
     }
 }
 

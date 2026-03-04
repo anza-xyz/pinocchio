@@ -1,3 +1,5 @@
+#![allow(clippy::undocumented_unsafe_blocks, clippy::multiple_unsafe_ops_per_block)]
+
 use {
     super::test_utils::{build_slot_hashes_bytes as raw_slot_hashes, make_account_view},
     crate::{error::ProgramError, sysvars::slot_hashes::*},

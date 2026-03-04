@@ -90,10 +90,8 @@ pub(crate) fn read_entry_count_from_bytes(data: &[u8]) -> Option<usize> {
     if data.len() < NUM_ENTRIES_SIZE {
         return None;
     }
+    // SAFETY: `data` is at least `NUM_ENTRIES_SIZE` bytes; reading first 8 bytes as u64 is valid.
     Some(unsafe {
-        // SAFETY: `data` is guaranteed to be at least `NUM_ENTRIES_SIZE` bytes long by
-        // the preceding length check, so it is sound to read the first 8 bytes
-        // and interpret them as a little-endian `u64`.
         u64::from_le_bytes(*(data.as_ptr() as *const [u8; NUM_ENTRIES_SIZE]))
     } as usize)
 }
@@ -210,17 +208,10 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// the slice is big enough and properly aligned.
     #[inline(always)]
     pub fn entries(&self) -> &[SlotHashEntry] {
-        unsafe {
-            // SAFETY: The slice begins `NUM_ENTRIES_SIZE` bytes into `self.data`, which
-            // is guaranteed by parse_and_validate_data() to have at least `len *
-            // ENTRY_SIZE` additional bytes. The pointer is properly aligned for
-            // `SlotHashEntry` (which a compile-time assertion ensures is
-            // alignment 1).
-            from_raw_parts(
-                self.data.as_ptr().add(NUM_ENTRIES_SIZE) as *const SlotHashEntry,
-                self.len(),
-            )
-        }
+        // SAFETY: parse_and_validate_data() ensures enough bytes; offset NUM_ENTRIES_SIZE is in bounds.
+        let ptr = unsafe { self.data.as_ptr().add(NUM_ENTRIES_SIZE) as *const SlotHashEntry };
+        // SAFETY: ptr and len() describe the validated entries region; alignment ensured by layout.
+        unsafe { from_raw_parts(ptr, self.len()) }
     }
 
     /// Gets a reference to the entry at `index` or `None` if out of bounds.
@@ -229,6 +220,7 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
         if index >= self.len() {
             return None;
         }
+        // SAFETY: Bounds check above ensures index is valid.
         Some(unsafe { self.get_entry_unchecked(index) })
     }
 
@@ -240,8 +232,10 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// to avoid repeated slice construction.
     #[inline(always)]
     pub fn get_hash(&self, target_slot: Slot) -> Option<&Hash> {
-        self.position(target_slot)
-            .map(|index| unsafe { &self.get_entry_unchecked(index).hash })
+        self.position(target_slot).map(|index| {
+            // SAFETY: position() returns a valid index; get_entry_unchecked is valid for that index.
+            unsafe { &self.get_entry_unchecked(index).hash }
+        })
     }
 
     /// Finds the position (index) of a specific slot using binary search.
@@ -334,15 +328,10 @@ impl SlotHashes<Box<[u8]>> {
     #[inline(always)]
     fn allocate_and_fetch() -> Result<Box<[u8]>, ProgramError> {
         let mut buf = Vec::with_capacity(MAX_SIZE);
-        unsafe {
-            // SAFETY: `buf` was allocated with capacity `MAX_SIZE` so its
-            // pointer is valid for exactly that many bytes. `fill_from_sysvar`
-            // writes `MAX_SIZE` bytes, and we immediately set the length to
-            // `MAX_SIZE`, marking the entire buffer as initialized before it is
-            // turned into a boxed slice.
-            Self::fill_from_sysvar(buf.as_mut_ptr())?;
-            buf.set_len(MAX_SIZE);
-        }
+        // SAFETY: Buffer has capacity MAX_SIZE; syscall writes exactly that many bytes.
+        unsafe { Self::fill_from_sysvar(buf.as_mut_ptr())? };
+        // SAFETY: fill_from_sysvar above initialized exactly MAX_SIZE bytes.
+        unsafe { buf.set_len(MAX_SIZE) };
         Ok(buf.into_boxed_slice())
     }
 
@@ -351,8 +340,7 @@ impl SlotHashes<Box<[u8]>> {
     #[inline(always)]
     pub fn fetch() -> Result<Self, ProgramError> {
         let data_init = Self::allocate_and_fetch()?;
-
-        // SAFETY: The data was initialized by the syscall.
+        // SAFETY: allocate_and_fetch() returns sysvar data in the expected SlotHashes layout.
         Ok(unsafe { SlotHashes::new_unchecked(data_init) })
     }
 }

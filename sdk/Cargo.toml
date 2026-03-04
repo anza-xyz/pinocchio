@@ -21,6 +21,11 @@ unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(target_os, values("solana"))',
 ] }
 
+# See issue #172: unsafe-block documentation and single-op blocks.
+[lints.clippy]
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"
+
 [features]
 alloc = ["solana-instruction-view?/slice-cpi"]
 copy = ["solana-account-view/copy", "solana-address/copy"]

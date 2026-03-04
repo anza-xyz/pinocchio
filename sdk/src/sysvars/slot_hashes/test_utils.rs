@@ -2,6 +2,8 @@
 //! This module is compiled only when `cfg(test)` is active so `std` can be used
 //! freely while production code remains `#![no_std]`.
 
+#![allow(clippy::undocumented_unsafe_blocks, clippy::multiple_unsafe_ops_per_block)]
+
 use {
     super::*,
     crate::account::{AccountView, RuntimeAccount},
