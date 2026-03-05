@@ -2,10 +2,6 @@
 //!
 //! This is required for the rent sysvar implementation.
 
-// This is necessary since `sol_get_rent_sysvar` is deprecated but still used here.
-// It can be removed once the implementation uses `get_sysvar` instead.
-#![allow(deprecated)]
-
 use {
     crate::{
         account::{AccountView, Ref},
@@ -312,6 +308,7 @@ impl Rent {
     /// # Returns
     ///
     /// `true`` if the account is rent exempt, `false`` otherwise.
+    #[allow(deprecated)]
     #[inline]
     pub fn is_exempt(&self, lamports: u64, data_len: usize) -> bool {
         lamports >= self.minimum_balance(data_len)
