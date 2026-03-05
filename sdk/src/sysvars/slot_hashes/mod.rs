@@ -14,7 +14,7 @@ mod test_raw;
 mod test_utils;
 
 #[cfg(feature = "alloc")]
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 use {
     crate::{
         account::{AccountView, Ref},
@@ -83,53 +83,15 @@ pub fn log(hash: &Hash) {
     core::hint::black_box(hash);
 }
 
-/// Reads the entry count from the first 8 bytes of data.
-/// Returns None if the data is too short.
-#[inline(always)]
-pub(crate) fn read_entry_count_from_bytes(data: &[u8]) -> Option<usize> {
-    if data.len() < NUM_ENTRIES_SIZE {
-        return None;
-    }
-    Some(unsafe {
-        // SAFETY: `data` is guaranteed to be at least `NUM_ENTRIES_SIZE` bytes long by
-        // the preceding length check, so it is sound to read the first 8 bytes
-        // and interpret them as a little-endian `u64`.
-        u64::from_le_bytes(*(data.as_ptr() as *const [u8; NUM_ENTRIES_SIZE]))
-    } as usize)
-}
-
-/// Reads the entry count from the first 8 bytes of data.
+/// Get the number of entries from the sysvar data bytes.
 ///
 /// # Safety
-/// Caller must ensure data has at least `NUM_ENTRIES_SIZE` bytes.
+///
+/// Caller must ensure that `data` has at least `NUM_ENTRIES_SIZE` bytes.
 #[inline(always)]
-pub(crate) unsafe fn read_entry_count_from_bytes_unchecked(data: &[u8]) -> usize {
+pub(crate) unsafe fn get_entry_count(data: &[u8]) -> usize {
+    debug_assert!(data.len() >= NUM_ENTRIES_SIZE);
     u64::from_le_bytes(*(data.as_ptr() as *const [u8; NUM_ENTRIES_SIZE])) as usize
-}
-
-/// Validates `SlotHashes` data format.
-///
-/// The function checks:
-/// 1. The buffer is large enough to contain the entry count.
-/// 2. The buffer length is sufficient to hold the declared number of entries.
-///
-/// It returns `Ok(())` if the data is well-formed, otherwise an appropriate
-/// `ProgramError` describing the issue.
-#[inline]
-fn parse_and_validate_data(data: &[u8]) -> Result<(), ProgramError> {
-    if data.len() < NUM_ENTRIES_SIZE {
-        return Err(ProgramError::AccountDataTooSmall);
-    }
-
-    // SAFETY: We've confirmed that data has enough bytes to read the entry count.
-    let num_entries = unsafe { read_entry_count_from_bytes_unchecked(data) };
-
-    let min_size = NUM_ENTRIES_SIZE + num_entries * ENTRY_SIZE;
-    if data.len() < min_size {
-        return Err(ProgramError::AccountDataTooSmall);
-    }
-
-    Ok(())
 }
 
 impl SlotHashEntry {
@@ -151,11 +113,27 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     /// entries are sorted in descending order.
     #[inline(always)]
     pub fn new(data: T) -> Result<Self, ProgramError> {
-        parse_and_validate_data(&data)?;
-        // SAFETY: `parse_and_validate_data` verifies that the data slice has at least
-        // `NUM_ENTRIES_SIZE` bytes for the entry count and enough additional bytes to
-        // contain the declared number of entries, thus upholding all invariants
-        // required by `SlotHashes::new_unchecked`.
+        if data.len() < NUM_ENTRIES_SIZE {
+            return Err(ProgramError::AccountDataTooSmall);
+        }
+
+        // SAFETY: `data` is guaranteed to have at least `NUM_ENTRIES_SIZE` bytes.
+        let num_entries = unsafe { get_entry_count(data.as_ref()) };
+
+        if num_entries > MAX_ENTRIES {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        // `num_entries` is guaranteed to be at most `MAX_ENTRIES`, so the
+        // multiplication cannot overflow.
+        let required_size = NUM_ENTRIES_SIZE + num_entries * ENTRY_SIZE;
+
+        if data.len() < required_size {
+            return Err(ProgramError::AccountDataTooSmall);
+        }
+
+        // SAFETY: `num_entries` is validated to be at most `MAX_ENTRIES`, and
+        // `data.len()` is validated to be of the expected size.
         Ok(unsafe { Self::new_unchecked(data) })
     }
 
@@ -178,21 +156,15 @@ impl<T: Deref<Target = [u8]>> SlotHashes<T> {
     ///    format.
     #[inline(always)]
     pub unsafe fn new_unchecked(data: T) -> Self {
-        if cfg!(debug_assertions) {
-            parse_and_validate_data(&data)
-                .expect("`data` matches all the same requirements as for `new()`");
-        }
-
         SlotHashes { data }
     }
 
     /// Returns the number of `SlotHashEntry` items accessible.
     #[inline(always)]
     pub fn len(&self) -> usize {
-        // SAFETY: `SlotHashes::new` and `new_unchecked` guarantee that `self.data` has
-        // at least `NUM_ENTRIES_SIZE` bytes, so reading the entry count without
-        // additional checks is safe.
-        unsafe { read_entry_count_from_bytes_unchecked(&self.data) }
+        // SAFETY: `SlotHashes` invariants guarantee that `self.data` has at least
+        // `NUM_ENTRIES_SIZE` bytes.
+        unsafe { get_entry_count(self.data.as_ref()) }
     }
 
     /// Returns if the sysvar is empty.
@@ -304,55 +276,34 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let data_ref = account_view.try_borrow()?;
+        let sysvar_data = account_view.try_borrow()?;
 
         // SAFETY: The account was validated to be the `SlotHashes` sysvar.
-        Ok(unsafe { SlotHashes::new_unchecked(data_ref) })
+        Ok(unsafe { SlotHashes::new_unchecked(sysvar_data) })
     }
 }
 
 #[cfg(feature = "alloc")]
 impl SlotHashes<Box<[u8]>> {
-    /// Fills the provided buffer with the full `SlotHashes` sysvar data.
+    /// Fetches the `SlotHashes` sysvar data directly via syscall.
     ///
-    /// # Safety
-    /// The caller must ensure the buffer pointer is valid for `MAX_SIZE` bytes.
-    /// The syscall will write exactly `MAX_SIZE` bytes to the buffer.
-    #[inline(always)]
-    unsafe fn fill_from_sysvar(buffer_ptr: *mut u8) -> Result<(), ProgramError> {
-        crate::sysvars::get_sysvar_unchecked(buffer_ptr, &SLOTHASHES_ID, 0, MAX_SIZE)?;
-
-        // For tests on builds that don't actually fill the buffer.
-        #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
-        core::ptr::write_bytes(buffer_ptr, 0, NUM_ENTRIES_SIZE);
-
-        Ok(())
-    }
-
-    /// Allocates an optimal buffer for the sysvar data based on available
-    /// features.
-    #[inline(always)]
-    fn allocate_and_fetch() -> Result<Box<[u8]>, ProgramError> {
-        let mut buf = Vec::with_capacity(MAX_SIZE);
-        unsafe {
-            // SAFETY: `buf` was allocated with capacity `MAX_SIZE` so its
-            // pointer is valid for exactly that many bytes. `fill_from_sysvar`
-            // writes `MAX_SIZE` bytes, and we immediately set the length to
-            // `MAX_SIZE`, marking the entire buffer as initialized before it is
-            // turned into a boxed slice.
-            Self::fill_from_sysvar(buf.as_mut_ptr())?;
-            buf.set_len(MAX_SIZE);
-        }
-        Ok(buf.into_boxed_slice())
-    }
-
-    /// Fetches the `SlotHashes` sysvar data directly via syscall. This copies
-    /// the full sysvar data (`MAX_SIZE` bytes).
+    /// This copies the full sysvar data (`MAX_SIZE` bytes).
     #[inline(always)]
     pub fn fetch() -> Result<Self, ProgramError> {
-        let data_init = Self::allocate_and_fetch()?;
+        let mut sysvar_data = Box::<[u8]>::new_uninit_slice(MAX_SIZE);
+        unsafe {
+            #[cfg(any(target_os = "solana", target_arch = "bpf"))]
+            crate::sysvars::get_sysvar_unchecked(
+                sysvar_data.as_mut_ptr() as *mut _,
+                &SLOTHASHES_ID,
+                0,
+                MAX_SIZE,
+            )?;
 
+            #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+            core::ptr::write_bytes(sysvar_data.as_mut_ptr(), 0, NUM_ENTRIES_SIZE);
+        }
         // SAFETY: The data was initialized by the syscall.
-        Ok(unsafe { SlotHashes::new_unchecked(data_init) })
+        Ok(unsafe { SlotHashes::new_unchecked(sysvar_data.assume_init()) })
     }
 }

@@ -98,8 +98,9 @@ pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramErro
     unsafe { fetch_into_unchecked(buffer, offset) }?;
 
     if offset == 0 {
-        // Buffer includes header: return actual entry count from sysvar data
-        Ok(read_entry_count_from_bytes(buffer).unwrap_or(0))
+        // SAFETY: `validate_fetch_offset` validates that the buffer
+        // has at least `NUM_ENTRIES_SIZE` bytes.
+        Ok(unsafe { get_entry_count(buffer) })
     } else {
         // Buffer excludes header: return calculated entry capacity
         Ok(num_entries)
@@ -121,12 +122,5 @@ pub fn fetch_into(buffer: &mut [u8], offset: usize) -> Result<usize, ProgramErro
 /// raw bytes into the provided pointer.
 #[inline(always)]
 pub unsafe fn fetch_into_unchecked(buffer: &mut [u8], offset: usize) -> Result<(), ProgramError> {
-    crate::sysvars::get_sysvar_unchecked(
-        buffer.as_mut_ptr(),
-        &SLOTHASHES_ID,
-        offset,
-        buffer.len(),
-    )?;
-
-    Ok(())
+    crate::sysvars::get_sysvar_unchecked(buffer.as_mut_ptr(), &SLOTHASHES_ID, offset, buffer.len())
 }
