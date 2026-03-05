@@ -1,9 +1,5 @@
 //! Information about the network's clock, ticks, slots, etc.
 
-// This is necessary since `sol_get_clock_sysvar` is deprecated but still used here.
-// It can be removed once the implementation uses `get_sysvar` instead.
-#![allow(deprecated)]
-
 use crate::{
     account::{AccountView, Ref},
     error::ProgramError,
@@ -145,5 +141,81 @@ impl Clock {
     #[inline]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes.as_ptr() as *const Clock)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec::Vec;
+
+    fn clock_to_bytes(clock: &Clock) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(Clock::LEN);
+        buf.extend_from_slice(&clock.slot.to_le_bytes());
+        buf.extend_from_slice(&clock.epoch_start_timestamp.to_le_bytes());
+        buf.extend_from_slice(&clock.epoch.to_le_bytes());
+        buf.extend_from_slice(&clock.leader_schedule_epoch.to_le_bytes());
+        buf.extend_from_slice(&clock.unix_timestamp.to_le_bytes());
+        buf
+    }
+
+    #[test]
+    fn test_clock_len() {
+        assert_eq!(Clock::LEN, 40);
+        assert_eq!(Clock::LEN, 8 + 8 + 8 + 8 + 8);
+    }
+
+    #[test]
+    fn test_clock_from_bytes_valid() {
+        let clock = Clock {
+            slot: 100,
+            epoch_start_timestamp: 1_600_000_000,
+            epoch: 5,
+            leader_schedule_epoch: 6,
+            unix_timestamp: 1_700_000_000,
+        };
+        let bytes = clock_to_bytes(&clock);
+        let parsed = Clock::from_bytes(&bytes).expect("valid length");
+        assert_eq!(parsed.slot, clock.slot);
+        assert_eq!(parsed.epoch_start_timestamp, clock.epoch_start_timestamp);
+        assert_eq!(parsed.epoch, clock.epoch);
+        assert_eq!(parsed.leader_schedule_epoch, clock.leader_schedule_epoch);
+        assert_eq!(parsed.unix_timestamp, clock.unix_timestamp);
+    }
+
+    #[test]
+    fn test_clock_from_bytes_too_short() {
+        let short = [0u8; 39];
+        assert!(Clock::from_bytes(&short).is_err());
+    }
+
+    #[test]
+    fn test_clock_from_bytes_empty() {
+        assert!(Clock::from_bytes(&[]).is_err());
+    }
+
+    #[test]
+    fn test_clock_from_bytes_unchecked() {
+        let clock = Clock {
+            slot: 0,
+            epoch_start_timestamp: -1,
+            epoch: 1,
+            leader_schedule_epoch: 1,
+            unix_timestamp: 0,
+        };
+        let bytes = clock_to_bytes(&clock);
+        let parsed = unsafe { Clock::from_bytes_unchecked(&bytes) };
+        assert_eq!(parsed.slot, 0);
+        assert_eq!(parsed.epoch_start_timestamp, -1);
+        assert_eq!(parsed.epoch, 1);
+        assert_eq!(parsed.leader_schedule_epoch, 1);
+        assert_eq!(parsed.unix_timestamp, 0);
+    }
+
+    #[test]
+    fn test_clock_default_constants() {
+        assert_eq!(DEFAULT_TICKS_PER_SLOT, 64);
+        assert_eq!(DEFAULT_TICKS_PER_SECOND, 160);
+        assert_eq!(DEFAULT_MS_PER_SLOT, 400);
     }
 }
