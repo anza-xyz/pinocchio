@@ -273,25 +273,28 @@ impl Rent {
     /// maximum permitted data length or if the `lamports_per_byte` is too
     /// large based on the `exemption_threshold`, which would cause an
     /// overflow.
-    //
-    // Note: Clippy suggests collapsing the `if` statements, but they are kept
-    // separate since it is more CU-efficient this way.
-    #[allow(clippy::collapsible_if)]
     #[inline(always)]
     pub fn try_minimum_balance(&self, data_len: usize) -> Result<u64, ProgramError> {
         if data_len as u64 > MAX_PERMITTED_DATA_LENGTH {
             return Err(ProgramError::InvalidArgument);
         }
 
-        // Validate `lamports_per_byte` based on `exemption_threshold`
-        // to prevent overflow.
+        // Validate `lamports_per_byte` based on `exemption_threshold` to prevent
+        // overflow.
+        //
+        // Only need to consider both `CURRENT_MAX_LAMPORTS_PER_BYTE`
+        // and `SIMD0194_MAX_LAMPORTS_PER_BYTE` values since `minimum_balance_unchecked`
+        // will perform the calculation using `f64` if the `exemption_threshold` is not
+        // equal to either of the default values.
 
         if unlikely(self.lamports_per_byte > CURRENT_MAX_LAMPORTS_PER_BYTE) {
             if self.exemption_threshold == CURRENT_EXEMPTION_THRESHOLD {
                 return Err(ProgramError::InvalidArgument);
             }
-        } else if unlikely(self.lamports_per_byte > SIMD0194_MAX_LAMPORTS_PER_BYTE) {
-            if self.exemption_threshold == SIMD0194_EXEMPTION_THRESHOLD {
+
+            if self.exemption_threshold == SIMD0194_EXEMPTION_THRESHOLD
+                && self.lamports_per_byte > SIMD0194_MAX_LAMPORTS_PER_BYTE
+            {
                 return Err(ProgramError::InvalidArgument);
             }
         }
