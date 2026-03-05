@@ -264,22 +264,22 @@ fn test_read_entry_count_from_bytes() {
     let mut data = [0u8; 16];
     data[0..8].copy_from_slice(&entry_count.to_le_bytes());
 
-    let result = read_entry_count_from_bytes(&data);
-    assert_eq!(result, Some(42));
+    let result = unsafe { get_entry_count(&data) };
+    assert_eq!(result, 42);
 
     let zero_count = 0u64;
     let mut zero_data = [0u8; 8];
     zero_data.copy_from_slice(&zero_count.to_le_bytes());
 
-    let zero_result = read_entry_count_from_bytes(&zero_data);
-    assert_eq!(zero_result, Some(0));
+    let zero_result = unsafe { get_entry_count(&zero_data) };
+    assert_eq!(zero_result, 0);
 
     let max_count = MAX_ENTRIES as u64;
     let mut max_data = [0u8; 8];
     max_data.copy_from_slice(&max_count.to_le_bytes());
 
-    let max_result = read_entry_count_from_bytes(&max_data);
-    assert_eq!(max_result, Some(MAX_ENTRIES));
+    let max_result = unsafe { get_entry_count(&max_data) };
+    assert_eq!(max_result, MAX_ENTRIES);
 }
 
 fn mock_fetch_into_unchecked(
@@ -388,7 +388,6 @@ fn test_safe_vs_unsafe_getters_consistency() {
 fn test_entry_count_header_too_short() {
     let short = [0u8; 4];
     assert!(SlotHashes::new(&short[..]).is_err());
-    assert_eq!(read_entry_count_from_bytes(&short), None);
 }
 
 #[test]
