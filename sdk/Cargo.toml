@@ -26,6 +26,8 @@ alloc = ["solana-instruction-view?/slice-cpi"]
 copy = ["solana-account-view/copy", "solana-address/copy"]
 cpi = ["dep:solana-instruction-view"]
 default = ["alloc"]
+resize = []
+unsafe-resize = []
 
 [dependencies]
 solana-account-view = { workspace = true }
@@ -38,4 +40,4 @@ solana-define-syscall = { workspace = true }
 
 [dev-dependencies]
 solana-address = { workspace = true, features = ["decode"] }
-pinocchio = { path = ".", features = ["alloc"] }
+pinocchio = { path = ".", features = ["alloc", "resize"] }
