@@ -3,8 +3,6 @@
 
 pub mod lazy;
 
-use core::slice::from_raw_parts_mut;
-
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
 pub use lazy::{InstructionContext, MaybeAccount};
@@ -18,7 +16,7 @@ use {
         cmp::min,
         mem::{size_of, MaybeUninit},
         ptr::with_exposed_provenance_mut,
-        slice::from_raw_parts,
+        slice::{from_raw_parts, from_raw_parts_mut},
     },
 };
 
