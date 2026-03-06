@@ -383,7 +383,7 @@ pub trait Resize: sealed::Sealed {
     /// referenced by `RuntimeAccount` fields. It should only be called for
     /// instances of `AccountView` that were created by the runtime and received
     /// in the `process_instruction` entrypoint of a program.
-    fn resize(&self, new_len: usize) -> Result<(), ProgramError>;
+    fn resize(&mut self, new_len: usize) -> Result<(), ProgramError>;
 
     /// Resize (either truncating or zero extending) the account's data.
     ///
@@ -402,7 +402,7 @@ pub trait Resize: sealed::Sealed {
     /// This method is unsafe because it does not check if the account data is
     /// already borrowed. The caller must guarantee that there are no active
     /// borrows to the account data.
-    unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError>;
+    unsafe fn resize_unchecked(&mut self, new_len: usize) -> Result<(), ProgramError>;
 }
 
 // Only AccountView is "sealed", so only it can implement `Resize`.
@@ -411,14 +411,14 @@ impl sealed::Sealed for AccountView {}
 
 #[cfg(feature = "resize")]
 impl Resize for AccountView {
-    fn resize(&self, new_len: usize) -> Result<(), ProgramError> {
+    fn resize(&mut self, new_len: usize) -> Result<(), ProgramError> {
         // Check whether the account data is already borrowed.
         self.check_borrow_mut()?;
 
         unsafe { self.resize_unchecked(new_len) }
     }
 
-    unsafe fn resize_unchecked(&self, new_len: usize) -> Result<(), ProgramError> {
+    unsafe fn resize_unchecked(&mut self, new_len: usize) -> Result<(), ProgramError> {
         // Return early if length hasn't changed.
         if new_len == self.data_len() {
             return Ok(());
@@ -435,7 +435,7 @@ impl Resize for AccountView {
         if new_len > self.data_len() {
             unsafe {
                 write_bytes(
-                    self.data_ptr().add(self.data_len()),
+                    self.data_mut_ptr().add(self.data_len()),
                     0,
                     new_len.saturating_sub(self.data_len()),
                 );
@@ -497,10 +497,6 @@ mod tests {
     use {super::*, solana_account_view::NOT_BORROWED};
     #[test]
     fn test_resize() {
-        struct TestAccount {
-            _raw: *mut RuntimeAccount,
-        }
-
         // 8-bytes aligned account data.
         let mut data = [0u64; 100 * size_of::<u64>()];
 
@@ -514,13 +510,9 @@ mod tests {
         data[10] = 100;
 
         let runtime_account = data.as_mut_ptr() as *mut RuntimeAccount;
-
-        let test_account = TestAccount {
-            _raw: runtime_account,
-        };
-        // SAFETY: A reference to `AccountView` that points to the same memory
-        // as `runtime_account`.
-        let account = unsafe { &*(&test_account as *const _ as *const AccountView) };
+        // SAFETY: `runtime_account` points to a valid in-memory account layout
+        // for the duration of this test.
+        let mut account = unsafe { AccountView::new_unchecked(runtime_account) };
 
         assert_eq!(account.data_len(), 100);
         assert_eq!(unsafe { (*runtime_account).padding }, 100);
