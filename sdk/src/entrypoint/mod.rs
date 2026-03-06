@@ -205,7 +205,7 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     // they are initialized so we cast the pointer to a slice of `[AccountView]`.
     match process_instruction(
         program_id,
-        unsafe { from_raw_parts_mut(accounts.as_ptr() as _, count) },
+        unsafe { from_raw_parts_mut(accounts.as_mut_ptr() as _, count) },
         instruction_data,
     ) {
         Ok(()) => SUCCESS,
