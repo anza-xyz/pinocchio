@@ -17,7 +17,7 @@ declare_id!("11111111111111111111111111111111");
 /// Create an account with a minimum balance to be rent-exempt.
 #[inline(always)]
 pub fn create_account_with_minimum_balance(
-    account: &AccountView,
+    account: &mut AccountView,
     space: usize,
     owner: &Address,
     payer: &AccountView,
@@ -37,7 +37,7 @@ pub fn create_account_with_minimum_balance(
 /// via the `signers`.
 #[inline(always)]
 pub fn create_account_with_minimum_balance_signed(
-    account: &AccountView,
+    account: &mut AccountView,
     space: usize,
     owner: &Address,
     payer: &AccountView,
@@ -81,6 +81,8 @@ pub fn create_account_with_minimum_balance_signed(
         //
         // SAFETY: There are no active borrows of the `account`.
         // This was checked by the `Assign` CPI above.
-        unsafe { account.resize_unchecked(space) }
+        // TODO: re-enable this when `Reize` trait is available.
+        //unsafe { account.resize_unchecked(space) }
+        Ok(())
     }
 }
