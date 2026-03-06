@@ -112,7 +112,7 @@ impl<'a, 'b, 'c> Pause<'a, 'b, 'c> {
             account.write(signer);
         }
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, &AccountView>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -122,7 +122,9 @@ impl<'a, 'b, 'c> Pause<'a, 'b, 'c> {
                 data: &[ExtensionDiscriminator::Pausable as u8, Self::DISCRIMINATOR],
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe {
+                slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
+            },
             signers,
         )
     }

@@ -136,7 +136,7 @@ impl<'a, 'b> BurnChecked<'a, 'b> {
         // Set decimals as u8 at offset [9]
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, &AccountView>(
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: &crate::ID,
                 accounts: unsafe {
@@ -144,7 +144,7 @@ impl<'a, 'b> BurnChecked<'a, 'b> {
                 },
                 data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 10) },
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }

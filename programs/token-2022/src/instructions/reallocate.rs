@@ -184,7 +184,7 @@ impl<'a, 'b, 'c, 'd> Reallocate<'a, 'b, 'c, 'd> {
             }
         }
 
-        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, &AccountView>(
+        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -195,7 +195,7 @@ impl<'a, 'b, 'c, 'd> Reallocate<'a, 'b, 'c, 'd> {
                 data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, expected_data) },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }

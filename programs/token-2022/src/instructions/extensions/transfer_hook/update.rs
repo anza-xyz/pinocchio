@@ -153,7 +153,7 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
             },
         );
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, &AccountView>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -166,7 +166,9 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
                 },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe {
+                slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
+            },
             signers,
         )
     }

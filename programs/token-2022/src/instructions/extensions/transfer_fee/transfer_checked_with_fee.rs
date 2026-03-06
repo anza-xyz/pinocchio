@@ -193,7 +193,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
 
         write_bytes(&mut instruction_data[11..19], &self.fee.to_le_bytes());
 
-        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, &AccountView>(
+        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -206,7 +206,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
                 },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }

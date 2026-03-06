@@ -111,7 +111,7 @@ impl<'a, 'b> ThawAccount<'a, 'b> {
             account.write(signer);
         }
 
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, &AccountView>(
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: &crate::ID,
                 accounts: unsafe {
@@ -119,7 +119,7 @@ impl<'a, 'b> ThawAccount<'a, 'b> {
                 },
                 data: &[11],
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }
