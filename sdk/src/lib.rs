@@ -332,7 +332,6 @@ pub mod sysvars;
 // Re-export the `solana_define_syscall` for downstream use.
 #[cfg(any(target_os = "solana", target_arch = "bpf"))]
 pub use solana_define_syscall::definitions as syscalls;
-
 #[cfg(feature = "resize")]
 use {
     core::ptr::write_bytes,
@@ -426,12 +425,12 @@ pub trait UnsafeResize: sealed::Sealed {
     /// already borrowed nor validate the `new_len` against the maximum
     /// permitted data increase.
     ///
-    /// The caller must guarantee that there are no active borrows to the account
-    /// data and that the `new_len` is valid. Resizing an account beyond
-    /// [`MAX_PERMITTED_DATA_INCREASE`] leads to out-of-bounds memory accesses
-    /// and undefined behavior. Particular care must be taken when resizing an
-    /// account after a cross-program invocation, since the account data may have
-    /// been resized by the invoked program.
+    /// The caller must guarantee that there are no active borrows to the
+    /// account data and that the `new_len` is valid. Resizing an account
+    /// beyond [`MAX_PERMITTED_DATA_INCREASE`] leads to out-of-bounds memory
+    /// accesses and undefined behavior. Particular care must be taken when
+    /// resizing an account after a cross-program invocation, since the
+    /// account data may have been resized by the invoked program.
     unsafe fn resize(&mut self, new_len: usize);
 }
 
@@ -448,6 +447,7 @@ impl Resize for AccountView {
         unsafe { self.resize_unchecked(new_len) }
     }
 
+    #[allow(clippy::arithmetic_side_effects)]
     unsafe fn resize_unchecked(&mut self, new_len: usize) -> Result<(), ProgramError> {
         // Return early if length hasn't changed.
         if new_len == self.data_len() {
@@ -467,7 +467,7 @@ impl Resize for AccountView {
                 write_bytes(
                     self.data_mut_ptr().add(self.data_len()),
                     0,
-                    new_len.saturating_sub(self.data_len()),
+                    new_len - self.data_len(),
                 );
             }
         }
@@ -479,16 +479,17 @@ impl Resize for AccountView {
 }
 
 #[cfg(all(feature = "unsafe-resize", not(feature = "resize")))]
+#[allow(clippy::arithmetic_side_effects)]
 impl UnsafeResize for AccountView {
     unsafe fn resize(&mut self, new_len: usize) {
         let account = self.account_ptr() as *mut solana_account_view::RuntimeAccount;
 
         if new_len > self.data_len() {
             unsafe {
-                write_bytes(
-                    self.data_ptr().add(self.data_len()),
+                core::ptr::write_bytes(
+                    self.data_mut_ptr().add(self.data_len()),
                     0,
-                    new_len.saturating_sub(self.data_len()),
+                    new_len - self.data_len(),
                 );
             }
         }
@@ -500,8 +501,9 @@ impl UnsafeResize for AccountView {
 // Not `pub`, so other crates cannot name nor implement its trait.
 #[cfg(any(feature = "resize", feature = "unsafe-resize"))]
 mod sealed {
-    // This is used to "seal" `Resize` and `UnsafeResize` traits, preventing external
-    // crates from implementing them for types other than `AccountView`.
+    // This is used to "seal" `Resize` and `UnsafeResize` traits, preventing
+    // external crates from implementing them for types other than
+    // `AccountView`.
     pub trait Sealed {}
 }
 
