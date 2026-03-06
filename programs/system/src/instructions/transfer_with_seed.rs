@@ -1,7 +1,13 @@
-use pinocchio::{
-    cpi::{invoke_signed, Signer},
-    instruction::{InstructionAccount, InstructionView},
-    AccountView, Address, ProgramResult,
+use {
+    crate::instructions::{write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
+    pinocchio::{
+        address::MAX_SEED_LEN,
+        cpi::{invoke_signed, Signer},
+        error::ProgramError,
+        instruction::{InstructionAccount, InstructionView},
+        AccountView, Address, ProgramResult,
+    },
 };
 
 /// Transfer lamports from a derived address.
@@ -49,25 +55,46 @@ impl TransferWithSeed<'_, '_, '_> {
             InstructionAccount::writable(self.to.address()),
         ];
 
+        if self.seed.len() > MAX_SEED_LEN {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
         // instruction data
         // - [0..4  ]: instruction discriminator
         // - [4..12 ]: lamports amount
         // - [12..20]: seed length
         // - [20..  ]: seed (max 32)
         // - [.. +32]: owner address
-        let mut instruction_data = [0; 80];
-        instruction_data[0] = 11;
-        instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
-        instruction_data[12..20].copy_from_slice(&u64::to_le_bytes(self.seed.len() as u64));
+        let mut instruction_data = [UNINIT_BYTE; 84];
+
+        write_bytes(&mut instruction_data[..4], &[11, 0, 0, 0]);
+
+        write_bytes(&mut instruction_data[4..12], &self.lamports.to_le_bytes());
+
+        write_bytes(
+            &mut instruction_data[12..20],
+            &u64::to_le_bytes(self.seed.len() as u64),
+        );
 
         let offset = 20 + self.seed.len();
-        instruction_data[20..offset].copy_from_slice(self.seed.as_bytes());
-        instruction_data[offset..offset + 32].copy_from_slice(self.owner.as_ref());
+        write_bytes(
+            // SAFETY: instruction data allocated `MAX_SEED_LEN` bytes
+            // for the seed.
+            unsafe { instruction_data.get_unchecked_mut(20..offset) },
+            self.seed.as_bytes(),
+        );
+
+        write_bytes(
+            // SAFETY: instruction data allocated space for the owner address.
+            unsafe { instruction_data.get_unchecked_mut(offset..offset + 32) },
+            self.owner.as_ref(),
+        );
 
         let instruction = InstructionView {
             program_id: &crate::ID,
             accounts: &instruction_accounts,
-            data: &instruction_data[..offset + 32],
+            // SAFETY: The instruction data is initialized.
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as *const _, offset + 32) },
         };
 
         invoke_signed(&instruction, &[self.from, self.base, self.to], signers)
