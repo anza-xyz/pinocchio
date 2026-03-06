@@ -149,7 +149,7 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
             instruction_data[1].write(0);
         }
 
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts have `expected_accounts` initialized.
@@ -160,7 +160,7 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
                 data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, expected_data) },
             },
             // SAFETY: accounts have `expected_accounts` initialized.
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }

@@ -128,7 +128,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
             account.write(*signer);
         }
 
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -141,7 +141,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
                 ],
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }

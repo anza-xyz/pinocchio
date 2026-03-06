@@ -171,7 +171,7 @@ impl<'a, 'b, 'c> Burn<'a, 'b, 'c> {
         // amount
         write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
 
-        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -184,7 +184,9 @@ impl<'a, 'b, 'c> Burn<'a, 'b, 'c> {
                 },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe {
+                slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
+            },
             signers,
         )
     }

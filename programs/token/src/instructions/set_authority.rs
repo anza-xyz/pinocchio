@@ -144,7 +144,7 @@ impl<'a, 'b, 'c> SetAuthority<'a, 'b, 'c> {
             length = 3;
         }
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: &crate::ID,
                 accounts: unsafe {
@@ -152,7 +152,7 @@ impl<'a, 'b, 'c> SetAuthority<'a, 'b, 'c> {
                 },
                 data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }

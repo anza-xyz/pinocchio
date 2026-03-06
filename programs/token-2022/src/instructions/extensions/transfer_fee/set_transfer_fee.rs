@@ -154,7 +154,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
             &self.maximum_fee.to_le_bytes(),
         );
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -167,7 +167,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
                 },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }

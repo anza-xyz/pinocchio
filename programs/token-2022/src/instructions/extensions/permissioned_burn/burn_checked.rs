@@ -182,7 +182,7 @@ impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
         // decimals
         instruction_data[10].write(self.decimals);
 
-        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -195,7 +195,9 @@ impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
                 },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { slice::from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe {
+                slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
+            },
             signers,
         )
     }

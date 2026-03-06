@@ -57,7 +57,7 @@ impl Memo<'_, '_, '_> {
             data: self.memo.as_bytes(),
         };
 
-        invoke_signed_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(
+        invoke_signed_with_bounds::<MAX_STATIC_CPI_ACCOUNTS, _>(
             &instruction,
             self.signers,
             signers_seeds,
