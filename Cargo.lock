@@ -238,8 +238,9 @@ checksum = "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9"
 
 [[package]]
 name = "solana-account-view"
-version = "1.0.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#ba1f9cdd836f9977df2bf7cb606be6e15c7b61aa"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc141b940560430425ebaadb7645496c45f6a10fad9911d719bd03eab7f4d422"
 dependencies = [
  "solana-address",
  "solana-program-error",
@@ -248,7 +249,8 @@ dependencies = [
 [[package]]
 name = "solana-address"
 version = "2.2.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#ba1f9cdd836f9977df2bf7cb606be6e15c7b61aa"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68c5d02824391b072dc5cd0aaa85fb0af9784a21d23286a767994d1e8a322131"
 dependencies = [
  "curve25519-dalek",
  "five8",
@@ -268,17 +270,20 @@ checksum = "57e5b1c0bc1d4a4d10c88a4100499d954c09d3fecfae4912c1a074dff68b1738"
 [[package]]
 name = "solana-define-syscall"
 version = "5.0.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#ba1f9cdd836f9977df2bf7cb606be6e15c7b61aa"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03aacdd7a61e2109887a7a7f046caebafce97ddf1150f33722eeac04f9039c73"
 
 [[package]]
 name = "solana-hash"
 version = "4.2.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#ba1f9cdd836f9977df2bf7cb606be6e15c7b61aa"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8064ea1d591ec791be95245058ca40f4f5345d390c200069d0f79bbf55bfae55"
 
 [[package]]
 name = "solana-instruction-view"
-version = "1.0.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#ba1f9cdd836f9977df2bf7cb606be6e15c7b61aa"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c35d02cd27575b1fd05938d3624e476b0173208139053b51aa48dd9bec149f1"
 dependencies = [
  "solana-account-view",
  "solana-address",
@@ -289,15 +294,17 @@ dependencies = [
 [[package]]
 name = "solana-program-error"
 version = "3.0.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#ba1f9cdd836f9977df2bf7cb606be6e15c7b61aa"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1af32c995a7b692a915bb7414d5f8e838450cf7c70414e763d8abcae7b51f28"
 
 [[package]]
 name = "solana-sha256-hasher"
 version = "3.1.0"
-source = "git+https://github.com/anza-xyz/solana-sdk.git#ba1f9cdd836f9977df2bf7cb606be6e15c7b61aa"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db7dc3011ea4c0334aaaa7e7128cb390ecf546b28d412e9bf2064680f57f588f"
 dependencies = [
  "sha2",
- "solana-define-syscall 5.0.0",
+ "solana-define-syscall 4.0.1",
  "solana-hash",
 ]
 
