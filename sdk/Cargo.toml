@@ -27,6 +27,7 @@ copy = ["solana-account-view/copy", "solana-address/copy"]
 cpi = ["dep:solana-instruction-view"]
 default = ["alloc"]
 resize = []
+unsafe-resize = []
 
 [dependencies]
 solana-account-view = { workspace = true }
