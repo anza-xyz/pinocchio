@@ -160,7 +160,7 @@ impl<'a, 'b, 'c> UpdateMultiplier<'a, 'b, 'c> {
             &self.effective_timestamp.to_le_bytes(),
         );
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.

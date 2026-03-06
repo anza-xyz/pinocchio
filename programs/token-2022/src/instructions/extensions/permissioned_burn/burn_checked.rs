@@ -182,7 +182,7 @@ impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
         // decimals
         instruction_data[10].write(self.decimals);
 
-        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.

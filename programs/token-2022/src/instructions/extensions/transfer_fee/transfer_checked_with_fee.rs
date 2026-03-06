@@ -193,7 +193,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
 
         write_bytes(&mut instruction_data[11..19], &self.fee.to_le_bytes());
 
-        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.

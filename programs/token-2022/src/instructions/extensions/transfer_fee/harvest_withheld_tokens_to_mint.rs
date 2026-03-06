@@ -68,7 +68,7 @@ impl HarvestWithheldTokensToMint<'_, '_, '_> {
             account.write(*source);
         }
 
-        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(
+        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.

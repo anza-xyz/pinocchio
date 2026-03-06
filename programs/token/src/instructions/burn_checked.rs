@@ -136,7 +136,7 @@ impl<'a, 'b> BurnChecked<'a, 'b> {
         // Set decimals as u8 at offset [9]
         write_bytes(&mut instruction_data[9..], &[self.decimals]);
 
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: &crate::ID,
                 accounts: unsafe {

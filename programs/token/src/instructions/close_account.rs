@@ -111,7 +111,7 @@ impl<'a, 'b> CloseAccount<'a, 'b> {
             account.write(signer);
         }
 
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: &crate::ID,
                 accounts: unsafe {

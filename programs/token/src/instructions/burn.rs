@@ -128,7 +128,7 @@ impl<'a, 'b> Burn<'a, 'b> {
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..], &self.amount.to_le_bytes());
 
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: &crate::ID,
                 accounts: unsafe {

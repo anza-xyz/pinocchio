@@ -112,7 +112,7 @@ impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
             account.write(signer);
         }
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.

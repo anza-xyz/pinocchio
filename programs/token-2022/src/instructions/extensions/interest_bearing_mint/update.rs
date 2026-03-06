@@ -136,7 +136,7 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
 
         write_bytes(&mut instruction_data[2..4], &self.rate.to_le_bytes());
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.

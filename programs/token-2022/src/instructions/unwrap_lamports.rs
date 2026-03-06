@@ -149,7 +149,7 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
             instruction_data[1].write(0);
         }
 
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts have `expected_accounts` initialized.

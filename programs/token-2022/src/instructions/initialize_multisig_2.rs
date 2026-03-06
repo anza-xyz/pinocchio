@@ -92,7 +92,7 @@ impl InitializeMultisig2<'_, '_, '_> {
             account_view.write(signer);
         }
 
-        invoke_with_bounds::<{ 1 + MAX_MULTISIG_SIGNERS }>(&instruction, unsafe {
+        invoke_with_bounds::<{ 1 + MAX_MULTISIG_SIGNERS }, &AccountView>(&instruction, unsafe {
             slice::from_raw_parts(acc_views.as_ptr() as _, num_accounts)
         })
     }

@@ -97,7 +97,7 @@ impl<'a, 'b> Revoke<'a, 'b> {
             account.write(signer);
         }
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: &crate::ID,
                 accounts: unsafe {

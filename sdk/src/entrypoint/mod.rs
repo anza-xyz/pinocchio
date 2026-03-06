@@ -3,6 +3,8 @@
 
 pub mod lazy;
 
+use core::slice::from_raw_parts_mut;
+
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
 pub use lazy::{InstructionContext, MaybeAccount};
@@ -58,9 +60,9 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 ///
 /// ```ignore
 /// fn process_instruction(
-///     program_id: &Address,      // Address of the account the program was loaded into
-///     accounts: &[AccountView], // All accounts required to process the instruction
-///     instruction_data: &[u8],  // Serialized instruction-specific data
+///     program_id: &Address,         // Address of the account the program was loaded into
+///     accounts: &mut [AccountView], // All accounts required to process the instruction
+///     instruction_data: &[u8],      // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
 /// The argument is defined as an `expr`, which allows the use of any function
@@ -97,7 +99,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 ///
 ///     pub fn process_instruction(
 ///         program_id: &Address,
-///         accounts: &[AccountView],
+///         accounts: &mut [AccountView],
 ///         instruction_data: &[u8],
 ///     ) -> ProgramResult {
 ///         Ok(())
@@ -152,7 +154,7 @@ macro_rules! entrypoint {
 /// ```ignore
 /// fn process_instruction(
 ///     program_id: &Address,     // Address of the account the program was loaded into
-///     accounts: &[AccountView], // All accounts required to process the instruction
+///     accounts: &mut [AccountView], // All accounts required to process the instruction
 ///     instruction_data: &[u8],  // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
@@ -192,7 +194,7 @@ macro_rules! program_entrypoint {
 #[inline(always)]
 pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     input: *mut u8,
-    process_instruction: fn(&Address, &[AccountView], &[u8]) -> ProgramResult,
+    process_instruction: fn(&Address, &mut [AccountView], &[u8]) -> ProgramResult,
 ) -> u64 {
     const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
     // Create an array of uninitialized account views.
@@ -205,7 +207,7 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     // they are initialized so we cast the pointer to a slice of `[AccountView]`.
     match process_instruction(
         program_id,
-        unsafe { from_raw_parts(accounts.as_ptr() as _, count) },
+        unsafe { from_raw_parts_mut(accounts.as_ptr() as _, count) },
         instruction_data,
     ) {
         Ok(()) => SUCCESS,
@@ -950,7 +952,7 @@ mod tests {
 
     /// Asserts that the accounts slice contains the expected number of accounts
     /// and all accounts are duplicated, apart from the first one.
-    fn assert_duplicated_accounts(accounts: &[MaybeUninit<AccountView>], duplicated: usize) {
+    fn assert_duplicated_accounts(accounts: &mut [MaybeUninit<AccountView>], duplicated: usize) {
         assert!(accounts.len() > duplicated);
 
         let unique = accounts.len() - duplicated;
@@ -962,28 +964,30 @@ mod tests {
         }
 
         // Last unique account.
-        let duplicated = unsafe { accounts[unique - 1].assume_init_ref() };
+        let (unique_accounts, duplicated_accounts) = accounts.split_at_mut(unique);
+        let last_unique = unsafe { unique_accounts.last_mut().unwrap().assume_init_mut() };
+
         // No mutable borrow active at this point.
-        assert!(duplicated.try_borrow_mut().is_ok());
+        assert!(last_unique.try_borrow_mut().is_ok());
 
         // Duplicated accounts should reference (share) the account pointer
         // to the last unique account.
-        for account in accounts[unique..].iter() {
-            let account_view = unsafe { account.assume_init_ref() };
+        for account in duplicated_accounts.iter_mut() {
+            let account_view = unsafe { account.assume_init_mut() };
 
-            assert_eq!(account_view, duplicated);
-            assert_eq!(account_view.data_len(), duplicated.data_len());
+            assert_eq!(account_view, last_unique);
+            assert_eq!(account_view.data_len(), last_unique.data_len());
 
             let borrowed = account_view.try_borrow_mut().unwrap();
             // Only one mutable borrow at the same time should be allowed
             // on the duplicated account.
-            assert!(duplicated.try_borrow_mut().is_err());
+            assert!(last_unique.try_borrow_mut().is_err());
             drop(borrowed);
         }
 
         // There should not be any mutable borrow on the duplicated account
         // at this point.
-        assert!(duplicated.try_borrow_mut().is_ok());
+        assert!(last_unique.try_borrow_mut().is_ok());
     }
 
     #[test]
@@ -1060,7 +1064,7 @@ mod tests {
         assert_eq!(count, 2);
         assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
-        assert_duplicated_accounts(&accounts[..count], 1);
+        assert_duplicated_accounts(&mut accounts[..count], 1);
 
         // Input with `MAX_TX_ACCOUNTS` accounts (only 32 unique ones) but accounts
         // array has only space for 64. The assert checks that the first 32
@@ -1078,7 +1082,7 @@ mod tests {
         assert_eq!(count, 64);
         assert!(program_id == &MOCK_PROGRAM_ID);
         assert_eq!(&ix_data, parsed_ix_data);
-        assert_duplicated_accounts(&accounts, 32);
+        assert_duplicated_accounts(&mut accounts, 32);
     }
 
     #[test]

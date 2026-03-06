@@ -154,7 +154,7 @@ impl<'a, 'b, 'c> SetTransferFee<'a, 'b, 'c> {
             &self.maximum_fee.to_le_bytes(),
         );
 
-        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.

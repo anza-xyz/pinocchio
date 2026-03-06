@@ -171,7 +171,7 @@ impl<'a, 'b, 'c> Burn<'a, 'b, 'c> {
         // amount
         write_bytes(&mut instruction_data[2..10], &self.amount.to_le_bytes());
 
-        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }>(
+        invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, &AccountView>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
