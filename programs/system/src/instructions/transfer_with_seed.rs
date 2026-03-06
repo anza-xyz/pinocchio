@@ -67,10 +67,7 @@ impl TransferWithSeed<'_, '_, '_> {
         // - [.. +32]: owner address
         let mut instruction_data = [UNINIT_BYTE; 84];
 
-        instruction_data[0].write(11);
-        instruction_data[1].write(0);
-        instruction_data[2].write(0);
-        instruction_data[3].write(0);
+        write_bytes(&mut instruction_data[..4], &[11, 0, 0, 0]);
 
         write_bytes(&mut instruction_data[4..12], &self.lamports.to_le_bytes());
 
@@ -86,6 +83,7 @@ impl TransferWithSeed<'_, '_, '_> {
             unsafe { instruction_data.get_unchecked_mut(20..offset) },
             self.seed.as_bytes(),
         );
+
         write_bytes(
             // SAFETY: instruction data allocated space for the owner address.
             unsafe { instruction_data.get_unchecked_mut(offset..offset + 32) },

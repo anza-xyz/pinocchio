@@ -117,10 +117,7 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
         // - [.. +32]: owner address
         let mut instruction_data = [UNINIT_BYTE; 124];
 
-        instruction_data[0].write(3);
-        instruction_data[1].write(0);
-        instruction_data[2].write(0);
-        instruction_data[3].write(0);
+        write_bytes(&mut instruction_data[..4], &[3, 0, 0, 0]);
 
         write_bytes(
             &mut instruction_data[4..36],
@@ -145,11 +142,13 @@ impl<'a, 'b, 'c> CreateAccountWithSeed<'a, 'b, 'c> {
             unsafe { instruction_data.get_unchecked_mut(offset..offset + 8) },
             &self.lamports.to_le_bytes(),
         );
+
         write_bytes(
             // SAFETY: instruction data allocated space for the `space`.
             unsafe { instruction_data.get_unchecked_mut(offset + 8..offset + 16) },
             &self.space.to_le_bytes(),
         );
+
         write_bytes(
             // SAFETY: instruction data allocated space for the owner address.
             unsafe { instruction_data.get_unchecked_mut(offset + 16..offset + 48) },

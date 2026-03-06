@@ -57,12 +57,9 @@ impl AssignWithSeed<'_, '_, '_> {
         // - [36..44]: seed length
         // - [44..  ]: seed (max 32)
         // - [.. +32]: owner address
-        let mut instruction_data = [UNINIT_BYTE; 116];
+        let mut instruction_data = [UNINIT_BYTE; 108];
 
-        instruction_data[0].write(10);
-        instruction_data[1].write(0);
-        instruction_data[2].write(0);
-        instruction_data[3].write(0);
+        write_bytes(&mut instruction_data[..4], &[10, 0, 0, 0]);
 
         write_bytes(&mut instruction_data[4..36], self.base.address().as_array());
 
