@@ -333,7 +333,7 @@ macro_rules! process_n_accounts {
             {
                 // Stores the data length in the `padding` field. This is needed
                 // to handle account resizing.
-                (*account).padding = (*account).data_len as u32;
+                (*account).padding = u32::to_le_bytes((*account).data_len as u32);
             }
             $accounts.write(AccountView::new_unchecked(account));
             advance_input_with_account!($input, account);
@@ -431,7 +431,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         {
             // Stores the data length in the `padding` field. This is needed
             // to handle account resizing.
-            (*account).padding = (*account).data_len as u32;
+            (*account).padding = u32::to_le_bytes((*account).data_len as u32);
         }
         accounts.write(AccountView::new_unchecked(account));
 

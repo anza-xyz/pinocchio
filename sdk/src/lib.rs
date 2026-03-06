@@ -427,11 +427,11 @@ pub trait UnsafeResize: sealed::Sealed {
     /// permitted data increase.
     ///
     /// The caller must guarantee that there are no active borrows to the account
-    /// data and that the `new_len` is valid. Resizing an account beyond the maximum
-    /// permitted data increase leads to out-of-bounds memory accesses and undefined
-    /// behavior. Particular care must be taken when resizing an account after a
-    /// cross-program invocation, since the account data may have been resized by
-    /// the invoked program.
+    /// data and that the `new_len` is valid. Resizing an account beyond
+    /// [`MAX_PERMITTED_DATA_INCREASE`] leads to out-of-bounds memory accesses
+    /// and undefined behavior. Particular care must be taken when resizing an
+    /// account after a cross-program invocation, since the account data may have
+    /// been resized by the invoked program.
     unsafe fn resize(&mut self, new_len: usize);
 }
 
@@ -455,7 +455,7 @@ impl Resize for AccountView {
         }
 
         let account = self.account_ptr() as *mut RuntimeAccount;
-        let original_data_len = unsafe { (*account).padding as usize };
+        let original_data_len = u32::from_le_bytes(unsafe { (*account).padding }) as usize;
         // Return early if the length increase from the original serialized data
         // length is too large and would result in an out-of-bounds allocation.
         if new_len.saturating_sub(original_data_len) > MAX_PERMITTED_DATA_INCREASE {
@@ -465,7 +465,7 @@ impl Resize for AccountView {
         if new_len > self.data_len() {
             unsafe {
                 write_bytes(
-                    self.data_ptr().add(self.data_len()),
+                    self.data_mut_ptr().add(self.data_len()),
                     0,
                     new_len.saturating_sub(self.data_len()),
                 );
@@ -565,7 +565,10 @@ mod tests {
         let mut account = unsafe { AccountView::new_unchecked(runtime_account) };
 
         assert_eq!(account.data_len(), 100);
-        assert_eq!(unsafe { (*runtime_account).padding }, 100);
+        assert_eq!(
+            u32::from_le_bytes(unsafe { (*runtime_account).padding }),
+            100
+        );
 
         // We should be able to get the data pointer whenever as long as we don't use
         // it while the data is borrowed.
@@ -577,7 +580,7 @@ mod tests {
 
         let data_ptr_after = account.data_ptr();
         // The data pointer should point to the same address regardless of the
-        // reallocation
+        // resize.
         assert_eq!(data_ptr_before, data_ptr_after);
 
         assert_eq!(account.data_len(), 200);
@@ -588,10 +591,10 @@ mod tests {
 
         assert_eq!(account.data_len(), 0);
 
-        // Invalid reallocation.
+        // Invalid resize.
 
-        let invalid_realloc = account.resize(10_000_000_001);
-        assert!(invalid_realloc.is_err());
+        let invalid_resize = account.resize(10_000_000_001);
+        assert!(invalid_resize.is_err());
 
         // Reset to its original size.
 
