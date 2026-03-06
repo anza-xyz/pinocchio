@@ -45,7 +45,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountView],
+//!   accounts: &mut [AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   log!("Hello from my pinocchio program!");
@@ -113,7 +113,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountView],
+//!   accounts: &mut [AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   log("Standard path");
@@ -205,7 +205,7 @@
 //!
 //! pub fn process_instruction(
 //!   program_id: &Address,
-//!   accounts: &[AccountView],
+//!   accounts: &mut [AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
 //!   Ok(())
@@ -293,7 +293,7 @@
 //!
 //!   pub fn process_instruction(
 //!     program_id: &Address,
-//!     accounts: &[AccountView],
+//!     accounts: &mut [AccountView],
 //!     instruction_data: &[u8],
 //!   ) -> ProgramResult {
 //!     Ok(())

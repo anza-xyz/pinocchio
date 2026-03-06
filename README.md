@@ -71,7 +71,7 @@ entrypoint!(process_instruction);
 
 pub fn process_instruction(
   program_id: &Address,
-  accounts: &[AccountView],
+  accounts: &mut [AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
   log("Hello from my pinocchio program!");
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
 
 pub fn process_instruction(
   program_id: &Address,
-  accounts: &[AccountView],
+  accounts: &mut [AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
   log("Standard path");
@@ -194,7 +194,7 @@ no_allocator!();
 
 pub fn process_instruction(
   program_id: &Address,
-  accounts: &[AccountView],
+  accounts: &mut [AccountView],
   instruction_data: &[u8],
 ) -> ProgramResult {
   Ok(())
@@ -268,7 +268,7 @@ mod entrypoint {
 
   pub fn process_instruction(
     program_id: &Address,
-    accounts: &[AccountView],
+    accounts: &mut [AccountView],
     instruction_data: &[u8],
   ) -> ProgramResult {
     Ok(())
