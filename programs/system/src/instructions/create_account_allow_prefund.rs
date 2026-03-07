@@ -1,12 +1,35 @@
-use pinocchio::{
-    cpi::{invoke_signed, Signer},
-    error::ProgramError,
-    instruction::{InstructionAccount, InstructionView},
-    sysvars::{rent::Rent, Sysvar},
-    AccountView, Address, ProgramResult,
+use {
+    crate::instructions::{write_bytes, UNINIT_BYTE},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
+    pinocchio::{
+        cpi::{invoke_signed_with_bounds, Signer},
+        error::ProgramError,
+        instruction::{InstructionAccount, InstructionView},
+        sysvars::{rent::Rent, Sysvar},
+        AccountView, Address, ProgramResult,
+    },
 };
 
-/// Create a new account without the `lamports==0` assertion.
+/// Funding lamports to transfer into a newly created account.
+pub struct Funding<'a> {
+    /// Funding account.
+    pub from: &'a AccountView,
+
+    /// Number of lamports to transfer to the new account.
+    pub lamports: u64,
+}
+
+/// Create a new account allowing the account to be prefunded.
+///
+/// This instruction is identical to `CreateAccount` except
+/// that it allows the account being created to already have
+/// lamports in it.
+///
+/// # Important
+///
+/// This instruction does not warn if the account has more than
+/// enough lamports. Special care must be taken to ensure that
+/// the account being created has a lamports balance.
 ///
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` New account
@@ -21,23 +44,25 @@ pub struct CreateAccountAllowPrefund<'a, 'b> {
     /// Address of program that will own the new account.
     pub owner: &'b Address,
 
-    /// Funding account and lamports to transfer to the new account.
-    pub payer_and_lamports: Option<(&'a AccountView, u64)>,
+    /// Funding for the new account.
+    ///
+    /// If `None`, the instruction will not transfer any
+    /// lamports to the new account.
+    pub funding: Option<Funding<'a>>,
 }
 
 impl<'a, 'b> CreateAccountAllowPrefund<'a, 'b> {
-    #[inline(always)]
-    /// Creates a new `CreateAccountAllowPrefund` instruction with the minimum balance required
-    /// for the account. The caller must provide a `payer` if the account needs lamports;
-    /// otherwise, the resulting instruction will fail (downstream) when invoked.
+    /// Creates a new `CreateAccountAllowPrefund` instruction with the minimum
+    /// balance required for the account.
     ///
-    /// This instruction does not warn if the account has more than enough lamports; large
-    /// lamport balances can be frozen by `CreateAccountAllowPrefund` if used incorrectly.
+    /// If the account already has lamports to cover the minimum balance, then
+    /// no lamports will be transferred.
+    #[inline(always)]
     pub fn with_minimum_balance(
+        from: &'a AccountView,
         to: &'a AccountView,
         space: u64,
         owner: &'b Address,
-        payer: Option<&'a AccountView>,
         rent_sysvar: Option<&'a AccountView>,
     ) -> Result<Self, ProgramError> {
         let required_lamports = if let Some(rent_sysvar) = rent_sysvar {
@@ -45,13 +70,14 @@ impl<'a, 'b> CreateAccountAllowPrefund<'a, 'b> {
         } else {
             Rent::get()?.try_minimum_balance(space as usize)?
         };
+
         let lamports = required_lamports.saturating_sub(to.lamports());
 
         Ok(Self {
             to,
             space,
             owner,
-            payer_and_lamports: payer.map(|p| (p, lamports)),
+            funding: Some(Funding { from, lamports }),
         })
     }
 
@@ -67,34 +93,56 @@ impl<'a, 'b> CreateAccountAllowPrefund<'a, 'b> {
         // - [4..12 ]: lamports
         // - [12..20]: account space
         // - [20..52]: owner address
-        let mut instruction_data = [0u8; 52];
-        // CreateAccountAllowPrefund has discriminator 13
-        instruction_data[0] = 13;
-        // Lamports remains 0 here, but may be changed just below
-        instruction_data[12..20].copy_from_slice(&self.space.to_le_bytes());
-        instruction_data[20..52].copy_from_slice(self.owner.as_ref());
+        let mut instruction_data = [UNINIT_BYTE; 52];
 
-        if let Some((payer, lamports)) = self.payer_and_lamports {
-            instruction_data[4..12].copy_from_slice(&lamports.to_le_bytes());
-            let instruction_accounts: [InstructionAccount; 2] = [
-                InstructionAccount::writable_signer(self.to.address()),
-                InstructionAccount::writable_signer(payer.address()),
-            ];
-            let instruction = InstructionView {
-                program_id: &crate::ID,
-                accounts: &instruction_accounts,
-                data: &instruction_data,
-            };
-            invoke_signed(&instruction, &[self.to, payer], signers)
+        write_bytes(&mut instruction_data[..4], &[13, 0, 0, 0]);
+
+        write_bytes(&mut instruction_data[12..20], &self.space.to_le_bytes());
+
+        write_bytes(&mut instruction_data[20..52], self.owner.as_ref());
+
+        // Determine the accounts to pass to the instruction based on whether funding
+        // is present or not.
+
+        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 2];
+
+        instruction_accounts[0].write(InstructionAccount::writable_signer(self.to.address()));
+
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; 2];
+
+        accounts[0].write(self.to);
+
+        let expected_accounts = if let Some(funding) = &self.funding {
+            write_bytes(
+                &mut instruction_data[4..12],
+                &funding.lamports.to_le_bytes(),
+            );
+
+            instruction_accounts[1]
+                .write(InstructionAccount::writable_signer(funding.from.address()));
+
+            accounts[1].write(funding.from);
+
+            2
         } else {
-            let instruction_accounts: [InstructionAccount; 1] =
-                [InstructionAccount::writable_signer(self.to.address())];
-            let instruction = InstructionView {
+            write_bytes(&mut instruction_data[4..12], &[0; 8]);
+
+            1
+        };
+
+        invoke_signed_with_bounds::<2, _>(
+            &InstructionView {
                 program_id: &crate::ID,
-                accounts: &instruction_accounts,
-                data: &instruction_data,
-            };
-            invoke_signed(&instruction, &[self.to], signers)
-        }
+                // SAFETY: instruction accounts has `expected_accounts` initialized.
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                // SAFETY: instruction data is initialized.
+                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 52) },
+            },
+            // SAFETY: accounts has `expected_accounts` initialized.
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
+            signers,
+        )
     }
 }
