@@ -36,7 +36,7 @@ use {
 ///   0. `[writable]` The mint.
 ///   1. `[]` The mint's multisignature multiplier authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct UpdateMultiplier<'a, 'b, 'c> {
+pub struct UpdateMultiplier<'a, 'b, 'c, A: AsRef<AccountView>> {
     /// The mint.
     pub mint: &'a AccountView,
 
@@ -44,7 +44,7 @@ pub struct UpdateMultiplier<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
 
     /// The new multiplier.
     pub multiplier: f64,
@@ -56,7 +56,7 @@ pub struct UpdateMultiplier<'a, 'b, 'c> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> UpdateMultiplier<'a, 'b, 'c> {
+impl<'a, 'b, 'c, A: AsRef<AccountView>> UpdateMultiplier<'a, 'b, 'c, A> {
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `UpdateMultiplier` instruction with a single
@@ -88,7 +88,7 @@ impl<'a, 'b, 'c> UpdateMultiplier<'a, 'b, 'c> {
         authority: &'a AccountView,
         multiplier: f64,
         effective_timestamp: i64,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             mint,
@@ -130,7 +130,9 @@ impl<'a, 'b, 'c> UpdateMultiplier<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -142,7 +144,7 @@ impl<'a, 'b, 'c> UpdateMultiplier<'a, 'b, 'c> {
         accounts[1].write(self.authority);
 
         for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

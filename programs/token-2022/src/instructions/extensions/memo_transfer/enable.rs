@@ -22,7 +22,7 @@ use {
 ///   0. `[writable]` The account to update.
 ///   1. `[]` The account's multisignature owner.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct Enable<'a, 'b, 'c> {
+pub struct Enable<'a, 'b, 'c, A: AsRef<AccountView>> {
     /// The account to update.
     pub account: &'a AccountView,
 
@@ -30,13 +30,13 @@ pub struct Enable<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
 
     /// The token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
+impl<'a, 'b, 'c, A: AsRef<AccountView>> Enable<'a, 'b, 'c, A> {
     pub const DISCRIMINATOR: u8 = 0;
 
     /// Creates a new `Enable` instruction with a single owner/delegate
@@ -57,7 +57,7 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
         token_program: &'b Address,
         account: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             account,
@@ -97,7 +97,9 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
+            instruction_account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -109,7 +111,7 @@ impl<'a, 'b, 'c> Enable<'a, 'b, 'c> {
         accounts[1].write(self.authority);
 
         for (account_view, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
-            account_view.write(signer);
+            account_view.write(signer.as_ref());
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, _>(

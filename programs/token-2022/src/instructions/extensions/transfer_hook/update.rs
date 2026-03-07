@@ -29,7 +29,7 @@ use {
 ///   0. `[writable]` The mint.
 ///   1. `[]` The mint's transfer hook authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct UpdateTransferHook<'a, 'b, 'c> {
+pub struct UpdateTransferHook<'a, 'b, 'c, A: AsRef<AccountView>> {
     /// The mint.
     pub mint: &'a AccountView,
 
@@ -37,7 +37,7 @@ pub struct UpdateTransferHook<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// The signer accounts when `authority` is a multisig.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
 
     /// Program that authorizes the transfer.
     pub transfer_hook_program: Option<&'b Address>,
@@ -46,7 +46,7 @@ pub struct UpdateTransferHook<'a, 'b, 'c> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
+impl<'a, 'b, 'c, A: AsRef<AccountView>> UpdateTransferHook<'a, 'b, 'c, A> {
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `UpdateTransferHook` instruction with a single
@@ -69,7 +69,7 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
         mint: &'a AccountView,
         authority: &'a AccountView,
         transfer_hook_program: Option<&'b Address>,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             mint,
@@ -110,7 +110,9 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -132,7 +134,7 @@ impl<'a, 'b, 'c> UpdateTransferHook<'a, 'b, 'c> {
                 .iter_mut()
                 .zip(self.multisig_signers.iter())
             {
-                account.write(signer);
+                account.write(signer.as_ref());
             }
         }
 

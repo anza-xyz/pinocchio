@@ -12,14 +12,14 @@ use {
 ///
 /// ### Accounts:
 ///   0. `..+N` `[SIGNER]` N signing accounts
-pub struct Memo<'a, 'b, 'c> {
+pub struct Memo<'a, 'b, A: AsRef<AccountView>> {
     /// Signing accounts
-    pub signers: &'b [&'a AccountView],
+    pub signers: &'a [A],
     /// Memo
-    pub memo: &'c str,
+    pub memo: &'b str,
 }
 
-impl Memo<'_, '_, '_> {
+impl<A: AsRef<AccountView>> Memo<'_, '_, A> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -43,7 +43,9 @@ impl Memo<'_, '_, '_> {
             unsafe {
                 // SAFETY: `num_accounts` is less than MAX_STATIC_CPI_ACCOUNTS.
                 instruction_accounts.get_unchecked_mut(i).write(
-                    InstructionAccount::readonly_signer(self.signers.get_unchecked(i).address()),
+                    InstructionAccount::readonly_signer(
+                        self.signers.get_unchecked(i).as_ref().address(),
+                    ),
                 );
             }
         }
