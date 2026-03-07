@@ -20,16 +20,16 @@ use {
 ///   0. `[WRITE]` The source account.
 ///   1. `[]` The source account's multisignature owner.
 ///   2. `..2+M` `[SIGNER]` M signer accounts
-pub struct Revoke<'a, 'b> {
+pub struct Revoke<'a, 'b, A: AsRef<AccountView>> {
     /// Source Account.
     pub source: &'a AccountView,
     ///  Source Owner Account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [A],
 }
 
-impl<'a, 'b> Revoke<'a, 'b> {
+impl<'a, 'b, A: AsRef<AccountView>> Revoke<'a, 'b, A> {
     /// Creates a new `Revoke` instruction with a single owner authority.
     #[inline(always)]
     pub fn new(source: &'a AccountView, authority: &'a AccountView) -> Self {
@@ -42,7 +42,7 @@ impl<'a, 'b> Revoke<'a, 'b> {
     pub fn with_multisig_signers(
         source: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'b [&'a AccountView],
+        multisig_signers: &'b [A],
     ) -> Self {
         Self {
             source,
@@ -81,7 +81,9 @@ impl<'a, 'b> Revoke<'a, 'b> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -94,7 +96,7 @@ impl<'a, 'b> Revoke<'a, 'b> {
         accounts[1].write(self.authority);
 
         for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, _>(

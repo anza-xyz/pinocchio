@@ -22,7 +22,7 @@ use {
 ///   1. `[]` The delegate.
 ///   2. `[]` The source account's multisignature owner.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct Approve<'a, 'b> {
+pub struct Approve<'a, 'b, A: AsRef<AccountView>> {
     /// Source Account.
     pub source: &'a AccountView,
     /// Delegate Account
@@ -30,12 +30,12 @@ pub struct Approve<'a, 'b> {
     /// Source Owner Account
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [A],
     /// Amount
     pub amount: u64,
 }
 
-impl<'a, 'b> Approve<'a, 'b> {
+impl<'a, 'b, A: AsRef<AccountView>> Approve<'a, 'b, A> {
     /// Creates a new `Approve` instruction with a single owner authority.
     #[inline(always)]
     pub fn new(
@@ -55,7 +55,7 @@ impl<'a, 'b> Approve<'a, 'b> {
         delegate: &'a AccountView,
         authority: &'a AccountView,
         amount: u64,
-        multisig_signers: &'b [&'a AccountView],
+        multisig_signers: &'b [A],
     ) -> Self {
         Self {
             source,
@@ -98,7 +98,9 @@ impl<'a, 'b> Approve<'a, 'b> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -113,7 +115,7 @@ impl<'a, 'b> Approve<'a, 'b> {
         accounts[2].write(self.authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

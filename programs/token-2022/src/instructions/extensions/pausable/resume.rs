@@ -21,7 +21,7 @@ use {
 ///   0. `[writable]` The mint to update.
 ///   1. `[]` The mint's multisignature pause authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct Resume<'a, 'b, 'c> {
+pub struct Resume<'a, 'b, 'c, A: AsRef<AccountView>> {
     /// The mint to update.
     pub mint: &'a AccountView,
 
@@ -29,13 +29,13 @@ pub struct Resume<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// The signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
 
     /// The token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
+impl<'a, 'b, 'c, A: AsRef<AccountView>> Resume<'a, 'b, 'c, A> {
     pub const DISCRIMINATOR: u8 = 2;
 
     /// Creates a new `Resume` instruction with a single owner/delegate
@@ -56,7 +56,7 @@ impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
         token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             mint,
@@ -96,7 +96,9 @@ impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -109,7 +111,7 @@ impl<'a, 'b, 'c> Resume<'a, 'b, 'c> {
         accounts[1].write(self.authority);
 
         for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         invoke_signed_with_bounds::<{ 2 + MAX_MULTISIG_SIGNERS }, _>(

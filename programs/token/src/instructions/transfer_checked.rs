@@ -24,7 +24,7 @@ use {
 ///   2. `[WRITE]` The destination account.
 ///   3. `[]` The source account's multisignature owner/delegate.
 ///   4. `..4+M` `[SIGNER]` M signer accounts
-pub struct TransferChecked<'a, 'b> {
+pub struct TransferChecked<'a, 'b, A: AsRef<AccountView>> {
     /// Sender account.
     pub from: &'a AccountView,
     /// Mint Account
@@ -34,14 +34,14 @@ pub struct TransferChecked<'a, 'b> {
     /// Authority account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [A],
     /// Amount of micro-tokens to transfer.
     pub amount: u64,
     /// Decimal for the Token
     pub decimals: u8,
 }
 
-impl<'a, 'b> TransferChecked<'a, 'b> {
+impl<'a, 'b, A: AsRef<AccountView>> TransferChecked<'a, 'b, A> {
     /// Creates a new `TransferChecked` instruction with a single
     /// owner/delegate authority.
     #[inline(always)]
@@ -66,7 +66,7 @@ impl<'a, 'b> TransferChecked<'a, 'b> {
         authority: &'a AccountView,
         amount: u64,
         decimals: u8,
-        multisig_signers: &'b [&'a AccountView],
+        multisig_signers: &'b [A],
     ) -> Self {
         Self {
             from,
@@ -113,7 +113,9 @@ impl<'a, 'b> TransferChecked<'a, 'b> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -130,7 +132,7 @@ impl<'a, 'b> TransferChecked<'a, 'b> {
         accounts[3].write(self.authority);
 
         for (account, signer) in accounts[4..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

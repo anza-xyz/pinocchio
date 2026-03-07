@@ -27,7 +27,7 @@ use {
 ///   1. `[writable]` The destination account.
 ///   2. `[]` The mint's multisig `withdraw_withheld_authority`.
 ///   3. `..3+M` `[signer]` M signer accounts.
-pub struct WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
+pub struct WithdrawWithheldTokensFromMint<'a, 'b, 'c, A: AsRef<AccountView>> {
     /// The token mint.
     pub mint: &'a AccountView,
 
@@ -38,13 +38,13 @@ pub struct WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
 
     /// Token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
+impl<'a, 'b, 'c, A: AsRef<AccountView>> WithdrawWithheldTokensFromMint<'a, 'b, 'c, A> {
     pub const DISCRIMINATOR: u8 = 2;
 
     /// Creates a new `WithdrawWithheldTokensFromMint` instruction
@@ -67,7 +67,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             mint,
@@ -110,7 +110,9 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
+            instruction_account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -125,7 +127,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromMint<'a, 'b, 'c> {
         accounts[2].write(self.authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(*signer);
+            account.write(signer.as_ref());
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(

@@ -22,7 +22,7 @@ use {
 ///   1. `[WRITE]` The token mint.
 ///   2. `[]` The account's multisignature owner/delegate.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct Burn<'a, 'b> {
+pub struct Burn<'a, 'b, A: AsRef<AccountView>> {
     /// Source of the Burn Account
     pub account: &'a AccountView,
     /// Mint Account
@@ -30,12 +30,12 @@ pub struct Burn<'a, 'b> {
     /// Owner of the Token Account
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [A],
     /// Amount
     pub amount: u64,
 }
 
-impl<'a, 'b> Burn<'a, 'b> {
+impl<'a, 'b, A: AsRef<AccountView>> Burn<'a, 'b, A> {
     /// Creates a new `Burn` instruction with a single
     /// owner/delegate authority.
     #[inline(always)]
@@ -56,7 +56,7 @@ impl<'a, 'b> Burn<'a, 'b> {
         mint: &'a AccountView,
         authority: &'a AccountView,
         amount: u64,
-        multisig_signers: &'b [&'a AccountView],
+        multisig_signers: &'b [A],
     ) -> Self {
         Self {
             account,
@@ -99,7 +99,9 @@ impl<'a, 'b> Burn<'a, 'b> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -114,7 +116,7 @@ impl<'a, 'b> Burn<'a, 'b> {
         accounts[2].write(self.authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

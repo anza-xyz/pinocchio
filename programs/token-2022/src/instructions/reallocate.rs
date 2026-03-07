@@ -31,7 +31,7 @@ use {
 ///   2. `[]` System program for reallocation funding
 ///   3. `[]` The account's multisignature owner/delegate.
 ///   4. ..`4+M` `[signer]` M signer accounts.
-pub struct Reallocate<'a, 'b, 'c, 'd> {
+pub struct Reallocate<'a, 'b, 'c, 'd, A: AsRef<AccountView>> {
     /// The account to reallocate.
     pub account: &'a AccountView,
 
@@ -45,7 +45,7 @@ pub struct Reallocate<'a, 'b, 'c, 'd> {
     pub owner: &'a AccountView,
 
     /// The signer accounts for multisignature owner, if applicable.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
 
     /// New extension types to include in the reallocated account
     pub extensions: &'d [ExtensionDiscriminator],
@@ -54,7 +54,7 @@ pub struct Reallocate<'a, 'b, 'c, 'd> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, 'd> Reallocate<'a, 'b, 'c, 'd> {
+impl<'a, 'b, 'c, 'd, A: AsRef<AccountView>> Reallocate<'a, 'b, 'c, 'd, A> {
     pub const DISCRIMINATOR: u8 = 29;
 
     /// Creates a new `Reallocate` instruction with a single owner/delegate
@@ -89,7 +89,7 @@ impl<'a, 'b, 'c, 'd> Reallocate<'a, 'b, 'c, 'd> {
         system_program: &'a AccountView,
         owner: &'a AccountView,
         extensions: &'d [ExtensionDiscriminator],
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             account,
@@ -137,7 +137,9 @@ impl<'a, 'b, 'c, 'd> Reallocate<'a, 'b, 'c, 'd> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -154,7 +156,7 @@ impl<'a, 'b, 'c, 'd> Reallocate<'a, 'b, 'c, 'd> {
         accounts[3].write(self.owner);
 
         for (account, signer) in accounts[4..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

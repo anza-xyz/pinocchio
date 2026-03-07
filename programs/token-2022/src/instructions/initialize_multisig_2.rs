@@ -12,14 +12,14 @@ use {
 /// ### Accounts:
 ///   0. `[writable]` The multisig account to initialize.
 ///   1. `..+N` `[]` The `N` signer accounts, where `N` is `1 <= N <= 11`.
-pub struct InitializeMultisig2<'a, 'b, 'c>
+pub struct InitializeMultisig2<'a, 'b, 'c, A: AsRef<AccountView>>
 where
     'a: 'b,
 {
     /// Multisig Account.
     pub multisig: &'a AccountView,
     /// Signer Accounts
-    pub signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [A],
     /// The number of signers (M) required to validate this multisignature
     /// account.
     pub m: u8,
@@ -27,12 +27,12 @@ where
     pub token_program: &'c Address,
 }
 
-impl InitializeMultisig2<'_, '_, '_> {
+impl<A: AsRef<AccountView>> InitializeMultisig2<'_, '_, '_, A> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         let &Self {
             multisig,
-            signers,
+            multisig_signers: signers,
             m,
             token_program,
         } = self;
@@ -60,7 +60,7 @@ impl InitializeMultisig2<'_, '_, '_> {
         for (instruction_account, signer) in
             instruction_accounts[1..].iter_mut().zip(signers.iter())
         {
-            instruction_account.write(InstructionAccount::readonly(signer.address()));
+            instruction_account.write(InstructionAccount::readonly(signer.as_ref().address()));
         }
 
         // Instruction data layout:
@@ -89,7 +89,7 @@ impl InitializeMultisig2<'_, '_, '_> {
 
         // Fill signer accounts
         for (account_view, signer) in acc_views[1..].iter_mut().zip(signers.iter()) {
-            account_view.write(signer);
+            account_view.write(signer.as_ref());
         }
 
         invoke_with_bounds::<{ 1 + MAX_MULTISIG_SIGNERS }, &AccountView>(&instruction, unsafe {

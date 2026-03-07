@@ -35,7 +35,7 @@ use {
 ///      any.
 ///   3. `[]` The source account's multisignature owner/delegate.
 ///   4. `..4+M` `[signer]` M signer accounts for the multisig.
-pub struct BurnChecked<'a, 'b, 'c> {
+pub struct BurnChecked<'a, 'b, 'c, A: AsRef<AccountView>> {
     /// The source account to burn from.
     pub account: &'a AccountView,
 
@@ -49,7 +49,7 @@ pub struct BurnChecked<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Signer accounts for multisignature authority, if applicable.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
 
     /// The amount of tokens to burn.
     pub amount: u64,
@@ -61,7 +61,7 @@ pub struct BurnChecked<'a, 'b, 'c> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
+impl<'a, 'b, 'c, A: AsRef<AccountView>> BurnChecked<'a, 'b, 'c, A> {
     pub const DISCRIMINATOR: u8 = 2;
 
     /// Creates a new `BurnChecked` instruction with a single owner/delegate
@@ -100,7 +100,7 @@ impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
         authority: &'a AccountView,
         amount: u64,
         decimals: u8,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             account,
@@ -150,7 +150,9 @@ impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -167,7 +169,7 @@ impl<'a, 'b, 'c> BurnChecked<'a, 'b, 'c> {
         accounts[3].write(self.authority);
 
         for (account, signer) in accounts[4..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

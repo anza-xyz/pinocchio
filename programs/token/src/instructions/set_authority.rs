@@ -30,20 +30,20 @@ pub enum AuthorityType {
 ///   0. `[WRITE]` The mint or account to change the authority of.
 ///   1. `[]` The current multisignature authority of the mint or account.
 ///   2. `..2+M` `[SIGNER]` M signer accounts
-pub struct SetAuthority<'a, 'b, 'c> {
+pub struct SetAuthority<'a, 'b, 'c, A: AsRef<AccountView>> {
     /// Account (Mint or Token)
     pub account: &'a AccountView,
     /// Authority of the Account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
     /// The type of authority to update.
     pub authority_type: AuthorityType,
     /// The new authority
     pub new_authority: Option<&'b Address>,
 }
 
-impl<'a, 'b, 'c> SetAuthority<'a, 'b, 'c> {
+impl<'a, 'b, 'c, A: AsRef<AccountView>> SetAuthority<'a, 'b, 'c, A> {
     /// Creates a new `SetAuthority` instruction with a single authority.
     #[inline(always)]
     pub fn new(
@@ -63,7 +63,7 @@ impl<'a, 'b, 'c> SetAuthority<'a, 'b, 'c> {
         authority: &'a AccountView,
         authority_type: AuthorityType,
         new_authority: Option<&'b Address>,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             account,
@@ -104,7 +104,9 @@ impl<'a, 'b, 'c> SetAuthority<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -117,7 +119,7 @@ impl<'a, 'b, 'c> SetAuthority<'a, 'b, 'c> {
         accounts[1].write(self.authority);
 
         for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

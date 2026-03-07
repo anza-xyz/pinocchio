@@ -28,7 +28,7 @@ use {
 ///   2. `[]` The mint's multisig `withdraw_withheld_authority`.
 ///   3. `..3+M` `[signer]` M signer accounts.
 ///   4. `3+M+1..3+M+N` `[writable]` The source accounts to withdraw from.
-pub struct WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
+pub struct WithdrawWithheldTokensFromAccounts<'a, 'b, 'c, A: AsRef<AccountView>> {
     /// The token mint.
     pub mint: &'a AccountView,
 
@@ -39,16 +39,16 @@ pub struct WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Multisignature signer accounts.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [A],
 
     /// Source accounts to withdraw from.
-    pub sources: &'c [&'a AccountView],
+    pub sources: &'c [A],
 
     /// Token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
+impl<'a, 'b, 'c, A: AsRef<AccountView>> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c, A> {
     pub const DISCRIMINATOR: u8 = 3;
 
     /// Creates a new `WithdrawWithheldTokensFromAccounts` instruction
@@ -59,7 +59,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        sources: &'c [&'a AccountView],
+        sources: &'c [A],
     ) -> Self {
         Self::with_multisig_signers(token_program, mint, destination, authority, sources, &[])
     }
@@ -72,8 +72,8 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        sources: &'c [&'a AccountView],
-        multisig_signers: &'c [&'a AccountView],
+        sources: &'c [A],
+        multisig_signers: &'c [A],
     ) -> Self {
         Self {
             mint,
@@ -121,7 +121,9 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
+            instruction_account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // SAFETY: The expected number of accounts has been validated to be less than
@@ -132,7 +134,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
                 .iter_mut()
                 .zip(self.sources.iter())
             {
-                instruction_account.write(InstructionAccount::writable(source.address()));
+                instruction_account.write(InstructionAccount::writable(source.as_ref().address()));
             }
         }
 
@@ -148,7 +150,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
         accounts[2].write(self.authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(*signer);
+            account.write(signer.as_ref());
         }
 
         // SAFETY: The expected number of accounts has been validated to be less than
@@ -159,7 +161,7 @@ impl<'a, 'b, 'c> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c> {
                 .iter_mut()
                 .zip(self.sources.iter())
             {
-                account.write(*source);
+                account.write(source.as_ref());
             }
         }
 

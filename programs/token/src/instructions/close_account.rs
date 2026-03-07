@@ -22,7 +22,7 @@ use {
 ///   1. `[WRITE]` The destination account.
 ///   2. `[]` The account's multisignature owner.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct CloseAccount<'a, 'b> {
+pub struct CloseAccount<'a, 'b, A: AsRef<AccountView>> {
     /// Token Account.
     pub account: &'a AccountView,
     /// Destination Account
@@ -30,10 +30,10 @@ pub struct CloseAccount<'a, 'b> {
     /// Owner Account
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [A],
 }
 
-impl<'a, 'b> CloseAccount<'a, 'b> {
+impl<'a, 'b, A: AsRef<AccountView>> CloseAccount<'a, 'b, A> {
     /// Creates a new `CloseAccount` instruction with a single owner authority.
     #[inline(always)]
     pub fn new(
@@ -51,7 +51,7 @@ impl<'a, 'b> CloseAccount<'a, 'b> {
         account: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'b [&'a AccountView],
+        multisig_signers: &'b [A],
     ) -> Self {
         Self {
             account,
@@ -93,7 +93,9 @@ impl<'a, 'b> CloseAccount<'a, 'b> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -108,7 +110,7 @@ impl<'a, 'b> CloseAccount<'a, 'b> {
         accounts[2].write(self.authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(
