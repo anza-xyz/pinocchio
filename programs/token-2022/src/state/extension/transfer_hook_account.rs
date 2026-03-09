@@ -1,4 +1,4 @@
-use super::{sealed, ExtensionType, ExtensionValue, Pod};
+use super::{sealed, ExtensionPod, ExtensionType, ExtensionValue};
 
 /// Transfer hook account extension data (1 byte).
 #[repr(C)]
@@ -23,8 +23,8 @@ impl TransferHookAccountExtension {
 
 // SAFETY: `TransferHookAccountExtension` is repr(C), contains only `u8`,
 // has no padding, and all bit patterns are valid.
-impl sealed::SealedPod for TransferHookAccountExtension {}
-unsafe impl Pod for TransferHookAccountExtension {}
+impl sealed::SealedExtensionPod for TransferHookAccountExtension {}
+unsafe impl ExtensionPod for TransferHookAccountExtension {}
 
 impl ExtensionValue for TransferHookAccountExtension {
     const TYPE: ExtensionType = ExtensionType::TransferHookAccount;

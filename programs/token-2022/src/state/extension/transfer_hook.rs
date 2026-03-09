@@ -1,5 +1,5 @@
 use {
-    super::{sealed, ExtensionType, ExtensionValue, Pod},
+    super::{sealed, ExtensionPod, ExtensionType, ExtensionValue},
     solana_address::Address,
 };
 
@@ -8,10 +8,10 @@ use {
 /// Configures a custom program to execute additional logic on every
 /// transfer involving this mint.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TransferHookExtension {
-    authority: [u8; 32],
-    program_id: [u8; 32],
+    authority: Address,
+    program_id: Address,
 }
 
 impl TransferHookExtension {
@@ -19,33 +19,29 @@ impl TransferHookExtension {
 
     #[inline(always)]
     pub fn authority(&self) -> &Address {
-        // SAFETY: `Address` is `#[repr(transparent)]` over `[u8; 32]` with
-        // alignment 1, so the pointer cast is valid.
-        unsafe { &*(self.authority.as_ptr() as *const Address) }
+        &self.authority
     }
 
     #[inline(always)]
     pub fn program_id(&self) -> &Address {
-        // SAFETY: `Address` is `#[repr(transparent)]` over `[u8; 32]` with
-        // alignment 1, so the pointer cast is valid.
-        unsafe { &*(self.program_id.as_ptr() as *const Address) }
+        &self.program_id
     }
 
     #[inline(always)]
     pub fn set_authority(&mut self, authority: &Address) {
-        self.authority.copy_from_slice(authority.as_ref());
+        self.authority = authority.clone();
     }
 
     #[inline(always)]
     pub fn set_program_id(&mut self, program_id: &Address) {
-        self.program_id.copy_from_slice(program_id.as_ref());
+        self.program_id = program_id.clone();
     }
 }
 
-// SAFETY: `TransferHookExtension` is repr(C), contains only `[u8; 32]` arrays,
-// has no padding, and all bit patterns are valid.
-impl sealed::SealedPod for TransferHookExtension {}
-unsafe impl Pod for TransferHookExtension {}
+// SAFETY: `TransferHookExtension` is repr(C), contains only `Address`
+// (`[u8; 32]`) fields, has no padding, and all bit patterns are valid.
+impl sealed::SealedExtensionPod for TransferHookExtension {}
+unsafe impl ExtensionPod for TransferHookExtension {}
 
 impl ExtensionValue for TransferHookExtension {
     const TYPE: ExtensionType = ExtensionType::TransferHook;

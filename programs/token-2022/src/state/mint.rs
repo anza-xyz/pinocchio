@@ -89,6 +89,19 @@ impl Mint {
         &*(bytes[..Self::BASE_LEN].as_ptr() as *const Mint)
     }
 
+    /// Return a mutable `Mint` from the given bytes.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `bytes` contains a valid representation of
+    /// `Mint`, and it is properly aligned to be interpreted as an instance
+    /// of `Mint`. At the moment `Mint` has an alignment of 1 byte.
+    /// This method does not perform a length validation.
+    #[inline(always)]
+    pub(crate) unsafe fn from_bytes_unchecked_mut(bytes: &mut [u8]) -> &mut Self {
+        &mut *(bytes[..Self::BASE_LEN].as_mut_ptr() as *mut Mint)
+    }
+
     #[inline(always)]
     pub fn has_mint_authority(&self) -> bool {
         self.mint_authority_flag[0] == 1

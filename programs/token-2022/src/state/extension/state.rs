@@ -1,16 +1,15 @@
 use {
     super::{
-        extension_not_found_error, extension_type_from_u16, mint_from_bytes_unchecked_mut,
-        token_account_from_bytes_unchecked_mut, validate_extension_account_type,
+        extension_not_found_error, extension_type_from_u16, validate_extension_account_type,
         validate_mint_extensions_data, validate_token_extensions_data, ExtensionBaseState,
-        ExtensionType, ExtensionValue, Pod, BASE_ACCOUNT_LEN, TLV_HEADER_LEN, TLV_START_INDEX,
+        ExtensionPod, ExtensionType, ExtensionValue, BASE_ACCOUNT_LEN, TLV_HEADER_LEN,
+        TLV_START_INDEX,
     },
     crate::{
         state::{AccountType, Mint, Multisig, TokenAccount},
         ID,
     },
-    core::marker::PhantomData,
-    solana_account_view::{AccountView, Ref, RefMut},
+    solana_account_view::AccountView,
     solana_program_error::ProgramError,
 };
 
@@ -128,7 +127,7 @@ pub(super) fn collect_extension_types_from_tlv(
 }
 
 #[inline(always)]
-pub(super) fn extension_from_bytes<T: Pod>(bytes: &[u8]) -> Result<&T, ProgramError> {
+pub(super) fn extension_from_bytes<T: ExtensionPod>(bytes: &[u8]) -> Result<&T, ProgramError> {
     if bytes.len() != core::mem::size_of::<T>() {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -140,7 +139,9 @@ pub(super) fn extension_from_bytes<T: Pod>(bytes: &[u8]) -> Result<&T, ProgramEr
 }
 
 #[inline(always)]
-pub(super) fn extension_from_bytes_mut<T: Pod>(bytes: &mut [u8]) -> Result<&mut T, ProgramError> {
+pub(super) fn extension_from_bytes_mut<T: ExtensionPod>(
+    bytes: &mut [u8],
+) -> Result<&mut T, ProgramError> {
     if bytes.len() != core::mem::size_of::<T>() {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -167,7 +168,7 @@ impl ExtensionBaseState for Mint {
 
     #[inline(always)]
     unsafe fn from_bytes_unchecked_mut(data: &mut [u8]) -> &mut Self {
-        mint_from_bytes_unchecked_mut(data)
+        Mint::from_bytes_unchecked_mut(data)
     }
 }
 
@@ -187,7 +188,7 @@ impl ExtensionBaseState for TokenAccount {
 
     #[inline(always)]
     unsafe fn from_bytes_unchecked_mut(data: &mut [u8]) -> &mut Self {
-        token_account_from_bytes_unchecked_mut(data)
+        TokenAccount::from_bytes_unchecked_mut(data)
     }
 }
 
@@ -227,6 +228,19 @@ pub struct StateWithExtensions<'a, B: ExtensionBaseState> {
 }
 
 impl<'a, B: ExtensionBaseState> StateWithExtensions<'a, B> {
+    /// Return a `StateWithExtensions` from the given byte slice.
+    ///
+    /// This method validates the data layout but does **not** check the
+    /// account owner. Callers needing owner validation should check
+    /// ownership before borrowing.
+    #[inline]
+    pub fn from_bytes(data: &'a [u8]) -> Result<Self, ProgramError> {
+        validate_state_with_extensions_data::<B>(data)?;
+        let base = unsafe { B::from_bytes_unchecked(data) };
+        let tlv_data = &data[extension_data_start::<B>(data.len())..];
+        Ok(Self { base, tlv_data })
+    }
+
     /// Return a `StateWithExtensions` from the given account view.
     ///
     /// This method performs owner and length validation on
@@ -282,155 +296,6 @@ impl<'a, B: ExtensionBaseState> StateWithExtensions<'a, B> {
     }
 }
 
-/// A base state with TLV extension data backed by a checked borrow.
-///
-/// This type holds a [`Ref`] guard that keeps the account data borrow alive.
-/// Use this when you need safe, checked borrowing of the account data.
-pub struct RefStateWithExtensions<'a, B: ExtensionBaseState> {
-    data: Ref<'a, [u8]>,
-    _marker: PhantomData<B>,
-}
-
-impl<'a, B: ExtensionBaseState> RefStateWithExtensions<'a, B> {
-    /// Return a `RefStateWithExtensions` from the given account view.
-    ///
-    /// This method performs owner and length validation on `AccountView`,
-    /// safe borrowing the account data.
-    #[inline]
-    pub fn from_account_view(account_view: &'a AccountView) -> Result<Self, ProgramError> {
-        if account_view.data_len() < B::BASE_LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
-        if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountOwner);
-        }
-
-        let data = account_view.try_borrow()?;
-        validate_state_with_extensions_data::<B>(&data)?;
-
-        Ok(Self {
-            data,
-            _marker: PhantomData,
-        })
-    }
-
-    #[inline(always)]
-    pub fn base(&self) -> &B {
-        unsafe { B::from_bytes_unchecked(&self.data) }
-    }
-
-    #[inline]
-    fn tlv_data(&self) -> &[u8] {
-        &self.data[extension_data_start::<B>(self.data.len())..]
-    }
-
-    /// Find the value bytes for a given extension type via
-    /// linear TLV walk.
-    #[inline]
-    pub fn get_extension_bytes(&self, target: ExtensionType) -> Result<&[u8], ProgramError> {
-        validate_extension_account_type(target, B::ACCOUNT_TYPE)?;
-        get_extension_bytes_from_tlv(self.tlv_data(), target)
-    }
-
-    #[inline]
-    pub fn get_extension_types(&self, out: &mut [ExtensionType]) -> Result<usize, ProgramError> {
-        collect_extension_types_from_tlv(self.tlv_data(), out)
-    }
-
-    #[inline]
-    pub fn get_extension<V: ExtensionValue>(&self) -> Result<&V, ProgramError> {
-        let bytes = self.get_extension_bytes(V::TYPE)?;
-        extension_from_bytes(bytes)
-    }
-}
-
-/// A base state with TLV extension data backed by a checked mutable borrow.
-pub struct RefMutStateWithExtensions<'a, B: ExtensionBaseState> {
-    data: RefMut<'a, [u8]>,
-    _marker: PhantomData<B>,
-}
-
-impl<'a, B: ExtensionBaseState> RefMutStateWithExtensions<'a, B> {
-    /// Return a `RefMutStateWithExtensions` from the given account view.
-    ///
-    /// This method performs owner and length validation on `AccountView`,
-    /// safe mutable borrowing the account data.
-    #[inline]
-    pub fn from_account_view(account_view: &'a AccountView) -> Result<Self, ProgramError> {
-        if account_view.data_len() < B::BASE_LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
-        if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountOwner);
-        }
-
-        let data = account_view.try_borrow_mut()?;
-        validate_state_with_extensions_data::<B>(&data)?;
-
-        Ok(Self {
-            data,
-            _marker: PhantomData,
-        })
-    }
-
-    #[inline(always)]
-    pub fn base(&self) -> &B {
-        unsafe { B::from_bytes_unchecked(&self.data) }
-    }
-
-    #[inline(always)]
-    pub fn base_mut(&mut self) -> &mut B {
-        unsafe { B::from_bytes_unchecked_mut(&mut self.data) }
-    }
-
-    #[inline]
-    fn tlv_data(&self) -> &[u8] {
-        &self.data[extension_data_start::<B>(self.data.len())..]
-    }
-
-    #[inline]
-    fn tlv_data_mut(&mut self) -> &mut [u8] {
-        let data_len = self.data.len();
-        &mut self.data[extension_data_start::<B>(data_len)..]
-    }
-
-    /// Find the value bytes for a given extension type via
-    /// linear TLV walk.
-    #[inline]
-    pub fn get_extension_bytes(&self, target: ExtensionType) -> Result<&[u8], ProgramError> {
-        validate_extension_account_type(target, B::ACCOUNT_TYPE)?;
-        get_extension_bytes_from_tlv(self.tlv_data(), target)
-    }
-
-    /// Find the mutable value bytes for a given extension type via
-    /// linear TLV walk.
-    #[inline]
-    pub fn get_extension_bytes_mut(
-        &mut self,
-        target: ExtensionType,
-    ) -> Result<&mut [u8], ProgramError> {
-        validate_extension_account_type(target, B::ACCOUNT_TYPE)?;
-        get_extension_bytes_from_tlv_mut(self.tlv_data_mut(), target)
-    }
-
-    #[inline]
-    pub fn get_extension_types(&self, out: &mut [ExtensionType]) -> Result<usize, ProgramError> {
-        collect_extension_types_from_tlv(self.tlv_data(), out)
-    }
-
-    #[inline]
-    pub fn get_extension<V: ExtensionValue>(&self) -> Result<&V, ProgramError> {
-        let bytes = self.get_extension_bytes(V::TYPE)?;
-        extension_from_bytes(bytes)
-    }
-
-    #[inline]
-    pub fn get_extension_mut<V: ExtensionValue>(&mut self) -> Result<&mut V, ProgramError> {
-        let bytes = self.get_extension_bytes_mut(V::TYPE)?;
-        extension_from_bytes_mut(bytes)
-    }
-}
-
 /// A base state with TLV extension data backed by an unchecked mutable borrow.
 pub struct StateWithExtensionsMut<'a, B: ExtensionBaseState> {
     base: &'a mut B,
@@ -438,6 +303,19 @@ pub struct StateWithExtensionsMut<'a, B: ExtensionBaseState> {
 }
 
 impl<'a, B: ExtensionBaseState> StateWithExtensionsMut<'a, B> {
+    /// Return a `StateWithExtensionsMut` from the given mutable byte slice.
+    ///
+    /// This method validates the data layout but does **not** check the
+    /// account owner. Callers needing owner validation should check
+    /// ownership before borrowing.
+    #[inline]
+    pub fn from_bytes_mut(data: &'a mut [u8]) -> Result<Self, ProgramError> {
+        validate_state_with_extensions_data::<B>(data)?;
+        let (base_and_type, tlv_data) = data.split_at_mut(extension_data_start::<B>(data.len()));
+        let base = unsafe { B::from_bytes_unchecked_mut(base_and_type) };
+        Ok(Self { base, tlv_data })
+    }
+
     /// Return a `StateWithExtensionsMut` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`,
@@ -681,34 +559,32 @@ mod tests {
     }
 
     #[test]
-    fn ref_mint_with_extensions_rejects_wrong_owner() {
+    fn mint_with_extensions_rejects_wrong_owner() {
         let account_owner = Address::new_from_array([7u8; 32]);
         let data = build_mint_data(&[]);
         let (_backing, account_view) = build_account_view(&account_owner, &data);
 
         assert!(matches!(
-            RefStateWithExtensions::<Mint>::from_account_view(&account_view),
+            unsafe { StateWithExtensions::<Mint>::from_account_view_unchecked(&account_view) },
             Err(ProgramError::InvalidAccountOwner)
         ));
     }
 
     #[test]
-    fn ref_mint_with_extensions_rejects_short_data() {
+    fn mint_with_extensions_rejects_short_data() {
         let data = vec![0u8; BASE_ACCOUNT_LEN];
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
         assert!(matches!(
-            RefStateWithExtensions::<Mint>::from_account_view(&account_view),
+            StateWithExtensions::<Mint>::from_bytes(&data),
             Err(ProgramError::InvalidAccountData)
         ));
     }
 
     #[test]
-    fn ref_mint_with_extensions_accepts_base_only_data() {
+    fn mint_with_extensions_accepts_base_only_data() {
         let data = vec![0u8; Mint::BASE_LEN];
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         assert!(matches!(
             mint.get_extension::<DefaultAccountStateExtension>(),
             Err(error) if is_extension_not_found_error(&error)
@@ -716,12 +592,10 @@ mod tests {
     }
 
     #[test]
-    fn ref_token_with_extensions_accepts_base_only_data() {
+    fn token_with_extensions_accepts_base_only_data() {
         let data = vec![0u8; TokenAccount::BASE_LEN];
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let token =
-            RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view).unwrap();
+        let token = StateWithExtensions::<TokenAccount>::from_bytes(&data).unwrap();
         assert!(matches!(
             token.get_extension::<TransferHookAccountExtension>(),
             Err(error) if is_extension_not_found_error(&error)
@@ -737,9 +611,8 @@ mod tests {
             &[AccountState::Initialized as u8],
         );
         let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         assert_eq!(
             mint.get_extension::<DefaultAccountStateExtension>()
                 .unwrap()
@@ -754,10 +627,8 @@ mod tests {
         let mut tlv_data = Vec::new();
         push_tlv_entry(&mut tlv_data, ExtensionType::TransferHookAccount, &[1u8]);
         let data = build_token_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let token =
-            RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view).unwrap();
+        let token = StateWithExtensions::<TokenAccount>::from_bytes(&data).unwrap();
         assert!(token
             .get_extension::<TransferHookAccountExtension>()
             .unwrap()
@@ -766,19 +637,17 @@ mod tests {
 
     #[test]
     fn get_extension_mut_returns_not_found_when_absent() {
-        let mint_data = vec![0u8; Mint::BASE_LEN];
-        let (_mint_backing, mint_view) = build_account_view(&ID, &mint_data);
-        let mut mint = RefMutStateWithExtensions::<Mint>::from_account_view(&mint_view).unwrap();
+        let mut mint_data = vec![0u8; Mint::BASE_LEN];
+        let mut mint = StateWithExtensionsMut::<Mint>::from_bytes_mut(&mut mint_data).unwrap();
         assert!(is_extension_not_found_error(
             &mint
                 .get_extension_mut::<DefaultAccountStateExtension>()
                 .unwrap_err()
         ));
 
-        let token_data = vec![0u8; TokenAccount::BASE_LEN];
-        let (_token_backing, token_view) = build_account_view(&ID, &token_data);
+        let mut token_data = vec![0u8; TokenAccount::BASE_LEN];
         let mut token =
-            RefMutStateWithExtensions::<TokenAccount>::from_account_view(&token_view).unwrap();
+            StateWithExtensionsMut::<TokenAccount>::from_bytes_mut(&mut token_data).unwrap();
         assert!(is_extension_not_found_error(
             &token
                 .get_extension_mut::<TransferHookAccountExtension>()
@@ -789,16 +658,14 @@ mod tests {
     #[test]
     fn get_extension_propagates_corrupt_tlv_data() {
         let corrupt_mint_data = build_mint_data(&[0u8]);
-        let (_mint_backing, mint_view) = build_account_view(&ID, &corrupt_mint_data);
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&mint_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&corrupt_mint_data).unwrap();
         assert!(matches!(
             mint.get_extension::<DefaultAccountStateExtension>(),
             Err(ProgramError::InvalidAccountData)
         ));
 
         let corrupt_token_data = build_token_data(&[0u8]);
-        let (_token_backing, token_view) = build_account_view(&ID, &corrupt_token_data);
-        let token = RefStateWithExtensions::<TokenAccount>::from_account_view(&token_view).unwrap();
+        let token = StateWithExtensions::<TokenAccount>::from_bytes(&corrupt_token_data).unwrap();
         assert!(matches!(
             token.get_extension::<TransferHookAccountExtension>(),
             Err(ProgramError::InvalidAccountData)
@@ -806,37 +673,34 @@ mod tests {
     }
 
     #[test]
-    fn ref_mint_with_extensions_rejects_multisig_len_collision() {
+    fn mint_with_extensions_rejects_multisig_len_collision() {
         let mut data = vec![0u8; Multisig::LEN];
         data[ACCOUNT_TYPE_INDEX] = AccountType::Mint as u8;
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
         assert!(matches!(
-            RefStateWithExtensions::<Mint>::from_account_view(&account_view),
+            StateWithExtensions::<Mint>::from_bytes(&data),
             Err(ProgramError::InvalidAccountData)
         ));
     }
 
     #[test]
-    fn ref_token_with_extensions_rejects_multisig_len_collision() {
+    fn token_with_extensions_rejects_multisig_len_collision() {
         let mut data = vec![0u8; Multisig::LEN];
         data[ACCOUNT_TYPE_INDEX] = AccountType::Account as u8;
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
         assert!(matches!(
-            RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view),
+            StateWithExtensions::<TokenAccount>::from_bytes(&data),
             Err(ProgramError::InvalidAccountData)
         ));
     }
 
     #[test]
-    fn ref_token_with_extensions_rejects_wrong_account_type() {
+    fn token_with_extensions_rejects_wrong_account_type() {
         let mut data = build_token_data(&[]);
         data[ACCOUNT_TYPE_INDEX] = AccountType::Mint as u8;
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
         assert!(matches!(
-            RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view),
+            StateWithExtensions::<TokenAccount>::from_bytes(&data),
             Err(ProgramError::InvalidAccountData)
         ));
     }
@@ -853,56 +717,52 @@ mod tests {
     }
 
     #[test]
-    fn ref_mint_with_extensions_enforces_borrow_rules() {
+    fn mint_with_extensions_from_bytes_write_then_read() {
         let mut tlv_data = Vec::new();
         push_tlv_entry(
             &mut tlv_data,
             ExtensionType::DefaultAccountState,
             &[AccountState::Initialized as u8],
         );
-        let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
+        let mut data = build_mint_data(&tlv_data);
 
-        let read_ref = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
-        assert!(RefMutStateWithExtensions::<Mint>::from_account_view(&account_view).is_err());
-        drop(read_ref);
+        {
+            let mut mint = StateWithExtensionsMut::<Mint>::from_bytes_mut(&mut data).unwrap();
+            mint.get_extension_mut::<DefaultAccountStateExtension>()
+                .unwrap()
+                .set_state(AccountState::Frozen);
+        }
 
-        let mut write_ref =
-            RefMutStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
-        assert!(RefStateWithExtensions::<Mint>::from_account_view(&account_view).is_err());
-        write_ref
-            .get_extension_mut::<DefaultAccountStateExtension>()
-            .unwrap()
-            .set_state(AccountState::Frozen);
-        drop(write_ref);
-
-        assert!(RefStateWithExtensions::<Mint>::from_account_view(&account_view).is_ok());
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        assert_eq!(
+            mint.get_extension::<DefaultAccountStateExtension>()
+                .unwrap()
+                .state()
+                .unwrap(),
+            AccountState::Frozen,
+        );
     }
 
     #[test]
-    fn ref_token_with_extensions_enforces_borrow_rules() {
+    fn token_with_extensions_from_bytes_write_then_read() {
         let mut tlv_data = Vec::new();
         push_tlv_entry(&mut tlv_data, ExtensionType::TransferHookAccount, &[0u8]);
-        let data = build_token_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
+        let mut data = build_token_data(&tlv_data);
 
-        let read_ref =
-            RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view).unwrap();
-        assert!(
-            RefMutStateWithExtensions::<TokenAccount>::from_account_view(&account_view).is_err()
-        );
-        drop(read_ref);
+        {
+            let mut token =
+                StateWithExtensionsMut::<TokenAccount>::from_bytes_mut(&mut data).unwrap();
+            token
+                .get_extension_mut::<TransferHookAccountExtension>()
+                .unwrap()
+                .set_transferring(true);
+        }
 
-        let mut write_ref =
-            RefMutStateWithExtensions::<TokenAccount>::from_account_view(&account_view).unwrap();
-        assert!(RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view).is_err());
-        write_ref
-            .get_extension_mut::<TransferHookAccountExtension>()
+        let token = StateWithExtensions::<TokenAccount>::from_bytes(&data).unwrap();
+        assert!(token
+            .get_extension::<TransferHookAccountExtension>()
             .unwrap()
-            .set_transferring(true);
-        drop(write_ref);
-
-        assert!(RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view).is_ok());
+            .transferring());
     }
 
     #[test]
@@ -988,18 +848,16 @@ mod tests {
             ExtensionType::DefaultAccountState,
             &[AccountState::Initialized as u8],
         );
-        let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
+        let mut data = build_mint_data(&tlv_data);
 
         {
-            let mut mint =
-                RefMutStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+            let mut mint = StateWithExtensionsMut::<Mint>::from_bytes_mut(&mut data).unwrap();
             mint.get_extension_mut::<DefaultAccountStateExtension>()
                 .unwrap()
                 .set_state(AccountState::Frozen);
         }
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         assert_eq!(
             mint.get_extension::<DefaultAccountStateExtension>()
                 .unwrap()
@@ -1013,21 +871,18 @@ mod tests {
     fn token_transfer_hook_account_write_then_read_roundtrip() {
         let mut tlv_data = Vec::new();
         push_tlv_entry(&mut tlv_data, ExtensionType::TransferHookAccount, &[0u8]);
-        let data = build_token_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
+        let mut data = build_token_data(&tlv_data);
 
         {
             let mut token =
-                RefMutStateWithExtensions::<TokenAccount>::from_account_view(&account_view)
-                    .unwrap();
+                StateWithExtensionsMut::<TokenAccount>::from_bytes_mut(&mut data).unwrap();
             token
                 .get_extension_mut::<TransferHookAccountExtension>()
                 .unwrap()
                 .set_transferring(true);
         }
 
-        let token =
-            RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view).unwrap();
+        let token = StateWithExtensions::<TokenAccount>::from_bytes(&data).unwrap();
         assert!(token
             .get_extension::<TransferHookAccountExtension>()
             .unwrap()
@@ -1044,9 +899,8 @@ mod tests {
             &[AccountState::Initialized as u8],
         );
         let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let mut out = [ExtensionType::Uninitialized; 2];
         let written = mint.get_extension_types(&mut out).unwrap();
 
@@ -1058,10 +912,8 @@ mod tests {
     #[test]
     fn get_extension_types_on_base_only_returns_empty() {
         let data = vec![0u8; TokenAccount::BASE_LEN];
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let token =
-            RefStateWithExtensions::<TokenAccount>::from_account_view(&account_view).unwrap();
+        let token = StateWithExtensions::<TokenAccount>::from_bytes(&data).unwrap();
         let mut out = [ExtensionType::Uninitialized; 1];
         let written = token.get_extension_types(&mut out).unwrap();
 
@@ -1078,9 +930,8 @@ mod tests {
             &[AccountState::Initialized as u8],
         );
         let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let mut out = [ExtensionType::Uninitialized; 1];
         assert_eq!(
             mint.get_extension_types(&mut out),
@@ -1128,7 +979,7 @@ mod tests {
                 ExtensionType::DefaultAccountState,
                 ExtensionType::DefaultAccountState,
             ]),
-            Ok(TLV_START_INDEX + TLV_HEADER_LEN + DefaultAccountStateExtension::LEN)
+            Err(ProgramError::InvalidInstructionData)
         );
     }
 
@@ -1188,9 +1039,8 @@ mod tests {
         let mut tlv_data = Vec::new();
         push_tlv_entry(&mut tlv_data, ExtensionType::PermanentDelegate, &delegate);
         let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let ext = mint.get_extension::<PermanentDelegateExtension>().unwrap();
         assert_eq!(ext.delegate().as_ref(), &delegate);
     }
@@ -1203,9 +1053,8 @@ mod tests {
         let mut tlv_data = Vec::new();
         push_tlv_entry(&mut tlv_data, ExtensionType::TransferHook, &value);
         let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let ext = mint.get_extension::<TransferHookExtension>().unwrap();
         assert_eq!(ext.authority().as_ref(), &[11u8; 32]);
         assert_eq!(ext.program_id().as_ref(), &[22u8; 32]);
@@ -1215,19 +1064,17 @@ mod tests {
     fn permanent_delegate_extension_write_then_read_roundtrip() {
         let mut tlv_data = Vec::new();
         push_tlv_entry(&mut tlv_data, ExtensionType::PermanentDelegate, &[0u8; 32]);
-        let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
+        let mut data = build_mint_data(&tlv_data);
 
         let new_delegate = Address::new_from_array([99u8; 32]);
         {
-            let mut mint =
-                RefMutStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+            let mut mint = StateWithExtensionsMut::<Mint>::from_bytes_mut(&mut data).unwrap();
             mint.get_extension_mut::<PermanentDelegateExtension>()
                 .unwrap()
                 .set_delegate(&new_delegate);
         }
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         assert_eq!(
             mint.get_extension::<PermanentDelegateExtension>()
                 .unwrap()
@@ -1240,20 +1087,18 @@ mod tests {
     fn transfer_hook_extension_write_then_read_roundtrip() {
         let mut tlv_data = Vec::new();
         push_tlv_entry(&mut tlv_data, ExtensionType::TransferHook, &[0u8; 64]);
-        let data = build_mint_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
+        let mut data = build_mint_data(&tlv_data);
 
         let new_authority = Address::new_from_array([77u8; 32]);
         let new_program_id = Address::new_from_array([88u8; 32]);
         {
-            let mut mint =
-                RefMutStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+            let mut mint = StateWithExtensionsMut::<Mint>::from_bytes_mut(&mut data).unwrap();
             let ext = mint.get_extension_mut::<TransferHookExtension>().unwrap();
             ext.set_authority(&new_authority);
             ext.set_program_id(&new_program_id);
         }
 
-        let mint = RefStateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let ext = mint.get_extension::<TransferHookExtension>().unwrap();
         assert_eq!(ext.authority(), &new_authority);
         assert_eq!(ext.program_id(), &new_program_id);

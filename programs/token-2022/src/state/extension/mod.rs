@@ -5,16 +5,13 @@ pub mod transfer_hook;
 pub mod transfer_hook_account;
 
 use {
-    super::{AccountType, Mint, Multisig, TokenAccount},
+    super::{AccountType, Mint, Multisig},
     solana_program_error::ProgramError,
 };
 pub use {
     default_account_state::DefaultAccountStateExtension,
     permanent_delegate::PermanentDelegateExtension,
-    state::{
-        RefMutStateWithExtensions, RefStateWithExtensions, StateWithExtensions,
-        StateWithExtensionsMut,
-    },
+    state::{StateWithExtensions, StateWithExtensionsMut},
     transfer_hook::TransferHookExtension,
     transfer_hook_account::TransferHookAccountExtension,
 };
@@ -54,7 +51,7 @@ impl From<TokenError> for ProgramError {
 pub const EXTENSION_NOT_FOUND_ERROR_CODE: u32 = TokenError::ExtensionNotFound as u32;
 
 mod sealed {
-    pub trait SealedPod {}
+    pub trait SealedExtensionPod {}
 }
 
 /// Marker trait for plain extension payload values that are safe to
@@ -63,9 +60,9 @@ mod sealed {
 /// # Safety
 ///
 /// Implementors must be plain data with no padding and no invalid bit-patterns.
-pub unsafe trait Pod: sealed::SealedPod + Copy + 'static {}
+pub unsafe trait ExtensionPod: sealed::SealedExtensionPod + 'static {}
 
-#[inline(always)]
+#[cold]
 pub const fn extension_not_found_error() -> ProgramError {
     ProgramError::Custom(TokenError::ExtensionNotFound as u32)
 }
@@ -113,7 +110,7 @@ pub enum ExtensionType {
 }
 
 /// Marker for typed extension values that can be decoded from TLV entries.
-pub trait ExtensionValue: Pod {
+pub trait ExtensionValue: ExtensionPod {
     const TYPE: ExtensionType;
 }
 
@@ -174,34 +171,7 @@ const fn extension_account_type(extension_type: ExtensionType) -> AccountType {
 #[inline(always)]
 fn extension_type_from_u16(extension_type: u16) -> Result<ExtensionType, ProgramError> {
     match extension_type {
-        0 => Ok(ExtensionType::Uninitialized),
-        1 => Ok(ExtensionType::TransferFeeConfig),
-        2 => Ok(ExtensionType::TransferFeeAmount),
-        3 => Ok(ExtensionType::MintCloseAuthority),
-        4 => Ok(ExtensionType::ConfidentialTransferMint),
-        5 => Ok(ExtensionType::ConfidentialTransferAccount),
-        6 => Ok(ExtensionType::DefaultAccountState),
-        7 => Ok(ExtensionType::ImmutableOwner),
-        8 => Ok(ExtensionType::MemoTransfer),
-        9 => Ok(ExtensionType::NonTransferable),
-        10 => Ok(ExtensionType::InterestBearingConfig),
-        11 => Ok(ExtensionType::CpiGuard),
-        12 => Ok(ExtensionType::PermanentDelegate),
-        13 => Ok(ExtensionType::NonTransferableAccount),
-        14 => Ok(ExtensionType::TransferHook),
-        15 => Ok(ExtensionType::TransferHookAccount),
-        16 => Ok(ExtensionType::ConfidentialTransferFeeConfig),
-        17 => Ok(ExtensionType::ConfidentialTransferFeeAmount),
-        18 => Ok(ExtensionType::MetadataPointer),
-        19 => Ok(ExtensionType::TokenMetadata),
-        20 => Ok(ExtensionType::GroupPointer),
-        21 => Ok(ExtensionType::TokenGroup),
-        22 => Ok(ExtensionType::GroupMemberPointer),
-        23 => Ok(ExtensionType::TokenGroupMember),
-        24 => Ok(ExtensionType::ConfidentialMintBurn),
-        25 => Ok(ExtensionType::ScaledUiAmount),
-        26 => Ok(ExtensionType::Pausable),
-        27 => Ok(ExtensionType::PausableAccount),
+        0..=27 => Ok(unsafe { core::mem::transmute::<u16, ExtensionType>(extension_type) }),
         _ => Err(ProgramError::InvalidAccountData),
     }
 }
@@ -257,16 +227,6 @@ fn validate_token_extensions_data(data: &[u8]) -> Result<(), ProgramError> {
     Ok(())
 }
 
-#[inline(always)]
-unsafe fn mint_from_bytes_unchecked_mut(bytes: &mut [u8]) -> &mut Mint {
-    &mut *(bytes[..Mint::BASE_LEN].as_mut_ptr() as *mut Mint)
-}
-
-#[inline(always)]
-unsafe fn token_account_from_bytes_unchecked_mut(bytes: &mut [u8]) -> &mut TokenAccount {
-    &mut *(bytes[..TokenAccount::BASE_LEN].as_mut_ptr() as *mut TokenAccount)
-}
-
 /// Returns the fixed byte length of the given extension's value payload,
 /// or `None` if the extension type is not yet supported.
 ///
@@ -299,17 +259,11 @@ pub fn try_calculate_account_len<B: ExtensionBaseState>(
         validate_extension_account_type(extension_type, B::ACCOUNT_TYPE)?;
 
         let mut j = 0;
-        let mut duplicate = false;
         while j < i {
             if extension_types[j] == extension_type {
-                duplicate = true;
-                break;
+                return Err(ProgramError::InvalidInstructionData);
             }
             j += 1;
-        }
-        if duplicate {
-            i += 1;
-            continue;
         }
 
         let value_len =

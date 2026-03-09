@@ -1,5 +1,5 @@
 use {
-    super::{sealed, ExtensionType, ExtensionValue, Pod},
+    super::{sealed, ExtensionPod, ExtensionType, ExtensionValue},
     solana_address::Address,
 };
 
@@ -8,9 +8,9 @@ use {
 /// When set on a mint, the delegate has unrestricted transfer and
 /// burn authority over all token accounts for the mint.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct PermanentDelegateExtension {
-    delegate: [u8; 32],
+    delegate: Address,
 }
 
 impl PermanentDelegateExtension {
@@ -18,21 +18,19 @@ impl PermanentDelegateExtension {
 
     #[inline(always)]
     pub fn delegate(&self) -> &Address {
-        // SAFETY: `Address` is `#[repr(transparent)]` over `[u8; 32]` with
-        // alignment 1, so the pointer cast is valid.
-        unsafe { &*(self.delegate.as_ptr() as *const Address) }
+        &self.delegate
     }
 
     #[inline(always)]
     pub fn set_delegate(&mut self, delegate: &Address) {
-        self.delegate.copy_from_slice(delegate.as_ref());
+        self.delegate = delegate.clone();
     }
 }
 
-// SAFETY: `PermanentDelegateExtension` is repr(C), contains only `[u8; 32]`,
-// has no padding, and all bit patterns are valid.
-impl sealed::SealedPod for PermanentDelegateExtension {}
-unsafe impl Pod for PermanentDelegateExtension {}
+// SAFETY: `PermanentDelegateExtension` is repr(C), contains only `Address`
+// (`[u8; 32]`), has no padding, and all bit patterns are valid.
+impl sealed::SealedExtensionPod for PermanentDelegateExtension {}
+unsafe impl ExtensionPod for PermanentDelegateExtension {}
 
 impl ExtensionValue for PermanentDelegateExtension {
     const TYPE: ExtensionType = ExtensionType::PermanentDelegate;
