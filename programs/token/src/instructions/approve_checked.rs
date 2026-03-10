@@ -24,7 +24,7 @@ use {
 ///   2. `[]` The delegate.
 ///   3. `[]` The source account's multisignature owner.
 ///   4. `..4+M` `[SIGNER]` M signer accounts
-pub struct ApproveChecked<'a, 'b> {
+pub struct ApproveChecked<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Source Account.
     pub source: &'a AccountView,
     /// Mint Account.
@@ -34,14 +34,14 @@ pub struct ApproveChecked<'a, 'b> {
     /// Source Owner Account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [MultisigSigner],
     /// Amount.
     pub amount: u64,
     /// Decimals.
     pub decimals: u8,
 }
 
-impl<'a, 'b> ApproveChecked<'a, 'b> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> ApproveChecked<'a, 'b, MultisigSigner> {
     /// Creates a new `ApproveChecked` instruction with a single owner
     /// authority.
     #[inline(always)]
@@ -66,7 +66,7 @@ impl<'a, 'b> ApproveChecked<'a, 'b> {
         authority: &'a AccountView,
         amount: u64,
         decimals: u8,
-        multisig_signers: &'b [&'a AccountView],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             source,
@@ -113,7 +113,9 @@ impl<'a, 'b> ApproveChecked<'a, 'b> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -130,7 +132,7 @@ impl<'a, 'b> ApproveChecked<'a, 'b> {
         accounts[3].write(self.authority);
 
         for (account, signer) in accounts[4..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

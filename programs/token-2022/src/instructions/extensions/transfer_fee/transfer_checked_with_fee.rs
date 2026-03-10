@@ -35,7 +35,7 @@ use {
 ///   2. `[writable]` The destination account.
 ///   3. `[]` The source account's multisignature.
 ///   4. `..+N` `[]` The `N` signer accounts, where `N` is `1 <= N <= 11`.
-pub struct TransferCheckedWithFee<'a, 'b, 'c> {
+pub struct TransferCheckedWithFee<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The source account.
     pub source: &'a AccountView,
 
@@ -49,7 +49,7 @@ pub struct TransferCheckedWithFee<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The amount of tokens to transfer.
     pub amount: u64,
@@ -66,7 +66,9 @@ pub struct TransferCheckedWithFee<'a, 'b, 'c> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
+    TransferCheckedWithFee<'a, 'b, 'c, MultisigSigner>
+{
     /// Instruction discriminator.
     pub const DISCRIMINATOR: u8 = 1;
 
@@ -110,7 +112,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
         amount: u64,
         decimals: u8,
         fee: u64,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             source,
@@ -159,7 +161,9 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            instruction_account.write(InstructionAccount::readonly_signer(signer.address()));
+            instruction_account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -176,7 +180,7 @@ impl<'a, 'b, 'c> TransferCheckedWithFee<'a, 'b, 'c> {
         accounts[3].write(self.authority);
 
         for (account, signer) in accounts[4..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(*signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

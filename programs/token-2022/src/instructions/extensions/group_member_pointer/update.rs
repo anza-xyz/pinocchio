@@ -29,7 +29,7 @@ use {
 ///   0. `[writable]` The mint.
 ///   1. `[]`         The group member pointer authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct Update<'a, 'b, 'c> {
+pub struct Update<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The mint.
     pub mint: &'a AccountView,
 
@@ -40,13 +40,13 @@ pub struct Update<'a, 'b, 'c> {
     pub member_address: Option<&'b Address>,
 
     /// The signer accounts if `authority` is a multisig
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// Token Program
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> Update<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `Update` instruction with a single owner/delegate
@@ -69,7 +69,7 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
         mint: &'a AccountView,
         authority: &'a AccountView,
         member_address: Option<&'b Address>,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,
@@ -110,7 +110,9 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -123,7 +125,7 @@ impl<'a, 'b, 'c> Update<'a, 'b, 'c> {
         accounts[1].write(self.authority);
 
         for (account, signer) in accounts[2..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(*signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

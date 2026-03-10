@@ -22,7 +22,7 @@ use {
 ///   1. `[]` The token mint.
 ///   2. `[]` The mint's multisignature freeze authority.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct FreezeAccount<'a, 'b> {
+pub struct FreezeAccount<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Token Account to freeze.
     pub account: &'a AccountView,
     /// Mint Account.
@@ -30,10 +30,10 @@ pub struct FreezeAccount<'a, 'b> {
     /// Mint Freeze Authority Account
     pub freeze_authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [MultisigSigner],
 }
 
-impl<'a, 'b> FreezeAccount<'a, 'b> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> FreezeAccount<'a, 'b, MultisigSigner> {
     /// Creates a new `FreezeAccount` instruction with a single freeze
     /// authority.
     #[inline(always)]
@@ -52,7 +52,7 @@ impl<'a, 'b> FreezeAccount<'a, 'b> {
         account: &'a AccountView,
         mint: &'a AccountView,
         freeze_authority: &'a AccountView,
-        multisig_signers: &'b [&'a AccountView],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             account,
@@ -94,7 +94,9 @@ impl<'a, 'b> FreezeAccount<'a, 'b> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -109,7 +111,7 @@ impl<'a, 'b> FreezeAccount<'a, 'b> {
         accounts[2].write(self.freeze_authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(

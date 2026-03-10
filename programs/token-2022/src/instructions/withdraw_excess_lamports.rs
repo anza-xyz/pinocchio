@@ -18,7 +18,7 @@ use {
 /// 1. `[writable]` Destination account.
 /// 2. `[signer]` Authority.
 /// 3. ..`3+M` `[signer]` M signer accounts.
-pub struct WidthdrawExcessLamports<'a, 'b, 'c> {
+pub struct WidthdrawExcessLamports<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// Source account owned by the token program.
     pub source: &'a AccountView,
 
@@ -29,13 +29,15 @@ pub struct WidthdrawExcessLamports<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// The signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
+    WidthdrawExcessLamports<'a, 'b, 'c, MultisigSigner>
+{
     pub const DISCRIMINATOR: u8 = 38;
 
     /// Creates a new `WidthdrawExcessLamports` instruction with a single
@@ -58,7 +60,7 @@ impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
         source: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             source,
@@ -101,7 +103,9 @@ impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -116,7 +120,7 @@ impl<'a, 'b, 'c> WidthdrawExcessLamports<'a, 'b, 'c> {
         accounts[2].write(self.authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(

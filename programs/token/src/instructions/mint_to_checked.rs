@@ -22,7 +22,7 @@ use {
 ///   1. `[WRITE]` The account to mint tokens to.
 ///   2. `[]` The mint's multisignature minting authority.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct MintToChecked<'a, 'b> {
+pub struct MintToChecked<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Mint Account.
     pub mint: &'a AccountView,
     /// Token Account.
@@ -30,14 +30,14 @@ pub struct MintToChecked<'a, 'b> {
     /// Mint Authority
     pub mint_authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [&'a AccountView],
+    pub multisig_signers: &'b [MultisigSigner],
     /// Amount
     pub amount: u64,
     /// Decimals
     pub decimals: u8,
 }
 
-impl<'a, 'b> MintToChecked<'a, 'b> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> MintToChecked<'a, 'b, MultisigSigner> {
     /// Creates a new `MintToChecked` instruction with a single mint authority.
     #[inline(always)]
     pub fn new(
@@ -59,7 +59,7 @@ impl<'a, 'b> MintToChecked<'a, 'b> {
         mint_authority: &'a AccountView,
         amount: u64,
         decimals: u8,
-        multisig_signers: &'b [&'a AccountView],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             mint,
@@ -103,7 +103,9 @@ impl<'a, 'b> MintToChecked<'a, 'b> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -118,7 +120,7 @@ impl<'a, 'b> MintToChecked<'a, 'b> {
         accounts[2].write(self.mint_authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.

@@ -26,7 +26,7 @@ use {
 ///   1. `[writable]` The destination account.
 ///   2. `[]` The source account's multisignature owner/delegate.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct UnwrapLamports<'a, 'b, 'c> {
+pub struct UnwrapLamports<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The source account.
     pub source: &'a AccountView,
 
@@ -37,7 +37,7 @@ pub struct UnwrapLamports<'a, 'b, 'c> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub multisig_signers: &'c [&'a AccountView],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The amount of lamports to transfer.
     pub amount: Option<u64>,
@@ -46,7 +46,7 @@ pub struct UnwrapLamports<'a, 'b, 'c> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> UnwrapLamports<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 45;
 
     /// Creates a new `UnwrapLamports` instruction with a single
@@ -71,7 +71,7 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
         destination: &'a AccountView,
         authority: &'a AccountView,
         amount: Option<u64>,
-        multisig_signers: &'c [&'a AccountView],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             source: account,
@@ -115,7 +115,9 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(InstructionAccount::readonly_signer(signer.address()));
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
         // Accounts.
@@ -130,7 +132,7 @@ impl<'a, 'b, 'c> UnwrapLamports<'a, 'b, 'c> {
         accounts[2].write(self.authority);
 
         for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer);
+            account.write(signer.as_ref());
         }
 
         // Instruction data.
