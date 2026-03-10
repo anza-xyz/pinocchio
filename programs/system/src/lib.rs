@@ -74,15 +74,30 @@ pub fn create_account_with_minimum_balance_signed(
             .invoke_signed(signers)?;
         }
 
+        #[cfg(not(any(feature = "account-resize", feature = "unsafe-account-resize")))]
+        // When account resize is not enabled, allocate the required space for the account
+        // using the `Allocate` instruction.
+        crate::instructions::Allocate {
+            account,
+            space: space as u64,
+        }
+        .invoke_signed(signers)?;
+
         // Assign the account to the specified owner.
         Assign { account, owner }.invoke_signed(signers)?;
 
-        // Allocate the required space for the account.
+        // Allocate the required space for the account using the `AccountView::resize`.
         //
         // SAFETY: There are no active borrows of the `account`.
         // This was checked by the `Assign` CPI above.
-        // TODO: re-enable this when `Reize` trait is available.
-        //unsafe { account.resize_unchecked(space) }
+        unsafe {
+            #[cfg(feature = "account-resize")]
+            <AccountView as pinocchio::Resize>::resize_unchecked(account, space)?;
+
+            #[cfg(all(feature = "unsafe-account-resize", not(feature = "account-resize")))]
+            <AccountView as pinocchio::UnsafeResize>::resize(account, space);
+        }
+
         Ok(())
     }
 }

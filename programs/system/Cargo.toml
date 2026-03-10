@@ -11,6 +11,10 @@ rust-version = { workspace = true }
 [lib]
 crate-type = ["rlib"]
 
+[features]
+account-resize = ["pinocchio/account-resize"]
+unsafe-account-resize = ["pinocchio/unsafe-account-resize"]
+
 [dependencies]
 pinocchio = { workspace = true, features = ["cpi"] }
 solana-address = { workspace = true, features = ["decode"] }
