@@ -59,7 +59,7 @@ mod sealed {
 ///
 /// # Safety
 ///
-/// Implementors must be plain data with no padding and no invalid bit-patterns.
+/// Implementers must be plain data with no padding and no invalid bit-patterns.
 pub unsafe trait ExtensionPod: sealed::SealedExtensionPod + 'static {}
 
 #[cold]

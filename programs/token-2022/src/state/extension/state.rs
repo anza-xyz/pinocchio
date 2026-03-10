@@ -327,7 +327,7 @@ impl<'a, B: ExtensionBaseState> StateWithExtensionsMut<'a, B> {
     /// data (e.g., there are no active borrows of the account data).
     #[inline]
     pub unsafe fn from_account_view_unchecked(
-        account_view: &'a AccountView,
+        account_view: &'a mut AccountView,
     ) -> Result<Self, ProgramError> {
         if account_view.data_len() < B::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
@@ -448,7 +448,7 @@ mod tests {
             (*raw).is_signer = 0;
             (*raw).is_writable = 1;
             (*raw).executable = 0;
-            (*raw).resize_delta = 0;
+            (*raw).padding = [0; 4];
             (*raw).address = Address::new_from_array([42u8; 32]);
             (*raw).owner = owner.clone();
             (*raw).lamports = 1;
@@ -822,10 +822,10 @@ mod tests {
         let mut tlv_data = Vec::new();
         push_tlv_entry(&mut tlv_data, ExtensionType::TransferHookAccount, &[0u8]);
         let data = build_token_data(&tlv_data);
-        let (_backing, account_view) = build_account_view(&ID, &data);
+        let (_backing, mut account_view) = build_account_view(&ID, &data);
 
         let mut token = unsafe {
-            StateWithExtensionsMut::<TokenAccount>::from_account_view_unchecked(&account_view)
+            StateWithExtensionsMut::<TokenAccount>::from_account_view_unchecked(&mut account_view)
         }
         .unwrap();
         let extension = token
