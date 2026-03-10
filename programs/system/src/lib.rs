@@ -86,6 +86,7 @@ pub fn create_account_with_minimum_balance_signed(
         // Assign the account to the specified owner.
         Assign { account, owner }.invoke_signed(signers)?;
 
+        #[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
         // Allocate the required space for the account using the `AccountView::resize`.
         //
         // SAFETY: There are no active borrows of the `account`.
