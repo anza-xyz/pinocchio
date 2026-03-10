@@ -27,7 +27,7 @@ use {
 ///   1. `[writable]` The destination account.
 ///   2. `[]` The mint's multisig `withdraw_withheld_authority`.
 ///   3. `..3+M` `[signer]` M signer accounts.
-pub struct WithdrawWithheldTokensFromMint<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct WithdrawWithheldTokensFromMint<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The token mint.
     pub mint: &'a AccountView,
 
@@ -38,13 +38,15 @@ pub struct WithdrawWithheldTokensFromMint<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// Token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> WithdrawWithheldTokensFromMint<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
+    WithdrawWithheldTokensFromMint<'a, 'b, 'c, MultisigSigner>
+{
     pub const DISCRIMINATOR: u8 = 2;
 
     /// Creates a new `WithdrawWithheldTokensFromMint` instruction
@@ -67,7 +69,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> WithdrawWithheldTokensFromMint<'a, 'b, '
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,

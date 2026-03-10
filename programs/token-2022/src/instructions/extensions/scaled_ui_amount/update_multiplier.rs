@@ -36,7 +36,7 @@ use {
 ///   0. `[writable]` The mint.
 ///   1. `[]` The mint's multisignature multiplier authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct UpdateMultiplier<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct UpdateMultiplier<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The mint.
     pub mint: &'a AccountView,
 
@@ -44,7 +44,7 @@ pub struct UpdateMultiplier<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// Signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The new multiplier.
     pub multiplier: f64,
@@ -56,7 +56,7 @@ pub struct UpdateMultiplier<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> UpdateMultiplier<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> UpdateMultiplier<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `UpdateMultiplier` instruction with a single
@@ -88,7 +88,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> UpdateMultiplier<'a, 'b, 'c, A> {
         authority: &'a AccountView,
         multiplier: f64,
         effective_timestamp: i64,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,

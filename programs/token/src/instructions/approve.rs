@@ -22,7 +22,7 @@ use {
 ///   1. `[]` The delegate.
 ///   2. `[]` The source account's multisignature owner.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct Approve<'a, 'b, A: AsRef<AccountView>> {
+pub struct Approve<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Source Account.
     pub source: &'a AccountView,
     /// Delegate Account
@@ -30,12 +30,12 @@ pub struct Approve<'a, 'b, A: AsRef<AccountView>> {
     /// Source Owner Account
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
     /// Amount
     pub amount: u64,
 }
 
-impl<'a, 'b, A: AsRef<AccountView>> Approve<'a, 'b, A> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> Approve<'a, 'b, MultisigSigner> {
     /// Creates a new `Approve` instruction with a single owner authority.
     #[inline(always)]
     pub fn new(
@@ -55,7 +55,7 @@ impl<'a, 'b, A: AsRef<AccountView>> Approve<'a, 'b, A> {
         delegate: &'a AccountView,
         authority: &'a AccountView,
         amount: u64,
-        multisig_signers: &'b [A],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             source,

@@ -22,7 +22,7 @@ use {
 ///   1. `[WRITE]` The account to mint tokens to.
 ///   2. `[]` The mint's multisignature minting authority.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct MintTo<'a, 'b, A: AsRef<AccountView>> {
+pub struct MintTo<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Mint Account.
     pub mint: &'a AccountView,
     /// Token Account.
@@ -30,12 +30,12 @@ pub struct MintTo<'a, 'b, A: AsRef<AccountView>> {
     /// Mint Authority
     pub mint_authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
     /// Amount
     pub amount: u64,
 }
 
-impl<'a, 'b, A: AsRef<AccountView>> MintTo<'a, 'b, A> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> MintTo<'a, 'b, MultisigSigner> {
     /// Creates a new `MintTo` instruction with a single mint authority.
     #[inline(always)]
     pub fn new(
@@ -55,7 +55,7 @@ impl<'a, 'b, A: AsRef<AccountView>> MintTo<'a, 'b, A> {
         account: &'a AccountView,
         mint_authority: &'a AccountView,
         amount: u64,
-        multisig_signers: &'b [A],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             mint,

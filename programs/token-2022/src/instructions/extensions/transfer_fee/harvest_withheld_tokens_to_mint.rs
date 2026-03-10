@@ -21,18 +21,18 @@ use {
 ///
 ///   0. `[writable]` The mint.
 ///   1. `..1+N` `[writable]` The source accounts to harvest from.
-pub struct HarvestWithheldTokensToMint<'a, 'b, 'c> {
+pub struct HarvestWithheldTokensToMint<'a, 'b, 'c, Source: AsRef<AccountView>> {
     /// The token mint.
     pub mint: &'a AccountView,
 
     /// The source accounts to harvest from.
-    pub sources: &'c [&'a AccountView],
+    pub sources: &'c [Source],
 
     /// The token program.
     pub token_program: &'b Address,
 }
 
-impl HarvestWithheldTokensToMint<'_, '_, '_> {
+impl<Source: AsRef<AccountView>> HarvestWithheldTokensToMint<'_, '_, '_, Source> {
     pub const DISCRIMINATOR: u8 = 4;
 
     #[inline(always)]
@@ -54,7 +54,7 @@ impl HarvestWithheldTokensToMint<'_, '_, '_> {
             .iter_mut()
             .zip(self.sources.iter())
         {
-            instruction_account.write(InstructionAccount::writable(source.address()));
+            instruction_account.write(InstructionAccount::writable(source.as_ref().address()));
         }
 
         // Accounts.
@@ -65,7 +65,7 @@ impl HarvestWithheldTokensToMint<'_, '_, '_> {
         accounts[0].write(self.mint);
 
         for (account, source) in accounts[1..].iter_mut().zip(self.sources.iter()) {
-            account.write(*source);
+            account.write(source.as_ref());
         }
 
         invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS, &AccountView>(

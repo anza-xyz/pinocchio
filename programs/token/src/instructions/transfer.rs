@@ -22,7 +22,7 @@ use {
 ///   1. `[WRITE]` Recipient account
 ///   2. `[]` Authority account (multisig)
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct Transfer<'a, 'b, A: AsRef<AccountView>> {
+pub struct Transfer<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Sender account.
     pub from: &'a AccountView,
     /// Recipient account.
@@ -30,12 +30,12 @@ pub struct Transfer<'a, 'b, A: AsRef<AccountView>> {
     /// Authority account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
     /// Amount of micro-tokens to transfer.
     pub amount: u64,
 }
 
-impl<'a, 'b, A: AsRef<AccountView>> Transfer<'a, 'b, A> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> Transfer<'a, 'b, MultisigSigner> {
     /// Creates a new `Transfer` instruction with a single
     /// owner/delegate authority.
     #[inline(always)]
@@ -56,7 +56,7 @@ impl<'a, 'b, A: AsRef<AccountView>> Transfer<'a, 'b, A> {
         to: &'a AccountView,
         authority: &'a AccountView,
         amount: u64,
-        multisig_signers: &'b [A],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             from,

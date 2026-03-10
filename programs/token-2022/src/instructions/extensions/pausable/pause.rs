@@ -21,7 +21,7 @@ use {
 ///   0. `[writable]` The mint to update.
 ///   1. `[]` The mint's multisignature pause authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct Pause<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct Pause<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The mint to update.
     pub mint: &'a AccountView,
 
@@ -29,13 +29,13 @@ pub struct Pause<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// The signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> Pause<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> Pause<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `Pause` instruction with a single owner/delegate
@@ -56,7 +56,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> Pause<'a, 'b, 'c, A> {
         token_program: &'b Address,
         mint: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,

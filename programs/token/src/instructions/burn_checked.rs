@@ -22,7 +22,7 @@ use {
 ///   1. `[WRITE]` The token mint.
 ///   2. `[]` The account's multisignature owner/delegate.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct BurnChecked<'a, 'b, A: AsRef<AccountView>> {
+pub struct BurnChecked<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Source of the Burn Account
     pub account: &'a AccountView,
     /// Mint Account
@@ -30,14 +30,14 @@ pub struct BurnChecked<'a, 'b, A: AsRef<AccountView>> {
     /// Owner of the Token Account
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
     /// Amount
     pub amount: u64,
     /// Decimals
     pub decimals: u8,
 }
 
-impl<'a, 'b, A: AsRef<AccountView>> BurnChecked<'a, 'b, A> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> BurnChecked<'a, 'b, MultisigSigner> {
     /// Creates a new `BurnChecked` instruction with a single
     /// owner/delegate authority.
     #[inline(always)]
@@ -60,7 +60,7 @@ impl<'a, 'b, A: AsRef<AccountView>> BurnChecked<'a, 'b, A> {
         authority: &'a AccountView,
         amount: u64,
         decimals: u8,
-        multisig_signers: &'b [A],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             account,

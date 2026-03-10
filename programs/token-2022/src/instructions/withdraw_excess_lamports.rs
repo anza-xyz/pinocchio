@@ -18,7 +18,7 @@ use {
 /// 1. `[writable]` Destination account.
 /// 2. `[signer]` Authority.
 /// 3. ..`3+M` `[signer]` M signer accounts.
-pub struct WidthdrawExcessLamports<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct WidthdrawExcessLamports<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// Source account owned by the token program.
     pub source: &'a AccountView,
 
@@ -29,13 +29,15 @@ pub struct WidthdrawExcessLamports<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// The signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> WidthdrawExcessLamports<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
+    WidthdrawExcessLamports<'a, 'b, 'c, MultisigSigner>
+{
     pub const DISCRIMINATOR: u8 = 38;
 
     /// Creates a new `WidthdrawExcessLamports` instruction with a single
@@ -58,7 +60,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> WidthdrawExcessLamports<'a, 'b, 'c, A> {
         source: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             source,

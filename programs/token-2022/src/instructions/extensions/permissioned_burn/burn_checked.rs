@@ -35,7 +35,7 @@ use {
 ///      any.
 ///   3. `[]` The source account's multisignature owner/delegate.
 ///   4. `..4+M` `[signer]` M signer accounts for the multisig.
-pub struct BurnChecked<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct BurnChecked<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The source account to burn from.
     pub account: &'a AccountView,
 
@@ -49,7 +49,7 @@ pub struct BurnChecked<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// Signer accounts for multisignature authority, if applicable.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The amount of tokens to burn.
     pub amount: u64,
@@ -61,7 +61,7 @@ pub struct BurnChecked<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> BurnChecked<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> BurnChecked<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 2;
 
     /// Creates a new `BurnChecked` instruction with a single owner/delegate
@@ -100,7 +100,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> BurnChecked<'a, 'b, 'c, A> {
         authority: &'a AccountView,
         amount: u64,
         decimals: u8,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             account,

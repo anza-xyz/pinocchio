@@ -26,7 +26,7 @@ use {
 ///   1. `[writable]` The destination account.
 ///   2. `[]` The source account's multisignature owner/delegate.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct UnwrapLamports<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct UnwrapLamports<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The source account.
     pub source: &'a AccountView,
 
@@ -37,7 +37,7 @@ pub struct UnwrapLamports<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The amount of lamports to transfer.
     pub amount: Option<u64>,
@@ -46,7 +46,7 @@ pub struct UnwrapLamports<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> UnwrapLamports<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> UnwrapLamports<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 45;
 
     /// Creates a new `UnwrapLamports` instruction with a single
@@ -71,7 +71,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> UnwrapLamports<'a, 'b, 'c, A> {
         destination: &'a AccountView,
         authority: &'a AccountView,
         amount: Option<u64>,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             source: account,

@@ -24,7 +24,7 @@ use {
 ///   0. `[writable]` The account to update.
 ///   1. `[]`  The account's multisignature owner.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct Disable<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct Disable<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The account to update.
     pub account: &'a AccountView,
 
@@ -32,13 +32,13 @@ pub struct Disable<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// Signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> Disable<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> Disable<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `Disable` instruction with a single owner/delegate
@@ -59,7 +59,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> Disable<'a, 'b, 'c, A> {
         token_program: &'b Address,
         account: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             account,

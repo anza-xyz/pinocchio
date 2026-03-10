@@ -30,20 +30,20 @@ pub enum AuthorityType {
 ///   0. `[WRITE]` The mint or account to change the authority of.
 ///   1. `[]` The current multisignature authority of the mint or account.
 ///   2. `..2+M` `[SIGNER]` M signer accounts
-pub struct SetAuthority<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct SetAuthority<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// Account (Mint or Token)
     pub account: &'a AccountView,
     /// Authority of the Account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
     /// The type of authority to update.
     pub authority_type: AuthorityType,
     /// The new authority
     pub new_authority: Option<&'b Address>,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> SetAuthority<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> SetAuthority<'a, 'b, 'c, MultisigSigner> {
     /// Creates a new `SetAuthority` instruction with a single authority.
     #[inline(always)]
     pub fn new(
@@ -63,7 +63,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> SetAuthority<'a, 'b, 'c, A> {
         authority: &'a AccountView,
         authority_type: AuthorityType,
         new_authority: Option<&'b Address>,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             account,

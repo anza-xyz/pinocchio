@@ -11,20 +11,20 @@ use {
 /// ### Accounts:
 ///   0. `[writable]` The multisig account to initialize.
 ///   1. ..`1+N`. `[]` The N signer accounts, where N is between 1 and 11.
-pub struct InitializeMultisig2<'a, 'b, A: AsRef<AccountView>>
+pub struct InitializeMultisig2<'a, 'b, MultisigSigner: AsRef<AccountView>>
 where
     'a: 'b,
 {
     /// Multisig Account.
     pub multisig: &'a AccountView,
     /// Signer Accounts
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
     /// The number of signers (M) required to validate this multisignature
     /// account.
     pub m: u8,
 }
 
-impl<A: AsRef<AccountView>> InitializeMultisig2<'_, '_, A> {
+impl<MultisigSigner: AsRef<AccountView>> InitializeMultisig2<'_, '_, MultisigSigner> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         let &Self {

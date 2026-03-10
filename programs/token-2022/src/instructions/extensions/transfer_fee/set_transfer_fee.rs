@@ -26,7 +26,7 @@ use {
 ///   0. `[writable]` The mint.
 ///   1. `[]` The mint's multisignature fee account owner.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct SetTransferFee<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct SetTransferFee<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The token mint.
     pub mint: &'a AccountView,
 
@@ -34,7 +34,7 @@ pub struct SetTransferFee<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// Amount of transfer collected as fees, expressed as basis points of
     /// the transfer amount
@@ -47,7 +47,7 @@ pub struct SetTransferFee<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> SetTransferFee<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> SetTransferFee<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 5;
 
     /// Creates a new `SetTransferFee` instruction with a single owner/delegate
@@ -79,7 +79,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> SetTransferFee<'a, 'b, 'c, A> {
         authority: &'a AccountView,
         transfer_fee_basis_points: u16,
         maximum_fee: u64,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,

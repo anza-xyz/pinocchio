@@ -35,7 +35,7 @@ use {
 ///   2. `[writable]` The destination account.
 ///   3. `[]` The source account's multisignature.
 ///   4. `..+N` `[]` The `N` signer accounts, where `N` is `1 <= N <= 11`.
-pub struct TransferCheckedWithFee<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct TransferCheckedWithFee<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The source account.
     pub source: &'a AccountView,
 
@@ -49,7 +49,7 @@ pub struct TransferCheckedWithFee<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// Multisignature owner/delegate.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The amount of tokens to transfer.
     pub amount: u64,
@@ -66,7 +66,9 @@ pub struct TransferCheckedWithFee<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> TransferCheckedWithFee<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
+    TransferCheckedWithFee<'a, 'b, 'c, MultisigSigner>
+{
     /// Instruction discriminator.
     pub const DISCRIMINATOR: u8 = 1;
 
@@ -110,7 +112,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> TransferCheckedWithFee<'a, 'b, 'c, A> {
         amount: u64,
         decimals: u8,
         fee: u64,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             source,

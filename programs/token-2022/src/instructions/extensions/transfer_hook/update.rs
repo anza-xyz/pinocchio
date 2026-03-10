@@ -29,7 +29,7 @@ use {
 ///   0. `[writable]` The mint.
 ///   1. `[]` The mint's transfer hook authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct UpdateTransferHook<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct UpdateTransferHook<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The mint.
     pub mint: &'a AccountView,
 
@@ -37,7 +37,7 @@ pub struct UpdateTransferHook<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub authority: &'a AccountView,
 
     /// The signer accounts when `authority` is a multisig.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// Program that authorizes the transfer.
     pub transfer_hook_program: Option<&'b Address>,
@@ -46,7 +46,9 @@ pub struct UpdateTransferHook<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> UpdateTransferHook<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
+    UpdateTransferHook<'a, 'b, 'c, MultisigSigner>
+{
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `UpdateTransferHook` instruction with a single
@@ -69,7 +71,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> UpdateTransferHook<'a, 'b, 'c, A> {
         mint: &'a AccountView,
         authority: &'a AccountView,
         transfer_hook_program: Option<&'b Address>,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,

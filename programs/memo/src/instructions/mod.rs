@@ -12,14 +12,14 @@ use {
 ///
 /// ### Accounts:
 ///   0. `..+N` `[SIGNER]` N signing accounts
-pub struct Memo<'a, 'b, A: AsRef<AccountView>> {
+pub struct Memo<'a, 'b, S: AsRef<AccountView>> {
     /// Signing accounts
-    pub signers: &'a [A],
+    pub signers: &'a [S],
     /// Memo
     pub memo: &'b str,
 }
 
-impl<A: AsRef<AccountView>> Memo<'_, '_, A> {
+impl<S: AsRef<AccountView>> Memo<'_, '_, S> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])

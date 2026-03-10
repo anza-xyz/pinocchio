@@ -20,16 +20,16 @@ use {
 ///   0. `[WRITE]` The source account.
 ///   1. `[]` The source account's multisignature owner.
 ///   2. `..2+M` `[SIGNER]` M signer accounts
-pub struct Revoke<'a, 'b, A: AsRef<AccountView>> {
+pub struct Revoke<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Source Account.
     pub source: &'a AccountView,
     ///  Source Owner Account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
 }
 
-impl<'a, 'b, A: AsRef<AccountView>> Revoke<'a, 'b, A> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> Revoke<'a, 'b, MultisigSigner> {
     /// Creates a new `Revoke` instruction with a single owner authority.
     #[inline(always)]
     pub fn new(source: &'a AccountView, authority: &'a AccountView) -> Self {
@@ -42,7 +42,7 @@ impl<'a, 'b, A: AsRef<AccountView>> Revoke<'a, 'b, A> {
     pub fn with_multisig_signers(
         source: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'b [A],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             source,

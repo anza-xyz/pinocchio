@@ -28,7 +28,13 @@ use {
 ///   2. `[]` The mint's multisig `withdraw_withheld_authority`.
 ///   3. `..3+M` `[signer]` M signer accounts.
 ///   4. `3+M+1..3+M+N` `[writable]` The source accounts to withdraw from.
-pub struct WithdrawWithheldTokensFromAccounts<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct WithdrawWithheldTokensFromAccounts<
+    'a,
+    'b,
+    'c,
+    MultisigSigner: AsRef<AccountView>,
+    Source: AsRef<AccountView>,
+> {
     /// The token mint.
     pub mint: &'a AccountView,
 
@@ -39,16 +45,18 @@ pub struct WithdrawWithheldTokensFromAccounts<'a, 'b, 'c, A: AsRef<AccountView>>
     pub authority: &'a AccountView,
 
     /// Multisignature signer accounts.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// Source accounts to withdraw from.
-    pub sources: &'c [A],
+    pub sources: &'c [Source],
 
     /// Token program.
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> WithdrawWithheldTokensFromAccounts<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>, Source: AsRef<AccountView>>
+    WithdrawWithheldTokensFromAccounts<'a, 'b, 'c, MultisigSigner, Source>
+{
     pub const DISCRIMINATOR: u8 = 3;
 
     /// Creates a new `WithdrawWithheldTokensFromAccounts` instruction
@@ -59,7 +67,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> WithdrawWithheldTokensFromAccounts<'a, '
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        sources: &'c [A],
+        sources: &'c [Source],
     ) -> Self {
         Self::with_multisig_signers(token_program, mint, destination, authority, sources, &[])
     }
@@ -72,8 +80,8 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> WithdrawWithheldTokensFromAccounts<'a, '
         mint: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        sources: &'c [A],
-        multisig_signers: &'c [A],
+        sources: &'c [Source],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,

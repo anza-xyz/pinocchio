@@ -22,7 +22,7 @@ use {
 ///   1. `[]` The token mint.
 ///   2. `[]` The mint's multisignature freeze authority.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct ThawAccount<'a, 'b, A: AsRef<AccountView>> {
+pub struct ThawAccount<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Token Account to thaw.
     pub account: &'a AccountView,
     /// Mint Account.
@@ -30,10 +30,10 @@ pub struct ThawAccount<'a, 'b, A: AsRef<AccountView>> {
     /// Mint Freeze Authority Account
     pub freeze_authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
 }
 
-impl<'a, 'b, A: AsRef<AccountView>> ThawAccount<'a, 'b, A> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> ThawAccount<'a, 'b, MultisigSigner> {
     /// Creates a new `ThawAccount` instruction with a single freeze authority.
     #[inline(always)]
     pub fn new(
@@ -51,7 +51,7 @@ impl<'a, 'b, A: AsRef<AccountView>> ThawAccount<'a, 'b, A> {
         account: &'a AccountView,
         mint: &'a AccountView,
         freeze_authority: &'a AccountView,
-        multisig_signers: &'b [A],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             account,

@@ -26,7 +26,7 @@ use {
 ///   0. `[writable]` The mint.
 ///   1. `[]` The mint's multisignature freeze authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct Update<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct Update<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The mint.
     pub mint: &'a AccountView,
 
@@ -34,7 +34,7 @@ pub struct Update<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub freeze_authority: &'a AccountView,
 
     /// The signer accounts if the authority is a multisig.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// The new account state in which new token accounts should be
     /// initialized.
@@ -44,7 +44,7 @@ pub struct Update<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> Update<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> Update<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `Update` instruction with a single owner/delegate
@@ -67,7 +67,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> Update<'a, 'b, 'c, A> {
         mint: &'a AccountView,
         freeze_authority: &'a AccountView,
         state: AccountState,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,

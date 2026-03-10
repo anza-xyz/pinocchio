@@ -14,7 +14,7 @@ pub const MAX_MULTISIG_SIGNERS: usize = 11;
 ///   0. `[writable]` The multisig account to initialize.
 ///   1. `[]` Rent sysvar
 ///   2. ..`2+N`. `[]` The N signer accounts, where N is between 1 and 11.
-pub struct InitializeMultisig<'a, 'b, A: AsRef<AccountView>>
+pub struct InitializeMultisig<'a, 'b, MultisigSigner: AsRef<AccountView>>
 where
     'a: 'b,
 {
@@ -23,13 +23,13 @@ where
     /// Rent sysvar Account.
     pub rent_sysvar: &'a AccountView,
     /// Signer Accounts
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
     /// The number of signers (M) required to validate this multisignature
     /// account.
     pub m: u8,
 }
 
-impl<A: AsRef<AccountView>> InitializeMultisig<'_, '_, A> {
+impl<MultisigSigner: AsRef<AccountView>> InitializeMultisig<'_, '_, MultisigSigner> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         let &Self {

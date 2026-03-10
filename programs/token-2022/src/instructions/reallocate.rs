@@ -31,7 +31,7 @@ use {
 ///   2. `[]` System program for reallocation funding
 ///   3. `[]` The account's multisignature owner/delegate.
 ///   4. ..`4+M` `[signer]` M signer accounts.
-pub struct Reallocate<'a, 'b, 'c, 'd, A: AsRef<AccountView>> {
+pub struct Reallocate<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>> {
     /// The account to reallocate.
     pub account: &'a AccountView,
 
@@ -45,7 +45,7 @@ pub struct Reallocate<'a, 'b, 'c, 'd, A: AsRef<AccountView>> {
     pub owner: &'a AccountView,
 
     /// The signer accounts for multisignature owner, if applicable.
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// New extension types to include in the reallocated account
     pub extensions: &'d [ExtensionDiscriminator],
@@ -54,7 +54,9 @@ pub struct Reallocate<'a, 'b, 'c, 'd, A: AsRef<AccountView>> {
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, 'd, A: AsRef<AccountView>> Reallocate<'a, 'b, 'c, 'd, A> {
+impl<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>>
+    Reallocate<'a, 'b, 'c, 'd, MultisigSigner>
+{
     pub const DISCRIMINATOR: u8 = 29;
 
     /// Creates a new `Reallocate` instruction with a single owner/delegate
@@ -89,7 +91,7 @@ impl<'a, 'b, 'c, 'd, A: AsRef<AccountView>> Reallocate<'a, 'b, 'c, 'd, A> {
         system_program: &'a AccountView,
         owner: &'a AccountView,
         extensions: &'d [ExtensionDiscriminator],
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             account,

@@ -29,7 +29,7 @@ use {
 ///   0. `[writable]` The mint.
 ///   1. `[]`         The group member pointer authority.
 ///   2. `..2+M` `[signer]` M signer accounts.
-pub struct Update<'a, 'b, 'c, A: AsRef<AccountView>> {
+pub struct Update<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// The mint.
     pub mint: &'a AccountView,
 
@@ -40,13 +40,13 @@ pub struct Update<'a, 'b, 'c, A: AsRef<AccountView>> {
     pub member_address: Option<&'b Address>,
 
     /// The signer accounts if `authority` is a multisig
-    pub multisig_signers: &'c [A],
+    pub multisig_signers: &'c [MultisigSigner],
 
     /// Token Program
     pub token_program: &'b Address,
 }
 
-impl<'a, 'b, 'c, A: AsRef<AccountView>> Update<'a, 'b, 'c, A> {
+impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> Update<'a, 'b, 'c, MultisigSigner> {
     pub const DISCRIMINATOR: u8 = 1;
 
     /// Creates a new `Update` instruction with a single owner/delegate
@@ -69,7 +69,7 @@ impl<'a, 'b, 'c, A: AsRef<AccountView>> Update<'a, 'b, 'c, A> {
         mint: &'a AccountView,
         authority: &'a AccountView,
         member_address: Option<&'b Address>,
-        multisig_signers: &'c [A],
+        multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
             mint,

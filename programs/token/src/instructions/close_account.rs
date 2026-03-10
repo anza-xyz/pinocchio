@@ -22,7 +22,7 @@ use {
 ///   1. `[WRITE]` The destination account.
 ///   2. `[]` The account's multisignature owner.
 ///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct CloseAccount<'a, 'b, A: AsRef<AccountView>> {
+pub struct CloseAccount<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Token Account.
     pub account: &'a AccountView,
     /// Destination Account
@@ -30,10 +30,10 @@ pub struct CloseAccount<'a, 'b, A: AsRef<AccountView>> {
     /// Owner Account
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
 }
 
-impl<'a, 'b, A: AsRef<AccountView>> CloseAccount<'a, 'b, A> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> CloseAccount<'a, 'b, MultisigSigner> {
     /// Creates a new `CloseAccount` instruction with a single owner authority.
     #[inline(always)]
     pub fn new(
@@ -51,7 +51,7 @@ impl<'a, 'b, A: AsRef<AccountView>> CloseAccount<'a, 'b, A> {
         account: &'a AccountView,
         destination: &'a AccountView,
         authority: &'a AccountView,
-        multisig_signers: &'b [A],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             account,

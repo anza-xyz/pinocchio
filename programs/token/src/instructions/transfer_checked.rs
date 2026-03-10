@@ -24,7 +24,7 @@ use {
 ///   2. `[WRITE]` The destination account.
 ///   3. `[]` The source account's multisignature owner/delegate.
 ///   4. `..4+M` `[SIGNER]` M signer accounts
-pub struct TransferChecked<'a, 'b, A: AsRef<AccountView>> {
+pub struct TransferChecked<'a, 'b, MultisigSigner: AsRef<AccountView>> {
     /// Sender account.
     pub from: &'a AccountView,
     /// Mint Account
@@ -34,14 +34,14 @@ pub struct TransferChecked<'a, 'b, A: AsRef<AccountView>> {
     /// Authority account.
     pub authority: &'a AccountView,
     /// Multisignature signers.
-    pub multisig_signers: &'b [A],
+    pub multisig_signers: &'b [MultisigSigner],
     /// Amount of micro-tokens to transfer.
     pub amount: u64,
     /// Decimal for the Token
     pub decimals: u8,
 }
 
-impl<'a, 'b, A: AsRef<AccountView>> TransferChecked<'a, 'b, A> {
+impl<'a, 'b, MultisigSigner: AsRef<AccountView>> TransferChecked<'a, 'b, MultisigSigner> {
     /// Creates a new `TransferChecked` instruction with a single
     /// owner/delegate authority.
     #[inline(always)]
@@ -66,7 +66,7 @@ impl<'a, 'b, A: AsRef<AccountView>> TransferChecked<'a, 'b, A> {
         authority: &'a AccountView,
         amount: u64,
         decimals: u8,
-        multisig_signers: &'b [A],
+        multisig_signers: &'b [MultisigSigner],
     ) -> Self {
         Self {
             from,
