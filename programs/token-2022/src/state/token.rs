@@ -62,7 +62,7 @@ impl TokenAccount {
             return Err(ProgramError::InvalidAccountData);
         }
         if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
@@ -86,7 +86,7 @@ impl TokenAccount {
             return Err(ProgramError::InvalidAccountData);
         }
         if account_view.owner() != &ID {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(ProgramError::InvalidAccountOwner);
         }
         Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
@@ -105,14 +105,31 @@ impl TokenAccount {
         &*(bytes[..Self::BASE_LEN].as_ptr() as *const TokenAccount)
     }
 
+    /// Return a mutable `TokenAccount` from the given bytes.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `bytes` contains a valid representation of
+    /// `TokenAccount`, and it is properly aligned to be interpreted as an
+    /// instance of `TokenAccount`. At the moment `TokenAccount` has an
+    /// alignment of 1 byte. This method does not perform a length
+    /// validation.
+    #[inline(always)]
+    pub(crate) unsafe fn from_bytes_unchecked_mut(bytes: &mut [u8]) -> &mut Self {
+        &mut *(bytes[..Self::BASE_LEN].as_mut_ptr() as *mut TokenAccount)
+    }
+
+    #[inline(always)]
     pub fn mint(&self) -> &Address {
         &self.mint
     }
 
+    #[inline(always)]
     pub fn owner(&self) -> &Address {
         &self.owner
     }
 
+    #[inline(always)]
     pub fn amount(&self) -> u64 {
         u64::from_le_bytes(self.amount)
     }
@@ -122,6 +139,7 @@ impl TokenAccount {
         self.delegate_flag[0] == 1
     }
 
+    #[inline(always)]
     pub fn delegate(&self) -> Option<&Address> {
         if self.has_delegate() {
             Some(self.delegate_unchecked())
@@ -138,8 +156,8 @@ impl TokenAccount {
     }
 
     #[inline(always)]
-    pub fn state(&self) -> AccountState {
-        self.state.into()
+    pub fn state(&self) -> Result<AccountState, ProgramError> {
+        AccountState::try_from(self.state)
     }
 
     #[inline(always)]
@@ -147,6 +165,7 @@ impl TokenAccount {
         self.is_native[0] == 1
     }
 
+    #[inline(always)]
     pub fn native_amount(&self) -> Option<u64> {
         if self.is_native() {
             Some(self.native_amount_unchecked())
@@ -164,6 +183,7 @@ impl TokenAccount {
         u64::from_le_bytes(self.native_amount)
     }
 
+    #[inline(always)]
     pub fn delegated_amount(&self) -> u64 {
         u64::from_le_bytes(self.delegated_amount)
     }
@@ -173,6 +193,7 @@ impl TokenAccount {
         self.close_authority_flag[0] == 1
     }
 
+    #[inline(always)]
     pub fn close_authority(&self) -> Option<&Address> {
         if self.has_close_authority() {
             Some(self.close_authority_unchecked())
