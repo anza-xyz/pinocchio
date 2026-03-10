@@ -32,7 +32,7 @@
 //! |         |
 //! |         ├─ 1 byte boolean, true if account is executable
 //! |         |
-//! │         ├─ 4 bytes of padding (account data length should be stored here)
+//! │         ├─ 4 bytes of padding (account data length stored here with `account-resize` feature)
 //! |         |
 //! │         ├─ 32 bytes: address of the account
 //! |         |
@@ -329,7 +329,7 @@ macro_rules! process_n_accounts {
         if (*account).borrow_state != NON_DUP_MARKER {
             clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
-            #[cfg(feature = "resize")]
+            #[cfg(feature = "account-resize")]
             {
                 // Stores the data length in the `padding` field. This is needed
                 // to handle account resizing.
@@ -427,7 +427,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         // The first account is always non-duplicated, so process
         // it directly as such.
         let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
-        #[cfg(feature = "resize")]
+        #[cfg(feature = "account-resize")]
         {
             // Stores the data length in the `padding` field. This is needed
             // to handle account resizing.

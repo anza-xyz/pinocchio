@@ -332,7 +332,7 @@ pub mod sysvars;
 // Re-export the `solana_define_syscall` for downstream use.
 #[cfg(any(target_os = "solana", target_arch = "bpf"))]
 pub use solana_define_syscall::definitions as syscalls;
-#[cfg(feature = "resize")]
+#[cfg(feature = "account-resize")]
 use {
     core::ptr::write_bytes,
     solana_account_view::{RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
@@ -369,7 +369,7 @@ const BPF_ALIGN_OF_U128: usize = 8;
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = 0;
 
-#[cfg(feature = "resize")]
+#[cfg(feature = "account-resize")]
 /// Trait to indicate that an account can be resized.
 pub trait Resize: sealed::Sealed {
     /// Resize (either truncating or zero extending) the account's data.
@@ -405,7 +405,7 @@ pub trait Resize: sealed::Sealed {
     unsafe fn resize_unchecked(&mut self, new_len: usize) -> Result<(), ProgramError>;
 }
 
-#[cfg(all(feature = "unsafe-resize", not(feature = "resize")))]
+#[cfg(all(feature = "unsafe-account-resize", not(feature = "account-resize")))]
 pub trait UnsafeResize: sealed::Sealed {
     /// Resize (either truncating or zero extending) the account's data.
     ///
@@ -435,10 +435,10 @@ pub trait UnsafeResize: sealed::Sealed {
 }
 
 // Only AccountView is "sealed", so only it can implement `Resize`.
-#[cfg(any(feature = "resize", feature = "unsafe-resize"))]
+#[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
 impl sealed::Sealed for AccountView {}
 
-#[cfg(feature = "resize")]
+#[cfg(feature = "account-resize")]
 impl Resize for AccountView {
     fn resize(&mut self, new_len: usize) -> Result<(), ProgramError> {
         // Check whether the account data is already borrowed.
@@ -478,7 +478,7 @@ impl Resize for AccountView {
     }
 }
 
-#[cfg(all(feature = "unsafe-resize", not(feature = "resize")))]
+#[cfg(all(feature = "unsafe-account-resize", not(feature = "account-resize")))]
 #[allow(clippy::arithmetic_side_effects)]
 impl UnsafeResize for AccountView {
     unsafe fn resize(&mut self, new_len: usize) {
@@ -499,7 +499,7 @@ impl UnsafeResize for AccountView {
 }
 
 // Not `pub`, so other crates cannot name nor implement its trait.
-#[cfg(any(feature = "resize", feature = "unsafe-resize"))]
+#[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
 mod sealed {
     // This is used to "seal" `Resize` and `UnsafeResize` traits, preventing
     // external crates from implementing them for types other than

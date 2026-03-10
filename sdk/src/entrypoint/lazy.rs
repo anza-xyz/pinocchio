@@ -236,7 +236,7 @@ impl InstructionContext {
     #[inline(always)]
     unsafe fn read_account(&mut self) -> MaybeAccount {
         let account: *mut RuntimeAccount = self.buffer as *mut RuntimeAccount;
-        #[cfg(feature = "resize")]
+        #[cfg(feature = "account-resize")]
         {
             // Stores the data length in the `padding` field. This is needed
             // to handle account resizing.
