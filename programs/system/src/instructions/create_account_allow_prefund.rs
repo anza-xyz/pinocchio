@@ -27,9 +27,11 @@ pub struct Funding<'a> {
 ///
 /// # Important
 ///
-/// This instruction does not warn if the account has more than
-/// enough lamports. Special care must be taken to ensure that
-/// the account being created has a lamports balance.
+/// Special care should be taken not to accidentally use a wallet
+/// account as the new account. This instruction allocates space
+/// and assigns the account to a new program owner, which makes
+/// the account unusable as a wallet. No warning is given if the
+/// account has more than enough lamports.
 ///
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` New account
@@ -77,7 +79,11 @@ impl<'a, 'b> CreateAccountAllowPrefund<'a, 'b> {
             to,
             space,
             owner,
-            funding: Some(Funding { from, lamports }),
+            funding: if lamports == 0 {
+                None
+            } else {
+                Some(Funding { from, lamports })
+            },
         })
     }
 
