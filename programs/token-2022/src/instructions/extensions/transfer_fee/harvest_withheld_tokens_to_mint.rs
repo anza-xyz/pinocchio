@@ -68,7 +68,7 @@ impl<Source: AsRef<AccountView>> HarvestWithheldTokensToMint<'_, '_, '_, Source>
             account.write(source.as_ref());
         }
 
-        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS, &AccountView>(
+        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS, _>(
             &InstructionView {
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
@@ -81,7 +81,7 @@ impl<Source: AsRef<AccountView>> HarvestWithheldTokensToMint<'_, '_, '_, Source>
                 ],
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
         )
     }
 }

@@ -3,10 +3,7 @@ use {
         instructions::{extensions::ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
         write_bytes, UNINIT_BYTE,
     },
-    core::{
-        mem::MaybeUninit,
-        slice::{self, from_raw_parts},
-    },
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
@@ -150,7 +147,7 @@ impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> Update<'a, 'b, 'c, Multisig
                 program_id: self.token_program,
                 // SAFETY: instruction accounts has `expected_accounts` initialized.
                 accounts: unsafe {
-                    slice::from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
                 },
                 // SAFETY: instruction data is initialized.
                 data: unsafe {
@@ -158,9 +155,7 @@ impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> Update<'a, 'b, 'c, Multisig
                 },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe {
-                slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
-            },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }
