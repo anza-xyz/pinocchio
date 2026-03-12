@@ -1,20 +1,21 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{
-    cpi::{invoke_signed, Signer},
-    InstructionAccount, InstructionView,
+use {
+    super::constants::MAX_IX_DATA,
+    crate::{write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{
+        cpi::{invoke_signed, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::{ProgramError, ProgramResult},
 };
-use solana_program_error::{ProgramError, ProgramResult};
-
-use super::constants::MAX_IX_DATA;
-use crate::{write_bytes, UNINIT_BYTE};
 
 /// Remove a key-value pair from token metadata.
 ///
 /// This instruction removes a custom key from the additional metadata.
-/// If idempotent is true, the instruction succeeds even if the key doesn't exist.
+/// If idempotent is true, the instruction succeeds even if the key doesn't
+/// exist.
 ///
 /// ### Accounts:
 ///   0. `[WRITE]` Metadata account

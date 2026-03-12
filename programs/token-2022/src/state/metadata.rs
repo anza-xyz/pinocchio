@@ -1,5 +1,4 @@
-use solana_address::Address;
-use solana_program_error::ProgramError;
+use {solana_address::Address, solana_program_error::ProgramError};
 
 /// Zero-copy view into token metadata account data.
 ///
@@ -63,7 +62,8 @@ impl<'a> Metadata<'a> {
 
     /// Read a variable-length field slice starting at `offset`.
     ///
-    /// Returns the field bytes and the offset past the field `(length prefix + data)`.
+    /// Returns the field bytes and the offset past the field `(length prefix +
+    /// data)`.
     ///
     /// # Safety
     ///
@@ -213,7 +213,8 @@ impl<'a> Metadata<'a> {
         self.uri
     }
 
-    /// Raw additional metadata bytes (key-value pairs without the pair count prefix).
+    /// Raw additional metadata bytes (key-value pairs without the pair count
+    /// prefix).
     #[inline(always)]
     pub fn additional_metadata(&self) -> &[u8] {
         self.additional_metadata
@@ -524,7 +525,8 @@ mod tests {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&[0u8; 64]); // authority + mint
         for _ in 0..3 {
-            bytes.extend_from_slice(&0u32.to_le_bytes()); // name, symbol, uri (empty)
+            bytes.extend_from_slice(&0u32.to_le_bytes()); // name, symbol, uri
+                                                          // (empty)
         }
         // pair_count = 2 (but only the first pair is complete)
         bytes.extend_from_slice(&2u32.to_le_bytes());

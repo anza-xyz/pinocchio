@@ -1,15 +1,15 @@
-use core::slice::from_raw_parts;
-
-use solana_account_view::AccountView;
-use solana_address::Address;
-use solana_instruction_view::{
-    cpi::{invoke_signed, Signer},
-    InstructionAccount, InstructionView,
+use {
+    super::constants::MAX_IX_DATA,
+    crate::{write_bytes, UNINIT_BYTE},
+    core::slice::from_raw_parts,
+    solana_account_view::AccountView,
+    solana_address::Address,
+    solana_instruction_view::{
+        cpi::{invoke_signed, Signer},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::{ProgramError, ProgramResult},
 };
-use solana_program_error::{ProgramError, ProgramResult};
-
-use super::constants::MAX_IX_DATA;
-use crate::{write_bytes, UNINIT_BYTE};
 
 /// Initialize token metadata for a Token-2022 mint.
 ///
