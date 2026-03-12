@@ -4,6 +4,7 @@ pub mod group_member_pointer;
 pub mod group_pointer;
 pub mod interest_bearing_mint;
 pub mod memo_transfer;
+pub mod metadata;
 pub mod metadata_pointer;
 pub mod mint_close_authority;
 pub mod pausable;
@@ -12,7 +13,6 @@ pub mod permissioned_burn;
 pub mod scaled_ui_amount;
 pub mod transfer_fee;
 pub mod transfer_hook;
-pub mod metadata;
 
 #[repr(u8)]
 #[non_exhaustive]
