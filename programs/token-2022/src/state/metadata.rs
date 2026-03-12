@@ -42,7 +42,8 @@ pub struct Metadata<'a> {
 }
 
 impl<'a> Metadata<'a> {
-    /// Minimum data size: `32 + 32 + 4×4 = 80` bytes.
+    /// Minimum data size: `32 (update_authority) + 32 (mint) + 4 (name_len) + 4
+    /// (symbol_len) + 4 (uri_len) + 4 (pair_count) = 80` bytes.
     pub const MIN_LEN: usize = 80;
 
     const UPDATE_AUTHORITY_OFFSET: usize = 0;
@@ -97,11 +98,11 @@ impl<'a> Metadata<'a> {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        // Read the 3 string fields (name, symbol, uri) — each is u32 byte_len + bytes.
+        // Validate all 3 string fields (name, symbol, uri) — each is u32 byte_len +
+        // bytes.
         let mut offset = Self::FIRST_VARLEN_OFFSET;
-        let mut fields: [&[u8]; 3] = [&[]; 3];
 
-        for field in &mut fields {
+        for _ in 0..3 {
             if offset
                 .checked_add(4)
                 .ok_or(ProgramError::InvalidAccountData)?
@@ -117,8 +118,6 @@ impl<'a> Metadata<'a> {
                 data[offset + 3],
             ]) as usize;
 
-            let start = offset + 4;
-
             offset = offset
                 .checked_add(4 + field_len)
                 .ok_or(ProgramError::InvalidAccountData)?;
@@ -126,14 +125,9 @@ impl<'a> Metadata<'a> {
             if offset > data.len() {
                 return Err(ProgramError::InvalidAccountData);
             }
-
-            *field = &data[start..start + field_len];
         }
 
-        // The additional_metadata field is encoded on-chain as:
-        //   u32 pair_count, then pair_count × (u32 key_len + key + u32 val_len + val)
-        // We skip the count prefix and capture the remaining bytes as
-        // the raw additional_metadata blob for the iterator.
+        // Validate that the pair_count prefix (u32) fits within the data.
         if offset
             .checked_add(4)
             .ok_or(ProgramError::InvalidAccountData)?
@@ -142,18 +136,8 @@ impl<'a> Metadata<'a> {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let additional_metadata = &data[offset + 4..];
-
-        Ok(Metadata {
-            update_authority: unsafe {
-                &*(data.as_ptr().add(Self::UPDATE_AUTHORITY_OFFSET) as *const Address)
-            },
-            mint: unsafe { &*(data.as_ptr().add(Self::MINT_OFFSET) as *const Address) },
-            name: fields[0],
-            symbol: fields[1],
-            uri: fields[2],
-            additional_metadata,
-        })
+        // All bounds are validated; delegate construction to the unchecked path.
+        Ok(unsafe { Self::from_bytes_unchecked(data) })
     }
 
     /// Create a `Metadata` view without any validation.
