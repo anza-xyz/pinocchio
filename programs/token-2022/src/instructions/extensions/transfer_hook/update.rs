@@ -3,10 +3,7 @@ use {
         instructions::{extensions::ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
         write_bytes, UNINIT_BYTE,
     },
-    core::{
-        mem::MaybeUninit,
-        slice::{self, from_raw_parts},
-    },
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
@@ -170,9 +167,7 @@ impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
                 },
             },
             // SAFETY: accounts has `expected_accounts` initialized.
-            unsafe {
-                slice::from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts)
-            },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
             signers,
         )
     }

@@ -1,6 +1,6 @@
 use {
     crate::instructions::MAX_MULTISIG_SIGNERS,
-    core::{mem::MaybeUninit, slice},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{cpi::invoke_with_bounds, InstructionAccount, InstructionView},
@@ -70,9 +70,7 @@ impl<MultisigSigner: AsRef<AccountView>> InitializeMultisig2<'_, '_, '_, Multisi
 
         let instruction = InstructionView {
             program_id: token_program,
-            accounts: unsafe {
-                slice::from_raw_parts(instruction_accounts.as_ptr() as _, num_accounts)
-            },
+            accounts: unsafe { from_raw_parts(instruction_accounts.as_ptr() as _, num_accounts) },
             data,
         };
 
@@ -92,8 +90,8 @@ impl<MultisigSigner: AsRef<AccountView>> InitializeMultisig2<'_, '_, '_, Multisi
             account_view.write(signer.as_ref());
         }
 
-        invoke_with_bounds::<{ 1 + MAX_MULTISIG_SIGNERS }, &AccountView>(&instruction, unsafe {
-            slice::from_raw_parts(acc_views.as_ptr() as _, num_accounts)
+        invoke_with_bounds::<{ 1 + MAX_MULTISIG_SIGNERS }, _>(&instruction, unsafe {
+            from_raw_parts(acc_views.as_ptr() as *const &AccountView, num_accounts)
         })
     }
 }
