@@ -487,7 +487,6 @@ macro_rules! nostd_panic_handler {
     () => {
         /// A panic handler for `no_std`.
         #[cfg(target_os = "solana")]
-        #[no_mangle]
         #[panic_handler]
         fn handler(info: &core::panic::PanicInfo<'_>) -> ! {
             if let Some(location) = info.location() {
