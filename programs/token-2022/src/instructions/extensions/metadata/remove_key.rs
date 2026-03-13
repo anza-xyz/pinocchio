@@ -14,12 +14,13 @@ use {
 /// Remove a key-value pair from token metadata.
 ///
 /// This instruction removes a custom key from the additional metadata.
-/// If idempotent is true, the instruction succeeds even if the key doesn't
-/// exist.
+/// If `idempotent` is `true`, the instruction succeeds even if the key
+/// does not exist.
 ///
-/// ### Accounts:
-///   0. `[WRITE]` Metadata account
-///   1. `[SIGNER]` Update authority
+/// Accounts expected by this instruction:
+///
+///   0. `[writable]` The metadata account.
+///   1. `[signer]` The update authority.
 pub struct RemoveKey<'a, 'b> {
     /// The metadata account to update
     pub metadata: &'a AccountView,

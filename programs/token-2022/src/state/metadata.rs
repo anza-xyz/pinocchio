@@ -146,8 +146,6 @@ impl<'a> Metadata<'a> {
     ///
     /// The caller must ensure that `data` contains a valid token metadata
     /// layout with all declared field lengths fitting within the slice.
-    /// The Token-2022 program guarantees valid UTF-8 for name, symbol, and
-    /// uri fields, so data from a valid account is safe to read as `&str`.
     #[inline(always)]
     pub unsafe fn from_bytes_unchecked(data: &'a [u8]) -> Self {
         let (name, offset) = Self::read_field(data, Self::FIRST_VARLEN_OFFSET);

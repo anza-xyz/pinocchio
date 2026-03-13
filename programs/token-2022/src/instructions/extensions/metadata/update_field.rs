@@ -54,9 +54,10 @@ impl Field<'_> {
 /// This instruction updates either a built-in field (Name, Symbol, Uri)
 /// or a custom key-value pair in the additional metadata.
 ///
-/// ### Accounts:
-///   0. `[WRITE]` Metadata account
-///   1. `[SIGNER]` Update authority
+/// Accounts expected by this instruction:
+///
+///   0. `[writable]` The metadata account.
+///   1. `[signer]` The update authority.
 pub struct UpdateField<'a, 'b> {
     /// The metadata account to update
     pub metadata: &'a AccountView,

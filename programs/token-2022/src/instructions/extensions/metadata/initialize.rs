@@ -16,11 +16,12 @@ use {
 /// This instruction creates and populates the metadata account with
 /// the token's name, symbol, and URI.
 ///
-/// ### Accounts:
-///   0. `[WRITE]` Metadata account
-///   1. `[]` Update authority
-///   2. `[]` Mint
-///   3. `[SIGNER]` Mint authority
+/// Accounts expected by this instruction:
+///
+///   0. `[writable]` The metadata account.
+///   1. `[]` The update authority.
+///   2. `[]` The mint.
+///   3. `[signer]` The mint authority.
 pub struct InitializeMetadata<'a, 'b> {
     /// The metadata account to initialize
     pub metadata: &'a AccountView,
