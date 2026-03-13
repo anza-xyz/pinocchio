@@ -127,7 +127,7 @@ dependencies = [
  "pinocchio",
  "solana-account-view",
  "solana-address",
- "solana-define-syscall 4.0.1",
+ "solana-define-syscall 5.0.0",
  "solana-instruction-view",
  "solana-program-error",
 ]
