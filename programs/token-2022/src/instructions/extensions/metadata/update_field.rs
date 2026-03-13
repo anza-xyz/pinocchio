@@ -13,7 +13,9 @@ use {
 
 /// Field type for metadata updates.
 ///
-/// The `#[repr(u8)]` controls the in-memory discriminant only;
+/// `#[repr(u8)]` sets the discriminant to a single byte, matching the
+/// on-chain wire format written by the Token-2022 program. `to_u8` is used
+/// for serialization because `Key` carries data and cannot be cast directly.
 #[repr(u8)]
 #[derive(Clone, Copy)]
 pub enum Field<'a> {
