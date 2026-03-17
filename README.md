@@ -252,11 +252,11 @@ pinocchio = { version = "0.11.0", features = ["cpi"] }
 
 ### `account-resize`
 
-The `account-resize` feature allows a program to grow or shrink an `AccountView`’s data at runtime. At the start of execution, the entrypoint stores the original data length so it can verify that the resize stays within the permitted bounds. This operation consumes `2` CUs per account.
+The `account-resize` feature allows a program to grow or shrink an `AccountView`'s data at runtime. At the start of execution, the entrypoint stores the original data length so it can verify that the resize stays within the permitted bounds. This operation consumes `2` CUs per account.
 
 ### `unsafe-account-resize`
 
-The `unsafe-account-resize` feature, like `account-resize`, allows a program to grow or shrink an `AccountView`’s data at runtime. Unlike `account-resize`, it does not validate the new size, so it adds no entrypoint overhead. The program must ensure that the account remains within the permitted bounds.
+The `unsafe-account-resize` feature, like `account-resize`, allows a program to grow or shrink an `AccountView`'s data at runtime. Unlike `account-resize`, it does not validate the new size, so it adds no entrypoint overhead. The program must ensure that the account remains within the permitted bounds.
 
 ## Advanced entrypoint configuration
 
