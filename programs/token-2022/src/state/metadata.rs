@@ -282,7 +282,7 @@ impl<'a> Iterator for AdditionalMetadataIterator<'a> {
         let key_start = self.offset + 4;
         let key_end = key_start.checked_add(key_len)?;
 
-        if key_end + 4 > self.data.len() {
+        if key_end.checked_add(4)? > self.data.len() {
             return None;
         }
 
