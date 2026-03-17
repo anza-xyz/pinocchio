@@ -123,7 +123,7 @@ impl Rent {
     ///
     /// This method performs a check on the account view key.
     #[inline]
-    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Rent>, ProgramError> {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Rent>, ProgramError> {
         if unlikely(account_view.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
