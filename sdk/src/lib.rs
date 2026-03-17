@@ -253,7 +253,7 @@
 //!
 //! When no allocation is needed or desired, the feature can be disabled:
 //! ```ignore
-//! pinocchio = { version = "0.11.0", default-features = false }
+//! pinocchio = { version = "0.11", default-features = false }
 //! ```
 //!
 //! ### `copy`
@@ -267,7 +267,7 @@
 //! The `cpi` feature enables the cross-program invocation helpers, as well as
 //! types to define instructions and signer information.
 //! ```ignore
-//! pinocchio = { version = "0.11.0", features = ["cpi"] }
+//! pinocchio = { version = "0.11", features = ["cpi"] }
 //! ```
 //!
 //! ### `account-resize`
@@ -330,7 +330,7 @@
 //! ```toml
 //! [dependencies]
 //! # Enable static syscalls for BPF target
-//! solana-define-syscall = { version = "4.0.1", features = ["unstable-static-syscalls"] }
+//! solana-define-syscall = { version = "5.0", features = ["unstable-static-syscalls"] }
 //! ```
 //!
 //! When compiling your program with the upstream BPF target, the `std` library
