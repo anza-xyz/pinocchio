@@ -102,3 +102,78 @@ impl Fees {
 impl Sysvar for Fees {
     impl_sysvar_get!(sol_get_fees_sysvar);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fee_calculator_new() {
+        let lamports = 5_000u64;
+        let calc = FeeCalculator::new(lamports);
+        assert_eq!(calc.lamports_per_signature, lamports);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_default() {
+        let governor = FeeRateGovernor::default();
+        assert_eq!(governor.lamports_per_signature, 0);
+        assert_eq!(governor.target_lamports_per_signature, DEFAULT_TARGET_LAMPORTS_PER_SIGNATURE);
+        assert_eq!(governor.target_signatures_per_slot, DEFAULT_TARGET_SIGNATURES_PER_SLOT);
+        assert_eq!(governor.min_lamports_per_signature, 0);
+        assert_eq!(governor.max_lamports_per_signature, 0);
+        assert_eq!(governor.burn_percent, DEFAULT_BURN_PERCENT);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_create_fee_calculator() {
+        let governor = FeeRateGovernor {
+            lamports_per_signature: 12_000,
+            ..FeeRateGovernor::default()
+        };
+        let calc = governor.create_fee_calculator();
+        assert_eq!(calc.lamports_per_signature, 12_000);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_burn() {
+        let governor = FeeRateGovernor {
+            burn_percent: 50,
+            ..FeeRateGovernor::default()
+        };
+        let (unburned, burned) = governor.burn(100);
+        assert_eq!(unburned, 50);
+        assert_eq!(burned, 50);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_burn_zero_percent() {
+        let governor = FeeRateGovernor {
+            burn_percent: 0,
+            ..FeeRateGovernor::default()
+        };
+        let (unburned, burned) = governor.burn(1000);
+        assert_eq!(unburned, 1000);
+        assert_eq!(burned, 0);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_burn_hundred_percent() {
+        let governor = FeeRateGovernor {
+            burn_percent: 100,
+            ..FeeRateGovernor::default()
+        };
+        let (unburned, burned) = governor.burn(1000);
+        assert_eq!(unburned, 0);
+        assert_eq!(burned, 1000);
+    }
+
+    #[test]
+    fn test_fees_new() {
+        let calc = FeeCalculator::new(7_000);
+        let governor = FeeRateGovernor::default();
+        let fees = Fees::new(calc, governor);
+        assert_eq!(fees.fee_calculator.lamports_per_signature, 7_000);
+        assert_eq!(fees.fee_rate_governor.target_lamports_per_signature, DEFAULT_TARGET_LAMPORTS_PER_SIGNATURE);
+    }
+}

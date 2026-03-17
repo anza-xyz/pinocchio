@@ -289,3 +289,218 @@ impl IntrospectedInstructionAccount {
         InstructionAccount::new(&self.key, self.is_writable(), self.is_signer())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+    use alloc::vec::Vec;
+
+    /// Build a single instruction blob (num_accounts, account metas, program_id, data).
+    fn build_instruction_blob(
+        num_account_metas: u16,
+        account_flags_and_keys: &[(u8, Address)],
+        program_id: &Address,
+        data: &[u8],
+    ) -> Vec<u8> {
+        assert_eq!(
+            num_account_metas as usize,
+            account_flags_and_keys.len(),
+            "account_flags_and_keys length must match num_account_metas"
+        );
+        let mut out = Vec::new();
+        out.extend_from_slice(&num_account_metas.to_le_bytes());
+        for (flags, key) in account_flags_and_keys {
+            out.push(*flags);
+            out.extend_from_slice(key.as_ref());
+        }
+        out.extend_from_slice(program_id.as_ref());
+        out.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        out.extend_from_slice(data);
+        out
+    }
+
+    /// Build the full Instructions sysvar buffer: header (num_instructions, offsets, current_index)
+    /// and instruction blobs at the given offsets.
+    fn build_instructions_sysvar_buffer(
+        instruction_blobs: &[Vec<u8>],
+        current_index: u16,
+    ) -> Vec<u8> {
+        let num_instructions = instruction_blobs.len() as u16;
+        let header_len = 2 + 2 * num_instructions as usize;
+        let mut offsets = Vec::with_capacity(instruction_blobs.len());
+        let mut offset = header_len;
+        for blob in instruction_blobs {
+            offsets.push(offset as u16);
+            offset += blob.len();
+        }
+        let current_index_offset = offset;
+        let total_len = current_index_offset + 2;
+
+        let mut buffer = vec![0u8; total_len];
+        buffer[0..2].copy_from_slice(&num_instructions.to_le_bytes());
+        for (i, &off) in offsets.iter().enumerate() {
+            buffer[2 + i * 2..4 + i * 2].copy_from_slice(&off.to_le_bytes());
+        }
+        let mut write_offset = header_len;
+        for blob in instruction_blobs {
+            buffer[write_offset..write_offset + blob.len()].copy_from_slice(blob);
+            write_offset += blob.len();
+        }
+        buffer[current_index_offset..total_len].copy_from_slice(&current_index.to_le_bytes());
+        buffer
+    }
+
+    fn make_address(byte: u8) -> Address {
+        Address::new_from_array([byte; 32])
+    }
+
+    #[test]
+    fn test_num_instructions_and_load_current_index() {
+        let program_id = make_address(1);
+        let blob = build_instruction_blob(0, &[], &program_id, b"data");
+        let buffer = build_instructions_sysvar_buffer(&[blob], 0);
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+
+        assert_eq!(instructions.num_instructions(), 1);
+        assert_eq!(instructions.load_current_index(), 0);
+    }
+
+    #[test]
+    fn test_load_current_index_last_instruction() {
+        let program_id = make_address(2);
+        let blob = build_instruction_blob(0, &[], &program_id, b"");
+        let buffer = build_instructions_sysvar_buffer(&[blob.clone(), blob], 1);
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+
+        assert_eq!(instructions.num_instructions(), 2);
+        assert_eq!(instructions.load_current_index(), 1);
+    }
+
+    #[test]
+    fn test_load_instruction_at_in_bounds() {
+        let program_id = make_address(10);
+        let data = b"hello";
+        let blob = build_instruction_blob(0, &[], &program_id, data);
+        let buffer = build_instructions_sysvar_buffer(&[blob], 0);
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+
+        let ix = instructions.load_instruction_at(0).expect("in bounds");
+        assert_eq!(ix.num_account_metas(), 0);
+        assert_eq!(ix.get_program_id(), &program_id);
+        assert_eq!(ix.get_instruction_data(), data);
+    }
+
+    #[test]
+    fn test_load_instruction_at_out_of_bounds() {
+        let program_id = make_address(0);
+        let blob = build_instruction_blob(0, &[], &program_id, b"");
+        let buffer = build_instructions_sysvar_buffer(&[blob], 0);
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+
+        assert!(instructions.load_instruction_at(1).is_err());
+        assert!(instructions.load_instruction_at(99).is_err());
+    }
+
+    #[test]
+    fn test_get_instruction_relative() {
+        let program_id0 = make_address(1);
+        let program_id1 = make_address(2);
+        let blob0 = build_instruction_blob(0, &[], &program_id0, b"zero");
+        let blob1 = build_instruction_blob(0, &[], &program_id1, b"one");
+        let buffer = build_instructions_sysvar_buffer(&[blob0, blob1], 1);
+
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+
+        let current = instructions.get_instruction_relative(0).expect("current");
+        assert_eq!(current.get_program_id(), &program_id1);
+        assert_eq!(current.get_instruction_data(), b"one");
+
+        let prev = instructions.get_instruction_relative(-1).expect("previous");
+        assert_eq!(prev.get_program_id(), &program_id0);
+        assert_eq!(prev.get_instruction_data(), b"zero");
+
+        let next = instructions.get_instruction_relative(1);
+        assert!(next.is_err());
+    }
+
+    #[test]
+    fn test_get_instruction_relative_negative_invalid() {
+        let program_id = make_address(0);
+        let blob = build_instruction_blob(0, &[], &program_id, b"");
+        let buffer = build_instructions_sysvar_buffer(&[blob], 0);
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+
+        assert!(instructions.get_instruction_relative(-1).is_err());
+    }
+
+    #[test]
+    fn test_instruction_with_account_metas() {
+        let program_id = make_address(100);
+        let signer_writable = 0b0000_0011u8;
+        let key1 = make_address(201);
+        let key2 = make_address(202);
+        let blob = build_instruction_blob(
+            2,
+            &[
+                (signer_writable, key1.clone()),
+                (0b0000_0010, key2.clone()), // writable only
+            ],
+            &program_id,
+            b"ixdata",
+        );
+        let buffer = build_instructions_sysvar_buffer(&[blob], 0);
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+        let ix = instructions.load_instruction_at(0).expect("in bounds");
+
+        assert_eq!(ix.num_account_metas(), 2);
+
+        let acc0 = ix.get_instruction_account_at(0).expect("account 0");
+        assert!(acc0.is_signer());
+        assert!(acc0.is_writable());
+        assert_eq!(acc0.key, key1);
+
+        let acc1 = ix.get_instruction_account_at(1).expect("account 1");
+        assert!(!acc1.is_signer());
+        assert!(acc1.is_writable());
+        assert_eq!(acc1.key, key2);
+
+        assert!(ix.get_instruction_account_at(2).is_err());
+    }
+
+    #[test]
+    fn test_introspected_instruction_data_empty() {
+        let program_id = make_address(0);
+        let blob = build_instruction_blob(0, &[], &program_id, b"");
+        let buffer = build_instructions_sysvar_buffer(&[blob], 0);
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+        let ix = instructions.load_instruction_at(0).expect("in bounds");
+
+        assert_eq!(ix.get_instruction_data(), b"");
+    }
+
+    #[test]
+    fn test_multiple_instructions_offsets() {
+        let p0 = make_address(0);
+        let p1 = make_address(1);
+        let p2 = make_address(2);
+        let b0 = build_instruction_blob(0, &[], &p0, b"a");
+        let b1 = build_instruction_blob(0, &[], &p1, b"bb");
+        let b2 = build_instruction_blob(0, &[], &p2, b"ccc");
+        let buffer = build_instructions_sysvar_buffer(&[b0, b1, b2], 1);
+
+        let instructions = unsafe { Instructions::new_unchecked(buffer.as_slice()) };
+        assert_eq!(instructions.num_instructions(), 3);
+
+        let ix0 = instructions.load_instruction_at(0).expect("0");
+        let ix1 = instructions.load_instruction_at(1).expect("1");
+        let ix2 = instructions.load_instruction_at(2).expect("2");
+
+        assert_eq!(ix0.get_program_id(), &p0);
+        assert_eq!(ix0.get_instruction_data(), b"a");
+        assert_eq!(ix1.get_program_id(), &p1);
+        assert_eq!(ix1.get_instruction_data(), b"bb");
+        assert_eq!(ix2.get_program_id(), &p2);
+        assert_eq!(ix2.get_instruction_data(), b"ccc");
+    }
+}
