@@ -90,7 +90,7 @@ impl Clock {
     ///
     /// This method performs a check on the account view address.
     #[inline]
-    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Clock>, ProgramError> {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Clock>, ProgramError> {
         if unlikely(account_view.address() != &CLOCK_ID) {
             return Err(ProgramError::InvalidArgument);
         }

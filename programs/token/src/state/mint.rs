@@ -42,7 +42,7 @@ impl Mint {
     /// This method performs owner and length validation on `AccountView`, safe
     /// borrowing the account data.
     #[inline]
-    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Mint>, ProgramError> {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Mint>, ProgramError> {
         if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }

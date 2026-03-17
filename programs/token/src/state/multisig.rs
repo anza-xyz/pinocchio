@@ -28,7 +28,9 @@ impl Multisig {
     /// This method performs owner and length validation on `AccountView`, safe
     /// borrowing the account data.
     #[inline]
-    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<Multisig>, ProgramError> {
+    pub fn from_account_view(
+        account_view: &AccountView,
+    ) -> Result<Ref<'_, Multisig>, ProgramError> {
         if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
