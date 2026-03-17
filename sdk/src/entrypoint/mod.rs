@@ -656,7 +656,6 @@ mod alloc {
         crate::{entrypoint::MAX_HEAP_LENGTH, hint::unlikely},
         core::{
             alloc::{GlobalAlloc, Layout},
-            mem::size_of,
             ptr::null_mut,
         },
     };
@@ -696,6 +695,13 @@ mod alloc {
         /// runtime. The runtime will enforce the actual heap size
         /// requested by the program.
         pub const unsafe fn new_unchecked(start: usize, len: usize) -> Self {
+            if len < size_of::<usize>() {
+                panic!("heap length must be at least `size_of::<usize>()` bytes");
+            }
+            // Reserves the first `size_of::<usize>()` bytes to store the current position
+            // of the heap pointer.
+            *(start as *mut usize) = start + size_of::<usize>();
+
             Self {
                 start,
                 end: start + len,
@@ -726,12 +732,7 @@ mod alloc {
             // Integer-to-pointer cast: the caller guarantees that `self.start` is a valid
             // address for the lifetime of the allocator and aligned to `usize`.
             let pos_ptr = self.start as *mut usize;
-            let mut pos = *pos_ptr;
-
-            if unlikely(pos == 0) {
-                // First time, set starting position.
-                pos = self.start + size_of::<usize>();
-            }
+            let pos = *pos_ptr;
 
             // Determines the allocation address, adjusting the alignment for the
             // type being allocated.
