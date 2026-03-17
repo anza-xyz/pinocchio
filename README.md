@@ -138,7 +138,7 @@ pub fn process_instruction(
 
 📌 [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html)
 
-The `entrypoint!` macro looks similar to the "standard" one found in [`solana-program-entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html). It parses the whole input and provides the `program_id`, `accounts` and `instruction_data` separately. This consumes compute units before the program begins its execution. In some cases, it is beneficial for a program to have more control when the input parsing is happening, even whether the parsing is needed or not &mdash; this is the purpose of the [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html) macro. This macro only wraps the program input and provides methods to parse the input on demand.
+The `entrypoint!` macro looks similar to the "standard" one found in [`solana-program-entrypoint`](https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html). It parses the whole input and provides the `program_id`, `accounts` and `instruction_data` separately. This consumes compute units before the program begins its execution. In some cases, it is beneficial for a program to have more control over when input parsing happens, including whether parsing is needed at all &mdash; this is the purpose of the [`lazy_program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.lazy_program_entrypoint.html) macro. This macro only wraps the program input and provides methods to parse the input on demand.
 
 The `lazy_entrypoint` is suitable for programs that have a single or very few instructions, since it requires the program to handle the parsing, which can become complex as the number of instructions increases. For *larger* programs, the [`program_entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.program_entrypoint.html) will likely be easier and more efficient to use.
 
@@ -166,16 +166,16 @@ pub fn process_instruction(
 The `InstructionContext` provides on-demand access to the information of the input:
 
 * `remaining()`: number of remaining accounts to be parsed
-* `next_account()`: parsers the next available account (can be used as many times as accounts remaining)
-* `instruction_data()`: parsers the instruction data
-* `program_id()`: parsers the program id
+* `next_account()`: parses the next available account (can be used as many times as accounts remaining)
+* `instruction_data()`: parses the instruction data
+* `program_id()`: parses the program id
 
 > ⚠️ **Note:**
 > The `lazy_program_entrypoint!` does not set up a global allocator nor a panic handler. A program should explicitly use one of the provided macros to set them up or include its own implementation.
 
 📌 [`no_allocator!`](https://docs.rs/pinocchio/latest/pinocchio/macro.no_allocator.html)
 
-When writing programs, it can be useful to make sure the program does not attempt to make any allocations. For this cases, `pinocchio` includes a [`no_allocator!`](https://docs.rs/pinocchio/latest/pinocchio/macro.no_allocator.html) macro that sets a global allocator just panics at any attempt to allocate memory.
+When writing programs, it can be useful to make sure the program does not attempt to make any allocations. In these cases, `pinocchio` includes a [`no_allocator!`](https://docs.rs/pinocchio/latest/pinocchio/macro.no_allocator.html) macro that sets a global allocator that panics on any attempt to allocate memory.
 
 To use the `no_allocator!` macro, use the following in your entrypoint definition:
 ```rust
@@ -231,7 +231,7 @@ The `alloc` feature is enabled by default and it uses the [`alloc`](https://doc.
 When no allocation is needed or desired, the feature can be disabled:
 
 ```
-pinocchio = { version = "0.10.0", default-features = false }
+pinocchio = { version = "0.11.0", default-features = false }
 ```
 
 > ⚠️ **Note:**
@@ -247,8 +247,16 @@ on the `solana-account-view` and `solana-address` re-exports.
 The `cpi` feature enables the cross-program invocation helpers, as well as types to define instructions and signer information.
 
 ```
-pinocchio = { version = "0.10.0", features = ["cpi"] }
+pinocchio = { version = "0.11.0", features = ["cpi"] }
 ```
+
+### `account-resize`
+
+The `account-resize` feature allows a program to grow or shrink an `AccountView`’s data at runtime. At the start of execution, the entrypoint stores the original data length so it can verify that the resize stays within the permitted bounds. This operation consumes `2` CUs per account.
+
+### `unsafe-account-resize`
+
+The `unsafe-account-resize` feature, like `account-resize`, allows a program to grow or shrink an `AccountView`’s data at runtime. Unlike `account-resize`, it does not validate the new size, so it adds no entrypoint overhead. The program must ensure that the account remains within the permitted bounds.
 
 ## Advanced entrypoint configuration
 

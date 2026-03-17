@@ -1,11 +1,11 @@
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-//! A *no external* dependencies library to create Solana programs
-//! in Rust. The only dependencies are types from the Solana SDK specifically
-//! designed for on-chain programs. This mitigates dependency issues and offers
-//! an efficient zero-copy library to write programs, optimized in terms of both
-//! compute units consumption and binary size.
+//! A library for creating Solana programs in Rust with no external
+//! dependencies. The only dependencies are types from the Solana SDK
+//! specifically designed for on-chain programs. This mitigates dependency
+//! issues and offers an efficient zero-copy library for writing programs,
+//! optimized in terms of both compute unit consumption and binary size.
 //!
 //! ## Defining the program entrypoint
 //!
@@ -53,7 +53,7 @@
 //! }
 //! ```
 //!
-//! The information from the input is parsed into their own entities:
+//! The input is parsed into the following components:
 //!
 //! * `program_id`: the `ID` of the program being called
 //! * `accounts`: the accounts received
@@ -128,8 +128,8 @@
 //! It parses the whole input and provides the `program_id`, `accounts` and
 //! `instruction_data` separately. This consumes compute units before the
 //! program begins its execution. In some cases, it is beneficial for a program
-//! to have more control when the input parsing is happening, even whether the
-//! parsing is needed or not - this is the purpose of the
+//! to have more control over when input parsing happens, including whether
+//! parsing is needed at all - this is the purpose of the
 //! [`lazy_program_entrypoint!`] macro. This macro only wraps the program input
 //! and provides methods to parse the input on-demand.
 //!
@@ -183,8 +183,8 @@
 //! ### [`no_allocator!`]
 //!
 //! When writing programs, it can be useful to make sure the program does not
-//! attempt to make any allocations. For this cases, Pinocchio includes a
-//! [`no_allocator!`] macro that set a global allocator just panics at any
+//! attempt to make any allocations. In these cases, Pinocchio includes a
+//! [`no_allocator!`] macro that sets a global allocator that panics on any
 //! attempt to allocate memory.
 //!
 //! To use the [`no_allocator!`] macro, use the following in your entrypoint
@@ -253,7 +253,7 @@
 //!
 //! When no allocation is needed or desired, the feature can be disabled:
 //! ```ignore
-//! pinocchio = { version = "0.10.0", default-features = false }
+//! pinocchio = { version = "0.11.0", default-features = false }
 //! ```
 //!
 //! ### `copy`
@@ -267,8 +267,22 @@
 //! The `cpi` feature enables the cross-program invocation helpers, as well as
 //! types to define instructions and signer information.
 //! ```ignore
-//! pinocchio = { version = "0.10.0", features = ["cpi"] }
+//! pinocchio = { version = "0.11.0", features = ["cpi"] }
 //! ```
+//!
+//! ### `account-resize`
+//!
+//! The `account-resize` feature allows a program to grow or shrink an `AccountView`’s
+//! data at runtime. At the start of execution, the entrypoint stores the original data
+//! length so it can verify that the resize stays within the permitted bounds. This
+//! operation consumes `2` CUs per account.
+//!
+//! ### `unsafe-account-resize`
+//!
+//! The `unsafe-account-resize` feature, like `account-resize`, allows a program to grow
+//! or shrink an `AccountView`’s data at runtime. Unlike `account-resize`, it does not
+//! validate the new size, so it adds no entrypoint overhead. The program must ensure
+//! that the account remains within the permitted bounds.
 //!
 //! ## Advanced entrypoint configuration
 //!
@@ -309,7 +323,7 @@
 //!
 //! ## Upstream BPF compatibility
 //!
-//! Pinocchio is compatible with upstream BPF target (`target_arch = bpf`). When
+//! Pinocchio is compatible with the upstream BPF target (`target_arch = bpf`). When
 //! using syscalls (e.g., cross-program invocations), it is necessary to
 //! explicitly enable static syscalls in your program's `Cargo.toml`:
 //! ```toml
