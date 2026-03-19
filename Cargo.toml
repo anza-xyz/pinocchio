@@ -21,7 +21,9 @@ solana-account-view = "2.0"
 solana-address = "2.0"
 solana-define-syscall = "5.0"
 solana-instruction-view = "2.0"
+solana-nullable = "1.0.0"
 solana-program-error = "3.0"
+solana-zero-copy = "1.0.0"
 
 [workspace.metadata.cli]
 solana = "2.3.0"
