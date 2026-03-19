@@ -16,25 +16,27 @@ pub const MAX_INLINE_ACCOUNTS: usize = 10;
 /// This allows the entrypoint to read the instruction data and decide how many
 /// accounts it wants to parse from the program input.
 ///
-/// It offers two macros to declare the entrypoint: [`inline_program_entrypoint`]
-/// and [`execute`]. The former is used to declare the entrypoint and the
-/// latter is used to execute the program logic with a specified number of
-/// accounts and a processor function. The processor function is called with
-/// the program id, the accounts, and the instruction data.
+/// It offers two macros to declare the entrypoint:
+/// [`crate::inline_program_entrypoint!`] and [`crate::execute!`]. The former is
+/// used to declare the entrypoint and the latter is used to execute the program
+/// logic with a specified number of accounts and a processor function. The
+/// processor function is called with the program id, the accounts, and the
+/// instruction data.
 ///
-/// The [`inline_program_entrypoint`] macro is used to declare the entrypoint. The
-/// only argument is the name of a function with this type signature:
+/// The [`crate::inline_program_entrypoint!`] macro is used to declare the
+/// entrypoint. The only argument is the name of a function with this type
+/// signature:
 ///
 /// ```ignore
 /// fn process_instruction(input: ProgramInput) -> ProgramResult;
 /// ```
 ///
 /// [`ProgramInput`] offers a method to read the instruction data. Programs can
-/// then use the [`execute`] macro to execute the program logic for the
-/// corresponding instruction. The [`execute`] macro takes three arguments: the
-/// number of accounts to parse from the input buffer, the program input, and
-/// the name of the processor function. The processor function has this type
-/// signature:
+/// then use the [`crate::execute!`] macro to execute the program logic for the
+/// corresponding instruction. The [`crate::execute!`] macro takes three
+/// arguments: the number of accounts to parse from the input buffer, the
+/// program input, and the name of the processor function. The processor
+/// function has this type signature:
 ///
 /// ```ignore
 /// fn processor(
