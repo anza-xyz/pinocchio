@@ -1,11 +1,16 @@
 use {
-    crate::{write_bytes, UNINIT_BYTE},
-    core::slice::from_raw_parts,
+    crate::{instructions::Batchable, write_bytes, UNINIT_BYTE},
+    core::{mem::MaybeUninit, ptr, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
-    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
+    solana_instruction_view::{
+        cpi::{invoke_unchecked, CpiAccount},
+        InstructionAccount, InstructionView,
+    },
     solana_program_error::ProgramResult,
 };
+
+const INITIALIZE_MINT_2_INSTRUCTION_DATA_LEN: usize = 67;
 
 /// Initialize a new mint.
 ///
@@ -23,45 +28,81 @@ pub struct InitializeMint2<'a> {
 }
 
 impl InitializeMint2<'_> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 20;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // Instruction accounts
-        let instruction_accounts: [InstructionAccount; 1] =
-            [InstructionAccount::writable(self.mint.address())];
+        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 1];
+        let written_instruction_accounts =
+            self.write_instruction_accounts(&mut instruction_accounts);
 
-        // Instruction data layout:
-        // - [0]: instruction discriminator (1 byte, u8)
-        // - [1]: decimals (1 byte, u8)
-        // - [2..34]: mint_authority (32 bytes, Address)
-        // - [34]: freeze_authority presence flag (1 byte, u8)
-        // - [35..67]: freeze_authority (optional, 32 bytes, Address)
-        let mut instruction_data = [UNINIT_BYTE; 67];
-        let mut length = instruction_data.len();
+        let mut accounts = [const { MaybeUninit::<CpiAccount>::uninit() }; 1];
+        let written_accounts = self.write_accounts(&mut accounts);
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[20]);
-        // Set decimals as u8 at offset [1]
-        write_bytes(&mut instruction_data[1..2], &[self.decimals]);
-        // Set mint_authority as Address at offset [2..34]
-        write_bytes(&mut instruction_data[2..34], self.mint_authority.as_array());
+        let mut instruction_data = [UNINIT_BYTE; INITIALIZE_MINT_2_INSTRUCTION_DATA_LEN];
+        let written_instruction_data = self.write_instruction_data(&mut instruction_data);
 
-        if let Some(freeze_auth) = self.freeze_authority {
-            // Set Option = `true` & freeze_authority at offset [34..67]
-            write_bytes(&mut instruction_data[34..35], &[1]);
-            write_bytes(&mut instruction_data[35..], freeze_auth.as_array());
-        } else {
-            // Set Option = `false`
-            write_bytes(&mut instruction_data[34..35], &[0]);
-            // Adjust length if no freeze authority
-            length = 35;
+        unsafe {
+            invoke_unchecked(
+                &InstructionView {
+                    program_id: &crate::ID,
+                    accounts: from_raw_parts(
+                        instruction_accounts.as_ptr() as _,
+                        written_instruction_accounts,
+                    ),
+                    data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
+                },
+                from_raw_parts(accounts.as_ptr() as *const CpiAccount, written_accounts),
+            );
         }
 
-        let instruction = InstructionView {
-            program_id: &crate::ID,
-            accounts: &instruction_accounts,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, length) },
-        };
+        Ok(())
+    }
+}
 
-        invoke(&instruction, &[self.mint])
+impl super::sealed::Sealed for InitializeMint2<'_> {}
+
+impl Batchable for InitializeMint2<'_> {
+    #[inline(always)]
+    fn write_accounts(&self, accounts: &mut [MaybeUninit<CpiAccount>]) -> usize {
+        accounts[0].write(CpiAccount::from(self.mint));
+        1
+    }
+
+    #[inline(always)]
+    fn write_instruction_accounts(
+        &self,
+        accounts: &mut [MaybeUninit<InstructionAccount>],
+    ) -> usize {
+        // SAFETY: The written address reference is borrowed from `self`, and
+        // callers must not use the output buffer after `self` expires.
+        unsafe {
+            ptr::write(
+                accounts[0].as_mut_ptr(),
+                InstructionAccount::writable(&*(self.mint.address() as *const _)),
+            );
+        }
+
+        1
+    }
+
+    #[inline(always)]
+    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> usize {
+        data[0].write(Self::DISCRIMINATOR);
+        data[1].write(self.decimals);
+        write_bytes(&mut data[2..34], self.mint_authority.as_array());
+
+        if let Some(freeze_auth) = self.freeze_authority {
+            data[34].write(1);
+            write_bytes(
+                &mut data[35..INITIALIZE_MINT_2_INSTRUCTION_DATA_LEN],
+                freeze_auth.as_array(),
+            );
+            INITIALIZE_MINT_2_INSTRUCTION_DATA_LEN
+        } else {
+            data[34].write(0);
+            35
+        }
     }
 }

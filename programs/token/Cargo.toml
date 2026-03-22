@@ -11,8 +11,18 @@ rust-version = { workspace = true }
 [lib]
 crate-type = ["rlib"]
 
+[features]
+batch = []
+wincode = ["dep:wincode", "solana-address/wincode", "solana-instruction/wincode"]
+
 [dependencies]
 solana-account-view = { workspace = true }
 solana-address = { workspace = true, features = ["decode"] }
+solana-instruction = { workspace = true }
 solana-instruction-view = { workspace = true, features = ["cpi"] }
 solana-program-error = { workspace = true }
+wincode = { workspace = true, optional = true }
+
+[dev-dependencies]
+strum = "0.28"
+strum_macros = "0.28"

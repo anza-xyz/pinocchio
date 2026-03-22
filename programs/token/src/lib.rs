@@ -1,7 +1,14 @@
 #![no_std]
 
+#[cfg(feature = "batch")]
+extern crate alloc;
+
+//mod error;
+//mod instruction;
 pub mod instructions;
 pub mod state;
+
+//pub use {error::*, instruction::*};
 
 use core::mem::MaybeUninit;
 
