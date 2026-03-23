@@ -27,7 +27,7 @@ mod transfer_checked;
 mod ui_amount_to_amount;
 
 #[cfg(feature = "batch")]
-pub use batch::*;
+pub use batch::{Batch, Batchable};
 pub use {
     amount_to_ui_amount::*, approve::*, approve_checked::*, burn::*, burn_checked::*,
     close_account::*, freeze_account::*, get_account_data_size::*, initialize_account::*,
@@ -38,60 +38,93 @@ pub use {
 };
 use {
     core::mem::MaybeUninit,
+    solana_account_view::AccountView,
     solana_instruction_view::{cpi::CpiAccount, InstructionAccount},
+    solana_program_error::ProgramError,
 };
 
-/// Maximum CPI instruction data size. 10 KiB was chosen to ensure that CPI
-/// instructions are not more limited than transaction instructions if the size
-/// of transactions is doubled in the future.
-const MAX_CPI_INSTRUCTION_DATA_LEN: usize = 10 * 1024;
-
-/// A trait for instructions that can be included in a batch instruction.
-pub trait Batchable: sealed::Sealed {
-    /// Writes the `AccountView`s required by this instruction into the provided slice.
-    ///
-    /// Returns the number of accounts written.
-    fn write_accounts(&self, accounts: &mut [MaybeUninit<CpiAccount>]) -> usize;
-
-    /// Writes the `InstructionAccount`s required by this instruction into the provided slice.
-    ///
-    /// Returns the number of accounts written.
-    fn write_instruction_accounts(&self, accounts: &mut [MaybeUninit<InstructionAccount>])
-        -> usize;
-
-    /// Writes the instruction data for this instruction into the provided slice.
-    ///
-    /// Returns the number of bytes written.
-    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> usize;
+#[cold]
+fn account_borrow_failed_error() -> ProgramError {
+    ProgramError::AccountBorrowFailed
 }
 
-/// Implement `Batchable` for references to types that implement `Batchable`.
-///
-/// This allows the use of `&dyn Batchable` trait object, allowing the
-/// use of array of batchable instructions.
-impl<T: Batchable + ?Sized> Batchable for &T {
+#[cold]
+fn invalid_argument_error() -> ProgramError {
+    ProgramError::InvalidArgument
+}
+
+#[inline(always)]
+fn writable_cpi_account<'cpi>(account: &AccountView) -> Result<CpiAccount<'cpi>, ProgramError> {
+    if account.as_ref().is_borrowed() {
+        return Err(account_borrow_failed_error());
+    }
+    Ok(CpiAccount::from(account))
+}
+
+#[inline(always)]
+fn cpi_account<'cpi>(account: &AccountView) -> Result<CpiAccount<'cpi>, ProgramError> {
+    if account.as_ref().is_borrowed_mut() {
+        return Err(account_borrow_failed_error());
+    }
+    Ok(CpiAccount::from(account))
+}
+
+/// A trait for instructions that can be used in a CPI context.
+pub trait CpiWriter {
+    /// Writes the `AccountView`s required by this instruction into the provided
+    /// slice.
+    ///
+    /// Returns the number of accounts written.
+    fn write_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi;
+
+    /// Writes the `InstructionAccount`s required by this instruction into the
+    /// provided slice.
+    ///
+    /// Returns the number of accounts written.
+    fn write_instruction_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi;
+
+    /// Writes the instruction data for this instruction into the provided
+    /// slice.
+    ///
+    /// Returns the number of bytes written.
+    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError>;
+}
+
+impl<T: CpiWriter + ?Sized> CpiWriter for &T {
     #[inline(always)]
-    fn write_accounts(&self, accounts: &mut [MaybeUninit<CpiAccount>]) -> usize {
+    fn write_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
         (**self).write_accounts(accounts)
     }
 
     #[inline(always)]
-    fn write_instruction_accounts(
-        &self,
-        accounts: &mut [MaybeUninit<InstructionAccount>],
-    ) -> usize {
+    fn write_instruction_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
         (**self).write_instruction_accounts(accounts)
     }
 
     #[inline(always)]
-    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> usize {
+    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
         (**self).write_instruction_data(data)
     }
-}
-
-/// Private module to "hide" the `Sealed` trait.
-mod sealed {
-    /// A sealed trait that prevents external implementations of the
-    /// `Batchable` trait.
-    pub trait Sealed {}
 }

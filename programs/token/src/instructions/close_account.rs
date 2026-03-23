@@ -1,6 +1,6 @@
 use {
-    crate::instructions::{Batchable, MAX_MULTISIG_SIGNERS},
-    core::{mem::MaybeUninit, ptr, slice::from_raw_parts},
+    crate::instructions::{invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer},
@@ -9,28 +9,35 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-const CLOSE_ACCOUNT_INSTRUCTION_DATA_LEN: usize = 1;
+const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+
+const DATA_LEN: usize = 1;
 
 /// Close an account by transferring all its SOL to the destination account.
+/// Non-native accounts may only be closed if its token amount is zero.
 ///
-/// ### Accounts:
+/// Accounts expected by this instruction:
+///
 ///   * Single owner
-///   0. `[WRITE]` The account to close.
-///   1. `[WRITE]` The destination account.
-///   2. `[SIGNER]` The account's owner.
+///   0. `[writable]` The account to close.
+///   1. `[writable]` The destination account.
+///   2. `[signer]` The account's owner.
 ///
 ///   * Multisignature owner
-///   0. `[WRITE]` The account to close.
-///   1. `[WRITE]` The destination account.
+///   0. `[writable]` The account to close.
+///   1. `[writable]` The destination account.
 ///   2. `[]` The account's multisignature owner.
-///   3. `..3+M` `[SIGNER]` M signer accounts
+///   3. `..+M` `[signer]` M signer accounts.
 pub struct CloseAccount<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
-    /// Token Account.
+    /// The account to close.
     pub account: &'account AccountView,
-    /// Destination Account
+
+    /// The destination account.
     pub destination: &'account AccountView,
-    /// Owner Account
+
+    /// The account's owner.
     pub authority: &'account AccountView,
+
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
 }
@@ -81,24 +88,16 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        // Instruction accounts.
-
         let mut instruction_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
-
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
-            self.write_instruction_accounts(&mut instruction_accounts);
+            self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        // Accounts.
+        let mut accounts = [const { MaybeUninit::<CpiAccount>::uninit() }; MAX_ACCOUNTS_LEN];
+        let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut accounts =
-            [const { MaybeUninit::<CpiAccount>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
-
-        let written_accounts = self.write_accounts(&mut accounts);
-
-        let mut instruction_data =
-            [MaybeUninit::<u8>::uninit(); CLOSE_ACCOUNT_INSTRUCTION_DATA_LEN];
-        let written_instruction_data = self.write_instruction_data(&mut instruction_data);
+        let mut instruction_data = [MaybeUninit::<u8>::uninit(); DATA_LEN];
+        let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_signed_unchecked(
@@ -119,15 +118,20 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> super::sealed::Sealed
-    for CloseAccount<'_, '_, MultisigSigner>
-{
-}
-
-impl<MultisigSigner: AsRef<AccountView>> Batchable for CloseAccount<'_, '_, MultisigSigner> {
+impl<MultisigSigner: AsRef<AccountView>> CpiWriter for CloseAccount<'_, '_, MultisigSigner> {
     #[inline(always)]
-    fn write_accounts(&self, accounts: &mut [MaybeUninit<CpiAccount>]) -> usize {
+    fn write_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
         let expected_accounts = 3 + self.multisig_signers.len();
+
+        if expected_accounts > accounts.len() {
+            return Err(invalid_argument_error());
+        }
 
         accounts[0].write(CpiAccount::from(self.account));
         accounts[1].write(CpiAccount::from(self.destination));
@@ -140,56 +144,51 @@ impl<MultisigSigner: AsRef<AccountView>> Batchable for CloseAccount<'_, '_, Mult
             account.write(CpiAccount::from(signer.as_ref()));
         }
 
-        expected_accounts
+        Ok(expected_accounts)
     }
 
     #[inline(always)]
-    fn write_instruction_accounts(
-        &self,
-        accounts: &mut [MaybeUninit<InstructionAccount>],
-    ) -> usize {
+    fn write_instruction_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
         let expected_accounts = 3 + self.multisig_signers.len();
 
-        // SAFETY: The written address references are borrowed from `self`, and
-        // callers must not use the output buffer after `self` expires.
-        unsafe {
-            ptr::write(
-                accounts[0].as_mut_ptr(),
-                InstructionAccount::writable(&*(self.account.address() as *const _)),
-            );
-            ptr::write(
-                accounts[1].as_mut_ptr(),
-                InstructionAccount::writable(&*(self.destination.address() as *const _)),
-            );
-            ptr::write(
-                accounts[2].as_mut_ptr(),
-                InstructionAccount::new(
-                    &*(self.authority.address() as *const _),
-                    false,
-                    self.multisig_signers.is_empty(),
-                ),
-            );
+        if expected_accounts > accounts.len() {
+            return Err(invalid_argument_error());
         }
+
+        accounts[0].write(InstructionAccount::writable(self.account.address()));
+        accounts[1].write(InstructionAccount::writable(self.destination.address()));
+        accounts[2].write(InstructionAccount::new(
+            self.authority.address(),
+            false,
+            self.multisig_signers.is_empty(),
+        ));
 
         for (account, signer) in accounts[3..expected_accounts]
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            // SAFETY: Same lifetime requirement as above.
-            unsafe {
-                ptr::write(
-                    account.as_mut_ptr(),
-                    InstructionAccount::readonly_signer(&*(signer.as_ref().address() as *const _)),
-                );
-            }
+            account.write(InstructionAccount::readonly_signer(
+                signer.as_ref().address(),
+            ));
         }
 
-        expected_accounts
+        Ok(expected_accounts)
     }
 
     #[inline(always)]
-    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> usize {
+    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+        if data.len() < DATA_LEN {
+            return Err(invalid_argument_error());
+        }
+
         data[0].write(Self::DISCRIMINATOR);
-        CLOSE_ACCOUNT_INSTRUCTION_DATA_LEN
+
+        Ok(DATA_LEN)
     }
 }

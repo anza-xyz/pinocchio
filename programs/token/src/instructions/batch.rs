@@ -1,13 +1,16 @@
-use core::{mem::MaybeUninit, slice::from_raw_parts};
-
-use alloc::boxed::Box;
-use solana_instruction_view::{
-    cpi::{invoke_signed_unchecked, CpiAccount, Signer, MAX_CPI_ACCOUNTS},
-    InstructionAccount, InstructionView,
+use {
+    crate::instructions::CpiWriter,
+    alloc::boxed::Box,
+    core::{mem::MaybeUninit, slice::from_raw_parts},
+    solana_instruction_view::{
+        cpi::{invoke_signed_unchecked, CpiAccount, Signer, MAX_CPI_ACCOUNTS},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::ProgramResult,
 };
-use solana_program_error::ProgramResult;
 
-use crate::instructions::{Batchable, MAX_CPI_INSTRUCTION_DATA_LEN};
+/// Maximum CPI instruction data size.
+const MAX_CPI_INSTRUCTION_DATA_LEN: usize = 10 * 1024;
 
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
@@ -25,12 +28,15 @@ pub struct Batch<'a> {
     instruction_accounts_len: usize,
 }
 
-impl Batch<'_> {
+impl<'a> Batch<'a> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 255;
+
     pub fn new() -> Self {
         let mut data: Box<[MaybeUninit<u8>]> = Box::new_uninit_slice(MAX_CPI_INSTRUCTION_DATA_LEN);
         // The first byte of the instruction data is reserved for the batch instruction
         // discriminator.
-        data[0].write(255);
+        data[0].write(Self::DISCRIMINATOR);
 
         Self {
             data,
@@ -42,14 +48,14 @@ impl Batch<'_> {
         }
     }
 
-    pub fn push<T: Batchable>(&mut self, instruction: T) -> ProgramResult {
-        self.accounts_len += instruction.write_accounts(&mut self.accounts[self.accounts_len..]);
+    pub fn push<T: Batchable + ?Sized>(&mut self, instruction: &'a T) -> ProgramResult {
+        self.accounts_len += instruction.write_accounts(&mut self.accounts[self.accounts_len..])?;
 
         let instruction_accounts_len = instruction.write_instruction_accounts(
             &mut self.instruction_accounts[self.instruction_accounts_len..],
-        );
+        )?;
 
-        let data_len = instruction.write_instruction_data(&mut self.data[self.data_len + 2..]);
+        let data_len = instruction.write_instruction_data(&mut self.data[self.data_len + 2..])?;
 
         self.data[self.data_len].write(instruction_accounts_len as u8);
         self.data[self.data_len + 1].write(data_len as u8);
@@ -60,7 +66,7 @@ impl Batch<'_> {
         Ok(())
     }
 
-    pub fn append(&mut self, instructions: &[&dyn Batchable]) -> ProgramResult {
+    pub fn append(&mut self, instructions: &[&'a dyn Batchable]) -> ProgramResult {
         for instruction in instructions {
             self.push(*instruction)?;
         }
@@ -101,4 +107,25 @@ impl Default for Batch<'_> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Marker trait for instructions that can be used in a `Batch`.
+///
+/// This trait is automatically implemented for all types that
+/// implement `CpiWriter`.
+pub trait Batchable: CpiWriter + sealed::Sealed {}
+
+/// Implement `Sealed` for all types that implement `CpiWriter`.
+impl<T: CpiWriter> sealed::Sealed for T {}
+
+/// Implement `Batchable` for all types that implement `CpiWriter`
+/// and are sealed.
+impl<T: CpiWriter + sealed::Sealed + ?Sized> Batchable for T {}
+
+/// A module only accessible within this crate that contains the
+/// `Sealed` trait.
+pub(crate) mod sealed {
+    /// A sealed trait that prevents external implementations of the
+    /// `Batchable` trait.
+    pub trait Sealed {}
 }
