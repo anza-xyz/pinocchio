@@ -4,7 +4,7 @@ use {
             cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter,
             MAX_MULTISIG_SIGNERS,
         },
-        write_bytes, UNINIT_BYTE,
+        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -108,12 +108,11 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [const { MaybeUninit::<CpiAccount>::uninit() }; MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
         let mut instruction_data = [UNINIT_BYTE; DATA_LEN];

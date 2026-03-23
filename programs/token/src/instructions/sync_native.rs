@@ -1,33 +1,139 @@
 use {
+    crate::{
+        instructions::{cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter},
+        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+    },
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
-    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
-    solana_program_error::ProgramResult,
+    solana_instruction_view::{
+        cpi::{invoke_unchecked, CpiAccount},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Given a native token account updates its amount field based
-/// on the account's underlying `lamports`.
+/// Maximum number of accounts expected by this instruction.
 ///
-/// ### Accounts:
-///   0. `[WRITE]`  The native token account to sync with its underlying
+/// The required number of accounts will depend whether the
+/// source account has a single owner or a multisignature
+/// owner.
+const MAX_ACCOUNTS_LEN: usize = 2;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+const DATA_LEN: usize = 1;
+
+/// Given a wrapped / native token account (a token account containing SOL)
+/// updates its amount field based on the account's underlying `lamports`.
+/// This is useful if a non-wrapped SOL account uses
+/// `system_instruction::transfer` to move lamports to a wrapped token
+/// account, and needs to have its token `amount` field updated.
+///
+/// Accounts expected by this instruction:
+///
+///   * Using runtime Rent sysvar
+///   0. `[writable]`  The native token account to sync with its underlying
 ///      lamports.
-pub struct SyncNative<'a> {
+///
+///   * Using Rent sysvar account
+///   0. `[writable]`  The native token account to sync with its underlying
+///      lamports.
+///   1. `[]` Rent sysvar.
+pub struct SyncNative<'account> {
     /// Native Token Account
-    pub native_token: &'a AccountView,
+    pub native_token: &'account AccountView,
+
+    pub rent_sysvar: Option<&'account AccountView>,
 }
 
 impl SyncNative<'_> {
+    pub const DISCRIMINATOR: u8 = 17;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // Instruction accounts
-        let instruction_accounts: [InstructionAccount; 1] =
-            [InstructionAccount::writable(self.native_token.address())];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let written_instruction_accounts =
+            self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let instruction = InstructionView {
-            program_id: &crate::ID,
-            accounts: &instruction_accounts,
-            data: &[17],
-        };
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let written_accounts = self.write_accounts(&mut accounts)?;
 
-        invoke(&instruction, &[self.native_token])
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
+
+        unsafe {
+            invoke_unchecked(
+                &InstructionView {
+                    program_id: &crate::ID,
+                    accounts: from_raw_parts(
+                        instruction_accounts.as_ptr() as _,
+                        written_instruction_accounts,
+                    ),
+                    data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
+                },
+                from_raw_parts(accounts.as_ptr() as _, written_accounts),
+            );
+        }
+
+        Ok(())
+    }
+}
+
+impl CpiWriter for SyncNative<'_> {
+    #[inline(always)]
+    fn write_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
+        if accounts.len() < MAX_ACCOUNTS_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        accounts[0].write(writable_cpi_account(self.native_token)?);
+
+        if let Some(rent_sysvar) = self.rent_sysvar {
+            accounts[1].write(cpi_account(rent_sysvar)?);
+
+            return Ok(MAX_ACCOUNTS_LEN);
+        }
+
+        Ok(1)
+    }
+
+    #[inline(always)]
+    fn write_instruction_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
+        if accounts.len() < MAX_ACCOUNTS_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        accounts[0].write(InstructionAccount::writable(self.native_token.address()));
+
+        if let Some(rent_sysvar) = self.rent_sysvar {
+            accounts[1].write(InstructionAccount::readonly(rent_sysvar.address()));
+
+            return Ok(MAX_ACCOUNTS_LEN);
+        }
+
+        Ok(1)
+    }
+
+    #[inline(always)]
+    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+        if data.len() < DATA_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        data[0].write(Self::DISCRIMINATOR);
+
+        Ok(DATA_LEN)
     }
 }

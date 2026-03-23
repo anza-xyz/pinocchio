@@ -1,6 +1,10 @@
 use {
-    crate::instructions::{
-        cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter, MAX_MULTISIG_SIGNERS,
+    crate::{
+        instructions::{
+            cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter,
+            MAX_MULTISIG_SIGNERS,
+        },
+        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -11,28 +15,34 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// The number of accounts is 2 for the source and authority, plus the number
-/// of multisig signer accounts.
+/// Maximum number of accounts expected by this instruction.
+///
+/// The required number of accounts will depend whether the
+/// source account has a single owner or a multisignature
+/// owner.
 const MAX_ACCOUNTS_LEN: usize = 2 + MAX_MULTISIG_SIGNERS;
 
+/// Instruction data length:
+///   - discriminator (1 byte)
 const DATA_LEN: usize = 1;
 
 /// Revokes the delegate's authority.
 ///
-/// ### Accounts:
-///   * Single owner
-///   0. `[WRITE]` The source account.
-///   1. `[SIGNER]` The source account owner.
+/// Accounts expected by this instruction:
 ///
-///   * Multisignature owner
-///   0. `[WRITE]` The source account.
-///   1. `[]` The source account's multisignature owner.
-///   2. `..2+M` `[SIGNER]` M signer accounts
+///   * Single owner
+///   0. `[writable]` The source account.
+///   1. `[signer]` The source account's owner/delegate.
+///
+///   * Multisignature owner/delegate
+///   0. `[writable]` The source account.
+///   1. `[]` The source account's multisignature owner/delegate.
+///   2. `..+M` `[signer]` M signer accounts.
 pub struct Revoke<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
     /// The source account.
     pub source: &'account AccountView,
 
-    ///  The source account owner.
+    /// The source account's owner/delegate.
     pub authority: &'account AccountView,
 
     /// Multisignature signers.
@@ -79,13 +89,15 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [const { MaybeUninit::<CpiAccount>::uninit() }; MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
+
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_signed_unchecked(
@@ -95,7 +107,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
                     ),
-                    data: &[5],
+                    data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
                 },
                 from_raw_parts(accounts.as_ptr() as _, written_accounts),
                 signers,
@@ -122,6 +134,7 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for Revoke<'_, '_, MultisigSi
         }
 
         accounts[0].write(writable_cpi_account(self.source)?);
+
         accounts[1].write(cpi_account(self.authority)?);
 
         for (account, signer) in accounts[2..expected_accounts]
@@ -149,6 +162,7 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for Revoke<'_, '_, MultisigSi
         }
 
         accounts[0].write(InstructionAccount::writable(self.source.address()));
+
         accounts[1].write(InstructionAccount::new(
             self.authority.address(),
             false,

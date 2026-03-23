@@ -1,10 +1,24 @@
 use {
-    crate::{write_bytes, UNINIT_BYTE},
-    core::slice::from_raw_parts,
+    crate::{
+        instructions::{cpi_account, invalid_argument_error, CpiWriter},
+        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+    },
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
-    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
-    solana_program_error::ProgramResult,
+    solana_instruction_view::{
+        cpi::{invoke_unchecked, CpiAccount},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::{ProgramError, ProgramResult},
 };
+
+/// Expected number of accounts.
+const ACCOUNTS_LEN: usize = 1;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - amount (8 bytes)
+const DATA_LEN: usize = 9;
 
 /// Convert an Amount of tokens to a `UiAmount` string, using the given
 /// mint.
@@ -17,11 +31,11 @@ use {
 /// Accounts expected by this instruction:
 ///
 ///   0. `[]` The mint to calculate for.
-pub struct AmountToUiAmount<'a> {
+pub struct AmountToUiAmount<'account> {
     /// The mint to calculate for.
-    pub mint: &'a AccountView,
+    pub mint: &'account AccountView,
 
-    /// The amount of tokens to convert.
+    /// The amount of tokens to reformat.
     pub amount: u64,
 }
 
@@ -30,24 +44,79 @@ impl AmountToUiAmount<'_> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // Instruction data.
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
+        let written_instruction_accounts =
+            self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; 9];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
+        let written_accounts = self.write_accounts(&mut accounts)?;
 
-        instruction_data[0].write(Self::DISCRIMINATOR);
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
-        write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
-
-        invoke(
-            &InstructionView {
-                program_id: &crate::ID,
-                accounts: &[InstructionAccount::readonly(self.mint.address())],
-                // SAFETY: `instruction_data` was initialized.
-                data: unsafe {
-                    from_raw_parts(instruction_data.as_ptr() as _, instruction_data.len())
+        unsafe {
+            invoke_unchecked(
+                &InstructionView {
+                    program_id: &crate::ID,
+                    accounts: from_raw_parts(
+                        instruction_accounts.as_ptr() as _,
+                        written_instruction_accounts,
+                    ),
+                    data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
                 },
-            },
-            &[self.mint],
-        )
+                from_raw_parts(accounts.as_ptr() as *const CpiAccount, written_accounts),
+            );
+        }
+
+        Ok(())
+    }
+}
+
+impl CpiWriter for AmountToUiAmount<'_> {
+    #[inline(always)]
+    fn write_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
+        if accounts.len() < ACCOUNTS_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        accounts[0].write(cpi_account(self.mint)?);
+
+        Ok(1)
+    }
+
+    #[inline(always)]
+    fn write_instruction_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
+        if accounts.len() < ACCOUNTS_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        accounts[0].write(InstructionAccount::readonly(self.mint.address()));
+
+        Ok(1)
+    }
+
+    #[inline(always)]
+    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+        if data.len() < DATA_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        data[0].write(Self::DISCRIMINATOR);
+
+        write_bytes(&mut data[1..DATA_LEN], &self.amount.to_le_bytes());
+
+        Ok(DATA_LEN)
     }
 }

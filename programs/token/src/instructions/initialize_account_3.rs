@@ -1,7 +1,7 @@
 use {
     crate::{
-        instructions::{invalid_argument_error, CpiWriter},
-        write_bytes, UNINIT_BYTE,
+        instructions::{cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter},
+        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -13,8 +13,12 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
+/// Expected number of accounts.
 const ACCOUNTS_LEN: usize = 2;
 
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - owner pubkey (32 bytes)
 const DATA_LEN: usize = 33;
 
 /// Like [`super::InitializeAccount2`], but does not require the
@@ -24,29 +28,28 @@ const DATA_LEN: usize = 33;
 ///
 ///   0. `[writable]`  The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
-pub struct InitializeAccount3<'a> {
+pub struct InitializeAccount3<'account, 'address> {
     /// The account to initialize.
-    pub account: &'a AccountView,
+    pub account: &'account AccountView,
 
     /// The mint this account will be associated with.
-    pub mint: &'a AccountView,
+    pub mint: &'account AccountView,
 
     /// The new account's owner/multisignature.
-    pub owner: &'a Address,
+    pub owner: &'address Address,
 }
 
-impl InitializeAccount3<'_> {
+impl InitializeAccount3<'_, '_> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 18;
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [const { MaybeUninit::<CpiAccount>::uninit() }; ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
         let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
@@ -62,7 +65,7 @@ impl InitializeAccount3<'_> {
                     ),
                     data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
                 },
-                from_raw_parts(accounts.as_ptr() as *const CpiAccount, written_accounts),
+                from_raw_parts(accounts.as_ptr() as _, written_accounts),
             );
         }
 
@@ -70,7 +73,7 @@ impl InitializeAccount3<'_> {
     }
 }
 
-impl CpiWriter for InitializeAccount3<'_> {
+impl CpiWriter for InitializeAccount3<'_, '_> {
     #[inline(always)]
     fn write_accounts<'source, 'cpi>(
         &'source self,
@@ -83,8 +86,9 @@ impl CpiWriter for InitializeAccount3<'_> {
             return Err(invalid_argument_error());
         }
 
-        accounts[0].write(CpiAccount::from(self.account));
-        accounts[1].write(CpiAccount::from(self.mint));
+        accounts[0].write(writable_cpi_account(self.account)?);
+
+        accounts[1].write(cpi_account(self.mint)?);
 
         Ok(ACCOUNTS_LEN)
     }
@@ -102,6 +106,7 @@ impl CpiWriter for InitializeAccount3<'_> {
         }
 
         accounts[0].write(InstructionAccount::writable(self.account.address()));
+
         accounts[1].write(InstructionAccount::readonly(self.mint.address()));
 
         Ok(ACCOUNTS_LEN)
@@ -114,6 +119,7 @@ impl CpiWriter for InitializeAccount3<'_> {
         }
 
         data[0].write(Self::DISCRIMINATOR);
+
         write_bytes(&mut data[1..DATA_LEN], self.owner.as_array());
 
         Ok(DATA_LEN)

@@ -15,16 +15,26 @@ const MAX_CPI_INSTRUCTION_DATA_LEN: usize = 10 * 1024;
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
 pub struct Batch<'a> {
+    /// The instruction data for the batch instruction. The first byte is
+    /// reserved for the batch instruction discriminator, and each
+    /// instruction's data is prefixed with a byte indicating the number of
+    /// instruction accounts and a byte indicating the length of the
+    /// instruction data.
     data: Box<[MaybeUninit<u8>]>,
 
+    /// The instruction accounts for the batch instruction.
     instruction_accounts: Box<[MaybeUninit<InstructionAccount<'a>>]>,
 
+    /// The accounts for the batch instruction.
     accounts: Box<[MaybeUninit<CpiAccount<'a>>]>,
 
+    /// The current length of the instruction data.
     data_len: usize,
 
+    /// The current length of the accounts.
     accounts_len: usize,
 
+    /// The current length of the instruction accounts.    
     instruction_accounts_len: usize,
 }
 
@@ -32,6 +42,7 @@ impl<'a> Batch<'a> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 255;
 
+    #[inline(always)]
     pub fn new() -> Self {
         let mut data: Box<[MaybeUninit<u8>]> = Box::new_uninit_slice(MAX_CPI_INSTRUCTION_DATA_LEN);
         // The first byte of the instruction data is reserved for the batch instruction
@@ -48,6 +59,7 @@ impl<'a> Batch<'a> {
         }
     }
 
+    #[inline(always)]
     pub fn push<T: Batchable + ?Sized>(&mut self, instruction: &'a T) -> ProgramResult {
         self.accounts_len += instruction.write_accounts(&mut self.accounts[self.accounts_len..])?;
 
@@ -66,6 +78,7 @@ impl<'a> Batch<'a> {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn append(&mut self, instructions: &[&'a dyn Batchable]) -> ProgramResult {
         for instruction in instructions {
             self.push(*instruction)?;

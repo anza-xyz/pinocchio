@@ -1,55 +1,137 @@
 use {
-    crate::{write_bytes, UNINIT_BYTE},
-    core::slice::from_raw_parts,
+    crate::{
+        instructions::{cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter},
+        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+    },
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
-    solana_instruction_view::{cpi::invoke, InstructionAccount, InstructionView},
-    solana_program_error::ProgramResult,
+    solana_instruction_view::{
+        cpi::{invoke_unchecked, CpiAccount},
+        InstructionAccount, InstructionView,
+    },
+    solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Initialize a new Token Account.
+/// Expected number of accounts.
+const ACCOUNTS_LEN: usize = 3;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - owner pubkey (32 bytes)
+const DATA_LEN: usize = 33;
+
+/// Like [`super::InitializeAccount`], but the owner pubkey is
+/// passed via instruction data rather than the accounts list. This
+/// variant may be preferable when using Cross Program Invocation from
+/// an instruction that does not need the owner's `AccountInfo`
+/// otherwise.
 ///
-/// ### Accounts:
-///   0. `[WRITE]`  The account to initialize.
+/// Accounts expected by this instruction:
+///
+///   0. `[writable]`  The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
-///   3. `[]` Rent sysvar
-pub struct InitializeAccount2<'a> {
-    /// New Account.
-    pub account: &'a AccountView,
-    /// Mint Account.
-    pub mint: &'a AccountView,
-    /// Rent Sysvar Account
-    pub rent_sysvar: &'a AccountView,
-    /// Owner of the new Account.
-    pub owner: &'a Address,
+///   2. `[]` Rent sysvar.
+pub struct InitializeAccount2<'account> {
+    /// The account to initialize.
+    pub account: &'account AccountView,
+
+    /// The mint this account will be associated with.
+    pub mint: &'account AccountView,
+
+    /// Rent sysvar.
+    pub rent_sysvar: &'account AccountView,
+
+    /// The new account's owner/multisignature.
+    pub owner: &'account Address,
 }
 
 impl InitializeAccount2<'_> {
+    pub const DISCRIMINATOR: u8 = 16;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        // Instruction accounts
-        let instruction_accounts: [InstructionAccount; 3] = [
-            InstructionAccount::writable(self.account.address()),
-            InstructionAccount::readonly(self.mint.address()),
-            InstructionAccount::readonly(self.rent_sysvar.address()),
-        ];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
+        let written_instruction_accounts =
+            self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        // instruction data
-        // - [0]: instruction discriminator (1 byte, u8)
-        // - [1..33]: owner (32 bytes, Address)
-        let mut instruction_data = [UNINIT_BYTE; 33];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
+        let written_accounts = self.write_accounts(&mut accounts)?;
 
-        // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[16]);
-        // Set owner as [u8; 32] at offset [1..33]
-        write_bytes(&mut instruction_data[1..], self.owner.as_array());
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
-        let instruction = InstructionView {
-            program_id: &crate::ID,
-            accounts: &instruction_accounts,
-            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 33) },
-        };
+        unsafe {
+            invoke_unchecked(
+                &InstructionView {
+                    program_id: &crate::ID,
+                    accounts: from_raw_parts(
+                        instruction_accounts.as_ptr() as _,
+                        written_instruction_accounts,
+                    ),
+                    data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
+                },
+                from_raw_parts(accounts.as_ptr() as *const CpiAccount, written_accounts),
+            );
+        }
 
-        invoke(&instruction, &[self.account, self.mint, self.rent_sysvar])
+        Ok(())
+    }
+}
+
+impl CpiWriter for InitializeAccount2<'_> {
+    #[inline(always)]
+    fn write_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
+        if accounts.len() < ACCOUNTS_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        accounts[0].write(writable_cpi_account(self.account)?);
+
+        accounts[1].write(cpi_account(self.mint)?);
+
+        accounts[2].write(cpi_account(self.rent_sysvar)?);
+
+        Ok(ACCOUNTS_LEN)
+    }
+
+    #[inline(always)]
+    fn write_instruction_accounts<'source, 'cpi>(
+        &'source self,
+        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        'source: 'cpi,
+    {
+        if accounts.len() < ACCOUNTS_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        accounts[0].write(InstructionAccount::writable(self.account.address()));
+
+        accounts[1].write(InstructionAccount::readonly(self.mint.address()));
+
+        accounts[2].write(InstructionAccount::readonly(self.rent_sysvar.address()));
+
+        Ok(ACCOUNTS_LEN)
+    }
+
+    #[inline(always)]
+    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+        if data.len() < DATA_LEN {
+            return Err(invalid_argument_error());
+        }
+
+        data[0].write(Self::DISCRIMINATOR);
+
+        write_bytes(&mut data[1..DATA_LEN], self.owner.as_array());
+
+        Ok(DATA_LEN)
     }
 }

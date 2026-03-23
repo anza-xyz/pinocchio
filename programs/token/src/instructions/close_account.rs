@@ -1,5 +1,11 @@
 use {
-    crate::instructions::{invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS},
+    crate::{
+        instructions::{
+            cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter,
+            MAX_MULTISIG_SIGNERS,
+        },
+        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+    },
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_instruction_view::{
@@ -9,8 +15,15 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
+/// Maximum number of accounts expected by this instruction.
+///
+/// The required number of accounts will depend whether the
+/// source account has a single owner or a multisignature
+/// owner.
 const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 
+/// Instruction data length:
+///   - discriminator (1 byte)
 const DATA_LEN: usize = 1;
 
 /// Close an account by transferring all its SOL to the destination account.
@@ -88,15 +101,14 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [const { MaybeUninit::<CpiAccount>::uninit() }; MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [MaybeUninit::<u8>::uninit(); DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -133,15 +145,17 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for CloseAccount<'_, '_, Mult
             return Err(invalid_argument_error());
         }
 
-        accounts[0].write(CpiAccount::from(self.account));
-        accounts[1].write(CpiAccount::from(self.destination));
-        accounts[2].write(CpiAccount::from(self.authority));
+        accounts[0].write(writable_cpi_account(self.account)?);
+
+        accounts[1].write(writable_cpi_account(self.destination)?);
+
+        accounts[2].write(cpi_account(self.authority)?);
 
         for (account, signer) in accounts[3..expected_accounts]
             .iter_mut()
             .zip(self.multisig_signers.iter())
         {
-            account.write(CpiAccount::from(signer.as_ref()));
+            account.write(cpi_account(signer.as_ref())?);
         }
 
         Ok(expected_accounts)
@@ -162,7 +176,9 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for CloseAccount<'_, '_, Mult
         }
 
         accounts[0].write(InstructionAccount::writable(self.account.address()));
+
         accounts[1].write(InstructionAccount::writable(self.destination.address()));
+
         accounts[2].write(InstructionAccount::new(
             self.authority.address(),
             false,
