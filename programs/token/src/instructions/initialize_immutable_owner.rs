@@ -101,7 +101,7 @@ impl super::IntoBatch for InitializeImmutableOwner<'_> {
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| write_accounts(self.account, accounts),
             |accounts| write_instruction_accounts(self.account, accounts),
             write_instruction_data,

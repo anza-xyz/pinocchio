@@ -67,24 +67,6 @@ impl<'a> Batch<'a> {
     }
 
     #[inline(always)]
-    pub fn push<T: Batchable + ?Sized>(&mut self, instruction: &'a T) -> ProgramResult {
-        self.push_encoded(
-            |accounts| instruction.write_accounts(accounts),
-            |instruction_accounts| instruction.write_instruction_accounts(instruction_accounts),
-            |data| instruction.write_instruction_data(data),
-        )
-    }
-
-    #[inline(always)]
-    pub fn append(&mut self, instructions: &[&'a dyn Batchable]) -> ProgramResult {
-        for instruction in instructions {
-            self.push(*instruction)?;
-        }
-
-        Ok(())
-    }
-
-    #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
@@ -113,7 +95,7 @@ impl<'a> Batch<'a> {
     }
 
     #[inline(always)]
-    pub(crate) fn push_encoded(
+    pub(crate) fn push(
         &mut self,
         write_accounts: impl FnOnce(&mut [MaybeUninit<CpiAccount<'a>>]) -> Result<usize, ProgramError>,
         write_instruction_accounts: impl FnOnce(
@@ -161,18 +143,8 @@ pub trait IntoBatch: sealed::Sealed {
         Self: 'batch;
 }
 
-/// Marker trait for instructions that can be used in a `Batch`.
-///
-/// This trait is automatically implemented for all types that
-/// implement `CpiWriter`.
-pub trait Batchable: CpiWriter + sealed::Sealed {}
-
 /// Implement `Sealed` for all types that implement `CpiWriter`.
 impl<T: CpiWriter> sealed::Sealed for T {}
-
-/// Implement `Batchable` for all types that implement `CpiWriter`
-/// and are sealed.
-impl<T: CpiWriter + sealed::Sealed + ?Sized> Batchable for T {}
 
 /// A module only accessible within this crate that contains the
 /// `Sealed` trait.

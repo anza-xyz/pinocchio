@@ -115,7 +115,7 @@ impl super::IntoBatch for InitializeAccount2<'_> {
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| write_accounts(self.account, self.mint, self.rent_sysvar, accounts),
             |accounts| {
                 write_instruction_accounts(self.account, self.mint, self.rent_sysvar, accounts)

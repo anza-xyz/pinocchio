@@ -108,7 +108,7 @@ impl super::IntoBatch for AmountToUiAmount<'_> {
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| write_accounts(self.mint, accounts),
             |accounts| write_instruction_accounts(self.mint, accounts),
             |data| write_instruction_data(self.amount, data),

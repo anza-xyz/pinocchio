@@ -118,7 +118,7 @@ impl super::IntoBatch for InitializeMint2<'_> {
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| write_accounts(self.mint, accounts),
             |accounts| write_instruction_accounts(self.mint, accounts),
             |data| {

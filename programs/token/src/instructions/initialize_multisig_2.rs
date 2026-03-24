@@ -125,7 +125,7 @@ impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| write_accounts(self.multisig, self.multisig_signers, accounts),
             |accounts| write_instruction_accounts(self.multisig, self.multisig_signers, accounts),
             |data| write_instruction_data(self.m, data),

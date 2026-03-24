@@ -27,7 +27,7 @@ mod transfer_checked;
 mod ui_amount_to_amount;
 
 #[cfg(feature = "batch")]
-pub use batch::{Batch, Batchable, IntoBatch};
+pub use batch::{Batch, IntoBatch};
 pub use {
     amount_to_ui_amount::*, approve::*, approve_checked::*, burn::*, burn_checked::*,
     close_account::*, freeze_account::*, get_account_data_size::*, initialize_account::*,
@@ -98,33 +98,4 @@ pub trait CpiWriter {
     ///
     /// Returns the number of bytes written.
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError>;
-}
-
-impl<T: CpiWriter + ?Sized> CpiWriter for &T {
-    #[inline(always)]
-    fn write_accounts<'source, 'cpi>(
-        &'source self,
-        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
-    ) -> Result<usize, ProgramError>
-    where
-        'source: 'cpi,
-    {
-        (**self).write_accounts(accounts)
-    }
-
-    #[inline(always)]
-    fn write_instruction_accounts<'source, 'cpi>(
-        &'source self,
-        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
-    ) -> Result<usize, ProgramError>
-    where
-        'source: 'cpi,
-    {
-        (**self).write_instruction_accounts(accounts)
-    }
-
-    #[inline(always)]
-    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        (**self).write_instruction_data(data)
-    }
 }

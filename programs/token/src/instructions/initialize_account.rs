@@ -132,7 +132,7 @@ impl super::IntoBatch for InitializeAccount<'_> {
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| {
                 write_accounts(
                     self.account,

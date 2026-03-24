@@ -115,7 +115,7 @@ impl super::IntoBatch for SyncNative<'_> {
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| write_accounts(self.native_token, self.rent_sysvar, accounts),
             |accounts| write_instruction_accounts(self.native_token, self.rent_sysvar, accounts),
             write_instruction_data,

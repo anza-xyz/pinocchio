@@ -198,7 +198,7 @@ impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch for BurnChecked<'_, '_
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| {
                 write_accounts(
                     self.account,

@@ -185,7 +185,7 @@ impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch for MintTo<'_, '_, Mul
     where
         Self: 'batch,
     {
-        batch.push_encoded(
+        batch.push(
             |accounts| {
                 write_accounts(
                     self.mint,

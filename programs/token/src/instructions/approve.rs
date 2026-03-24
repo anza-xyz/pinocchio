@@ -193,7 +193,7 @@ impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch for Approve<'_, '_, Mu
             amount,
         } = self;
 
-        batch.push_encoded(
+        batch.push(
             |accounts| write_accounts(source, delegate, authority, multisig_signers, accounts),
             |accounts| {
                 write_instruction_accounts(source, delegate, authority, multisig_signers, accounts)
