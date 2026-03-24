@@ -1,16 +1,23 @@
 use {
-    crate::instructions::CpiWriter,
+    crate::instructions::{invalid_argument_error, CpiWriter},
     alloc::boxed::Box,
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer, MAX_CPI_ACCOUNTS},
         InstructionAccount, InstructionView,
     },
-    solana_program_error::ProgramResult,
+    solana_program_error::{ProgramError, ProgramResult},
 };
 
 /// Maximum CPI instruction data size.
 const MAX_CPI_INSTRUCTION_DATA_LEN: usize = 10 * 1024;
+
+/// The size of the batch instruction header.
+///
+/// The header of each instruction consists of two `u8` values:
+///   - number of the accounts
+///   - length of the instruction data
+const IX_HEADER_SIZE: usize = 2;
 
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
@@ -61,21 +68,11 @@ impl<'a> Batch<'a> {
 
     #[inline(always)]
     pub fn push<T: Batchable + ?Sized>(&mut self, instruction: &'a T) -> ProgramResult {
-        self.accounts_len += instruction.write_accounts(&mut self.accounts[self.accounts_len..])?;
-
-        let instruction_accounts_len = instruction.write_instruction_accounts(
-            &mut self.instruction_accounts[self.instruction_accounts_len..],
-        )?;
-
-        let data_len = instruction.write_instruction_data(&mut self.data[self.data_len + 2..])?;
-
-        self.data[self.data_len].write(instruction_accounts_len as u8);
-        self.data[self.data_len + 1].write(data_len as u8);
-
-        self.instruction_accounts_len += instruction_accounts_len;
-        self.data_len += data_len + 2;
-
-        Ok(())
+        self.push_encoded(
+            |accounts| instruction.write_accounts(accounts),
+            |instruction_accounts| instruction.write_instruction_accounts(instruction_accounts),
+            |data| instruction.write_instruction_data(data),
+        )
     }
 
     #[inline(always)]
@@ -114,12 +111,54 @@ impl<'a> Batch<'a> {
 
         Ok(())
     }
+
+    #[inline(always)]
+    pub(crate) fn push_encoded(
+        &mut self,
+        write_accounts: impl FnOnce(&mut [MaybeUninit<CpiAccount<'a>>]) -> Result<usize, ProgramError>,
+        write_instruction_accounts: impl FnOnce(
+            &mut [MaybeUninit<InstructionAccount<'a>>],
+        ) -> Result<usize, ProgramError>,
+        write_data: impl FnOnce(&mut [MaybeUninit<u8>]) -> Result<usize, ProgramError>,
+    ) -> ProgramResult {
+        // Ensure that there is enough space for another instruction.
+        if self.data_len + IX_HEADER_SIZE > self.data.len() {
+            return Err(invalid_argument_error());
+        }
+
+        let written_data = write_data(&mut self.data[self.data_len + IX_HEADER_SIZE..])?;
+
+        let written_accounts = write_accounts(&mut self.accounts[self.accounts_len..])?;
+
+        let written_instruction_accounts = write_instruction_accounts(
+            &mut self.instruction_accounts[self.instruction_accounts_len..],
+        )?;
+
+        // If all writres succeeded, update the lengths and write the instruction header.
+
+        self.accounts_len += written_accounts;
+        self.instruction_accounts_len += written_instruction_accounts;
+
+        self.data[self.data_len].write(written_instruction_accounts as u8);
+        self.data[self.data_len + 1].write(written_data as u8);
+        self.data_len += written_data + IX_HEADER_SIZE;
+
+        Ok(())
+    }
 }
 
 impl Default for Batch<'_> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// A trait for instructions that can be consumed directly into a `Batch`.
+pub trait IntoBatch: sealed::Sealed {
+    /// Serializes `self` into the provided batch.
+    fn into_batch<'batch>(self, batch: &mut Batch<'batch>) -> ProgramResult
+    where
+        Self: 'batch;
 }
 
 /// Marker trait for instructions that can be used in a `Batch`.

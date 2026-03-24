@@ -86,13 +86,7 @@ impl CpiWriter for InitializeMint2<'_> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(writable_cpi_account(self.mint)?);
-
-        Ok(ACCOUNTS_LEN)
+        write_accounts(self.mint, accounts)
     }
 
     #[inline(always)]
@@ -103,37 +97,102 @@ impl CpiWriter for InitializeMint2<'_> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(InstructionAccount::writable(self.mint.address()));
-
-        Ok(ACCOUNTS_LEN)
+        write_instruction_accounts(self.mint, accounts)
     }
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        if data.len() < MAX_DATA_LEN {
-            return Err(invalid_argument_error());
-        }
+        write_instruction_data(
+            self.decimals,
+            self.mint_authority,
+            self.freeze_authority,
+            data,
+        )
+    }
+}
 
-        data[0].write(Self::DISCRIMINATOR);
+#[cfg(feature = "batch")]
+impl super::IntoBatch for InitializeMint2<'_> {
+    #[inline(always)]
+    fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
+    where
+        Self: 'batch,
+    {
+        batch.push_encoded(
+            |accounts| write_accounts(self.mint, accounts),
+            |accounts| write_instruction_accounts(self.mint, accounts),
+            |data| {
+                write_instruction_data(
+                    self.decimals,
+                    self.mint_authority,
+                    self.freeze_authority,
+                    data,
+                )
+            },
+        )
+    }
+}
 
-        data[1].write(self.decimals);
+#[inline(always)]
+fn write_accounts<'account, 'out>(
+    mint: &'account AccountView,
+    accounts: &mut [MaybeUninit<CpiAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
 
-        write_bytes(&mut data[2..34], self.mint_authority.as_array());
+    accounts[0].write(writable_cpi_account(mint)?);
 
-        if let Some(freeze_auth) = self.freeze_authority {
-            data[34].write(1);
+    Ok(ACCOUNTS_LEN)
+}
 
-            write_bytes(&mut data[35..MAX_DATA_LEN], freeze_auth.as_array());
+#[inline(always)]
+fn write_instruction_accounts<'account, 'out>(
+    mint: &'account AccountView,
+    accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
 
-            Ok(MAX_DATA_LEN)
-        } else {
-            data[34].write(0);
+    accounts[0].write(InstructionAccount::writable(mint.address()));
 
-            Ok(35)
-        }
+    Ok(ACCOUNTS_LEN)
+}
+
+#[inline(always)]
+fn write_instruction_data(
+    decimals: u8,
+    mint_authority: &Address,
+    freeze_authority: Option<&Address>,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
+    if data.len() < MAX_DATA_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    data[0].write(InitializeMint2::DISCRIMINATOR);
+
+    data[1].write(decimals);
+
+    write_bytes(&mut data[2..34], mint_authority.as_array());
+
+    if let Some(freeze_auth) = freeze_authority {
+        data[34].write(1);
+
+        write_bytes(&mut data[35..MAX_DATA_LEN], freeze_auth.as_array());
+
+        Ok(MAX_DATA_LEN)
+    } else {
+        data[34].write(0);
+
+        Ok(35)
     }
 }

@@ -67,6 +67,21 @@ impl<const LENGTH: usize> UiAmountToAmount<'_, '_, LENGTH> {
     }
 }
 
+#[cfg(feature = "batch")]
+impl<const LENGTH: usize> super::IntoBatch for UiAmountToAmount<'_, '_, LENGTH> {
+    #[inline(always)]
+    fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
+    where
+        Self: 'batch,
+    {
+        batch.push_encoded(
+            |accounts| write_accounts(self.mint, accounts),
+            |accounts| write_instruction_accounts(self.mint, accounts),
+            |data| write_instruction_data::<LENGTH>(self.amount, data),
+        )
+    }
+}
+
 impl<const LENGTH: usize> CpiWriter for UiAmountToAmount<'_, '_, LENGTH> {
     #[inline(always)]
     fn write_accounts<'source, 'cpi>(
@@ -76,13 +91,7 @@ impl<const LENGTH: usize> CpiWriter for UiAmountToAmount<'_, '_, LENGTH> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(cpi_account(self.mint)?);
-
-        Ok(ACCOUNTS_LEN)
+        write_accounts(self.mint, accounts)
     }
 
     #[inline(always)]
@@ -93,27 +102,63 @@ impl<const LENGTH: usize> CpiWriter for UiAmountToAmount<'_, '_, LENGTH> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(InstructionAccount::readonly(self.mint.address()));
-
-        Ok(ACCOUNTS_LEN)
+        write_instruction_accounts(self.mint, accounts)
     }
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        let expected_data_len = 1 + self.amount.len();
-
-        if data.len() < expected_data_len {
-            return Err(invalid_argument_error());
-        }
-
-        data[0].write(Self::DISCRIMINATOR);
-
-        write_bytes(&mut data[1..expected_data_len], self.amount.as_bytes());
-
-        Ok(expected_data_len)
+        write_instruction_data::<LENGTH>(self.amount, data)
     }
+}
+
+#[inline(always)]
+fn write_accounts<'account, 'out>(
+    mint: &'account AccountView,
+    accounts: &mut [MaybeUninit<CpiAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(cpi_account(mint)?);
+
+    Ok(ACCOUNTS_LEN)
+}
+
+#[inline(always)]
+fn write_instruction_accounts<'account, 'out>(
+    mint: &'account AccountView,
+    accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(InstructionAccount::readonly(mint.address()));
+
+    Ok(ACCOUNTS_LEN)
+}
+
+#[inline(always)]
+fn write_instruction_data<const LENGTH: usize>(
+    amount: &str,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
+    let expected_data_len = 1 + amount.len();
+
+    if data.len() < expected_data_len {
+        return Err(invalid_argument_error());
+    }
+
+    data[0].write(UiAmountToAmount::<LENGTH>::DISCRIMINATOR);
+
+    write_bytes(&mut data[1..expected_data_len], amount.as_bytes());
+
+    Ok(expected_data_len)
 }

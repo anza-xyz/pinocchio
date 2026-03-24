@@ -74,13 +74,7 @@ impl CpiWriter for InitializeImmutableOwner<'_> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(writable_cpi_account(self.account)?);
-
-        Ok(ACCOUNTS_LEN)
+        write_accounts(self.account, accounts)
     }
 
     #[inline(always)]
@@ -91,23 +85,71 @@ impl CpiWriter for InitializeImmutableOwner<'_> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(InstructionAccount::writable(self.account.address()));
-
-        Ok(ACCOUNTS_LEN)
+        write_instruction_accounts(self.account, accounts)
     }
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        if data.len() < DATA_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        data[0].write(Self::DISCRIMINATOR);
-
-        Ok(DATA_LEN)
+        write_instruction_data(data)
     }
+}
+
+#[cfg(feature = "batch")]
+impl super::IntoBatch for InitializeImmutableOwner<'_> {
+    #[inline(always)]
+    fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
+    where
+        Self: 'batch,
+    {
+        batch.push_encoded(
+            |accounts| write_accounts(self.account, accounts),
+            |accounts| write_instruction_accounts(self.account, accounts),
+            write_instruction_data,
+        )
+    }
+}
+
+#[inline(always)]
+fn write_accounts<'account, 'out>(
+    account: &'account AccountView,
+    accounts: &mut [MaybeUninit<CpiAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(writable_cpi_account(account)?);
+
+    Ok(ACCOUNTS_LEN)
+}
+
+#[inline(always)]
+fn write_instruction_accounts<'account, 'out>(
+    account: &'account AccountView,
+    accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(InstructionAccount::writable(account.address()));
+
+    Ok(ACCOUNTS_LEN)
+}
+
+#[inline(always)]
+fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+    if data.len() < DATA_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    data[0].write(InitializeImmutableOwner::DISCRIMINATOR);
+
+    Ok(DATA_LEN)
 }

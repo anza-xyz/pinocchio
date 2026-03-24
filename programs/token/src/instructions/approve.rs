@@ -60,6 +60,9 @@ pub struct Approve<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
 }
 
 impl<'account> Approve<'account, '_, &'account AccountView> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 4;
+
     /// Creates a new `Approve` instruction with a single owner authority.
     #[inline(always)]
     pub fn new(
@@ -75,9 +78,6 @@ impl<'account> Approve<'account, '_, &'account AccountView> {
 impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
     Approve<'account, 'multisig, MultisigSigner>
 {
-    /// The instruction discriminator.
-    pub const DISCRIMINATOR: u8 = 4;
-
     /// Creates a new `Approve` instruction with a
     /// multisignature owner authority and signer accounts.
     #[inline(always)]
@@ -146,26 +146,13 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for Approve<'_, '_, MultisigS
     where
         'source: 'cpi,
     {
-        let expected_accounts = 3 + self.multisig_signers.len();
-
-        if expected_accounts > accounts.len() {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(writable_cpi_account(self.source)?);
-
-        accounts[1].write(cpi_account(self.delegate)?);
-
-        accounts[2].write(cpi_account(self.authority)?);
-
-        for (account, signer) in accounts[3..expected_accounts]
-            .iter_mut()
-            .zip(self.multisig_signers.iter())
-        {
-            account.write(cpi_account(signer.as_ref())?);
-        }
-
-        Ok(expected_accounts)
+        write_accounts(
+            self.source,
+            self.delegate,
+            self.authority,
+            self.multisig_signers,
+            accounts,
+        )
     }
 
     #[inline(always)]
@@ -176,44 +163,132 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for Approve<'_, '_, MultisigS
     where
         'source: 'cpi,
     {
-        let expected_accounts = 3 + self.multisig_signers.len();
-
-        if expected_accounts > accounts.len() {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(InstructionAccount::writable(self.source.address()));
-
-        accounts[1].write(InstructionAccount::readonly(self.delegate.address()));
-
-        accounts[2].write(InstructionAccount::new(
-            self.authority.address(),
-            false,
-            self.multisig_signers.is_empty(),
-        ));
-
-        for (account, signer) in accounts[3..expected_accounts]
-            .iter_mut()
-            .zip(self.multisig_signers.iter())
-        {
-            account.write(InstructionAccount::readonly_signer(
-                signer.as_ref().address(),
-            ));
-        }
-
-        Ok(expected_accounts)
+        write_instruction_accounts(
+            self.source,
+            self.delegate,
+            self.authority,
+            self.multisig_signers,
+            accounts,
+        )
     }
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        if data.len() < DATA_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        data[0].write(Self::DISCRIMINATOR);
-
-        write_bytes(&mut data[1..DATA_LEN], &self.amount.to_le_bytes());
-
-        Ok(DATA_LEN)
+        write_instruction_data(self.amount, data)
     }
+}
+
+#[cfg(feature = "batch")]
+impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch for Approve<'_, '_, MultisigSigner> {
+    #[inline(always)]
+    fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
+    where
+        Self: 'batch,
+    {
+        let Self {
+            source,
+            delegate,
+            authority,
+            multisig_signers,
+            amount,
+        } = self;
+
+        batch.push_encoded(
+            |accounts| write_accounts(source, delegate, authority, multisig_signers, accounts),
+            |accounts| {
+                write_instruction_accounts(source, delegate, authority, multisig_signers, accounts)
+            },
+            |data| write_instruction_data(amount, data),
+        )
+    }
+}
+
+#[inline(always)]
+fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
+    source: &'account AccountView,
+    delegate: &'account AccountView,
+    authority: &'account AccountView,
+    multisig_signers: &'multisig [MultisigSigner],
+    accounts: &mut [MaybeUninit<CpiAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+    'multisig: 'out,
+{
+    let expected_accounts = 3 + multisig_signers.len();
+
+    if expected_accounts > accounts.len() {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(writable_cpi_account(source)?);
+
+    accounts[1].write(cpi_account(delegate)?);
+
+    accounts[2].write(cpi_account(authority)?);
+
+    for (account, signer) in accounts[3..expected_accounts]
+        .iter_mut()
+        .zip(multisig_signers.iter())
+    {
+        account.write(cpi_account(signer.as_ref())?);
+    }
+
+    Ok(expected_accounts)
+}
+
+#[inline(always)]
+fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
+    source: &'account AccountView,
+    delegate: &'account AccountView,
+    authority: &'account AccountView,
+    multisig_signers: &'multisig [MultisigSigner],
+    accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+    'multisig: 'out,
+{
+    let expected_accounts = 3 + multisig_signers.len();
+
+    if expected_accounts > accounts.len() {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(InstructionAccount::writable(source.address()));
+
+    accounts[1].write(InstructionAccount::readonly(delegate.address()));
+
+    accounts[2].write(InstructionAccount::new(
+        authority.address(),
+        false,
+        multisig_signers.is_empty(),
+    ));
+
+    for (account, signer) in accounts[3..expected_accounts]
+        .iter_mut()
+        .zip(multisig_signers.iter())
+    {
+        account.write(InstructionAccount::readonly_signer(
+            signer.as_ref().address(),
+        ));
+    }
+
+    Ok(expected_accounts)
+}
+
+#[inline(always)]
+fn write_instruction_data(
+    amount: u64,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
+    if data.len() < DATA_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    data[0].write(Approve::DISCRIMINATOR);
+
+    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
+
+    Ok(DATA_LEN)
 }

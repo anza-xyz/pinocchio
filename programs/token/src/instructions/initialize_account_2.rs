@@ -88,17 +88,7 @@ impl CpiWriter for InitializeAccount2<'_> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(writable_cpi_account(self.account)?);
-
-        accounts[1].write(cpi_account(self.mint)?);
-
-        accounts[2].write(cpi_account(self.rent_sysvar)?);
-
-        Ok(ACCOUNTS_LEN)
+        write_accounts(self.account, self.mint, self.rent_sysvar, accounts)
     }
 
     #[inline(always)]
@@ -109,29 +99,90 @@ impl CpiWriter for InitializeAccount2<'_> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(InstructionAccount::writable(self.account.address()));
-
-        accounts[1].write(InstructionAccount::readonly(self.mint.address()));
-
-        accounts[2].write(InstructionAccount::readonly(self.rent_sysvar.address()));
-
-        Ok(ACCOUNTS_LEN)
+        write_instruction_accounts(self.account, self.mint, self.rent_sysvar, accounts)
     }
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        if data.len() < DATA_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        data[0].write(Self::DISCRIMINATOR);
-
-        write_bytes(&mut data[1..DATA_LEN], self.owner.as_array());
-
-        Ok(DATA_LEN)
+        write_instruction_data(self.owner, data)
     }
+}
+
+#[cfg(feature = "batch")]
+impl super::IntoBatch for InitializeAccount2<'_> {
+    #[inline(always)]
+    fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
+    where
+        Self: 'batch,
+    {
+        batch.push_encoded(
+            |accounts| write_accounts(self.account, self.mint, self.rent_sysvar, accounts),
+            |accounts| {
+                write_instruction_accounts(self.account, self.mint, self.rent_sysvar, accounts)
+            },
+            |data| write_instruction_data(self.owner, data),
+        )
+    }
+}
+
+#[inline(always)]
+fn write_accounts<'account, 'out>(
+    account: &'account AccountView,
+    mint: &'account AccountView,
+    rent_sysvar: &'account AccountView,
+    accounts: &mut [MaybeUninit<CpiAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(writable_cpi_account(account)?);
+
+    accounts[1].write(cpi_account(mint)?);
+
+    accounts[2].write(cpi_account(rent_sysvar)?);
+
+    Ok(ACCOUNTS_LEN)
+}
+
+#[inline(always)]
+fn write_instruction_accounts<'account, 'out>(
+    account: &'account AccountView,
+    mint: &'account AccountView,
+    rent_sysvar: &'account AccountView,
+    accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(InstructionAccount::writable(account.address()));
+
+    accounts[1].write(InstructionAccount::readonly(mint.address()));
+
+    accounts[2].write(InstructionAccount::readonly(rent_sysvar.address()));
+
+    Ok(ACCOUNTS_LEN)
+}
+
+#[inline(always)]
+fn write_instruction_data(
+    owner: &Address,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
+    if data.len() < DATA_LEN {
+        return Err(invalid_argument_error());
+    }
+
+    data[0].write(InitializeAccount2::DISCRIMINATOR);
+
+    write_bytes(&mut data[1..DATA_LEN], owner.as_array());
+
+    Ok(DATA_LEN)
 }

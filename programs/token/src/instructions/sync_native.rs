@@ -88,19 +88,7 @@ impl CpiWriter for SyncNative<'_> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < MAX_ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(writable_cpi_account(self.native_token)?);
-
-        if let Some(rent_sysvar) = self.rent_sysvar {
-            accounts[1].write(cpi_account(rent_sysvar)?);
-
-            return Ok(MAX_ACCOUNTS_LEN);
-        }
-
-        Ok(1)
+        write_accounts(self.native_token, self.rent_sysvar, accounts)
     }
 
     #[inline(always)]
@@ -111,29 +99,77 @@ impl CpiWriter for SyncNative<'_> {
     where
         'source: 'cpi,
     {
-        if accounts.len() < MAX_ACCOUNTS_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        accounts[0].write(InstructionAccount::writable(self.native_token.address()));
-
-        if let Some(rent_sysvar) = self.rent_sysvar {
-            accounts[1].write(InstructionAccount::readonly(rent_sysvar.address()));
-
-            return Ok(MAX_ACCOUNTS_LEN);
-        }
-
-        Ok(1)
+        write_instruction_accounts(self.native_token, self.rent_sysvar, accounts)
     }
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        if data.len() < DATA_LEN {
-            return Err(invalid_argument_error());
-        }
-
-        data[0].write(Self::DISCRIMINATOR);
-
-        Ok(DATA_LEN)
+        write_instruction_data(data)
     }
+}
+
+#[cfg(feature = "batch")]
+impl super::IntoBatch for SyncNative<'_> {
+    #[inline(always)]
+    fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
+    where
+        Self: 'batch,
+    {
+        batch.push_encoded(
+            |accounts| write_accounts(self.native_token, self.rent_sysvar, accounts),
+            |accounts| write_instruction_accounts(self.native_token, self.rent_sysvar, accounts),
+            write_instruction_data,
+        )
+    }
+}
+
+#[inline(always)]
+fn write_accounts<'account, 'out>(
+    native_token: &'account AccountView,
+    rent_sysvar: Option<&'account AccountView>,
+    accounts: &mut [MaybeUninit<CpiAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < MAX_ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
+    accounts[0].write(writable_cpi_account(native_token)?);
+    if let Some(rent_sysvar) = rent_sysvar {
+        accounts[1].write(cpi_account(rent_sysvar)?);
+        Ok(MAX_ACCOUNTS_LEN)
+    } else {
+        Ok(1)
+    }
+}
+
+#[inline(always)]
+fn write_instruction_accounts<'account, 'out>(
+    native_token: &'account AccountView,
+    rent_sysvar: Option<&'account AccountView>,
+    accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+{
+    if accounts.len() < MAX_ACCOUNTS_LEN {
+        return Err(invalid_argument_error());
+    }
+    accounts[0].write(InstructionAccount::writable(native_token.address()));
+    if let Some(rent_sysvar) = rent_sysvar {
+        accounts[1].write(InstructionAccount::readonly(rent_sysvar.address()));
+        Ok(MAX_ACCOUNTS_LEN)
+    } else {
+        Ok(1)
+    }
+}
+
+#[inline(always)]
+fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+    if data.len() < DATA_LEN {
+        return Err(invalid_argument_error());
+    }
+    data[0].write(SyncNative::DISCRIMINATOR);
+    Ok(DATA_LEN)
 }
