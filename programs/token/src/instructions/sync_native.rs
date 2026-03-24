@@ -46,8 +46,19 @@ pub struct SyncNative<'account> {
     pub rent_sysvar: Option<&'account AccountView>,
 }
 
-impl SyncNative<'_> {
+impl<'account> SyncNative<'account> {
     pub const DISCRIMINATOR: u8 = 17;
+
+    #[inline(always)]
+    pub fn new(
+        native_token: &'account AccountView,
+        rent_sysvar: Option<&'account AccountView>,
+    ) -> Self {
+        Self {
+            native_token,
+            rent_sysvar,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {

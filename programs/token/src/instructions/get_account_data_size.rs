@@ -33,9 +33,14 @@ pub struct GetAccountDataSize<'account> {
     pub mint: &'account AccountView,
 }
 
-impl GetAccountDataSize<'_> {
+impl<'account> GetAccountDataSize<'account> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 21;
+
+    #[inline(always)]
+    pub fn new(mint: &'account AccountView) -> Self {
+        Self { mint }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {

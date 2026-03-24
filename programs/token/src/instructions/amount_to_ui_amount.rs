@@ -39,8 +39,13 @@ pub struct AmountToUiAmount<'account> {
     pub amount: u64,
 }
 
-impl AmountToUiAmount<'_> {
+impl<'account> AmountToUiAmount<'account> {
     pub const DISCRIMINATOR: u8 = 23;
+
+    #[inline(always)]
+    pub fn new(mint: &'account AccountView, amount: u64) -> Self {
+        Self { mint, amount }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {

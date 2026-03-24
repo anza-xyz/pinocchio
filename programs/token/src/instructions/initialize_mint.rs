@@ -21,7 +21,7 @@ const ACCOUNTS_LEN: usize = 2;
 ///   - decimals (1 byte)
 ///   - mint authority (32 bytes)
 ///   - freeze authority (33 bytes, optional)
-const DATA_LEN: usize = 67;
+const MAX_DATA_LEN: usize = 67;
 
 /// Initializes a new mint and optionally deposits all the newly minted
 /// tokens in an account.
@@ -36,7 +36,7 @@ const DATA_LEN: usize = 67;
 ///
 ///   0. `[writable]` The mint to initialize.
 ///   1. `[]` Rent sysvar.
-pub struct InitializeMint<'account> {
+pub struct InitializeMint<'account, 'address> {
     /// The mint to initialize.
     pub mint: &'account AccountView,
 
@@ -47,14 +47,31 @@ pub struct InitializeMint<'account> {
     pub decimals: u8,
 
     /// The authority/multisignature to mint tokens.
-    pub mint_authority: &'account Address,
+    pub mint_authority: &'address Address,
 
     /// The freeze authority/multisignature of the mint.
-    pub freeze_authority: Option<&'account Address>,
+    pub freeze_authority: Option<&'address Address>,
 }
 
-impl InitializeMint<'_> {
+impl<'account, 'address> InitializeMint<'account, 'address> {
     pub const DISCRIMINATOR: u8 = 0;
+
+    #[inline(always)]
+    pub fn new(
+        mint: &'account AccountView,
+        rent_sysvar: &'account AccountView,
+        decimals: u8,
+        mint_authority: &'address Address,
+        freeze_authority: Option<&'address Address>,
+    ) -> Self {
+        Self {
+            mint,
+            rent_sysvar,
+            decimals,
+            mint_authority,
+            freeze_authority,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -65,7 +82,7 @@ impl InitializeMint<'_> {
         let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; MAX_DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -86,7 +103,7 @@ impl InitializeMint<'_> {
     }
 }
 
-impl CpiWriter for InitializeMint<'_> {
+impl CpiWriter for InitializeMint<'_, '_> {
     #[inline(always)]
     fn write_accounts<'source, 'cpi>(
         &'source self,
@@ -121,7 +138,7 @@ impl CpiWriter for InitializeMint<'_> {
 }
 
 #[cfg(feature = "batch")]
-impl super::IntoBatch for InitializeMint<'_> {
+impl super::IntoBatch for InitializeMint<'_, '_> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
     where
@@ -189,7 +206,7 @@ fn write_instruction_data(
     freeze_authority: Option<&Address>,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < 35 {
+    if data.len() < MAX_DATA_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -200,15 +217,11 @@ fn write_instruction_data(
     write_bytes(&mut data[2..34], mint_authority.as_array());
 
     if let Some(freeze_authority) = freeze_authority {
-        if data.len() < DATA_LEN {
-            return Err(invalid_argument_error());
-        }
-
         data[34].write(1);
 
-        write_bytes(&mut data[35..DATA_LEN], freeze_authority.as_array());
+        write_bytes(&mut data[35..MAX_DATA_LEN], freeze_authority.as_array());
 
-        Ok(DATA_LEN)
+        Ok(MAX_DATA_LEN)
     } else {
         data[34].write(0);
 

@@ -33,9 +33,14 @@ pub struct UiAmountToAmount<'account, 'amount, const LENGTH: usize> {
     pub amount: &'amount str,
 }
 
-impl<const LENGTH: usize> UiAmountToAmount<'_, '_, LENGTH> {
+impl<'account, 'amount, const LENGTH: usize> UiAmountToAmount<'account, 'amount, LENGTH> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 24;
+
+    #[inline(always)]
+    pub fn new(mint: &'account AccountView, amount: &'amount str) -> Self {
+        Self { mint, amount }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {

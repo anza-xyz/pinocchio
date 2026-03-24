@@ -46,8 +46,23 @@ pub struct InitializeAccount2<'account> {
     pub owner: &'account Address,
 }
 
-impl InitializeAccount2<'_> {
+impl<'account> InitializeAccount2<'account> {
     pub const DISCRIMINATOR: u8 = 16;
+
+    #[inline(always)]
+    pub fn new(
+        account: &'account AccountView,
+        mint: &'account AccountView,
+        rent_sysvar: &'account AccountView,
+        owner: &'account Address,
+    ) -> Self {
+        Self {
+            account,
+            mint,
+            rent_sysvar,
+            owner,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {

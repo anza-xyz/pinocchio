@@ -29,7 +29,7 @@ const MAX_DATA_LEN: usize = 67;
 /// Accounts expected by this instruction:
 ///
 ///   0. `[writable]` The mint to initialize.
-pub struct InitializeMint2<'account> {
+pub struct InitializeMint2<'account, 'address> {
     /// The mint to initialize.
     pub mint: &'account AccountView,
 
@@ -37,15 +37,30 @@ pub struct InitializeMint2<'account> {
     pub decimals: u8,
 
     /// The authority/multisignature to mint tokens.
-    pub mint_authority: &'account Address,
+    pub mint_authority: &'address Address,
 
     /// The freeze authority/multisignature of the mint.
-    pub freeze_authority: Option<&'account Address>,
+    pub freeze_authority: Option<&'address Address>,
 }
 
-impl InitializeMint2<'_> {
+impl<'account, 'address> InitializeMint2<'account, 'address> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 20;
+
+    #[inline(always)]
+    pub fn new(
+        mint: &'account AccountView,
+        decimals: u8,
+        mint_authority: &'address Address,
+        freeze_authority: Option<&'address Address>,
+    ) -> Self {
+        Self {
+            mint,
+            decimals,
+            mint_authority,
+            freeze_authority,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
@@ -77,7 +92,7 @@ impl InitializeMint2<'_> {
     }
 }
 
-impl CpiWriter for InitializeMint2<'_> {
+impl CpiWriter for InitializeMint2<'_, '_> {
     #[inline(always)]
     fn write_accounts<'source, 'cpi>(
         &'source self,
@@ -112,7 +127,7 @@ impl CpiWriter for InitializeMint2<'_> {
 }
 
 #[cfg(feature = "batch")]
-impl super::IntoBatch for InitializeMint2<'_> {
+impl super::IntoBatch for InitializeMint2<'_, '_> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
     where

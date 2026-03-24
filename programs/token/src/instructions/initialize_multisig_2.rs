@@ -50,8 +50,25 @@ where
     pub m: u8,
 }
 
-impl<MultisigSigner: AsRef<AccountView>> InitializeMultisig2<'_, '_, MultisigSigner> {
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
+    InitializeMultisig2<'account, 'multisig, MultisigSigner>
+where
+    'account: 'multisig,
+{
     pub const DISCRIMINATOR: u8 = 19;
+
+    #[inline(always)]
+    pub fn new(
+        multisig: &'account AccountView,
+        multisig_signers: &'multisig [MultisigSigner],
+        m: u8,
+    ) -> Self {
+        Self {
+            multisig,
+            multisig_signers,
+            m,
+        }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {

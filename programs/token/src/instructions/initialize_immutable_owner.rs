@@ -32,8 +32,13 @@ pub struct InitializeImmutableOwner<'account> {
     pub account: &'account AccountView,
 }
 
-impl InitializeImmutableOwner<'_> {
+impl<'account> InitializeImmutableOwner<'account> {
     pub const DISCRIMINATOR: u8 = 22;
+
+    #[inline(always)]
+    pub fn new(account: &'account AccountView) -> Self {
+        Self { account }
+    }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
