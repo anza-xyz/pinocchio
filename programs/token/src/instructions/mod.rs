@@ -80,7 +80,7 @@ pub trait CpiWriter {
         accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
     ) -> Result<usize, ProgramError>
     where
-        'source: 'cpi;
+        Self: 'cpi;
 
     /// Writes the `InstructionAccount`s required by this instruction into the
     /// provided slice.
@@ -91,7 +91,7 @@ pub trait CpiWriter {
         accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
     ) -> Result<usize, ProgramError>
     where
-        'source: 'cpi;
+        Self: 'cpi;
 
     /// Writes the instruction data for this instruction into the provided
     /// slice.

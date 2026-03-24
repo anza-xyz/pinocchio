@@ -147,12 +147,12 @@ impl<'account, 'address, 'multisig, MultisigSigner: AsRef<AccountView>>
 
 impl<MultisigSigner: AsRef<AccountView>> CpiWriter for SetAuthority<'_, '_, '_, MultisigSigner> {
     #[inline(always)]
-    fn write_accounts<'source, 'multisigpi>(
-        &'source self,
-        accounts: &mut [MaybeUninit<CpiAccount<'multisigpi>>],
+    fn write_accounts<'cpi>(
+        &self,
+        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
     ) -> Result<usize, ProgramError>
     where
-        'source: 'multisigpi,
+        Self: 'cpi,
     {
         write_accounts(
             self.account,
@@ -163,12 +163,12 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for SetAuthority<'_, '_, '_, 
     }
 
     #[inline(always)]
-    fn write_instruction_accounts<'source, 'multisigpi>(
-        &'source self,
-        accounts: &mut [MaybeUninit<InstructionAccount<'multisigpi>>],
+    fn write_instruction_accounts<'cpi>(
+        &self,
+        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
     ) -> Result<usize, ProgramError>
     where
-        'source: 'multisigpi,
+        Self: 'cpi,
     {
         write_instruction_accounts(
             self.account,

@@ -120,23 +120,23 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
 
 impl<MultisigSigner: AsRef<AccountView>> CpiWriter for Revoke<'_, '_, MultisigSigner> {
     #[inline(always)]
-    fn write_accounts<'source, 'cpi>(
-        &'source self,
+    fn write_accounts<'cpi>(
+        &self,
         accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
     ) -> Result<usize, ProgramError>
     where
-        'source: 'cpi,
+        Self: 'cpi,
     {
         write_accounts(self.source, self.authority, self.multisig_signers, accounts)
     }
 
     #[inline(always)]
-    fn write_instruction_accounts<'source, 'cpi>(
-        &'source self,
+    fn write_instruction_accounts<'cpi>(
+        &self,
         accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
     ) -> Result<usize, ProgramError>
     where
-        'source: 'cpi,
+        Self: 'cpi,
     {
         write_instruction_accounts(self.source, self.authority, self.multisig_signers, accounts)
     }

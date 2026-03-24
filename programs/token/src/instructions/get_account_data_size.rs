@@ -74,23 +74,23 @@ impl<'account> GetAccountDataSize<'account> {
 
 impl CpiWriter for GetAccountDataSize<'_> {
     #[inline(always)]
-    fn write_accounts<'source, 'cpi>(
-        &'source self,
+    fn write_accounts<'cpi>(
+        &self,
         accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
     ) -> Result<usize, ProgramError>
     where
-        'source: 'cpi,
+        Self: 'cpi,
     {
         write_accounts(self.mint, accounts)
     }
 
     #[inline(always)]
-    fn write_instruction_accounts<'source, 'cpi>(
-        &'source self,
+    fn write_instruction_accounts<'cpi>(
+        &self,
         accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
     ) -> Result<usize, ProgramError>
     where
-        'source: 'cpi,
+        Self: 'cpi,
     {
         write_instruction_accounts(self.mint, accounts)
     }
