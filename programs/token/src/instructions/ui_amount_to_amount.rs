@@ -25,7 +25,7 @@ const ACCOUNTS_LEN: usize = 1;
 /// Accounts expected by this instruction:
 ///
 ///   0. `[]` The mint to calculate for.
-pub struct UiAmountToAmount<'account, 'amount, const LENGTH: usize> {
+pub struct UiAmountToAmount<'account, 'amount, const LENGTH: u8> {
     /// The mint to calculate for.
     pub mint: &'account AccountView,
 
@@ -33,7 +33,7 @@ pub struct UiAmountToAmount<'account, 'amount, const LENGTH: usize> {
     pub amount: &'amount str,
 }
 
-impl<'account, 'amount, const LENGTH: usize> UiAmountToAmount<'account, 'amount, LENGTH> {
+impl<'account, 'amount, const LENGTH: u8> UiAmountToAmount<'account, 'amount, LENGTH> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 24;
 
@@ -51,7 +51,7 @@ impl<'account, 'amount, const LENGTH: usize> UiAmountToAmount<'account, 'amount,
         let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; LENGTH];
+        let mut instruction_data = [UNINIT_BYTE; u8::MAX as usize];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -73,7 +73,7 @@ impl<'account, 'amount, const LENGTH: usize> UiAmountToAmount<'account, 'amount,
 }
 
 #[cfg(feature = "batch")]
-impl<const LENGTH: usize> super::IntoBatch for UiAmountToAmount<'_, '_, LENGTH> {
+impl<const LENGTH: u8> super::IntoBatch for UiAmountToAmount<'_, '_, LENGTH> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
     where
@@ -87,7 +87,7 @@ impl<const LENGTH: usize> super::IntoBatch for UiAmountToAmount<'_, '_, LENGTH> 
     }
 }
 
-impl<const LENGTH: usize> CpiWriter for UiAmountToAmount<'_, '_, LENGTH> {
+impl<const LENGTH: u8> CpiWriter for UiAmountToAmount<'_, '_, LENGTH> {
     #[inline(always)]
     fn write_accounts<'source, 'cpi>(
         &'source self,
@@ -151,7 +151,7 @@ where
 }
 
 #[inline(always)]
-fn write_instruction_data<const LENGTH: usize>(
+fn write_instruction_data<const LENGTH: u8>(
     amount: &str,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
