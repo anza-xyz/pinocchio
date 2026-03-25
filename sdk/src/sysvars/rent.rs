@@ -33,6 +33,9 @@ pub const DEFAULT_LAMPORTS_PER_BYTE: u64 = 6960;
 /// added to an accounts data length when calculating [`Rent::minimum_balance`].
 pub const ACCOUNT_STORAGE_OVERHEAD: u64 = 128;
 
+/// Maximum lamports per byte value.
+const MAX_LAMPORTS_PER_BYTE: u64 = 1_759_197_129_867;
+
 /// Rent sysvar data
 #[repr(C)]
 #[cfg_attr(feature = "copy", derive(Copy))]
@@ -57,8 +60,13 @@ impl Rent {
         if unlikely(account_view.address() != &RENT_ID) {
             return Err(ProgramError::InvalidArgument);
         }
-        let data = account_view.try_borrow()?;
-        let rent = unsafe { Self::from_bytes_unchecked(&data) };
+
+        if unlikely(account_view.is_borrowed_mut()) {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        // SAFETY: The account data can be safely borrowed.
+        let rent = unsafe { Self::from_account_view_unchecked(account_view) }?;
         Ok(rent)
     }
 
@@ -87,12 +95,10 @@ impl Rent {
     /// ensure that `bytes` contains a valid representation of `Rent`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ProgramError> {
-        let lamports_per_byte = u64::from_le_bytes(
-            bytes[..8]
-                .try_into()
-                .map_err(|_| ProgramError::InvalidArgument)?,
-        );
-        Ok(Rent { lamports_per_byte })
+        if bytes.len() < size_of::<Self>() {
+            return Err(ProgramError::InvalidArgument);
+        }
+        Ok(unsafe { Self::from_bytes_unchecked(bytes) })
     }
 
     /// Return a `Rent` from the given bytes.
@@ -103,12 +109,12 @@ impl Rent {
     /// `Rent` and that is has the expected length.
     #[inline]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> Self {
-        let lamports_per_byte = u64::from_le_bytes(
-            bytes[..8]
-                .try_into()
-                .expect("Invalid bytes representation of Rent"),
-        );
-        Rent { lamports_per_byte }
+        // SAFETY: The caller must ensure that `bytes` has the expected length.
+        Self {
+            lamports_per_byte: unsafe {
+                core::ptr::read_unaligned::<u64>(bytes.as_ptr() as *const u64)
+            },
+        }
     }
 
     /// Calculates the minimum balance for rent exemption.
@@ -156,8 +162,7 @@ impl Rent {
     /// The minimum balance in lamports for rent exemption.
     #[inline(always)]
     pub fn minimum_balance_unchecked(&self, data_len: usize) -> u64 {
-        let bytes = data_len as u64;
-        (ACCOUNT_STORAGE_OVERHEAD + bytes) * self.lamports_per_byte
+        (ACCOUNT_STORAGE_OVERHEAD + data_len as u64) * self.lamports_per_byte
     }
 
     /// Calculates the minimum balance for rent exemption.
@@ -184,6 +189,14 @@ impl Rent {
         if data_len as u64 > MAX_PERMITTED_DATA_LENGTH {
             return Err(ProgramError::InvalidArgument);
         }
+
+        // Validate `lamports_per_byte` based on `exemption_threshold` to prevent
+        // overflow.
+
+        if unlikely(self.lamports_per_byte > MAX_LAMPORTS_PER_BYTE) {
+            return Err(ProgramError::InvalidArgument);
+        }
+
         Ok(self.minimum_balance_unchecked(data_len))
     }
 
@@ -234,5 +247,24 @@ mod tests {
 
         assert!(calculated > 0);
         assert_eq!(balance, calculated);
+    }
+
+    #[test]
+    pub fn test_from_bytes() {
+        // Happy Path
+        let rent = super::Rent {
+            lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE,
+        };
+
+        let bytes = rent.lamports_per_byte.to_le_bytes();
+        let deserialized = super::Rent::from_bytes(&bytes).unwrap();
+
+        assert_eq!(rent.lamports_per_byte, deserialized.lamports_per_byte);
+
+        // Invalid length
+        
+        let bytes = [0u8; 7];
+        let result = super::Rent::from_bytes(&bytes);
+        assert!(result.is_err());
     }
 }
