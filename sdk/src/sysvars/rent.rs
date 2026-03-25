@@ -262,7 +262,7 @@ mod tests {
         assert_eq!(rent.lamports_per_byte, deserialized.lamports_per_byte);
 
         // Invalid length
-        
+
         let bytes = [0u8; 7];
         let result = super::Rent::from_bytes(&bytes);
         assert!(result.is_err());
