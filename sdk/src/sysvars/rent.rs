@@ -57,10 +57,6 @@ impl Rent {
     /// This method performs a check on the account view key.
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Rent, ProgramError> {
-        if unlikely(account_view.address() != &RENT_ID) {
-            return Err(ProgramError::InvalidArgument);
-        }
-
         if unlikely(account_view.is_borrowed_mut()) {
             return Err(ProgramError::AccountBorrowFailed);
         }
@@ -98,6 +94,8 @@ impl Rent {
         if bytes.len() < size_of::<Self>() {
             return Err(ProgramError::InvalidArgument);
         }
+
+        // SAFETY: `bytes` has the expected length.
         Ok(unsafe { Self::from_bytes_unchecked(bytes) })
     }
 
@@ -109,8 +107,8 @@ impl Rent {
     /// `Rent` and that is has the expected length.
     #[inline]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> Self {
-        // SAFETY: The caller must ensure that `bytes` has the expected length.
         Self {
+            // SAFETY: The caller must ensure that `bytes` has the expected length.
             lamports_per_byte: unsafe {
                 core::ptr::read_unaligned::<u64>(bytes.as_ptr() as *const u64)
             },
@@ -143,9 +141,6 @@ impl Rent {
 
     /// Calculates the minimum balance for rent exemption without performing
     /// any validation.
-    ///
-    /// This method avoids floating-point operations when the
-    /// `exemption_threshold` is the default value.
     ///
     /// # Important
     ///
