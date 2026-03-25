@@ -87,7 +87,7 @@ impl Rent {
 
     /// Return a `Rent` from the given bytes.
     ///
-    /// This method performs a length and alignment validation. The caller must
+    /// This method performs a length validation. The caller must
     /// ensure that `bytes` contains a valid representation of `Rent`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ProgramError> {
