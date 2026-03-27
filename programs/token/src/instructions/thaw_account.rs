@@ -31,17 +31,17 @@ const DATA_LEN: usize = 1;
 /// Accounts expected by this instruction:
 ///
 ///   * Single owner
-///   0. `[writable]` The account to freeze.
+///   0. `[writable]` The account to thaw.
 ///   1. `[]` The token mint.
 ///   2. `[signer]` The mint freeze authority.
 ///
 ///   * Multisignature owner
-///   0. `[writable]` The account to freeze.
+///   0. `[writable]` The account to thaw.
 ///   1. `[]` The token mint.
 ///   2. `[]` The mint's multisignature freeze authority.
 ///   3. `..+M` `[signer]` M signer accounts.
 pub struct ThawAccount<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
-    ///  The account to freeze.
+    ///  The account to thaw.
     pub account: &'account AccountView,
 
     /// The token mint.

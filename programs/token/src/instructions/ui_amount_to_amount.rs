@@ -15,6 +15,11 @@ use {
 /// Expected number of accounts.
 const ACCOUNTS_LEN: usize = 1;
 
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - amount (variable, up to 254 bytes)
+const MAX_DATA_LEN: usize = 255;
+
 /// Convert a `UiAmount` of tokens to a little-endian `u64` raw Amount,
 /// using the given mint. In this version of the program, the mint can
 /// only specify the number of decimals.
@@ -25,7 +30,7 @@ const ACCOUNTS_LEN: usize = 1;
 /// Accounts expected by this instruction:
 ///
 ///   0. `[]` The mint to calculate for.
-pub struct UiAmountToAmount<'account, 'amount, const LENGTH: u8> {
+pub struct UiAmountToAmount<'account, 'amount> {
     /// The mint to calculate for.
     pub mint: &'account AccountView,
 
@@ -33,7 +38,7 @@ pub struct UiAmountToAmount<'account, 'amount, const LENGTH: u8> {
     pub amount: &'amount str,
 }
 
-impl<'account, 'amount, const LENGTH: u8> UiAmountToAmount<'account, 'amount, LENGTH> {
+impl<'account, 'amount> UiAmountToAmount<'account, 'amount> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 24;
 
@@ -73,7 +78,7 @@ impl<'account, 'amount, const LENGTH: u8> UiAmountToAmount<'account, 'amount, LE
 }
 
 #[cfg(feature = "batch")]
-impl<const LENGTH: u8> super::IntoBatch for UiAmountToAmount<'_, '_, LENGTH> {
+impl super::IntoBatch for UiAmountToAmount<'_, '_> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
     where
@@ -82,12 +87,12 @@ impl<const LENGTH: u8> super::IntoBatch for UiAmountToAmount<'_, '_, LENGTH> {
         batch.push(
             |accounts| write_accounts(self.mint, accounts),
             |accounts| write_instruction_accounts(self.mint, accounts),
-            |data| write_instruction_data::<LENGTH>(self.amount, data),
+            |data| write_instruction_data(self.amount, data),
         )
     }
 }
 
-impl<const LENGTH: u8> CpiWriter for UiAmountToAmount<'_, '_, LENGTH> {
+impl CpiWriter for UiAmountToAmount<'_, '_> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -112,7 +117,7 @@ impl<const LENGTH: u8> CpiWriter for UiAmountToAmount<'_, '_, LENGTH> {
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data::<LENGTH>(self.amount, data)
+        write_instruction_data(self.amount, data)
     }
 }
 
@@ -151,17 +156,17 @@ where
 }
 
 #[inline(always)]
-fn write_instruction_data<const LENGTH: u8>(
+fn write_instruction_data(
     amount: &str,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
     let expected_data_len = 1 + amount.len();
 
-    if data.len() < expected_data_len {
+    if expected_data_len > MAX_DATA_LEN || data.len() < expected_data_len {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(UiAmountToAmount::<LENGTH>::DISCRIMINATOR);
+    data[0].write(UiAmountToAmount::DISCRIMINATOR);
 
     write_bytes(&mut data[1..expected_data_len], amount.as_bytes());
 

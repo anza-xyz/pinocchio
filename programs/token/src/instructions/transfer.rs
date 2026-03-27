@@ -20,7 +20,7 @@ use {
 /// The required number of accounts will depend whether the
 /// source account has a single owner or a multisignature
 /// owner.
-const MAX_ACCOUNTS_LEN: usize = 4 + MAX_MULTISIG_SIGNERS;
+const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)

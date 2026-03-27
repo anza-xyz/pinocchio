@@ -116,7 +116,7 @@ impl<'a> Batch<'a> {
             &mut self.instruction_accounts[self.instruction_accounts_len..],
         )?;
 
-        // If all writres succeeded, update the lengths and write the instruction
+        // If all writes succeeded, update the lengths and write the instruction
         // header.
 
         self.accounts_len += written_accounts;
@@ -151,6 +151,6 @@ impl<T: CpiWriter> sealed::Sealed for T {}
 /// `Sealed` trait.
 pub(crate) mod sealed {
     /// A sealed trait that prevents external implementations of the
-    /// `Batchable` trait.
+    /// `IntoBatch` trait.
     pub trait Sealed {}
 }
