@@ -39,6 +39,8 @@ runs:
       uses: actions-rust-lang/setup-rust-toolchain@1fbea72663f6d4c03efaab13560c8a24cfd2a7cc  # v1.9.0
       with:
         toolchain: ${{ env.TOOLCHAIN_BUILD }}
+        cache: false
+        rustflags: ""
 
     - name: Install Rust 'format' Toolchain
       if: ${{ contains(inputs.toolchain, 'format') }}
@@ -46,6 +48,8 @@ runs:
       with:
         toolchain: ${{ env.TOOLCHAIN_FORMAT }}
         components: rustfmt
+        cache: false
+        rustflags: ""
 
     - name: Install Rust 'lint' Toolchain
       if: ${{ contains(inputs.toolchain, 'lint') }}
@@ -53,12 +57,16 @@ runs:
       with:
         toolchain: ${{ env.TOOLCHAIN_LINT }}
         components: clippy
+        cache: false
+        rustflags: ""
 
     - name: Install Rust 'test' Toolchain
       if: ${{ contains(inputs.toolchain, 'test') }}
       uses: actions-rust-lang/setup-rust-toolchain@1fbea72663f6d4c03efaab13560c8a24cfd2a7cc  # v1.9.0
       with:
         toolchain: ${{ env.TOOLCHAIN_TEST }}
+        cache: false
+        rustflags: ""
 
     - name: Install Solana
       if: ${{ inputs.solana == 'true' }}
@@ -97,6 +105,8 @@ runs:
       with:
         toolchain: ${{ env.TOOLCHAIN_LINT }}
         components: miri
+        cache: false
+        rustflags: ""
 
     - name: Install 'cargo-spellcheck'
       if: ${{ contains(inputs.components, 'spellcheck') }}
