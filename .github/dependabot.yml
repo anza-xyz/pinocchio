@@ -13,16 +13,6 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: cargo
-    directory: /
-    schedule:
-      interval: weekly
-      day: monday
-    groups:
-      cargo:
-        patterns:
-          - "*"
-
   - package-ecosystem: npm
     directory: /
     schedule:
