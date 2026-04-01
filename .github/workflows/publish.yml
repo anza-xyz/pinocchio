@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
       - name: Setup Environment
         uses: ./.github/actions/setup
@@ -90,7 +90,7 @@ jobs:
       id-token: write
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
         with:
           token: ${{ secrets.ANZA_TEAM_PAT }}
           fetch-depth: 0 # get the whole history for git-cliff
@@ -114,7 +114,7 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
 
-      - uses: rust-lang/crates-io-auth-action@v1
+      - uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe  # v1.0.4
         id: auth
 
       - name: Publish Crate
@@ -138,7 +138,7 @@ jobs:
 
       - name: Generate a changelog
         if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
-        uses: orhun/git-cliff-action@v4
+        uses: orhun/git-cliff-action@c93ef52f3d0ddcdcc9bd5447d98d458a11cd4f72  # v4.7.1
         with:
           config: ".github/cliff.toml"
           args: ${{ steps.publish.outputs.old_git_tag }}..HEAD --include-path "${{ inputs.crate }}/**" --github-repo ${{ github.repository }}
@@ -148,7 +148,7 @@ jobs:
 
       - name: Create GitHub release
         if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@40bb172bd05f266cf9ba4ff965cb61e9ee5f6d01  # v1.9.0
         with:
           tag: ${{ steps.publish.outputs.new_git_tag }}
           bodyFile: CHANGELOG.md

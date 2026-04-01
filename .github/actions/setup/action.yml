@@ -18,10 +18,10 @@ runs:
   using: 'composite'
   steps:
     - name: Setup pnpm
-      uses: pnpm/action-setup@v3
+      uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3.0.0
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
       with:
         node-version: 20
         cache: 'pnpm'
@@ -36,77 +36,77 @@ runs:
 
     - name: Install Rust 'build' Toolchain
       if: ${{ contains(inputs.toolchain, 'build') }}
-      uses: dtolnay/rust-toolchain@master
+      uses: actions-rust-lang/setup-rust-toolchain@1fbea72663f6d4c03efaab13560c8a24cfd2a7cc  # v1.9.0
       with:
         toolchain: ${{ env.TOOLCHAIN_BUILD }}
 
     - name: Install Rust 'format' Toolchain
       if: ${{ contains(inputs.toolchain, 'format') }}
-      uses: dtolnay/rust-toolchain@master
+      uses: actions-rust-lang/setup-rust-toolchain@1fbea72663f6d4c03efaab13560c8a24cfd2a7cc  # v1.9.0
       with:
         toolchain: ${{ env.TOOLCHAIN_FORMAT }}
         components: rustfmt
 
     - name: Install Rust 'lint' Toolchain
       if: ${{ contains(inputs.toolchain, 'lint') }}
-      uses: dtolnay/rust-toolchain@master
+      uses: actions-rust-lang/setup-rust-toolchain@1fbea72663f6d4c03efaab13560c8a24cfd2a7cc  # v1.9.0
       with:
         toolchain: ${{ env.TOOLCHAIN_LINT }}
         components: clippy
 
     - name: Install Rust 'test' Toolchain
       if: ${{ contains(inputs.toolchain, 'test') }}
-      uses: dtolnay/rust-toolchain@master
+      uses: actions-rust-lang/setup-rust-toolchain@1fbea72663f6d4c03efaab13560c8a24cfd2a7cc  # v1.9.0
       with:
         toolchain: ${{ env.TOOLCHAIN_TEST }}
 
     - name: Install Solana
       if: ${{ inputs.solana == 'true' }}
-      uses: solana-program/actions/install-solana@v1
+      uses: solana-program/actions/install-solana@678f622be092844a943327c17430401d871e6998  # v1
       with:
         version: ${{ env.SOLANA_VERSION }}
         cache: true
 
     - name: Install 'cargo-audit'
       if: ${{ contains(inputs.components, 'audit') }}
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@7627fb428e65e78e2ec9a24ae5c5bd5f8553f182  # v2.69.10
       with:
         tool: cargo-audit
 
     - name: Install 'cargo-hack'
       if: ${{ contains(inputs.components, 'hack') }}
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@7627fb428e65e78e2ec9a24ae5c5bd5f8553f182  # v2.69.10
       with:
         tool: cargo-hack
 
     - name: Install 'cargo-release'
       if: ${{ contains(inputs.components, 'release') }}
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@7627fb428e65e78e2ec9a24ae5c5bd5f8553f182  # v2.69.10
       with:
         tool: cargo-release
 
     - name: Install 'cargo-semver-checks'
       if: ${{ contains(inputs.components, 'semver-checks') }}
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@7627fb428e65e78e2ec9a24ae5c5bd5f8553f182  # v2.69.10
       with:
         tool: cargo-semver-checks@0.41.0
 
     - name: Install 'cargo-miri'
       if: ${{ contains(inputs.toolchain, 'lint') }}
-      uses: dtolnay/rust-toolchain@master
+      uses: actions-rust-lang/setup-rust-toolchain@1fbea72663f6d4c03efaab13560c8a24cfd2a7cc  # v1.9.0
       with:
         toolchain: ${{ env.TOOLCHAIN_LINT }}
         components: miri
 
     - name: Install 'cargo-spellcheck'
       if: ${{ contains(inputs.components, 'spellcheck') }}
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@7627fb428e65e78e2ec9a24ae5c5bd5f8553f182  # v2.69.10
       with:
         tool: cargo-spellcheck
 
     - name: Cache Cargo Dependencies
       if: ${{ inputs.cargo-cache-key }}
-      uses: actions/cache@v4
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
       with:
         path: |
           ~/.cargo/bin/
