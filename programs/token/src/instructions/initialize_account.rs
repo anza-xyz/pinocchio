@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter},
+        instructions::{account_borrow_failed_error, invalid_argument_error, CpiWriter},
         UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{mem::MaybeUninit, slice::from_raw_parts},
@@ -186,13 +186,17 @@ where
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(writable_cpi_account(account)?);
+    if account.is_borrowed() {
+        return Err(account_borrow_failed_error());
+    }
 
-    accounts[1].write(cpi_account(mint)?);
+    CpiAccount::init_from_account_view(account, &mut accounts[0]);
 
-    accounts[2].write(cpi_account(owner)?);
+    CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
-    accounts[3].write(cpi_account(rent_sysvar)?);
+    CpiAccount::init_from_account_view(owner, &mut accounts[2]);
+
+    CpiAccount::init_from_account_view(rent_sysvar, &mut accounts[3]);
 
     Ok(ACCOUNTS_LEN)
 }

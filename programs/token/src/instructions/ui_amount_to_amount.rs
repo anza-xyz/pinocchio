@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{cpi_account, invalid_argument_error, CpiWriter},
+        instructions::{invalid_argument_error, CpiWriter},
         write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{mem::MaybeUninit, slice::from_raw_parts},
@@ -133,7 +133,7 @@ where
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(cpi_account(mint)?);
+    CpiAccount::init_from_account_view(mint, &mut accounts[0]);
 
     Ok(ACCOUNTS_LEN)
 }

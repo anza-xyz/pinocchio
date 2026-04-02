@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter},
+        instructions::{account_borrow_failed_error, invalid_argument_error, CpiWriter},
         UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{mem::MaybeUninit, slice::from_raw_parts},
@@ -146,9 +146,15 @@ where
     if accounts.len() < MAX_ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
-    accounts[0].write(writable_cpi_account(native_token)?);
+
+    if native_token.is_borrowed() {
+        return Err(account_borrow_failed_error());
+    }
+
+    CpiAccount::init_from_account_view(native_token, &mut accounts[0]);
+
     if let Some(rent_sysvar) = rent_sysvar {
-        accounts[1].write(cpi_account(rent_sysvar)?);
+        CpiAccount::init_from_account_view(rent_sysvar, &mut accounts[1]);
         Ok(MAX_ACCOUNTS_LEN)
     } else {
         Ok(1)
@@ -167,7 +173,9 @@ where
     if accounts.len() < MAX_ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
+
     accounts[0].write(InstructionAccount::writable(native_token.address()));
+
     if let Some(rent_sysvar) = rent_sysvar {
         accounts[1].write(InstructionAccount::readonly(rent_sysvar.address()));
         Ok(MAX_ACCOUNTS_LEN)
@@ -181,6 +189,8 @@ fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, Program
     if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
+
     data[0].write(SyncNative::DISCRIMINATOR);
+
     Ok(DATA_LEN)
 }

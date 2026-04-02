@@ -1,8 +1,7 @@
 use {
     crate::{
         instructions::{
-            cpi_account, invalid_argument_error, writable_cpi_account, CpiWriter,
-            MAX_MULTISIG_SIGNERS,
+            account_borrow_failed_error, invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS,
         },
         write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
@@ -256,19 +255,23 @@ where
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(writable_cpi_account(from)?);
+    if from.is_borrowed() | to.is_borrowed() {
+        return Err(account_borrow_failed_error());
+    }
 
-    accounts[1].write(cpi_account(mint)?);
+    CpiAccount::init_from_account_view(from, &mut accounts[0]);
 
-    accounts[2].write(writable_cpi_account(to)?);
+    CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
-    accounts[3].write(cpi_account(authority)?);
+    CpiAccount::init_from_account_view(to, &mut accounts[2]);
+
+    CpiAccount::init_from_account_view(authority, &mut accounts[3]);
 
     for (account, signer) in accounts[4..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {
-        account.write(cpi_account(signer.as_ref())?);
+        CpiAccount::init_from_account_view(signer.as_ref(), account);
     }
 
     Ok(expected_accounts)

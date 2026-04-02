@@ -38,7 +38,6 @@ pub use {
 };
 use {
     core::mem::MaybeUninit,
-    solana_account_view::AccountView,
     solana_instruction_view::{cpi::CpiAccount, InstructionAccount},
     solana_program_error::ProgramError,
 };
@@ -51,22 +50,6 @@ fn account_borrow_failed_error() -> ProgramError {
 #[cold]
 fn invalid_argument_error() -> ProgramError {
     ProgramError::InvalidArgument
-}
-
-#[inline(always)]
-fn writable_cpi_account<'cpi>(account: &AccountView) -> Result<CpiAccount<'cpi>, ProgramError> {
-    if account.as_ref().is_borrowed() {
-        return Err(account_borrow_failed_error());
-    }
-    Ok(CpiAccount::from(account))
-}
-
-#[inline(always)]
-fn cpi_account<'cpi>(account: &AccountView) -> Result<CpiAccount<'cpi>, ProgramError> {
-    if account.as_ref().is_borrowed_mut() {
-        return Err(account_borrow_failed_error());
-    }
-    Ok(CpiAccount::from(account))
 }
 
 /// A trait for instructions that can be used in a CPI context.
