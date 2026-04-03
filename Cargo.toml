@@ -24,13 +24,13 @@ solana-instruction-view = "2.1"
 solana-program-error = "3.0"
 
 [workspace.metadata.cli]
-solana = "2.3.0"
+solana = "3.1.8"
 
 [workspace.metadata.toolchains]
-build = "1.84.1"
+build = "1.89.0"
 format = "nightly-2026-01-22"
 lint = "nightly-2026-01-22"
-test = "1.84.1"
+test = "1.89.0"
 
 [workspace.metadata.release]
 pre-release-commit-message = "Publish {{crate_name}} v{{version}}"
