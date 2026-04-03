@@ -76,3 +76,7 @@ pausable
 permissioned
 endian
 prefunded
+TLV
+discriminant
+discriminants
+implementer/S
