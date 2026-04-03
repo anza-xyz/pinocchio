@@ -99,7 +99,6 @@ impl CpiWriter for InitializeImmutableOwner<'_> {
     }
 }
 
-#[cfg(feature = "batch")]
 impl super::IntoBatch for InitializeImmutableOwner<'_> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult

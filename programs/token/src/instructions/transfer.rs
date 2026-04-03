@@ -180,7 +180,6 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for Transfer<'_, '_, Multisig
     }
 }
 
-#[cfg(feature = "batch")]
 impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch for Transfer<'_, '_, MultisigSigner> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult

@@ -9,9 +9,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Maximum CPI instruction data size.
-const MAX_CPI_INSTRUCTION_DATA_LEN: usize = 10 * 1024;
-
 /// The size of the batch instruction header.
 ///
 /// The header of each instruction consists of two `u8` values:
@@ -22,18 +19,19 @@ const IX_HEADER_SIZE: usize = 2;
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
 pub struct Batch<'a> {
-    /// The instruction data for the batch instruction. The first byte is
-    /// reserved for the batch instruction discriminator, and each
-    /// instruction's data is prefixed with a byte indicating the number of
-    /// instruction accounts and a byte indicating the length of the
-    /// instruction data.
-    data: Box<[MaybeUninit<u8>]>,
+    /// The instruction data for the batch instruction.
+    ///
+    /// The first byte is reserved for the batch instruction discriminator,
+    /// and each instruction's data is prefixed with a byte indicating the
+    /// number of instruction accounts and a byte indicating the length of
+    /// the instruction data.
+    data: &'a mut [MaybeUninit<u8>],
 
     /// The instruction accounts for the batch instruction.
-    instruction_accounts: Box<[MaybeUninit<InstructionAccount<'a>>]>,
+    instruction_accounts: &'a mut [MaybeUninit<InstructionAccount<'a>>],
 
     /// The accounts for the batch instruction.
-    accounts: Box<[MaybeUninit<CpiAccount<'a>>]>,
+    accounts: &'a mut [MaybeUninit<CpiAccount<'a>>],
 
     /// The current length of the instruction data.
     data_len: usize,
@@ -49,21 +47,35 @@ impl<'a> Batch<'a> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 255;
 
+    /// The maximum instruction data buffer length required for a batch.
+    pub const MAX_DATA_LEN: usize = 10 * 1024;
+
+    /// The maximum account buffer length required for a batch.
+    pub const MAX_ACCOUNTS_LEN: usize = MAX_CPI_ACCOUNTS;
+
+    /// Creates a new `Batch` with the provided buffers.
     #[inline(always)]
-    pub fn new() -> Self {
-        let mut data: Box<[MaybeUninit<u8>]> = Box::new_uninit_slice(MAX_CPI_INSTRUCTION_DATA_LEN);
-        // The first byte of the instruction data is reserved for the batch instruction
-        // discriminator.
+    pub fn new(
+        data: &'a mut [MaybeUninit<u8>],
+        instruction_accounts: &'a mut [MaybeUninit<InstructionAccount<'a>>],
+        accounts: &'a mut [MaybeUninit<CpiAccount<'a>>],
+    ) -> Result<Self, ProgramError> {
+        if data.is_empty() {
+            return Err(invalid_argument_error());
+        }
+
+        // The first byte of the instruction data is reserved for
+        // the batch discriminator.
         data[0].write(Self::DISCRIMINATOR);
 
-        Self {
+        Ok(Self {
             data,
-            instruction_accounts: Box::new_uninit_slice(MAX_CPI_ACCOUNTS),
-            accounts: Box::new_uninit_slice(MAX_CPI_ACCOUNTS),
+            instruction_accounts,
+            accounts,
             data_len: 1,
             accounts_len: 0,
             instruction_accounts_len: 0,
-        }
+        })
     }
 
     #[inline(always)]
@@ -83,10 +95,7 @@ impl<'a> Batch<'a> {
                     ),
                     data: from_raw_parts(self.data.as_ptr() as _, self.data_len),
                 },
-                from_raw_parts(
-                    self.accounts.as_ptr() as *const CpiAccount,
-                    self.accounts_len,
-                ),
+                from_raw_parts(self.accounts.as_ptr() as _, self.accounts_len),
                 signers,
             );
         }
@@ -130,9 +139,37 @@ impl<'a> Batch<'a> {
     }
 }
 
-impl Default for Batch<'_> {
-    fn default() -> Self {
-        Self::new()
+#[cfg(feature = "alloc")]
+/// A state object that contains the buffers for a `Batch` instruction.
+pub struct BatchState<'account> {
+    /// Container for the instruction data of the batch instruction.
+    data: Box<[MaybeUninit<u8>]>,
+
+    /// Container for the instruction accounts of the batch instruction.
+    instruction_accounts: Box<[MaybeUninit<InstructionAccount<'account>>]>,
+
+    /// Container for the accounts of the batch instruction.
+    accounts: Box<[MaybeUninit<CpiAccount<'account>>]>,
+}
+
+#[cfg(feature = "alloc")]
+impl<'account> BatchState<'account> {
+    #[inline(always)]
+    pub fn new(accounts_len: usize, data_len: usize) -> Self {
+        Self {
+            data: Box::new_uninit_slice(data_len),
+            instruction_accounts: Box::new_uninit_slice(accounts_len),
+            accounts: Box::new_uninit_slice(accounts_len),
+        }
+    }
+
+    #[inline(always)]
+    pub fn as_batch(&'account mut self) -> Result<Batch<'account>, ProgramError> {
+        Batch::new(
+            self.data.as_mut(),
+            self.instruction_accounts.as_mut(),
+            self.accounts.as_mut(),
+        )
     }
 }
 

@@ -183,7 +183,6 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for SetAuthority<'_, '_, '_, 
     }
 }
 
-#[cfg(feature = "batch")]
 impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
     for SetAuthority<'_, '_, '_, MultisigSigner>
 {

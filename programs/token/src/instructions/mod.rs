@@ -1,7 +1,6 @@
 mod amount_to_ui_amount;
 mod approve;
 mod approve_checked;
-#[cfg(feature = "batch")]
 mod batch;
 mod burn;
 mod burn_checked;
@@ -26,8 +25,7 @@ mod transfer;
 mod transfer_checked;
 mod ui_amount_to_amount;
 
-#[cfg(feature = "batch")]
-pub use batch::{Batch, IntoBatch};
+pub use batch::{Batch, BatchState, IntoBatch};
 pub use {
     amount_to_ui_amount::*, approve::*, approve_checked::*, burn::*, burn_checked::*,
     close_account::*, freeze_account::*, get_account_data_size::*, initialize_account::*,

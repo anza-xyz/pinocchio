@@ -119,7 +119,6 @@ impl CpiWriter for SyncNative<'_> {
     }
 }
 
-#[cfg(feature = "batch")]
 impl super::IntoBatch for SyncNative<'_> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult

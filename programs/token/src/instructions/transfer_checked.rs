@@ -201,7 +201,6 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for TransferChecked<'_, '_, M
     }
 }
 
-#[cfg(feature = "batch")]
 impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
     for TransferChecked<'_, '_, MultisigSigner>
 {

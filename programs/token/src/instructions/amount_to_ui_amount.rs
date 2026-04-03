@@ -106,7 +106,6 @@ impl CpiWriter for AmountToUiAmount<'_> {
     }
 }
 
-#[cfg(feature = "batch")]
 impl super::IntoBatch for AmountToUiAmount<'_> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult

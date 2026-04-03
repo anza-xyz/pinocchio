@@ -190,7 +190,6 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for BurnChecked<'_, '_, Multi
     }
 }
 
-#[cfg(feature = "batch")]
 impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch for BurnChecked<'_, '_, MultisigSigner> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult

@@ -171,7 +171,6 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for FreezeAccount<'_, '_, Mul
     }
 }
 
-#[cfg(feature = "batch")]
 impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
     for FreezeAccount<'_, '_, MultisigSigner>
 {

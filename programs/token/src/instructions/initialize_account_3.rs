@@ -115,7 +115,6 @@ impl CpiWriter for InitializeAccount3<'_, '_> {
     }
 }
 
-#[cfg(feature = "batch")]
 impl super::IntoBatch for InitializeAccount3<'_, '_> {
     #[inline(always)]
     fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult

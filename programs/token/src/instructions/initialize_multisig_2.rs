@@ -132,7 +132,6 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for InitializeMultisig2<'_, '
     }
 }
 
-#[cfg(feature = "batch")]
 impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
     for InitializeMultisig2<'_, '_, MultisigSigner>
 {

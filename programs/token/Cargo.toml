@@ -12,7 +12,7 @@ rust-version = { workspace = true }
 crate-type = ["rlib"]
 
 [features]
-batch = []
+alloc = []
 
 [dependencies]
 solana-account-view = { workspace = true }
