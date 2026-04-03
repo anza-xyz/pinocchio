@@ -68,10 +68,10 @@ impl<'account, 'address> InitializeMint2<'account, 'address> {
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; InitializeMint2::ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; Self::ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; InitializeMint2::MAX_DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; Self::MAX_DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {

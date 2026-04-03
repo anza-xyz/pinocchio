@@ -76,10 +76,10 @@ impl<'account> InitializeAccount<'account> {
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; InitializeAccount::ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; Self::ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; InitializeAccount::DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; Self::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
