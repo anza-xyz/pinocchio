@@ -206,9 +206,12 @@ impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
     for TransferChecked<'_, '_, MultisigSigner>
 {
     #[inline(always)]
-    fn into_batch<'batch>(self, batch: &mut super::Batch<'batch>) -> ProgramResult
+    fn into_batch<'account, 'state>(
+        self,
+        batch: &mut super::Batch<'account, 'state>,
+    ) -> ProgramResult
     where
-        Self: 'batch,
+        Self: 'account + 'state,
     {
         batch.push(
             |accounts| {

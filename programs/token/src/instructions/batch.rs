@@ -19,20 +19,20 @@ const IX_HEADER_SIZE: usize = 2;
 
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
-pub struct Batch<'a> {
+pub struct Batch<'account, 'state> {
     /// The instruction data for the batch instruction.
     ///
     /// The first byte is reserved for the batch instruction discriminator,
     /// and each instruction's data is prefixed with a byte indicating the
     /// number of instruction accounts and a byte indicating the length of
     /// the instruction data.
-    data: &'a mut [MaybeUninit<u8>],
+    data: &'state mut [MaybeUninit<u8>],
 
     /// The instruction accounts for the batch instruction.
-    instruction_accounts: &'a mut [MaybeUninit<InstructionAccount<'a>>],
+    instruction_accounts: &'state mut [MaybeUninit<InstructionAccount<'account>>],
 
     /// The accounts for the batch instruction.
-    accounts: &'a mut [MaybeUninit<CpiAccount<'a>>],
+    accounts: &'state mut [MaybeUninit<CpiAccount<'account>>],
 
     /// The current length of the instruction data.
     data_len: usize,
@@ -44,7 +44,10 @@ pub struct Batch<'a> {
     instruction_accounts_len: usize,
 }
 
-impl<'a> Batch<'a> {
+impl<'account, 'state> Batch<'account, 'state>
+where
+    'account: 'state,
+{
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 255;
 
@@ -57,9 +60,9 @@ impl<'a> Batch<'a> {
     /// Creates a new `Batch` with the provided buffers.
     #[inline(always)]
     pub fn new(
-        data: &'a mut [MaybeUninit<u8>],
-        instruction_accounts: &'a mut [MaybeUninit<InstructionAccount<'a>>],
-        accounts: &'a mut [MaybeUninit<CpiAccount<'a>>],
+        data: &'state mut [MaybeUninit<u8>],
+        instruction_accounts: &'state mut [MaybeUninit<InstructionAccount<'account>>],
+        accounts: &'state mut [MaybeUninit<CpiAccount<'account>>],
     ) -> Result<Self, ProgramError> {
         if data.is_empty() {
             return Err(invalid_argument_error());
@@ -107,9 +110,11 @@ impl<'a> Batch<'a> {
     #[inline(always)]
     pub(crate) fn push(
         &mut self,
-        write_accounts: impl FnOnce(&mut [MaybeUninit<CpiAccount<'a>>]) -> Result<usize, ProgramError>,
+        write_accounts: impl FnOnce(
+            &mut [MaybeUninit<CpiAccount<'account>>],
+        ) -> Result<usize, ProgramError>,
         write_instruction_accounts: impl FnOnce(
-            &mut [MaybeUninit<InstructionAccount<'a>>],
+            &mut [MaybeUninit<InstructionAccount<'account>>],
         ) -> Result<usize, ProgramError>,
         write_data: impl FnOnce(&mut [MaybeUninit<u8>]) -> Result<usize, ProgramError>,
     ) -> ProgramResult {
@@ -165,7 +170,10 @@ impl<'account> BatchState<'account> {
     }
 
     #[inline(always)]
-    pub fn as_batch(&'account mut self) -> Result<Batch<'account>, ProgramError> {
+    pub fn as_batch<'state>(&'state mut self) -> Result<Batch<'account, 'state>, ProgramError>
+    where
+        Self: 'account,
+    {
         Batch::new(
             self.data.as_mut(),
             self.instruction_accounts.as_mut(),
@@ -177,9 +185,9 @@ impl<'account> BatchState<'account> {
 /// A trait for instructions that can be consumed directly into a `Batch`.
 pub trait IntoBatch: sealed::Sealed {
     /// Serializes `self` into the provided batch.
-    fn into_batch<'batch>(self, batch: &mut Batch<'batch>) -> ProgramResult
+    fn into_batch<'account, 'state>(self, batch: &mut Batch<'account, 'state>) -> ProgramResult
     where
-        Self: 'batch;
+        Self: 'account + 'state;
 }
 
 /// Implement `Sealed` for all types that implement `CpiWriter`.
