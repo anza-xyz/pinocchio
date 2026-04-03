@@ -15,18 +15,6 @@ use {
 /// Maximum number of multisignature signers.
 pub const MAX_MULTISIG_SIGNERS: usize = 11;
 
-/// Maximum number of accounts expected by this instruction.
-///
-/// The required number of accounts will depend whether the
-/// source account has a single owner or a multisignature
-/// owner.
-const MAX_ACCOUNTS_LEN: usize = 2 + MAX_MULTISIG_SIGNERS;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-///   - number of signers (1 byte)
-const DATA_LEN: usize = 2;
-
 /// Initializes a multisignature account with N provided signers.
 ///
 /// Multisignature accounts can used in place of any single owner/delegate
@@ -71,6 +59,18 @@ where
 {
     pub const DISCRIMINATOR: u8 = 2;
 
+    /// Maximum number of accounts expected by this instruction.
+    ///
+    /// The required number of accounts will depend whether the
+    /// source account has a single owner or a multisignature
+    /// owner.
+    pub const MAX_ACCOUNTS_LEN: usize = 2 + MAX_MULTISIG_SIGNERS;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - number of signers (1 byte)
+    pub const DATA_LEN: usize = 2;
+
     #[inline(always)]
     pub fn new(
         multisig: &'account AccountView,
@@ -92,14 +92,16 @@ where
             return Err(ProgramError::InvalidArgument);
         }
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts =
+            [UNINIT_INSTRUCTION_ACCOUNT; InitializeMultisig::<&AccountView>::MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut accounts =
+            [UNINIT_CPI_ACCOUNT; InitializeMultisig::<&AccountView>::MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; InitializeMultisig::<&AccountView>::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -257,7 +259,7 @@ where
 
 #[inline(always)]
 fn write_instruction_data(m: u8, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.len() < DATA_LEN {
+    if data.len() < InitializeMultisig::<&AccountView>::DATA_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -265,5 +267,5 @@ fn write_instruction_data(m: u8, data: &mut [MaybeUninit<u8>]) -> Result<usize, 
 
     data[1].write(m);
 
-    Ok(DATA_LEN)
+    Ok(InitializeMultisig::<&AccountView>::DATA_LEN)
 }

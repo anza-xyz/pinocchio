@@ -14,17 +14,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Maximum number of accounts expected by this instruction.
-///
-/// The required number of accounts will depend whether the
-/// source account has a single owner or a multisignature
-/// owner.
-const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-const DATA_LEN: usize = 1;
-
 /// Thaw a Frozen account using the Mint's `freeze_authority` (if set).
 ///
 /// Accounts expected by this instruction:
@@ -56,6 +45,17 @@ pub struct ThawAccount<'account, 'multisig, MultisigSigner: AsRef<AccountView>> 
 impl<'account> ThawAccount<'account, '_, &'account AccountView> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 11;
+
+    /// Maximum number of accounts expected by this instruction.
+    ///
+    /// The required number of accounts will depend whether the
+    /// source account has a single owner or a multisignature
+    /// owner.
+    pub const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    pub const DATA_LEN: usize = 1;
 
     /// Creates a new `ThawAccount` instruction with a single freeze authority.
     #[inline(always)]
@@ -99,14 +99,14 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ThawAccount::MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; ThawAccount::MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; ThawAccount::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -279,11 +279,11 @@ where
 
 #[inline(always)]
 fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.len() < DATA_LEN {
+    if data.len() < ThawAccount::DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(ThawAccount::DISCRIMINATOR);
 
-    Ok(DATA_LEN)
+    Ok(ThawAccount::DATA_LEN)
 }

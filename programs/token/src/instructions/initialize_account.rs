@@ -12,13 +12,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Expected number of accounts.
-const ACCOUNTS_LEN: usize = 4;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-const DATA_LEN: usize = 1;
-
 /// Initializes a new account to hold tokens.  If this account is associated
 /// with the native mint then the token balance of the initialized account
 /// will be equal to the amount of SOL in the account. If this account is
@@ -54,6 +47,13 @@ pub struct InitializeAccount<'account> {
 impl<'account> InitializeAccount<'account> {
     pub const DISCRIMINATOR: u8 = 1;
 
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = 4;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    pub const DATA_LEN: usize = 1;
+
     #[inline(always)]
     pub fn new(
         account: &'account AccountView,
@@ -71,14 +71,15 @@ impl<'account> InitializeAccount<'account> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
+        let mut instruction_accounts =
+            [UNINIT_INSTRUCTION_ACCOUNT; InitializeAccount::ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; InitializeAccount::ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; InitializeAccount::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -181,7 +182,7 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < InitializeAccount::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -197,7 +198,7 @@ where
 
     CpiAccount::init_from_account_view(rent_sysvar, &mut accounts[3]);
 
-    Ok(ACCOUNTS_LEN)
+    Ok(InitializeAccount::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -211,7 +212,7 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < InitializeAccount::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -223,16 +224,16 @@ where
 
     accounts[3].write(InstructionAccount::readonly(rent_sysvar.address()));
 
-    Ok(ACCOUNTS_LEN)
+    Ok(InitializeAccount::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
 fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.len() < DATA_LEN {
+    if data.len() < InitializeAccount::DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(InitializeAccount::DISCRIMINATOR);
 
-    Ok(DATA_LEN)
+    Ok(InitializeAccount::DATA_LEN)
 }

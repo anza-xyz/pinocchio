@@ -12,17 +12,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Maximum number of accounts expected by this instruction.
-///
-/// The required number of accounts will depend whether the
-/// source account has a single owner or a multisignature
-/// owner.
-const MAX_ACCOUNTS_LEN: usize = 2;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-const DATA_LEN: usize = 1;
-
 /// Given a wrapped / native token account (a token account containing SOL)
 /// updates its amount field based on the account's underlying `lamports`.
 /// This is useful if a non-wrapped SOL account uses
@@ -49,6 +38,17 @@ pub struct SyncNative<'account> {
 impl<'account> SyncNative<'account> {
     pub const DISCRIMINATOR: u8 = 17;
 
+    /// Maximum number of accounts expected by this instruction.
+    ///
+    /// The required number of accounts will depend whether the
+    /// source account has a single owner or a multisignature
+    /// owner.
+    pub const MAX_ACCOUNTS_LEN: usize = 2;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    pub const DATA_LEN: usize = 1;
+
     #[inline(always)]
     pub fn new(
         native_token: &'account AccountView,
@@ -62,14 +62,14 @@ impl<'account> SyncNative<'account> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; SyncNative::MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; SyncNative::MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; SyncNative::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -142,7 +142,7 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < MAX_ACCOUNTS_LEN {
+    if accounts.len() < SyncNative::MAX_ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -154,7 +154,7 @@ where
 
     if let Some(rent_sysvar) = rent_sysvar {
         CpiAccount::init_from_account_view(rent_sysvar, &mut accounts[1]);
-        Ok(MAX_ACCOUNTS_LEN)
+        Ok(SyncNative::MAX_ACCOUNTS_LEN)
     } else {
         Ok(1)
     }
@@ -169,7 +169,7 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < MAX_ACCOUNTS_LEN {
+    if accounts.len() < SyncNative::MAX_ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -177,7 +177,7 @@ where
 
     if let Some(rent_sysvar) = rent_sysvar {
         accounts[1].write(InstructionAccount::readonly(rent_sysvar.address()));
-        Ok(MAX_ACCOUNTS_LEN)
+        Ok(SyncNative::MAX_ACCOUNTS_LEN)
     } else {
         Ok(1)
     }
@@ -185,11 +185,11 @@ where
 
 #[inline(always)]
 fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.len() < DATA_LEN {
+    if data.len() < SyncNative::DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(SyncNative::DISCRIMINATOR);
 
-    Ok(DATA_LEN)
+    Ok(SyncNative::DATA_LEN)
 }

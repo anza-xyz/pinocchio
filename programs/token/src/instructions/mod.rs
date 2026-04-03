@@ -25,9 +25,8 @@ mod transfer;
 mod transfer_checked;
 mod ui_amount_to_amount;
 
-pub use batch::{Batch, BatchState, IntoBatch};
 pub use {
-    amount_to_ui_amount::*, approve::*, approve_checked::*, burn::*, burn_checked::*,
+    amount_to_ui_amount::*, approve::*, approve_checked::*, batch::*, burn::*, burn_checked::*,
     close_account::*, freeze_account::*, get_account_data_size::*, initialize_account::*,
     initialize_account_2::*, initialize_account_3::*, initialize_immutable_owner::*,
     initialize_mint::*, initialize_mint_2::*, initialize_multisig::*, initialize_multisig_2::*,

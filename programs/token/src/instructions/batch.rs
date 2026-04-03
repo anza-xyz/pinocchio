@@ -1,6 +1,7 @@
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
 use {
     crate::instructions::{invalid_argument_error, CpiWriter},
-    alloc::boxed::Box,
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer, MAX_CPI_ACCOUNTS},

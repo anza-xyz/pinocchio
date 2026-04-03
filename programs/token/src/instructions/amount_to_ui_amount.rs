@@ -12,14 +12,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Expected number of accounts.
-const ACCOUNTS_LEN: usize = 1;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-///   - amount (8 bytes)
-const DATA_LEN: usize = 9;
-
 /// Convert an Amount of tokens to a `UiAmount` string, using the given
 /// mint.
 ///
@@ -40,7 +32,16 @@ pub struct AmountToUiAmount<'account> {
 }
 
 impl<'account> AmountToUiAmount<'account> {
+    /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 23;
+
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = 1;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - amount (8 bytes)
+    pub const DATA_LEN: usize = 9;
 
     #[inline(always)]
     pub fn new(mint: &'account AccountView, amount: u64) -> Self {
@@ -49,14 +50,14 @@ impl<'account> AmountToUiAmount<'account> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; AmountToUiAmount::ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; AmountToUiAmount::ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; AmountToUiAmount::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -128,13 +129,13 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < AmountToUiAmount::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
     CpiAccount::init_from_account_view(mint, &mut accounts[0]);
 
-    Ok(ACCOUNTS_LEN)
+    Ok(AmountToUiAmount::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -145,13 +146,13 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < AmountToUiAmount::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
     accounts[0].write(InstructionAccount::readonly(mint.address()));
 
-    Ok(ACCOUNTS_LEN)
+    Ok(AmountToUiAmount::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -159,13 +160,16 @@ fn write_instruction_data(
     amount: u64,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < DATA_LEN {
+    if data.len() < AmountToUiAmount::DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(AmountToUiAmount::DISCRIMINATOR);
 
-    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
+    write_bytes(
+        &mut data[1..AmountToUiAmount::DATA_LEN],
+        &amount.to_le_bytes(),
+    );
 
-    Ok(DATA_LEN)
+    Ok(AmountToUiAmount::DATA_LEN)
 }

@@ -15,19 +15,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Maximum number of accounts expected by this instruction.
-///
-/// The required number of accounts will depend whether the
-/// source account has a single owner or a multisignature
-/// owner.
-const MAX_ACCOUNTS_LEN: usize = 2 + MAX_MULTISIG_SIGNERS;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-///   - authority type (1 byte)
-///   - new authority (33 bytes, optional)
-const DATA_LEN: usize = 35;
-
 #[repr(u8)]
 #[derive(Clone, Copy)]
 pub enum AuthorityType {
@@ -69,6 +56,19 @@ pub struct SetAuthority<'account, 'address, 'multisig, MultisigSigner: AsRef<Acc
 impl<'account, 'address> SetAuthority<'account, 'address, '_, &'account AccountView> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 6;
+
+    /// Maximum number of accounts expected by this instruction.
+    ///
+    /// The required number of accounts will depend whether the
+    /// source account has a single owner or a multisignature
+    /// owner.
+    pub const MAX_ACCOUNTS_LEN: usize = 2 + MAX_MULTISIG_SIGNERS;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - authority type (1 byte)
+    ///   - new authority (33 bytes, optional)
+    pub const DATA_LEN: usize = 35;
 
     /// Creates a new `SetAuthority` instruction with a single authority.
     #[inline(always)]
@@ -115,14 +115,14 @@ impl<'account, 'address, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; SetAuthority::MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; SetAuthority::MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; SetAuthority::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -300,15 +300,18 @@ fn write_instruction_data(
     data[1].write(authority_type as u8);
 
     if let Some(new_authority) = new_authority {
-        if data.len() < DATA_LEN {
+        if data.len() < SetAuthority::DATA_LEN {
             return Err(invalid_argument_error());
         }
 
         data[2].write(1);
 
-        write_bytes(&mut data[3..DATA_LEN], new_authority.as_array());
+        write_bytes(
+            &mut data[3..SetAuthority::DATA_LEN],
+            new_authority.as_array(),
+        );
 
-        Ok(DATA_LEN)
+        Ok(SetAuthority::DATA_LEN)
     } else {
         data[2].write(0);
 

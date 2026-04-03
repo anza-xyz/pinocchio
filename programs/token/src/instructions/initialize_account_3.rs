@@ -13,14 +13,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Expected number of accounts.
-const ACCOUNTS_LEN: usize = 2;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-///   - owner pubkey (32 bytes)
-const DATA_LEN: usize = 33;
-
 /// Like [`super::InitializeAccount2`], but does not require the
 /// Rent sysvar to be provided
 ///
@@ -43,6 +35,14 @@ impl<'account, 'address> InitializeAccount3<'account, 'address> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 18;
 
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = 2;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - owner pubkey (32 bytes)
+    pub const DATA_LEN: usize = 33;
+
     #[inline(always)]
     pub fn new(
         account: &'account AccountView,
@@ -58,14 +58,15 @@ impl<'account, 'address> InitializeAccount3<'account, 'address> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
+        let mut instruction_accounts =
+            [UNINIT_INSTRUCTION_ACCOUNT; InitializeAccount3::ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; InitializeAccount3::ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; InitializeAccount3::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -138,7 +139,7 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < InitializeAccount3::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -150,7 +151,7 @@ where
 
     CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
-    Ok(ACCOUNTS_LEN)
+    Ok(InitializeAccount3::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -162,7 +163,7 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < InitializeAccount3::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -170,7 +171,7 @@ where
 
     accounts[1].write(InstructionAccount::readonly(mint.address()));
 
-    Ok(ACCOUNTS_LEN)
+    Ok(InitializeAccount3::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -178,13 +179,13 @@ fn write_instruction_data(
     owner: &Address,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < DATA_LEN {
+    if data.len() < InitializeAccount3::DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(InitializeAccount3::DISCRIMINATOR);
 
-    write_bytes(&mut data[1..DATA_LEN], owner.as_array());
+    write_bytes(&mut data[1..InitializeAccount3::DATA_LEN], owner.as_array());
 
-    Ok(DATA_LEN)
+    Ok(InitializeAccount3::DATA_LEN)
 }

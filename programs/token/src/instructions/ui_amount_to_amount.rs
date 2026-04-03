@@ -12,14 +12,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Expected number of accounts.
-const ACCOUNTS_LEN: usize = 1;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-///   - amount (variable, up to 254 bytes)
-const MAX_DATA_LEN: usize = 255;
-
 /// Convert a `UiAmount` of tokens to a little-endian `u64` raw Amount,
 /// using the given mint. In this version of the program, the mint can
 /// only specify the number of decimals.
@@ -42,6 +34,14 @@ impl<'account, 'amount> UiAmountToAmount<'account, 'amount> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 24;
 
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = 1;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - amount (variable, up to 254 bytes)
+    pub const MAX_DATA_LEN: usize = 255;
+
     #[inline(always)]
     pub fn new(mint: &'account AccountView, amount: &'amount str) -> Self {
         Self { mint, amount }
@@ -49,14 +49,14 @@ impl<'account, 'amount> UiAmountToAmount<'account, 'amount> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; UiAmountToAmount::ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; UiAmountToAmount::ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; u8::MAX as usize];
+        let mut instruction_data = [UNINIT_BYTE; UiAmountToAmount::MAX_DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -128,13 +128,13 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < UiAmountToAmount::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
     CpiAccount::init_from_account_view(mint, &mut accounts[0]);
 
-    Ok(ACCOUNTS_LEN)
+    Ok(UiAmountToAmount::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -145,13 +145,13 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < UiAmountToAmount::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
     accounts[0].write(InstructionAccount::readonly(mint.address()));
 
-    Ok(ACCOUNTS_LEN)
+    Ok(UiAmountToAmount::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -161,7 +161,7 @@ fn write_instruction_data(
 ) -> Result<usize, ProgramError> {
     let expected_data_len = 1 + amount.len();
 
-    if expected_data_len > MAX_DATA_LEN || data.len() < expected_data_len {
+    if expected_data_len > UiAmountToAmount::MAX_DATA_LEN || data.len() < expected_data_len {
         return Err(invalid_argument_error());
     }
 

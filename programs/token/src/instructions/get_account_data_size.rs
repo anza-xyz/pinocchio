@@ -12,13 +12,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Expected number of accounts.
-const ACCOUNTS_LEN: usize = 1;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-const DATA_LEN: usize = 1;
-
 /// Gets the required size of an account for the given mint as a
 /// little-endian `u64`.
 ///
@@ -37,6 +30,13 @@ impl<'account> GetAccountDataSize<'account> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 21;
 
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = 1;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    pub const DATA_LEN: usize = 1;
+
     #[inline(always)]
     pub fn new(mint: &'account AccountView) -> Self {
         Self { mint }
@@ -44,14 +44,15 @@ impl<'account> GetAccountDataSize<'account> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
+        let mut instruction_accounts =
+            [UNINIT_INSTRUCTION_ACCOUNT; GetAccountDataSize::ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; GetAccountDataSize::ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; GetAccountDataSize::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -123,13 +124,13 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < GetAccountDataSize::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
     CpiAccount::init_from_account_view(mint, &mut accounts[0]);
 
-    Ok(ACCOUNTS_LEN)
+    Ok(GetAccountDataSize::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -140,22 +141,22 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < GetAccountDataSize::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
     accounts[0].write(InstructionAccount::readonly(mint.address()));
 
-    Ok(ACCOUNTS_LEN)
+    Ok(GetAccountDataSize::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
 fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.len() < DATA_LEN {
+    if data.len() < GetAccountDataSize::DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(GetAccountDataSize::DISCRIMINATOR);
 
-    Ok(DATA_LEN)
+    Ok(GetAccountDataSize::DATA_LEN)
 }

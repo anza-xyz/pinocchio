@@ -13,16 +13,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Expected number of accounts.
-const ACCOUNTS_LEN: usize = 1;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-///   - decimals (1 byte)
-///   - mint authority (32 bytes)
-///   - freeze authority (33 bytes, optional)
-const MAX_DATA_LEN: usize = 67;
-
 /// Like [`super::InitializeMint`], but does not require the Rent
 /// sysvar to be provided
 ///
@@ -47,6 +37,16 @@ impl<'account, 'address> InitializeMint2<'account, 'address> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 20;
 
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = 1;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - decimals (1 byte)
+    ///   - mint authority (32 bytes)
+    ///   - freeze authority (33 bytes, optional)
+    pub const MAX_DATA_LEN: usize = 67;
+
     #[inline(always)]
     pub fn new(
         mint: &'account AccountView,
@@ -64,14 +64,14 @@ impl<'account, 'address> InitializeMint2<'account, 'address> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; InitializeMint2::ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; InitializeMint2::ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; MAX_DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; InitializeMint2::MAX_DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -155,7 +155,7 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < InitializeMint2::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -165,7 +165,7 @@ where
 
     CpiAccount::init_from_account_view(mint, &mut accounts[0]);
 
-    Ok(ACCOUNTS_LEN)
+    Ok(InitializeMint2::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -176,13 +176,13 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < ACCOUNTS_LEN {
+    if accounts.len() < InitializeMint2::ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
     accounts[0].write(InstructionAccount::writable(mint.address()));
 
-    Ok(ACCOUNTS_LEN)
+    Ok(InitializeMint2::ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -192,7 +192,7 @@ fn write_instruction_data(
     freeze_authority: Option<&Address>,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < MAX_DATA_LEN {
+    if data.len() < InitializeMint2::MAX_DATA_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -205,9 +205,12 @@ fn write_instruction_data(
     if let Some(freeze_auth) = freeze_authority {
         data[34].write(1);
 
-        write_bytes(&mut data[35..MAX_DATA_LEN], freeze_auth.as_array());
+        write_bytes(
+            &mut data[35..InitializeMint2::MAX_DATA_LEN],
+            freeze_auth.as_array(),
+        );
 
-        Ok(MAX_DATA_LEN)
+        Ok(InitializeMint2::MAX_DATA_LEN)
     } else {
         data[34].write(0);
 

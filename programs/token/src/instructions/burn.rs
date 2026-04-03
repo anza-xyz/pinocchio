@@ -14,18 +14,6 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Maximum number of accounts expected by this instruction.
-///
-/// The required number of accounts will depend whether the
-/// source account has a single owner or a multisignature
-/// owner.
-const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
-
-/// Instruction data length:
-///   - discriminator (1 byte)
-///   - amount (8 bytes)
-const DATA_LEN: usize = 9;
-
 /// Burns tokens by removing them from an account.  `Burn` does not support
 /// accounts associated with the native mint, use `CloseAccount` instead.
 ///
@@ -61,6 +49,18 @@ pub struct Burn<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
 impl<'account> Burn<'account, '_, &'account AccountView> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = 8;
+
+    /// Maximum number of accounts expected by this instruction.
+    ///
+    /// The required number of accounts will depend whether the
+    /// source account has a single owner or a multisignature
+    /// owner.
+    pub const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - amount (8 bytes)
+    pub const DATA_LEN: usize = 9;
 
     /// Creates a new `Burn` instruction with a single
     /// owner/delegate authority.
@@ -108,14 +108,14 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; Burn::MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; Burn::MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; Burn::DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
@@ -291,13 +291,13 @@ fn write_instruction_data(
     amount: u64,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < DATA_LEN {
+    if data.len() < Burn::DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(Burn::DISCRIMINATOR);
 
-    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
+    write_bytes(&mut data[1..Burn::DATA_LEN], &amount.to_le_bytes());
 
-    Ok(DATA_LEN)
+    Ok(Burn::DATA_LEN)
 }
