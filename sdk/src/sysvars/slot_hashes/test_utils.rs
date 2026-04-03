@@ -67,14 +67,14 @@ pub fn generate_mock_entries(
         let dec = match strategy {
             DecrementStrategy::Strictly1 => 1,
             DecrementStrategy::Average1_05 => {
-                if random_val % 20 == 0 {
+                if random_val.is_multiple_of(20) {
                     2
                 } else {
                     1
                 }
             }
             DecrementStrategy::Average2 => {
-                if random_val % 2 == 0 {
+                if random_val.is_multiple_of(2) {
                     1
                 } else {
                     3

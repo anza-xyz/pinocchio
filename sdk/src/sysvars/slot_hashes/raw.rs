@@ -36,14 +36,14 @@ pub(crate) fn get_valid_buffer_capacity(
         }
 
         let entry_data_len = buffer_len - NUM_ENTRIES_SIZE;
-        if entry_data_len % ENTRY_SIZE != 0 {
+        if !entry_data_len.is_multiple_of(ENTRY_SIZE) {
             return Err(ProgramError::InvalidArgument);
         }
 
         Ok(entry_data_len / ENTRY_SIZE)
     } else {
         // Buffer contains only entry data: must be multiple of ENTRY_SIZE
-        if buffer_len % ENTRY_SIZE != 0 {
+        if !buffer_len.is_multiple_of(ENTRY_SIZE) {
             return Err(ProgramError::InvalidArgument);
         }
 
@@ -60,7 +60,9 @@ pub fn validate_fetch_offset(offset: usize, buffer_len: usize) -> Result<(), Pro
     if offset >= MAX_SIZE {
         return Err(ProgramError::InvalidArgument);
     }
-    if offset != 0 && (offset < NUM_ENTRIES_SIZE || (offset - NUM_ENTRIES_SIZE) % ENTRY_SIZE != 0) {
+    if offset != 0
+        && (offset < NUM_ENTRIES_SIZE || !(offset - NUM_ENTRIES_SIZE).is_multiple_of(ENTRY_SIZE))
+    {
         return Err(ProgramError::InvalidArgument);
     }
     // Perhaps redundant, as the syscall will fail later if

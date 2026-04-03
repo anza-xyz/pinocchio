@@ -1,58 +1,86 @@
 use {
-    crate::instructions::MAX_MULTISIG_SIGNERS,
+    crate::{
+        instructions::{
+            account_borrow_failed_error, invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS,
+        },
+        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+    },
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_instruction_view::{
-        cpi::{invoke_signed_with_bounds, Signer},
+        cpi::{invoke_signed_unchecked, CpiAccount, Signer},
         InstructionAccount, InstructionView,
     },
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Freeze an initialized account using the Mint's freeze authority.
+/// Freeze an Initialized account using the Mint's `freeze_authority` (if
+/// set).
 ///
-/// ### Accounts:
-///   * Single freeze authority
-///   0. `[WRITE]` The account to freeze.
+/// Accounts expected by this instruction:
+///
+///   * Single owner
+///   0. `[writable]` The account to freeze.
 ///   1. `[]` The token mint.
-///   2. `[SIGNER]` The mint freeze authority.
+///   2. `[signer]` The mint freeze authority.
 ///
-///   * Multisignature freeze authority
-///   0. `[WRITE]` The account to freeze.
+///   * Multisignature owner
+///   0. `[writable]` The account to freeze.
 ///   1. `[]` The token mint.
 ///   2. `[]` The mint's multisignature freeze authority.
-///   3. `..3+M` `[SIGNER]` M signer accounts
-pub struct FreezeAccount<'a, 'b, MultisigSigner: AsRef<AccountView>> {
-    /// Token Account to freeze.
-    pub account: &'a AccountView,
-    /// Mint Account.
-    pub mint: &'a AccountView,
-    /// Mint Freeze Authority Account
-    pub freeze_authority: &'a AccountView,
+///   3. `..+M` `[signer]` M signer accounts.
+pub struct FreezeAccount<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
+    /// The account to freeze.
+    pub account: &'account AccountView,
+
+    /// The token mint.
+    pub mint: &'account AccountView,
+
+    /// The mint freeze authority.
+    pub freeze_authority: &'account AccountView,
+
     /// Multisignature signers.
-    pub multisig_signers: &'b [MultisigSigner],
+    pub multisig_signers: &'multisig [MultisigSigner],
 }
 
-impl<'a, 'b, MultisigSigner: AsRef<AccountView>> FreezeAccount<'a, 'b, MultisigSigner> {
+impl<'account> FreezeAccount<'account, '_, &'account AccountView> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 10;
+
+    /// Maximum number of accounts expected by this instruction.
+    ///
+    /// The required number of accounts will depend whether the
+    /// source account has a single owner or a multisignature
+    /// owner.
+    pub const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    pub const DATA_LEN: usize = 1;
+
     /// Creates a new `FreezeAccount` instruction with a single freeze
     /// authority.
     #[inline(always)]
     pub fn new(
-        account: &'a AccountView,
-        mint: &'a AccountView,
-        freeze_authority: &'a AccountView,
+        account: &'account AccountView,
+        mint: &'account AccountView,
+        freeze_authority: &'account AccountView,
     ) -> Self {
         Self::with_multisig_signers(account, mint, freeze_authority, &[])
     }
+}
 
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
+    FreezeAccount<'account, 'multisig, MultisigSigner>
+{
     /// Creates a new `FreezeAccount` instruction with a
     /// multisignature freeze authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig_signers(
-        account: &'a AccountView,
-        mint: &'a AccountView,
-        freeze_authority: &'a AccountView,
-        multisig_signers: &'b [MultisigSigner],
+        account: &'account AccountView,
+        mint: &'account AccountView,
+        freeze_authority: &'account AccountView,
+        multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
             account,
@@ -73,57 +101,197 @@ impl<'a, 'b, MultisigSigner: AsRef<AccountView>> FreezeAccount<'a, 'b, MultisigS
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let expected_accounts = 3 + self.multisig_signers.len();
-
-        // Instruction accounts.
-
         let mut instruction_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
+            [UNINIT_INSTRUCTION_ACCOUNT; FreezeAccount::MAX_ACCOUNTS_LEN];
+        let written_instruction_accounts =
+            self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        instruction_accounts[0].write(InstructionAccount::writable(self.account.address()));
+        let mut accounts = [UNINIT_CPI_ACCOUNT; FreezeAccount::MAX_ACCOUNTS_LEN];
+        let written_accounts = self.write_accounts(&mut accounts)?;
 
-        instruction_accounts[1].write(InstructionAccount::readonly(self.mint.address()));
+        let mut instruction_data = [UNINIT_BYTE; FreezeAccount::DATA_LEN];
+        let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
-        instruction_accounts[2].write(InstructionAccount::new(
-            self.freeze_authority.address(),
-            false,
-            self.multisig_signers.is_empty(),
-        ));
-
-        for (account, signer) in instruction_accounts[3..]
-            .iter_mut()
-            .zip(self.multisig_signers.iter())
-        {
-            account.write(InstructionAccount::readonly_signer(
-                signer.as_ref().address(),
-            ));
-        }
-
-        // Accounts.
-
-        let mut accounts =
-            [const { MaybeUninit::<&AccountView>::uninit() }; 3 + MAX_MULTISIG_SIGNERS];
-
-        accounts[0].write(self.account);
-
-        accounts[1].write(self.mint);
-
-        accounts[2].write(self.freeze_authority);
-
-        for (account, signer) in accounts[3..].iter_mut().zip(self.multisig_signers.iter()) {
-            account.write(signer.as_ref());
-        }
-
-        invoke_signed_with_bounds::<{ 3 + MAX_MULTISIG_SIGNERS }, _>(
-            &InstructionView {
-                program_id: &crate::ID,
-                accounts: unsafe {
-                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+        unsafe {
+            invoke_signed_unchecked(
+                &InstructionView {
+                    program_id: &crate::ID,
+                    accounts: from_raw_parts(
+                        instruction_accounts.as_ptr() as _,
+                        written_instruction_accounts,
+                    ),
+                    data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
                 },
-                data: &[10],
-            },
-            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, expected_accounts) },
-            signers,
+                from_raw_parts(accounts.as_ptr() as _, written_accounts),
+                signers,
+            );
+        }
+
+        Ok(())
+    }
+}
+
+impl<MultisigSigner: AsRef<AccountView>> CpiWriter for FreezeAccount<'_, '_, MultisigSigner> {
+    #[inline(always)]
+    fn write_accounts<'cpi>(
+        &self,
+        accounts: &mut [MaybeUninit<CpiAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        Self: 'cpi,
+    {
+        write_accounts(
+            self.account,
+            self.mint,
+            self.freeze_authority,
+            self.multisig_signers,
+            accounts,
         )
     }
+
+    #[inline(always)]
+    fn write_instruction_accounts<'cpi>(
+        &self,
+        accounts: &mut [MaybeUninit<InstructionAccount<'cpi>>],
+    ) -> Result<usize, ProgramError>
+    where
+        Self: 'cpi,
+    {
+        write_instruction_accounts(
+            self.account,
+            self.mint,
+            self.freeze_authority,
+            self.multisig_signers,
+            accounts,
+        )
+    }
+
+    #[inline(always)]
+    fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+        write_instruction_data(data)
+    }
+}
+
+impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
+    for FreezeAccount<'_, '_, MultisigSigner>
+{
+    #[inline(always)]
+    fn into_batch<'account, 'state>(
+        self,
+        batch: &mut super::Batch<'account, 'state>,
+    ) -> ProgramResult
+    where
+        Self: 'account + 'state,
+    {
+        batch.push(
+            |accounts| {
+                write_accounts(
+                    self.account,
+                    self.mint,
+                    self.freeze_authority,
+                    self.multisig_signers,
+                    accounts,
+                )
+            },
+            |accounts| {
+                write_instruction_accounts(
+                    self.account,
+                    self.mint,
+                    self.freeze_authority,
+                    self.multisig_signers,
+                    accounts,
+                )
+            },
+            write_instruction_data,
+        )
+    }
+}
+
+#[inline(always)]
+fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
+    account: &'account AccountView,
+    mint: &'account AccountView,
+    freeze_authority: &'account AccountView,
+    multisig_signers: &'multisig [MultisigSigner],
+    accounts: &mut [MaybeUninit<CpiAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+    'multisig: 'out,
+{
+    let expected_accounts = 3 + multisig_signers.len();
+
+    if expected_accounts > accounts.len() {
+        return Err(invalid_argument_error());
+    }
+
+    if account.is_borrowed() {
+        return Err(account_borrow_failed_error());
+    }
+
+    CpiAccount::init_from_account_view(account, &mut accounts[0]);
+
+    CpiAccount::init_from_account_view(mint, &mut accounts[1]);
+
+    CpiAccount::init_from_account_view(freeze_authority, &mut accounts[2]);
+
+    for (account, signer) in accounts[3..expected_accounts]
+        .iter_mut()
+        .zip(multisig_signers.iter())
+    {
+        CpiAccount::init_from_account_view(signer.as_ref(), account);
+    }
+
+    Ok(expected_accounts)
+}
+
+#[inline(always)]
+fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
+    account: &'account AccountView,
+    mint: &'account AccountView,
+    freeze_authority: &'account AccountView,
+    multisig_signers: &'multisig [MultisigSigner],
+    accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
+) -> Result<usize, ProgramError>
+where
+    'account: 'out,
+    'multisig: 'out,
+{
+    let expected_accounts = 3 + multisig_signers.len();
+
+    if expected_accounts > accounts.len() {
+        return Err(invalid_argument_error());
+    }
+
+    accounts[0].write(InstructionAccount::writable(account.address()));
+
+    accounts[1].write(InstructionAccount::readonly(mint.address()));
+
+    accounts[2].write(InstructionAccount::new(
+        freeze_authority.address(),
+        false,
+        multisig_signers.is_empty(),
+    ));
+
+    for (account, signer) in accounts[3..expected_accounts]
+        .iter_mut()
+        .zip(multisig_signers.iter())
+    {
+        account.write(InstructionAccount::readonly_signer(
+            signer.as_ref().address(),
+        ));
+    }
+
+    Ok(expected_accounts)
+}
+
+#[inline(always)]
+fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+    if data.is_empty() {
+        return Err(invalid_argument_error());
+    }
+
+    data[0].write(FreezeAccount::DISCRIMINATOR);
+
+    Ok(FreezeAccount::DATA_LEN)
 }

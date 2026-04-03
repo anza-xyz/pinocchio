@@ -13,24 +13,24 @@ members = [
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/anza-xyz/pinocchio"
-rust-version = "1.84"
+rust-version = "1.89.0"
 
 [workspace.dependencies]
 pinocchio = { version = "0.10", default-features = false, path = "sdk" }
 solana-account-view = "2.0"
 solana-address = "2.0"
 solana-define-syscall = "5.0"
-solana-instruction-view = "2.0"
+solana-instruction-view = "2.1"
 solana-program-error = "3.0"
 
 [workspace.metadata.cli]
-solana = "2.3.0"
+solana = "3.1.8"
 
 [workspace.metadata.toolchains]
-build = "1.84.1"
+build = "1.89.0"
 format = "nightly-2026-01-22"
 lint = "nightly-2026-01-22"
-test = "1.84.1"
+test = "1.89.0"
 
 [workspace.metadata.release]
 pre-release-commit-message = "Publish {{crate_name}} v{{version}}"
