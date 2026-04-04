@@ -27,6 +27,9 @@ pub struct InitializeAccount2<'a, 'b> {
 }
 
 impl InitializeAccount2<'_, '_> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 16;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Instruction accounts
@@ -42,7 +45,7 @@ impl InitializeAccount2<'_, '_> {
         let mut instruction_data = [UNINIT_BYTE; 33];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[16]);
+        write_bytes(&mut instruction_data, &[Self::DISCRIMINATOR]);
         // Set owner as [u8; 32] at offset [1..33]
         write_bytes(&mut instruction_data[1..], self.owner.as_array());
 

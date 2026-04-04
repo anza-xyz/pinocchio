@@ -28,6 +28,9 @@ pub struct InitializeMint<'a, 'b> {
 }
 
 impl InitializeMint<'_, '_> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 0;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         // Instruction accounts
@@ -46,7 +49,7 @@ impl InitializeMint<'_, '_> {
         let mut length = instruction_data.len();
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[0]);
+        write_bytes(&mut instruction_data, &[Self::DISCRIMINATOR]);
         // Set decimals as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[self.decimals]);
         // Set mint_authority at offset [2..34]

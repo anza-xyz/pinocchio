@@ -38,6 +38,9 @@ pub struct SetAuthority<'a, 'b> {
 }
 
 impl SetAuthority<'_, '_> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 6;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -60,7 +63,7 @@ impl SetAuthority<'_, '_> {
         let mut length = instruction_data.len();
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[6]);
+        write_bytes(&mut instruction_data, &[Self::DISCRIMINATOR]);
         // Set authority_type as u8 at offset [1]
         write_bytes(&mut instruction_data[1..2], &[self.authority_type as u8]);
 
