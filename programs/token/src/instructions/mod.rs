@@ -24,6 +24,7 @@ mod thaw_account;
 mod transfer;
 mod transfer_checked;
 mod ui_amount_to_amount;
+mod withdraw_excess_lamports;
 
 pub use {
     amount_to_ui_amount::*, approve::*, approve_checked::*, batch::*, burn::*, burn_checked::*,
@@ -31,7 +32,7 @@ pub use {
     initialize_account_2::*, initialize_account_3::*, initialize_immutable_owner::*,
     initialize_mint::*, initialize_mint_2::*, initialize_multisig::*, initialize_multisig_2::*,
     mint_to::*, mint_to_checked::*, revoke::*, set_authority::*, sync_native::*, thaw_account::*,
-    transfer::*, transfer_checked::*, ui_amount_to_amount::*,
+    transfer::*, transfer_checked::*, ui_amount_to_amount::*, withdraw_excess_lamports::*,
 };
 use {
     core::mem::MaybeUninit,
