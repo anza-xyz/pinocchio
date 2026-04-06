@@ -14,6 +14,21 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
+/// Enum specifying the amount of lamports to transfer
+/// from a native SOL account.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Amount {
+    /// Transfer the entire amount of the source account.
+    All,
+
+    /// Transfer a specified amount.
+    ///
+    /// The value must be less than or equal to the amount
+    /// of the source account.
+    Some(u64),
+}
+
 /// Transfer lamports from a native SOL account to a destination account.
 ///
 /// This is useful to unwrap lamports from a wrapped SOL account.
@@ -44,10 +59,7 @@ pub struct UnwrapLamports<'account, 'multisig, MultisigSigner: AsRef<AccountView
     pub multisig_signers: &'multisig [MultisigSigner],
 
     /// The amount of lamports to transfer.
-    ///
-    /// When an amount is not specified, the entire balance of the source
-    /// account will be transferred.
-    pub amount: Option<u64>,
+    pub amount: Amount,
 }
 
 impl<'account> UnwrapLamports<'account, '_, &'account AccountView> {
@@ -73,7 +85,7 @@ impl<'account> UnwrapLamports<'account, '_, &'account AccountView> {
         source: &'account AccountView,
         destination: &'account AccountView,
         authority: &'account AccountView,
-        amount: Option<u64>,
+        amount: Amount,
     ) -> Self {
         Self::with_multisig_signers(source, destination, authority, amount, &[])
     }
@@ -89,7 +101,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
         source: &'account AccountView,
         destination: &'account AccountView,
         authority: &'account AccountView,
-        amount: Option<u64>,
+        amount: Amount,
         multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
@@ -298,7 +310,7 @@ where
 
 #[inline(always)]
 fn write_instruction_data(
-    amount: Option<u64>,
+    amount: Amount,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
     if data.len() < UnwrapLamports::MAX_DATA_LEN {
@@ -307,7 +319,7 @@ fn write_instruction_data(
 
     data[0].write(UnwrapLamports::DISCRIMINATOR);
 
-    if let Some(amount) = amount {
+    if let Amount::Some(amount) = amount {
         data[1].write(1);
 
         write_bytes(
