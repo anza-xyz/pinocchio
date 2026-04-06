@@ -1,4 +1,5 @@
 name: Setup environment
+description: Sets up the environment for Rust, Node.js, pnpm and optional components.
 
 inputs:
   cargo-cache-key:
@@ -97,7 +98,7 @@ runs:
       if: ${{ contains(inputs.components, 'semver-checks') }}
       uses: taiki-e/install-action@7627fb428e65e78e2ec9a24ae5c5bd5f8553f182  # v2.69.10
       with:
-        tool: cargo-semver-checks@0.41.0
+        tool: cargo-semver-checks@0.45.0
 
     - name: Install 'cargo-miri'
       if: ${{ contains(inputs.toolchain, 'lint') }}
