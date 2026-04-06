@@ -14,11 +14,19 @@ use {
 /// owned account by sending them to any other account, leaving behind only
 /// lamports for rent exemption.
 ///
-/// 0. `[writable]` Source account owned by the token program.
-/// 1. `[writable]` Destination account.
-/// 2. `[signer]` Authority.
-/// 3. ..`3+M` `[signer]` M signer accounts.
-pub struct WidthdrawExcessLamports<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
+/// Accounts expected by this instruction:
+///
+///   * Single owner/delegate
+///   0. `[writable]` The source account.
+///   1. `[writable]` The destination account.
+///   2. `[signer]` The source account's owner/delegate.
+///
+///   * Multisignature owner/delegate
+///   0. `[writable]` The source account.
+///   1. `[writable]` The destination account.
+///   2. `[]` The source account's multisignature owner/delegate.
+///   3. `..+M` `[signer]` M signer accounts.
+pub struct WithdrawExcessLamports<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> {
     /// Source account owned by the token program.
     pub source: &'a AccountView,
 
@@ -36,7 +44,7 @@ pub struct WidthdrawExcessLamports<'a, 'b, 'c, MultisigSigner: AsRef<AccountView
 }
 
 impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
-    WidthdrawExcessLamports<'a, 'b, 'c, MultisigSigner>
+    WithdrawExcessLamports<'a, 'b, 'c, MultisigSigner>
 {
     pub const DISCRIMINATOR: u8 = 38;
 
