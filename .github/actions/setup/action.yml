@@ -1,4 +1,5 @@
 name: Setup environment
+description: Sets up the environment for Rust, Node.js, pnpm and optional components.
 
 inputs:
   cargo-cache-key:
