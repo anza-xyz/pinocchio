@@ -30,6 +30,9 @@ pub struct MintTo<'a, 'b> {
 }
 
 impl MintTo<'_, '_> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 7;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -50,7 +53,7 @@ impl MintTo<'_, '_> {
         let mut instruction_data = [UNINIT_BYTE; 9];
 
         // Set discriminator as u8 at offset [0]
-        write_bytes(&mut instruction_data, &[7]);
+        write_bytes(&mut instruction_data, &[Self::DISCRIMINATOR]);
         // Set amount as u64 at offset [1..9]
         write_bytes(&mut instruction_data[1..9], &self.amount.to_le_bytes());
 
