@@ -83,6 +83,7 @@ jobs:
   publish_release:
     name: Publish
     runs-on: ubuntu-latest
+    if: inputs.dry_run != 'true'
     environment: prod
     needs: semver_check
     permissions:
