@@ -1,11 +1,14 @@
 //! Defines the lazy program entrypoint and the context to access the
 //! input buffer.
 
-use crate::{
-    account::{AccountView, RuntimeAccount},
-    entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
-    error::ProgramError,
-    Address, BPF_ALIGN_OF_U128,
+use {
+    crate::{
+        account::{AccountView, RuntimeAccount},
+        entrypoint::{NON_DUP_MARKER, STATIC_ACCOUNT_DATA},
+        error::ProgramError,
+        Address, BPF_ALIGN_OF_U128,
+    },
+    core::mem::size_of,
 };
 
 /// Declare the lazy program entrypoint.
@@ -70,9 +73,10 @@ macro_rules! lazy_program_entrypoint {
         /// Program entrypoint.
         #[no_mangle]
         pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            match $process_instruction($crate::entrypoint::lazy::InstructionContext::new_unchecked(
-                input,
-            )) {
+            // SAFETY: Passing the program input received from the runtime.
+            match $process_instruction(unsafe {
+                $crate::entrypoint::lazy::InstructionContext::new_unchecked(input)
+            }) {
                 Ok(_) => $crate::SUCCESS,
                 Err(error) => error.into(),
             }
@@ -120,7 +124,7 @@ impl InstructionContext {
             // SAFETY: The first 8 bytes of the input buffer represent the
             // number of accounts when serialized by the SVM loader, which is read
             // when the context is created.
-            buffer: unsafe { input.add(core::mem::size_of::<u64>()) },
+            buffer: unsafe { input.add(size_of::<u64>()) },
             // SAFETY: Read the number of accounts from the input buffer serialized
             // by the SVM loader.
             remaining: unsafe { *(input as *const u64) },
