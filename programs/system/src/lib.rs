@@ -14,7 +14,11 @@ pub mod instructions;
 
 declare_id!("11111111111111111111111111111111");
 
-/// Create an account with a minimum balance to be rent-exempt.
+/// Create an account with the minimum balance required for rent exemption.
+///
+/// Calling this function on an account that is already fully initialized with
+/// the
+/// requested size and owner will fail.
 #[inline(always)]
 pub fn create_account_with_minimum_balance(
     account: &mut AccountView,
@@ -26,15 +30,19 @@ pub fn create_account_with_minimum_balance(
     create_account_with_minimum_balance_signed(account, space, owner, payer, rent_sysvar, &[])
 }
 
-/// Create an account with a minimum balance to be rent-exempt.
+/// Create an account with the minimum balance required for rent exemption.
 ///
 /// When creating a PDA `account`, the PDA signer seeds must be provided
-/// via the `signers`.
+/// via `signers`.
 ///
 /// The account will be funded by the `payer` if its current lamports
 /// are insufficient for rent-exemption. The payer can be a PDA signer
 /// owned by the system program and its signer seeds can be provided
-/// via the `signers`.
+/// via `signers`.
+///
+/// Calling this function on an account that is already fully initialized with
+/// the
+/// requested size and owner will fail.
 #[inline(always)]
 pub fn create_account_with_minimum_balance_signed(
     account: &mut AccountView,
@@ -87,11 +95,16 @@ pub fn create_account_with_minimum_balance_signed(
 }
 
 #[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
-/// Create a program account with a minimum balance to be rent-exempt.
+/// Create a program account with the minimum balance required for rent
+/// exemption.
 ///
 /// This can only be used for accounts owned by the current program. For
 /// accounts owned by other programs, use
 /// [`create_account_with_minimum_balance`] instead.
+///
+/// Calling this function on an account that is already fully initialized with
+/// the
+/// requested size and owner will have no effect.
 #[inline(always)]
 pub fn create_program_account_with_minimum_balance(
     account: &mut AccountView,
@@ -111,9 +124,10 @@ pub fn create_program_account_with_minimum_balance(
 }
 
 #[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
-/// Create a program account with a minimum balance to be rent-exempt.
+/// Create a program account with the minimum balance required for rent
+/// exemption.
 ///
-/// The PDA signer seeds must be provided via the `signers`.
+/// The PDA signer seeds must be provided via `signers`.
 ///
 /// The account will be funded by the `payer` if its current lamports
 /// are insufficient for rent-exemption. The payer can be a PDA signer
@@ -123,6 +137,10 @@ pub fn create_program_account_with_minimum_balance(
 /// This can only be used for accounts owned by the current program. For
 /// accounts owned by other programs, use
 /// [`create_account_with_minimum_balance_signed`] instead.
+///
+/// Calling this function on an account that is already fully initialized with
+/// the
+/// requested size and owner will have no effect.
 #[inline(always)]
 pub fn create_program_account_with_minimum_balance_signed(
     account: &mut AccountView,
@@ -165,7 +183,8 @@ pub fn create_program_account_with_minimum_balance_signed(
         // Assign the account to the specified owner.
         Assign { account, owner }.invoke_signed(signers)?;
 
-        // Allocate the required space for the account using the `AccountView::resize`.
+        // Allocate the required space for the account using
+        // `AccountView::resize`.
         //
         // SAFETY: There are no active borrows of the `account`.
         // This was checked by the `Assign` CPI above.
