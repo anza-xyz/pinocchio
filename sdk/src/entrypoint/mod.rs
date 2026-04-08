@@ -406,8 +406,11 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
 ) -> (&'static Address, usize, &'static [u8]) {
     // Ensure that MAX_ACCOUNTS is less than or equal to the maximum number of
-    // accounts (MAX_TX_ACCOUNTS) that can be processed in a transaction.
+    // accounts (MAX_TX_ACCOUNTS) that can be processed in a transaction and
+    // greater than 0.
     const {
+        assert!(MAX_ACCOUNTS > 0, "MAX_ACCOUNTS must be at least 1");
+
         assert!(
             MAX_ACCOUNTS <= MAX_TX_ACCOUNTS,
             "MAX_ACCOUNTS must be less than or equal to MAX_TX_ACCOUNTS"
