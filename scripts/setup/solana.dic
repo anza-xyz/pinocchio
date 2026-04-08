@@ -76,3 +76,8 @@ pausable
 permissioned
 endian
 prefunded
+UpdateField
+RemoveKey
+u8
+bool
+TLV

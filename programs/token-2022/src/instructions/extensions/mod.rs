@@ -4,6 +4,7 @@ pub mod group_member_pointer;
 pub mod group_pointer;
 pub mod interest_bearing_mint;
 pub mod memo_transfer;
+pub mod metadata;
 pub mod metadata_pointer;
 pub mod mint_close_authority;
 pub mod pausable;
