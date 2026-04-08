@@ -301,7 +301,7 @@ impl SlotHashes<Box<[u8]>> {
             )?;
 
             #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
-            core::ptr::write_bytes(sysvar_data.as_mut_ptr(), 0, NUM_ENTRIES_SIZE);
+            core::ptr::write_bytes(sysvar_data.as_mut_ptr(), 0, MAX_SIZE);
         }
         // SAFETY: The data was initialized by the syscall.
         Ok(unsafe { SlotHashes::new_unchecked(sysvar_data.assume_init()) })
