@@ -115,7 +115,7 @@ impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>, Source: AsRef<AccountView>>
         let mut instruction_accounts =
             [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_STATIC_CPI_ACCOUNTS];
 
-        instruction_accounts[0].write(InstructionAccount::writable(self.mint.address()));
+        instruction_accounts[0].write(InstructionAccount::readonly(self.mint.address()));
 
         instruction_accounts[1].write(InstructionAccount::writable(self.destination.address()));
 
