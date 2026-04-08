@@ -47,6 +47,8 @@ impl Initialize<'_, '_> {
 
         instruction_data[0].write(ExtensionDiscriminator::ScaledUiAmount as u8);
 
+        instruction_data[1].write(Self::DISCRIMINATOR);
+
         write_bytes(
             &mut instruction_data[2..34],
             if let Some(authority) = self.authority {
