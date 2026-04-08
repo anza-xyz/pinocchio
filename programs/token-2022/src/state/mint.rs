@@ -1,5 +1,8 @@
 use {
-    crate::ID,
+    crate::{
+        state::{validate_account_type, AccountType},
+        ID,
+    },
     solana_account_view::{AccountView, Ref},
     solana_address::Address,
     solana_program_error::ProgramError,
@@ -46,10 +49,11 @@ impl Mint {
         if account_view.data_len() < Self::BASE_LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountOwner);
-        }
-        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
+
+        let bytes = account_view.try_borrow()?;
+        validate_account_type(&bytes, AccountType::Mint, Self::BASE_LEN)?;
+
+        Ok(Ref::map(bytes, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -67,13 +71,14 @@ impl Mint {
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
-        if account_view.data_len() < Self::BASE_LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
         if account_view.owner() != &ID {
             return Err(ProgramError::InvalidAccountOwner);
         }
-        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
+
+        let bytes = account_view.borrow_unchecked();
+        validate_account_type(bytes, AccountType::Mint, Self::BASE_LEN)?;
+
+        Ok(Self::from_bytes_unchecked(bytes))
     }
 
     /// Return a `Mint` from the given bytes.
