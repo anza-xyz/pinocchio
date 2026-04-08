@@ -134,7 +134,7 @@ impl<'a> TryFrom<&'a AccountView> for Instructions<Ref<'a, [u8]>> {
 #[cfg_attr(feature = "copy", derive(Copy))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IntrospectedInstruction<'a> {
-    pub raw: *const u8,
+    raw: *const u8,
     marker: PhantomData<&'a [u8]>,
 }
 
