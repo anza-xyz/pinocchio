@@ -7,7 +7,7 @@ use {
 
 /// Token account data.
 #[repr(C)]
-pub struct TokenAccount {
+pub struct Account {
     /// The mint associated with this account
     mint: Address,
 
@@ -46,17 +46,15 @@ pub struct TokenAccount {
     close_authority: Address,
 }
 
-impl TokenAccount {
-    pub const LEN: usize = core::mem::size_of::<TokenAccount>();
+impl Account {
+    pub const LEN: usize = core::mem::size_of::<Account>();
 
     /// Return a `TokenAccount` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, safe
     /// borrowing the account data.
     #[inline]
-    pub fn from_account_view(
-        account_view: &AccountView,
-    ) -> Result<Ref<'_, TokenAccount>, ProgramError> {
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Account>, ProgramError> {
         if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -80,7 +78,7 @@ impl TokenAccount {
     #[inline]
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
-    ) -> Result<&TokenAccount, ProgramError> {
+    ) -> Result<&Account, ProgramError> {
         if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -101,7 +99,7 @@ impl TokenAccount {
     /// validation.
     #[inline(always)]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
-        &*(bytes.as_ptr() as *const TokenAccount)
+        &*(bytes.as_ptr() as *const Account)
     }
 
     pub fn mint(&self) -> &Address {
