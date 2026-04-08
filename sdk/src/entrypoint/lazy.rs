@@ -240,18 +240,20 @@ impl InstructionContext {
     #[inline(always)]
     unsafe fn read_account(&mut self) -> MaybeAccount {
         let account: *mut RuntimeAccount = self.buffer as *mut RuntimeAccount;
-        #[cfg(feature = "account-resize")]
-        {
-            // Stores the data length in the `padding` field. This is needed
-            // to handle account resizing.
-            (*account).padding = u32::to_le_bytes((*account).data_len as u32);
-        }
+
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicate account
         //   - duplicate marker + 7 bytes of padding in case of a duplicate account
         self.buffer = self.buffer.add(core::mem::size_of::<u64>());
 
         if (*account).borrow_state == NON_DUP_MARKER {
+            #[cfg(feature = "account-resize")]
+            {
+                // Stores the data length in the `padding` field. This is needed
+                // to handle account resizing.
+                (*account).padding = u32::to_le_bytes((*account).data_len as u32);
+            }
+
             self.buffer = self.buffer.add(STATIC_ACCOUNT_DATA);
             self.buffer = self.buffer.add((*account).data_len as usize);
             self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
