@@ -1,6 +1,9 @@
 use {
     super::AccountState,
-    crate::ID,
+    crate::{
+        state::{validate_account_type, AccountType},
+        ID,
+    },
     solana_account_view::{AccountView, Ref},
     solana_address::Address,
     solana_program_error::ProgramError,
@@ -8,7 +11,7 @@ use {
 
 /// Token account data.
 #[repr(C)]
-pub struct TokenAccount {
+pub struct Account {
     /// The mint associated with this account
     mint: Address,
 
@@ -47,24 +50,23 @@ pub struct TokenAccount {
     close_authority: Address,
 }
 
-impl TokenAccount {
-    pub const BASE_LEN: usize = core::mem::size_of::<TokenAccount>();
+impl Account {
+    pub const BASE_LEN: usize = core::mem::size_of::<Account>();
 
     /// Return a `TokenAccount` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, safe
     /// borrowing the account data.
     #[inline]
-    pub fn from_account_view(
-        account_view: &AccountView,
-    ) -> Result<Ref<'_, TokenAccount>, ProgramError> {
-        if account_view.data_len() < Self::BASE_LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
+    pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Account>, ProgramError> {
         if !account_view.owned_by(&ID) {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
+
+        let bytes = account_view.try_borrow()?;
+        validate_account_type(&bytes, AccountType::Account, Self::BASE_LEN)?;
+
+        Ok(Ref::map(bytes, |data| unsafe {
             Self::from_bytes_unchecked(data)
         }))
     }
@@ -81,14 +83,15 @@ impl TokenAccount {
     #[inline]
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
-    ) -> Result<&TokenAccount, ProgramError> {
-        if account_view.data_len() < Self::BASE_LEN {
-            return Err(ProgramError::InvalidAccountData);
-        }
+    ) -> Result<&Account, ProgramError> {
         if account_view.owner() != &ID {
             return Err(ProgramError::InvalidAccountData);
         }
-        Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
+
+        let bytes = account_view.borrow_unchecked();
+        validate_account_type(bytes, AccountType::Account, Self::BASE_LEN)?;
+
+        Ok(Self::from_bytes_unchecked(bytes))
     }
 
     /// Return a `TokenAccount` from the given bytes.
@@ -102,7 +105,7 @@ impl TokenAccount {
     /// validation.
     #[inline(always)]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
-        &*(bytes[..Self::BASE_LEN].as_ptr() as *const TokenAccount)
+        &*(bytes[..Self::BASE_LEN].as_ptr() as *const Account)
     }
 
     pub fn mint(&self) -> &Address {
