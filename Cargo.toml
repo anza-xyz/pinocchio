@@ -16,7 +16,7 @@ repository = "https://github.com/anza-xyz/pinocchio"
 rust-version = "1.89.0"
 
 [workspace.dependencies]
-pinocchio = { version = "0.10", default-features = false, path = "sdk" }
+pinocchio = { version = "0.11", default-features = false, path = "sdk" }
 solana-account-view = "2.0"
 solana-address = "2.0"
 solana-define-syscall = "5.0"
