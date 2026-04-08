@@ -120,7 +120,7 @@ impl Clock {
 
     /// Return a `Clock` from the given bytes.
     ///
-    /// This method performs a length and alignmentvalidation. The caller must
+    /// This method performs a length and alignment validation. The caller must
     /// ensure that `bytes` contains a valid representation of `Clock`.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<&Self, ProgramError> {
