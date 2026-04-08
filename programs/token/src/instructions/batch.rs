@@ -147,7 +147,8 @@ where
     /// Returns the length of the instruction data header for a batch with the
     /// given number of instructions.
     pub const fn header_data_len(instructions_len: usize) -> usize {
-        1 + instructions_len * IX_HEADER_SIZE
+        // 1 bytes discriminator + 2 bytes (header) per instruction
+        1usize.saturating_add(instructions_len.saturating_mul(IX_HEADER_SIZE))
     }
 }
 
