@@ -1,5 +1,7 @@
 #![no_std]
 
+#[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
+use pinocchio::{error::ProgramError, hint::unlikely};
 use {
     crate::instructions::{Allocate, Assign, CreateAccount, Transfer},
     pinocchio::{
@@ -16,9 +18,8 @@ declare_id!("11111111111111111111111111111111");
 
 /// Create an account with the minimum balance required for rent exemption.
 ///
-/// Calling this function on an account that is already fully initialized with
-/// the
-/// requested size and owner will fail.
+/// Calling this function on an account that is already initialized with
+/// the requested size will fail.
 #[inline(always)]
 pub fn create_account_with_minimum_balance(
     account: &mut AccountView,
@@ -40,9 +41,8 @@ pub fn create_account_with_minimum_balance(
 /// owned by the system program and its signer seeds can be provided
 /// via `signers`.
 ///
-/// Calling this function on an account that is already fully initialized with
-/// the
-/// requested size and owner will fail.
+/// Calling this function on an account that is already initialized with
+/// the requested size will fail.
 #[inline(always)]
 pub fn create_account_with_minimum_balance_signed(
     account: &mut AccountView,
@@ -102,9 +102,8 @@ pub fn create_account_with_minimum_balance_signed(
 /// accounts owned by other programs, use
 /// [`create_account_with_minimum_balance`] instead.
 ///
-/// Calling this function on an account that is already fully initialized with
-/// the
-/// requested size and owner will have no effect.
+/// Calling this function on an account that is already initialized with
+/// the requested size will fail.
 #[inline(always)]
 pub fn create_program_account_with_minimum_balance(
     account: &mut AccountView,
@@ -138,9 +137,8 @@ pub fn create_program_account_with_minimum_balance(
 /// accounts owned by other programs, use
 /// [`create_account_with_minimum_balance_signed`] instead.
 ///
-/// Calling this function on an account that is already fully initialized with
-/// the
-/// requested size and owner will have no effect.
+/// Calling this function on an account that is already initialized with
+/// the requested size will fail.
 #[inline(always)]
 pub fn create_program_account_with_minimum_balance_signed(
     account: &mut AccountView,
@@ -168,6 +166,12 @@ pub fn create_program_account_with_minimum_balance_signed(
         }
         .invoke_signed(signers)
     } else {
+        // If the account already exists, prevent re-initialization by
+        // checking if its data length is greater than zero.
+        if unlikely(account.data_len() > 0) {
+            return Err(ProgramError::AccountAlreadyInitialized);
+        }
+
         let required_lamports = lamports.saturating_sub(account.lamports());
 
         // Transfer lamports from `payer` to `account` if needed.
