@@ -22,11 +22,12 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
+account-resize = []
 alloc = ["solana-instruction-view?/slice-cpi"]
 copy = ["solana-account-view/copy", "solana-address/copy"]
 cpi = ["dep:solana-instruction-view"]
-default = ["alloc"]
-account-resize = []
+default = ["alloc", "copy", "sha2"]
+sha2 = ["solana-address/sha2"]
 unsafe-account-resize = []
 
 [dependencies]
