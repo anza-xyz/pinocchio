@@ -128,7 +128,7 @@ checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
 
 [[package]]
 name = "pinocchio"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "pinocchio",
  "solana-account-view",
