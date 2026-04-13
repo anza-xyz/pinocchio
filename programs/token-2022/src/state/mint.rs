@@ -46,8 +46,8 @@ impl Mint {
     /// borrowing the account data.
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Mint>, ProgramError> {
-        if account_view.data_len() < Self::BASE_LEN {
-            return Err(ProgramError::InvalidAccountData);
+        if !account_view.owned_by(&ID) {
+            return Err(ProgramError::InvalidAccountOwner);
         }
 
         let bytes = account_view.try_borrow()?;
