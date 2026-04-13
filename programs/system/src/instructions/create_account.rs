@@ -1,9 +1,13 @@
-use pinocchio::{
-    cpi::{invoke_signed, Signer},
-    error::ProgramError,
-    instruction::{InstructionAccount, InstructionView},
-    sysvars::{rent::Rent, Sysvar},
-    AccountView, Address, ProgramResult,
+use {
+    core::{mem::MaybeUninit, slice::from_raw_parts},
+    pinocchio::{
+        cpi::{invoke_signed_unchecked, CpiAccount, Signer},
+        error::ProgramError,
+        instruction::{InstructionAccount, InstructionView},
+        sysvars::{rent::Rent, Sysvar},
+        AccountView, Address, ProgramResult,
+    },
+    solana_address::ADDRESS_BYTES,
 };
 
 /// Create a new account.
@@ -11,12 +15,12 @@ use pinocchio::{
 /// ### Accounts:
 ///   0. `[WRITE, SIGNER]` Funding account
 ///   1. `[WRITE, SIGNER]` New account
-pub struct CreateAccount<'a, 'b> {
+pub struct CreateAccount<'account, 'address> {
     /// Funding account.
-    pub from: &'a AccountView,
+    pub from: &'account AccountView,
 
     /// New account.
-    pub to: &'a AccountView,
+    pub to: &'account AccountView,
 
     /// Number of lamports to transfer to the new account.
     pub lamports: u64,
@@ -25,29 +29,29 @@ pub struct CreateAccount<'a, 'b> {
     pub space: u64,
 
     /// Address of program that will own the new account.
-    pub owner: &'b Address,
+    pub owner: &'address Address,
 }
 
-impl<'a, 'b> CreateAccount<'a, 'b> {
+impl<'account, 'address> CreateAccount<'account, 'address> {
     #[deprecated(since = "0.5.0", note = "Use `with_minimum_balance` instead")]
     #[inline(always)]
     pub fn with_minimal_balance(
-        from: &'a AccountView,
-        to: &'a AccountView,
-        rent_sysvar: &'a AccountView,
+        from: &'account AccountView,
+        to: &'account AccountView,
+        rent_sysvar: &'account AccountView,
         space: u64,
-        owner: &'b Address,
+        owner: &'address Address,
     ) -> Result<Self, ProgramError> {
         Self::with_minimum_balance(from, to, space, owner, Some(rent_sysvar))
     }
 
     #[inline(always)]
     pub fn with_minimum_balance(
-        from: &'a AccountView,
-        to: &'a AccountView,
+        from: &'account AccountView,
+        to: &'account AccountView,
         space: u64,
-        owner: &'b Address,
-        rent_sysvar: Option<&'a AccountView>,
+        owner: &'address Address,
+        rent_sysvar: Option<&'account AccountView>,
     ) -> Result<Self, ProgramError> {
         let lamports = if let Some(rent_sysvar) = rent_sysvar {
             let rent = Rent::from_account_view(rent_sysvar)?;
@@ -73,28 +77,51 @@ impl<'a, 'b> CreateAccount<'a, 'b> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction accounts
-        let instruction_accounts: [InstructionAccount; 2] = [
-            InstructionAccount::writable_signer(self.from.address()),
-            InstructionAccount::writable_signer(self.to.address()),
-        ];
+        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 2];
+        instruction_accounts[0].write(InstructionAccount::writable_signer(self.from.address()));
+        instruction_accounts[1].write(InstructionAccount::writable_signer(self.to.address()));
 
         // instruction data
         // - [0..4  ]: instruction discriminator
         // - [4..12 ]: lamports
         // - [12..20]: account space
         // - [20..52]: owner address
-        let mut instruction_data = [0; 52];
-        // create account instruction has a '0' discriminator
-        instruction_data[4..12].copy_from_slice(&self.lamports.to_le_bytes());
-        instruction_data[12..20].copy_from_slice(&self.space.to_le_bytes());
-        instruction_data[20..52].copy_from_slice(self.owner.as_ref());
+        let mut instruction_data = [const { MaybeUninit::<u8>::uninit() }; 52];
+        // SAFETY: All writes are within bounds of the allocated data.
+        unsafe {
+            let ptr = instruction_data.as_mut_ptr() as *mut u8;
+            (ptr as *mut u32).write_unaligned(0u32);
+            (ptr.add(4) as *mut u64).write_unaligned(self.lamports);
+            (ptr.add(12) as *mut u64).write_unaligned(self.space);
+            ptr.add(20)
+                .copy_from_nonoverlapping(self.owner.as_ref().as_ptr(), ADDRESS_BYTES)
+        }
 
         let instruction = InstructionView {
             program_id: &crate::ID,
-            accounts: &instruction_accounts,
-            data: &instruction_data,
+            // SAFETY: `instruction_accounts` was initialized.
+            accounts: unsafe { from_raw_parts(instruction_accounts.as_ptr() as _, 2) },
+            // SAFETY: `instruction_data` was initialized.
+            data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 52) },
         };
 
-        invoke_signed(&instruction, &[self.from, self.to], signers)
+        if self.from.is_borrowed() | self.to.is_borrowed() {
+            return Err(ProgramError::AccountBorrowFailed);
+        }
+
+        let mut accounts = [const { MaybeUninit::<CpiAccount>::uninit() }; 2];
+        CpiAccount::init_from_account_view(self.from, &mut accounts[0]);
+        CpiAccount::init_from_account_view(self.to, &mut accounts[1]);
+
+        // SAFETY: `accounts` was initialized and not borrowed.
+        unsafe {
+            invoke_signed_unchecked(
+                &instruction,
+                from_raw_parts(accounts.as_ptr() as _, 2),
+                signers,
+            )
+        };
+
+        Ok(())
     }
 }
