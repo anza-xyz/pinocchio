@@ -15,9 +15,9 @@
   },
   "devDependencies": {
     "@iarna/toml": "^2.2.5",
-    "tsx": "^4.19.3",
-    "typescript": "^5.7.3",
-    "zx": "^8.3.2"
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "zx": "^8.8.5"
   },
   "engines": {
     "node": ">=v20.0.0"
