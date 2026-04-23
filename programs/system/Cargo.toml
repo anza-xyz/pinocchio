@@ -1,7 +1,7 @@
 [package]
 name = "pinocchio-system"
 description = "Pinocchio helpers to invoke System program instructions"
-version = "0.6.0"
+version = "0.6.1"
 edition = { workspace = true }
 license = { workspace = true }
 readme = "./README.md"

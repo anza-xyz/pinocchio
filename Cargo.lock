@@ -160,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "pinocchio-system"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "pinocchio",
  "solana-address",
