@@ -13,24 +13,9 @@ mod transfer_with_seed;
 mod upgrade_nonce_account;
 mod withdraw_nonce_account;
 
-use core::mem::MaybeUninit;
 pub use {
     advance_nonce_account::*, allocate::*, allocate_with_seed::*, assign::*, assign_with_seed::*,
     authorize_nonce_account::*, create_account::*, create_account_allow_prefund::*,
     create_account_with_seed::*, initialize_nonce_account::*, transfer::*, transfer_with_seed::*,
     upgrade_nonce_account::*, withdraw_nonce_account::*,
 };
-
-const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
-
-#[inline(always)]
-fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
-    let len = destination.len().min(source.len());
-    // SAFETY:
-    // - Both pointers have alignment 1.
-    // - For valid (non-UB) references, the borrow checker guarantees no overlap.
-    // - `len` is bounded by both slice lengths.
-    unsafe {
-        core::ptr::copy_nonoverlapping(source.as_ptr(), destination.as_mut_ptr() as *mut u8, len);
-    }
-}
