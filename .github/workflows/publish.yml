@@ -79,6 +79,18 @@ jobs:
         run: |
           pnpm semver ${{ inputs.crate }}
 
+      - name: Summary
+        run: |
+          version=$(awk -F'"' '/^version = /{print $2; exit}' "${CRATE}/Cargo.toml")
+          {
+            echo "Crate: ${CRATE}"
+            echo "Version: ${version}"
+            echo "Ref: ${GITHUB_SHA} (https://github.com/${REPO}/commit/${GITHUB_SHA})"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          CRATE: ${{ inputs.crate }}
+          REPO: ${{ github.repository }}
+
 
   publish_release:
     name: Publish
