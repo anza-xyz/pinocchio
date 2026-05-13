@@ -379,7 +379,7 @@ pub const MAX_TX_ACCOUNTS: usize = u8::MAX as usize;
 
 /// `assert_eq(core::mem::align_of::<u128>(), 8)` is true for BPF but not
 /// for some host machines.
-const BPF_ALIGN_OF_U128: usize = 8;
+pub const BPF_ALIGN_OF_U128: usize = 8;
 
 /// Return value for a successful program execution.
 pub const SUCCESS: u64 = 0;
