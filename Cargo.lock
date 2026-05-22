@@ -185,7 +185,9 @@ dependencies = [
  "solana-account-view",
  "solana-address",
  "solana-instruction-view",
+ "solana-nullable",
  "solana-program-error",
+ "solana-zero-copy",
 ]
 
 [[package]]
@@ -265,6 +267,7 @@ dependencies = [
  "five8_const",
  "sha2-const-stable",
  "solana-define-syscall 5.0.0",
+ "solana-nullable",
  "solana-program-error",
  "solana-sha256-hasher",
 ]
@@ -300,6 +303,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-nullable"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a90429a75d69fdcb31952c3dea79f5f3c8157cfe88221e066103c9c237876073"
+
+[[package]]
 name = "solana-program-error"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -315,6 +324,12 @@ dependencies = [
  "solana-define-syscall 4.0.1",
  "solana-hash",
 ]
+
+[[package]]
+name = "solana-zero-copy"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94f52dd8f733a13f6a18e55de83cf97c4c3f5fdf27ea3830bcff0b35313efcc2"
 
 [[package]]
 name = "strum"

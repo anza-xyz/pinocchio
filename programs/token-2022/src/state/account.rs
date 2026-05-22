@@ -53,7 +53,7 @@ pub struct Account {
 impl Account {
     pub const BASE_LEN: usize = core::mem::size_of::<Account>();
 
-    /// Return a `TokenAccount` from the given account view.
+    /// Return an `Account` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, safe
     /// borrowing the account data.
@@ -71,7 +71,7 @@ impl Account {
         }))
     }
 
-    /// Return a `TokenAccount` from the given account view.
+    /// Return an `Account` from the given account view.
     ///
     /// This method performs owner and length validation on `AccountView`, but
     /// does not perform the borrow check.
@@ -94,18 +94,23 @@ impl Account {
         Ok(Self::from_bytes_unchecked(bytes))
     }
 
-    /// Return a `TokenAccount` from the given bytes.
+    /// Return an `Account` from the given bytes.
     ///
     /// # Safety
     ///
     /// The caller must ensure that `bytes` contains a valid representation of
-    /// `TokenAccount`, and it is properly aligned to be interpreted as an
-    /// instance of `TokenAccount`. At the moment `TokenAccount` has an
+    /// `Account`, and it is properly aligned to be interpreted as an
+    /// instance of `Account`. At the moment `Account` has an
     /// alignment of 1 byte. This method does not perform a length
     /// validation.
     #[inline(always)]
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> &Self {
         &*(bytes[..Self::BASE_LEN].as_ptr() as *const Account)
+    }
+
+    #[inline(always)]
+    pub(crate) unsafe fn from_bytes_unchecked_mut(bytes: &mut [u8]) -> &mut Self {
+        &mut *(bytes[..Self::BASE_LEN].as_mut_ptr() as *mut Account)
     }
 
     pub fn mint(&self) -> &Address {
@@ -141,8 +146,8 @@ impl Account {
     }
 
     #[inline(always)]
-    pub fn state(&self) -> AccountState {
-        self.state.into()
+    pub fn state(&self) -> Result<AccountState, ProgramError> {
+        AccountState::try_from(self.state)
     }
 
     #[inline(always)]

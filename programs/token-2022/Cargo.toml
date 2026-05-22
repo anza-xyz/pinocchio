@@ -12,9 +12,11 @@ crate-type = ["rlib"]
 
 [dependencies]
 solana-account-view = { workspace = true }
-solana-address = { workspace = true, features = ["decode"] }
+solana-address = { workspace = true, features = ["decode", "nullable"] }
 solana-instruction-view = { workspace = true, features = ["cpi"] }
+solana-nullable = { workspace = true }
 solana-program-error = { workspace = true }
+solana-zero-copy = { workspace = true }
 
 [dev-dependencies]
 solana-address = { workspace = true, features = ["curve25519"] }

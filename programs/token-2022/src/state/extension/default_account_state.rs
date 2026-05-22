@@ -1,5 +1,5 @@
 use {
-    super::{sealed, ExtensionType, ExtensionValue, Pod},
+    super::{sealed, ExtensionType, ExtensionValue},
     crate::state::AccountState,
     solana_program_error::ProgramError,
 };
@@ -28,11 +28,10 @@ impl DefaultAccountStateExtension {
     }
 }
 
+impl sealed::Sealed for DefaultAccountStateExtension {}
+
 // SAFETY: `DefaultAccountStateExtension` is repr(C), contains only `u8`,
 // has no padding, and all bit patterns are valid.
-impl sealed::SealedPod for DefaultAccountStateExtension {}
-unsafe impl Pod for DefaultAccountStateExtension {}
-
-impl ExtensionValue for DefaultAccountStateExtension {
+unsafe impl ExtensionValue for DefaultAccountStateExtension {
     const TYPE: ExtensionType = ExtensionType::DefaultAccountState;
 }

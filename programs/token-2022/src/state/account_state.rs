@@ -21,9 +21,10 @@ impl TryFrom<u8> for AccountState {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(AccountState::Uninitialized),
-            1 => Ok(AccountState::Initialized),
-            2 => Ok(AccountState::Frozen),
+            0..=2 => {
+                // SAFETY: `value` is guaranteed to be in the range of the enum variants.
+                Ok(unsafe { core::mem::transmute::<u8, AccountState>(value) })
+            }
             _ => Err(ProgramError::InvalidAccountData),
         }
     }

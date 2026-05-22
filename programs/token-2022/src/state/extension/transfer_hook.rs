@@ -1,6 +1,7 @@
 use {
-    super::{sealed, ExtensionType, ExtensionValue, Pod},
+    super::{sealed, ExtensionType, ExtensionValue},
     solana_address::Address,
+    solana_nullable::MaybeNull,
 };
 
 /// Transfer hook extension data for mints (64 bytes).
@@ -8,45 +9,21 @@ use {
 /// Configures a custom program to execute additional logic on every
 /// transfer involving this mint.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TransferHookExtension {
-    authority: [u8; 32],
-    program_id: [u8; 32],
+    pub authority: MaybeNull<Address>,
+    pub program_id: MaybeNull<Address>,
 }
 
 impl TransferHookExtension {
     pub const LEN: usize = core::mem::size_of::<TransferHookExtension>();
-
-    #[inline(always)]
-    pub fn authority(&self) -> &Address {
-        // SAFETY: `Address` is `#[repr(transparent)]` over `[u8; 32]` with
-        // alignment 1, so the pointer cast is valid.
-        unsafe { &*(self.authority.as_ptr() as *const Address) }
-    }
-
-    #[inline(always)]
-    pub fn program_id(&self) -> &Address {
-        // SAFETY: `Address` is `#[repr(transparent)]` over `[u8; 32]` with
-        // alignment 1, so the pointer cast is valid.
-        unsafe { &*(self.program_id.as_ptr() as *const Address) }
-    }
-
-    #[inline(always)]
-    pub fn set_authority(&mut self, authority: &Address) {
-        self.authority.copy_from_slice(authority.as_ref());
-    }
-
-    #[inline(always)]
-    pub fn set_program_id(&mut self, program_id: &Address) {
-        self.program_id.copy_from_slice(program_id.as_ref());
-    }
 }
 
-// SAFETY: `TransferHookExtension` is repr(C), contains only `[u8; 32]` arrays,
-// has no padding, and all bit patterns are valid.
-impl sealed::SealedPod for TransferHookExtension {}
-unsafe impl Pod for TransferHookExtension {}
+impl sealed::Sealed for TransferHookExtension {}
 
-impl ExtensionValue for TransferHookExtension {
+// SAFETY: `TransferHookExtension` is repr(C), contains only
+// `MaybeNull<Address>` fields which are repr(transparent) over `Address`
+// (`[u8; 32]`), has no padding, and all bit patterns are valid.
+unsafe impl ExtensionValue for TransferHookExtension {
     const TYPE: ExtensionType = ExtensionType::TransferHook;
 }
