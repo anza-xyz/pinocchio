@@ -92,7 +92,7 @@ pub(super) fn get_extension_bytes_from_tlv_mut(
 ///
 /// Returns the number of written entries on success.
 #[inline]
-pub(super) fn collect_extension_types_from_tlv(
+pub(super) fn write_extension_types_from_tlv(
     tlv_data: &[u8],
     out: &mut [ExtensionType],
 ) -> Result<usize, ProgramError> {
@@ -201,21 +201,14 @@ impl ExtensionBaseState for Account {
 }
 
 #[inline(always)]
-fn extension_data_start<B: ExtensionBaseState>(data_len: usize) -> usize {
-    if data_len == B::BASE_LEN {
-        data_len
-    } else {
-        TLV_START_INDEX
-    }
+fn extension_data_start<B: ExtensionBaseState>(tail_len: usize) -> usize {
+    core::cmp::min(tail_len, TLV_START_INDEX - B::BASE_LEN)
 }
 
 #[inline]
 fn validate_state_with_extensions_data<B: ExtensionBaseState>(
     data: &[u8],
 ) -> Result<(), ProgramError> {
-    if data.len() < B::BASE_LEN {
-        return Err(ProgramError::InvalidAccountData);
-    }
     if data.len() == Multisig::LEN {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -293,21 +286,21 @@ impl<B: ExtensionBaseState> StateWithExtensions<B> {
 
     #[inline(always)]
     fn tlv_data(&self) -> &[u8] {
-        let data_start = extension_data_start::<B>(B::BASE_LEN + self.data.len()) - B::BASE_LEN;
+        let data_start = extension_data_start::<B>(self.data.len());
         &self.data[data_start..]
     }
 
     /// Find the value bytes for a given extension type via
     /// linear TLV walk.
     #[inline]
-    pub fn get_extension_bytes(&self, target: ExtensionType) -> Result<&[u8], ProgramError> {
+    fn get_extension_bytes(&self, target: ExtensionType) -> Result<&[u8], ProgramError> {
         validate_extension_account_type(target, B::ACCOUNT_TYPE)?;
         get_extension_bytes_from_tlv(self.tlv_data(), target)
     }
 
     #[inline]
-    pub fn get_extension_types(&self, out: &mut [ExtensionType]) -> Result<usize, ProgramError> {
-        collect_extension_types_from_tlv(self.tlv_data(), out)
+    pub fn write_extension_types(&self, out: &mut [ExtensionType]) -> Result<usize, ProgramError> {
+        write_extension_types_from_tlv(self.tlv_data(), out)
     }
 
     #[inline]
@@ -341,7 +334,7 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
     /// This method performs owner and length validation on `AccountView` and
     /// checks the account data borrow state.
     #[inline]
-    pub fn from_account_view(
+    pub fn from_account_view_mut(
         account_view: &mut AccountView,
     ) -> Result<RefMut<'_, Self>, ProgramError> {
         if !account_view.owned_by(&ID) {
@@ -362,7 +355,7 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
     /// The caller must ensure that it is safe to mutably borrow the account
     /// data (e.g., there are no active borrows of the account data).
     #[inline]
-    pub unsafe fn from_account_view_unchecked(
+    pub unsafe fn from_account_view_unchecked_mut(
         account_view: &mut AccountView,
     ) -> Result<&mut Self, ProgramError> {
         if account_view.owner() != &ID {
@@ -375,7 +368,7 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
     /// Find the value bytes for a given extension type via
     /// linear TLV walk.
     #[inline]
-    pub fn get_extension_bytes(&self, target: ExtensionType) -> Result<&[u8], ProgramError> {
+    fn get_extension_bytes(&self, target: ExtensionType) -> Result<&[u8], ProgramError> {
         validate_extension_account_type(target, B::ACCOUNT_TYPE)?;
         get_extension_bytes_from_tlv(self.tlv_data(), target)
     }
@@ -383,7 +376,7 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
     /// Find the mutable value bytes for a given extension type via
     /// linear TLV walk.
     #[inline]
-    pub fn get_extension_bytes_mut(
+    fn get_extension_bytes_mut(
         &mut self,
         target: ExtensionType,
     ) -> Result<&mut [u8], ProgramError> {
@@ -392,8 +385,8 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
     }
 
     #[inline]
-    pub fn get_extension_types(&self, out: &mut [ExtensionType]) -> Result<usize, ProgramError> {
-        collect_extension_types_from_tlv(self.tlv_data(), out)
+    pub fn write_extension_types(&self, out: &mut [ExtensionType]) -> Result<usize, ProgramError> {
+        write_extension_types_from_tlv(self.tlv_data(), out)
     }
 
     #[inline]
@@ -420,13 +413,13 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
 
     #[inline(always)]
     fn tlv_data(&self) -> &[u8] {
-        let data_start = extension_data_start::<B>(B::BASE_LEN + self.data.len()) - B::BASE_LEN;
+        let data_start = extension_data_start::<B>(self.data.len());
         &self.data[data_start..]
     }
 
     #[inline]
     fn tlv_data_mut(&mut self) -> &mut [u8] {
-        let data_start = extension_data_start::<B>(B::BASE_LEN + self.data.len()) - B::BASE_LEN;
+        let data_start = extension_data_start::<B>(self.data.len());
         &mut self.data[data_start..]
     }
 }
@@ -818,11 +811,13 @@ mod tests {
         let mut account_view_mut = account_view.clone();
 
         let mint = StateWithExtensions::<Mint>::from_account_view(&account_view).unwrap();
-        assert!(StateWithExtensionsMut::<Mint>::from_account_view(&mut account_view_mut).is_err());
+        assert!(
+            StateWithExtensionsMut::<Mint>::from_account_view_mut(&mut account_view_mut).is_err()
+        );
         drop(mint);
 
         let mut mint =
-            StateWithExtensionsMut::<Mint>::from_account_view(&mut account_view_mut).unwrap();
+            StateWithExtensionsMut::<Mint>::from_account_view_mut(&mut account_view_mut).unwrap();
         let account_view_read = account_view.clone();
         assert!(StateWithExtensions::<Mint>::from_account_view(&account_view_read).is_err());
         mint.get_extension_mut::<DefaultAccountStateExtension>()
@@ -850,12 +845,14 @@ mod tests {
 
         let token = StateWithExtensions::<Account>::from_account_view(&account_view).unwrap();
         assert!(
-            StateWithExtensionsMut::<Account>::from_account_view(&mut account_view_mut).is_err()
+            StateWithExtensionsMut::<Account>::from_account_view_mut(&mut account_view_mut)
+                .is_err()
         );
         drop(token);
 
         let mut token =
-            StateWithExtensionsMut::<Account>::from_account_view(&mut account_view_mut).unwrap();
+            StateWithExtensionsMut::<Account>::from_account_view_mut(&mut account_view_mut)
+                .unwrap();
         let account_view_read = account_view.clone();
         assert!(StateWithExtensions::<Account>::from_account_view(&account_view_read).is_err());
         token
@@ -933,7 +930,7 @@ mod tests {
         let (_backing, mut account_view) = build_account_view(&ID, &data);
 
         let token = unsafe {
-            StateWithExtensionsMut::<Account>::from_account_view_unchecked(&mut account_view)
+            StateWithExtensionsMut::<Account>::from_account_view_unchecked_mut(&mut account_view)
         }
         .unwrap();
         let extension = token
@@ -1011,7 +1008,7 @@ mod tests {
 
         let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let mut out = [ExtensionType::Uninitialized; 2];
-        let written = mint.get_extension_types(&mut out).unwrap();
+        let written = mint.write_extension_types(&mut out).unwrap();
 
         assert_eq!(written, 2);
         assert_eq!(out[0], ExtensionType::PermanentDelegate);
@@ -1024,7 +1021,7 @@ mod tests {
 
         let token = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
         let mut out = [ExtensionType::Uninitialized; 1];
-        let written = token.get_extension_types(&mut out).unwrap();
+        let written = token.write_extension_types(&mut out).unwrap();
 
         assert_eq!(written, 0);
     }
@@ -1035,7 +1032,7 @@ mod tests {
 
         let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let mut out = [ExtensionType::Uninitialized; 1];
-        let written = mint.get_extension_types(&mut out).unwrap();
+        let written = mint.write_extension_types(&mut out).unwrap();
 
         assert_eq!(written, 0);
     }
@@ -1046,14 +1043,14 @@ mod tests {
         let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let mut out = [ExtensionType::Uninitialized; 1];
         assert_eq!(
-            mint.get_extension_types(&mut out),
+            mint.write_extension_types(&mut out),
             Err(ProgramError::InvalidAccountData)
         );
 
         data = build_mint_data(&[ExtensionType::DefaultAccountState as u8, 0u8, 0u8]);
         let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         assert_eq!(
-            mint.get_extension_types(&mut out),
+            mint.write_extension_types(&mut out),
             Err(ProgramError::InvalidAccountData)
         );
     }
@@ -1072,7 +1069,7 @@ mod tests {
         let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
         let mut out = [ExtensionType::Uninitialized; 1];
         assert_eq!(
-            mint.get_extension_types(&mut out),
+            mint.write_extension_types(&mut out),
             Err(ProgramError::InvalidArgument)
         );
     }

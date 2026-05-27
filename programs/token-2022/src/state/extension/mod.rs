@@ -21,7 +21,7 @@ pub use {
 /// Number of `ExtensionType` variants, including `Uninitialized`.
 ///
 /// Useful for conservatively pre-allocating the output buffer when calling
-/// `collect_extension_types_from_tlv` or the wrapper `get_extension_types`
+/// `write_extension_types_from_tlv` or the wrapper `write_extension_types`
 /// methods.
 pub const MAX_EXTENSIONS: usize = 29;
 
