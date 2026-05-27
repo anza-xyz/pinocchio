@@ -9,6 +9,8 @@ readme/S
 arg/S
 vec/S
 enum/S
+discriminant/S
+TLV
 noop/S
 realloc/S
 overallocate/SGD

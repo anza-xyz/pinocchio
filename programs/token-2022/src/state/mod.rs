@@ -1,11 +1,12 @@
 mod account;
 mod account_state;
 mod account_type;
+mod extension;
 mod mint;
 mod multisig;
 
 use solana_program_error::{ProgramError, ProgramResult};
-pub use {account::*, account_state::*, account_type::*, mint::*, multisig::*};
+pub use {account::*, account_state::*, account_type::*, extension::*, mint::*, multisig::*};
 
 /// Extension data is only written after `Account::BASE_LEN`, so extensible
 /// accounts store their [`AccountType`] marker immediately after that base
