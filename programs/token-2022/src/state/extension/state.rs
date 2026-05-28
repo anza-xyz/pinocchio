@@ -439,7 +439,8 @@ mod tests {
                 transfer_hook_account::TransferHookAccountExtension, try_calculate_account_len,
                 TokenError, ACCOUNT_TYPE_INDEX, EXTENSION_NOT_FOUND_ERROR_CODE,
             },
-            AccountState,
+            AccountState, ImmutableOwnerExtension, NonTransferableAccountExtension,
+            PausableAccountExtension, TransferFeeAmountExtension,
         },
         core::{mem::size_of, ptr::copy_nonoverlapping},
         solana_account_view::{RuntimeAccount, NOT_BORROWED},
@@ -1136,8 +1137,12 @@ mod tests {
 
     #[test]
     fn spl2022_supported_extension_discriminants_match() {
+        assert_eq!(ExtensionType::TransferFeeAmount as u16, 2);
         assert_eq!(ExtensionType::DefaultAccountState as u16, 6);
+        assert_eq!(ExtensionType::ImmutableOwner as u16, 7);
+        assert_eq!(ExtensionType::NonTransferableAccount as u16, 13);
         assert_eq!(ExtensionType::TransferHookAccount as u16, 15);
+        assert_eq!(ExtensionType::PausableAccount as u16, 27);
         assert_eq!(ExtensionType::PermissionedBurn as u16, 28);
     }
 
@@ -1162,6 +1167,22 @@ mod tests {
             extension_account_type(ExtensionType::PermissionedBurn),
             AccountType::Mint
         );
+        assert_eq!(
+            extension_account_type(ExtensionType::ImmutableOwner),
+            AccountType::Account
+        );
+        assert_eq!(
+            extension_account_type(ExtensionType::NonTransferableAccount),
+            AccountType::Account
+        );
+        assert_eq!(
+            extension_account_type(ExtensionType::PausableAccount),
+            AccountType::Account
+        );
+        assert_eq!(
+            extension_account_type(ExtensionType::TransferFeeAmount),
+            AccountType::Account
+        );
     }
 
     #[test]
@@ -1171,6 +1192,10 @@ mod tests {
         assert_eq!(PermanentDelegateExtension::LEN, 32);
         assert_eq!(PermissionedBurnExtension::LEN, 32);
         assert_eq!(TransferHookExtension::LEN, 64);
+        assert_eq!(ImmutableOwnerExtension::LEN, 0);
+        assert_eq!(NonTransferableAccountExtension::LEN, 0);
+        assert_eq!(PausableAccountExtension::LEN, 0);
+        assert_eq!(TransferFeeAmountExtension::LEN, 8);
     }
 
     #[test]
@@ -1180,6 +1205,10 @@ mod tests {
         assert_eq!(core::mem::align_of::<PermanentDelegateExtension>(), 1);
         assert_eq!(core::mem::align_of::<PermissionedBurnExtension>(), 1);
         assert_eq!(core::mem::align_of::<TransferHookExtension>(), 1);
+        assert_eq!(core::mem::align_of::<ImmutableOwnerExtension>(), 1);
+        assert_eq!(core::mem::align_of::<NonTransferableAccountExtension>(), 1);
+        assert_eq!(core::mem::align_of::<PausableAccountExtension>(), 1);
+        assert_eq!(core::mem::align_of::<TransferFeeAmountExtension>(), 1);
     }
 
     #[test]
@@ -1278,5 +1307,80 @@ mod tests {
         let ext = mint.get_extension::<TransferHookExtension>().unwrap();
         assert_eq!(ext.authority.as_ref().unwrap(), &new_authority);
         assert_eq!(ext.program_id.as_ref().unwrap(), &new_program_id);
+    }
+
+    #[test]
+    fn transfer_fee_amount_extension_read_roundtrip() {
+        let amount: u64 = 1_234_567_890_123;
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(
+            &mut tlv_data,
+            ExtensionType::TransferFeeAmount,
+            &amount.to_le_bytes(),
+        );
+        let data = build_token_data(&tlv_data);
+
+        let account = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
+        let ext = account
+            .get_extension::<TransferFeeAmountExtension>()
+            .unwrap();
+        assert_eq!(u64::from(ext.withheld_amount), amount);
+    }
+
+    #[test]
+    fn transfer_fee_amount_extension_write_then_read_roundtrip() {
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::TransferFeeAmount, &[0u8; 8]);
+        let mut data = build_token_data(&tlv_data);
+
+        let new_amount: u64 = 987_654_321;
+        let account = StateWithExtensionsMut::<Account>::from_bytes_mut(&mut data).unwrap();
+        account
+            .get_extension_mut::<TransferFeeAmountExtension>()
+            .unwrap()
+            .withheld_amount = new_amount.into();
+
+        let account = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
+        assert_eq!(
+            u64::from(
+                account
+                    .get_extension::<TransferFeeAmountExtension>()
+                    .unwrap()
+                    .withheld_amount
+            ),
+            new_amount,
+        );
+    }
+
+    #[test]
+    fn immutable_owner_extension_present() {
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::ImmutableOwner, &[]);
+        let data = build_token_data(&tlv_data);
+
+        let account = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
+        account.get_extension::<ImmutableOwnerExtension>().unwrap();
+    }
+
+    #[test]
+    fn non_transferable_account_extension_present() {
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::NonTransferableAccount, &[]);
+        let data = build_token_data(&tlv_data);
+
+        let account = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
+        account
+            .get_extension::<NonTransferableAccountExtension>()
+            .unwrap();
+    }
+
+    #[test]
+    fn pausable_account_extension_present() {
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::PausableAccount, &[]);
+        let data = build_token_data(&tlv_data);
+
+        let account = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
+        account.get_extension::<PausableAccountExtension>().unwrap();
     }
 }

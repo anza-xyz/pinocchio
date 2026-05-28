@@ -1,7 +1,11 @@
 pub mod default_account_state;
+pub mod immutable_owner;
+pub mod non_transferable_account;
+pub mod pausable_account;
 pub mod permanent_delegate;
 pub mod permissioned_burn;
 mod state;
+pub mod transfer_fee_amount;
 pub mod transfer_hook;
 pub mod transfer_hook_account;
 
@@ -11,9 +15,13 @@ use {
 };
 pub use {
     default_account_state::DefaultAccountStateExtension,
+    immutable_owner::ImmutableOwnerExtension,
+    non_transferable_account::NonTransferableAccountExtension,
+    pausable_account::PausableAccountExtension,
     permanent_delegate::PermanentDelegateExtension,
     permissioned_burn::PermissionedBurnExtension,
     state::{StateWithExtensions, StateWithExtensionsMut},
+    transfer_fee_amount::TransferFeeAmountExtension,
     transfer_hook::TransferHookExtension,
     transfer_hook_account::TransferHookAccountExtension,
 };
@@ -253,6 +261,10 @@ pub const fn extension_value_len(extension_type: ExtensionType) -> Option<usize>
         ExtensionType::PermissionedBurn => Some(PermissionedBurnExtension::LEN),
         ExtensionType::TransferHook => Some(TransferHookExtension::LEN),
         ExtensionType::TransferHookAccount => Some(TransferHookAccountExtension::LEN),
+        ExtensionType::ImmutableOwner => Some(ImmutableOwnerExtension::LEN),
+        ExtensionType::NonTransferableAccount => Some(NonTransferableAccountExtension::LEN),
+        ExtensionType::PausableAccount => Some(PausableAccountExtension::LEN),
+        ExtensionType::TransferFeeAmount => Some(TransferFeeAmountExtension::LEN),
         _ => None,
     }
 }
