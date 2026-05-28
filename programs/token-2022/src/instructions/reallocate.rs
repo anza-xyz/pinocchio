@@ -1,6 +1,10 @@
 use {
     crate::{
-        instructions::{ExtensionDiscriminator, MAX_EXTENSION_COUNT, MAX_MULTISIG_SIGNERS},
+        instructions::{
+            write_extension_types_instruction_data, EXTENSION_TYPES_INSTRUCTION_DATA_LEN,
+            MAX_EXTENSION_COUNT, MAX_MULTISIG_SIGNERS,
+        },
+        state::ExtensionType,
         UNINIT_BYTE,
     },
     core::{mem::MaybeUninit, slice::from_raw_parts},
@@ -48,7 +52,7 @@ pub struct Reallocate<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>> {
     pub multisig_signers: &'c [MultisigSigner],
 
     /// New extension types to include in the reallocated account
-    pub extensions: &'d [ExtensionDiscriminator],
+    pub extensions: &'d [ExtensionType],
 
     /// The token program.
     pub token_program: &'b Address,
@@ -68,7 +72,7 @@ impl<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>>
         payer: &'a AccountView,
         system_program: &'a AccountView,
         owner: &'a AccountView,
-        extensions: &'d [ExtensionDiscriminator],
+        extensions: &'d [ExtensionType],
     ) -> Self {
         Self::with_multisig_signers(
             token_program,
@@ -90,7 +94,7 @@ impl<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>>
         payer: &'a AccountView,
         system_program: &'a AccountView,
         owner: &'a AccountView,
-        extensions: &'d [ExtensionDiscriminator],
+        extensions: &'d [ExtensionType],
         multisig_signers: &'c [MultisigSigner],
     ) -> Self {
         Self {
@@ -170,23 +174,13 @@ impl<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>>
         let expected_data = 1 + self.extensions.len() * 2;
 
         // 1 byte (discriminator) + 2 bytes per extension (extension type as `u16`).
-        let mut instruction_data = [UNINIT_BYTE; 1 + MAX_EXTENSION_COUNT * 2];
+        let mut instruction_data = [UNINIT_BYTE; EXTENSION_TYPES_INSTRUCTION_DATA_LEN];
 
-        instruction_data[0].write(Self::DISCRIMINATOR);
-
-        for (i, extension) in self.extensions.iter().enumerate() {
-            let offset = 1 + i * 2;
-            // SAFETY: `offset` and `offset + 1` are within bounds of `instruction_data`
-            // since `extensions.len() <= MAX_EXTENSION_COUNT`.
-            //
-            // Write the extension type as a little-endian `u16`.
-            unsafe {
-                instruction_data
-                    .get_unchecked_mut(offset)
-                    .write(*extension as u8);
-                instruction_data.get_unchecked_mut(offset + 1).write(0);
-            }
-        }
+        write_extension_types_instruction_data(
+            &mut instruction_data,
+            Self::DISCRIMINATOR,
+            self.extensions,
+        );
 
         invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {

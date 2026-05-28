@@ -1,6 +1,10 @@
 use {
     crate::{
-        instructions::{ExtensionDiscriminator, MAX_EXTENSION_COUNT},
+        instructions::{
+            write_extension_types_instruction_data, EXTENSION_TYPES_INSTRUCTION_DATA_LEN,
+            MAX_EXTENSION_COUNT,
+        },
+        state::ExtensionType,
         UNINIT_BYTE,
     },
     core::slice::from_raw_parts,
@@ -24,7 +28,7 @@ pub struct GetAccountDataSize<'a, 'b, 'c> {
     pub mint: &'a AccountView,
 
     /// New extension types to include in the reallocated account
-    pub extensions: &'c [ExtensionDiscriminator],
+    pub extensions: &'c [ExtensionType],
 
     /// The token program.
     pub token_program: &'b Address,
@@ -44,23 +48,13 @@ impl GetAccountDataSize<'_, '_, '_> {
         // Instruction data.
 
         // 1 byte (discriminator) + 2 bytes per extension (extension type as `u16`)
-        let mut instruction_data = [UNINIT_BYTE; 1 + MAX_EXTENSION_COUNT * 2];
+        let mut instruction_data = [UNINIT_BYTE; EXTENSION_TYPES_INSTRUCTION_DATA_LEN];
 
-        instruction_data[0].write(Self::DISCRIMINATOR);
-
-        for (i, extension) in self.extensions.iter().enumerate() {
-            let offset = 1 + i * 2;
-            // SAFETY: `offset` and `offset + 1` are within bounds of `instruction_data`
-            // since `extensions.len() <= MAX_EXTENSION_COUNT`.
-            //
-            // Write the extension type as a little-endian `u16`.
-            unsafe {
-                instruction_data
-                    .get_unchecked_mut(offset)
-                    .write(*extension as u8);
-                instruction_data.get_unchecked_mut(offset + 1).write(0);
-            }
-        }
+        write_extension_types_instruction_data(
+            &mut instruction_data,
+            Self::DISCRIMINATOR,
+            self.extensions,
+        );
 
         invoke(
             &InstructionView {
