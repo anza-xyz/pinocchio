@@ -107,7 +107,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// execution, calling a provided function to process the program instruction
 /// supplied by the runtime, and reporting its result to the runtime.
 ///
-/// It also sets up a [global allocator] and [panic handler], using the
+/// It also sets up a [global allocator] and [custom panic hook], using the
 /// [`crate::default_allocator!`] and [`crate::default_panic_handler!`] macros.
 ///
 /// The first argument is the name of a function with this type signature:
@@ -130,7 +130,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 ///
 /// [global allocator]: https://doc.rust-lang.org/stable/alloc/alloc/trait.GlobalAlloc.html
 /// [maximum number of accounts]: https://github.com/anza-xyz/agave/blob/ccabfcf84921977202fd06d3197cbcea83742133/runtime/src/bank.rs#L3207-L3219
-/// [panic handler]: https://doc.rust-lang.org/stable/core/panic/trait.PanicHandler.html
+/// [custom panic hook]: https://github.com/anza-xyz/rust/blob/2830febbc59d44bdd7ad2c3b81731f1d08b96eba/library/std/src/sys/pal/sbf/mod.rs#L49
 ///
 /// # Examples
 ///
