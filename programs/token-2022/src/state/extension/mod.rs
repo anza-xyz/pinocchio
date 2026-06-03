@@ -1,6 +1,14 @@
+pub mod cpi_guard;
 pub mod default_account_state;
+pub mod group_member_pointer;
+pub mod group_pointer;
 pub mod immutable_owner;
+pub mod memo_transfer;
+pub mod metadata_pointer;
+pub mod mint_close_authority;
+pub mod non_transferable;
 pub mod non_transferable_account;
+pub mod pausable;
 pub mod pausable_account;
 pub mod permanent_delegate;
 pub mod permissioned_burn;
@@ -14,9 +22,17 @@ use {
     solana_program_error::ProgramError,
 };
 pub use {
+    cpi_guard::CpiGuardExtension,
     default_account_state::DefaultAccountStateExtension,
+    group_member_pointer::GroupMemberPointerExtension,
+    group_pointer::GroupPointerExtension,
     immutable_owner::ImmutableOwnerExtension,
+    memo_transfer::MemoTransferExtension,
+    metadata_pointer::MetadataPointerExtension,
+    mint_close_authority::MintCloseAuthorityExtension,
+    non_transferable::NonTransferableExtension,
     non_transferable_account::NonTransferableAccountExtension,
+    pausable::PausableExtension,
     pausable_account::PausableAccountExtension,
     permanent_delegate::PermanentDelegateExtension,
     permissioned_burn::PermissionedBurnExtension,
@@ -265,6 +281,14 @@ pub const fn extension_value_len(extension_type: ExtensionType) -> Option<usize>
         ExtensionType::NonTransferableAccount => Some(NonTransferableAccountExtension::LEN),
         ExtensionType::PausableAccount => Some(PausableAccountExtension::LEN),
         ExtensionType::TransferFeeAmount => Some(TransferFeeAmountExtension::LEN),
+        ExtensionType::MintCloseAuthority => Some(MintCloseAuthorityExtension::LEN),
+        ExtensionType::NonTransferable => Some(NonTransferableExtension::LEN),
+        ExtensionType::MemoTransfer => Some(MemoTransferExtension::LEN),
+        ExtensionType::CpiGuard => Some(CpiGuardExtension::LEN),
+        ExtensionType::MetadataPointer => Some(MetadataPointerExtension::LEN),
+        ExtensionType::GroupPointer => Some(GroupPointerExtension::LEN),
+        ExtensionType::GroupMemberPointer => Some(GroupMemberPointerExtension::LEN),
+        ExtensionType::Pausable => Some(PausableExtension::LEN),
         _ => None,
     }
 }
