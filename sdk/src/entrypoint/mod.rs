@@ -57,6 +57,7 @@
 //! └─ 32 bytes: address of the program account
 //! ```
 
+pub mod inline;
 pub mod lazy;
 
 #[cfg(feature = "alloc")]
@@ -65,13 +66,12 @@ pub use lazy::{InstructionContext, MaybeAccount};
 use {
     crate::{
         account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
-        Address, ProgramResult, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS,
+        Address, ProgramResult, MAX_TX_ACCOUNTS, SUCCESS,
     },
     core::{
         alloc::{GlobalAlloc, Layout},
         cmp::min,
         mem::{size_of, MaybeUninit},
-        ptr::with_exposed_provenance_mut,
         slice::{from_raw_parts, from_raw_parts_mut},
     },
 };
@@ -93,7 +93,7 @@ pub const NON_DUP_MARKER: u8 = u8::MAX;
 ///
 /// This is the size of the account header plus the maximum permitted data
 /// increase.
-const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_DATA_INCREASE;
+pub const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_DATA_INCREASE;
 
 /// Declare the program entrypoint and set up global handlers.
 ///
@@ -270,15 +270,17 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
 }
 
 /// Align a pointer to the BPF alignment of [`u128`].
-macro_rules! align_pointer {
+#[macro_export]
+macro_rules! __align_pointer {
     ($ptr:ident) => {
         // Integer-to-pointer cast: first compute the aligned address as a `usize`,
         // since this is more CU-efficient than using `ptr::align_offset()` or the
         // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
         // back to a pointer. The resulting pointer is guaranteed to be valid
         // because it follows the layout serialized by the runtime.
-        with_exposed_provenance_mut(
-            ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
+        core::ptr::with_exposed_provenance_mut(
+            ($ptr.expose_provenance() + ($crate::BPF_ALIGN_OF_U128 - 1))
+                & !($crate::BPF_ALIGN_OF_U128 - 1),
         )
     };
 }
@@ -286,13 +288,32 @@ macro_rules! align_pointer {
 /// Advance the input pointer in relation to a non-duplicated account.
 ///
 /// The macro will add `STATIC_ACCOUNT_DATA` and the account length to
-/// the input pointer and align its address using [`align_pointer`].
-macro_rules! advance_input_with_account {
+/// the input pointer and align its address using [`__align_pointer`].
+#[macro_export]
+macro_rules! __advance_input_with_account {
     ($input:ident, $account:expr) => {{
-        $input = $input.add(STATIC_ACCOUNT_DATA);
+        $input = $input.add($crate::entrypoint::STATIC_ACCOUNT_DATA);
         $input = $input.add((*$account).data_len as usize);
-        $input = align_pointer!($input);
+        $input = $crate::__align_pointer!($input);
     }};
+}
+
+#[cfg(feature = "account-resize")]
+/// Store the data length in the `padding` field of an account.
+#[macro_export]
+macro_rules! __store_data_length_in_padding {
+    ($account:expr) => {{
+        // Stores the data length in the `padding` field. This is needed
+        // to handle account resizing.
+        (*$account).padding = u32::to_le_bytes((*$account).data_len as u32);
+    }};
+}
+
+#[cfg(not(feature = "account-resize"))]
+/// Placeholder macro when the `account-resize` feature is not enabled.
+#[macro_export]
+macro_rules! __store_data_length_in_padding {
+    ($account:expr) => {};
 }
 
 /// A macro to repeat a pattern to process an account `n` times, where `n` is
@@ -304,14 +325,15 @@ macro_rules! advance_input_with_account {
 ///
 /// Note that this macro emits code to update both the `input` and `accounts`
 /// pointers.
-macro_rules! process_n_accounts {
+#[macro_export]
+macro_rules! __process_n_accounts {
     // Base case: no tokens left.
     ( () => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {};
 
     // Recursive case: one `_` token per repetition.
     ( ( _ $($rest:tt)* ) => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
-        process_n_accounts!(@process_account => ($input, $accounts, $accounts_slice));
-        process_n_accounts!(($($rest)*) => ($input, $accounts, $accounts_slice));
+        $crate::__process_n_accounts!(@process_account => ($input, $accounts, $accounts_slice));
+        $crate::__process_n_accounts!(($($rest)*) => ($input, $accounts, $accounts_slice));
     };
 
     // Process one account.
@@ -320,44 +342,52 @@ macro_rules! process_n_accounts {
         $accounts = $accounts.add(1);
 
         // Read the next account.
-        let account: *mut RuntimeAccount = $input as *mut RuntimeAccount;
+        let account =$input as *mut $crate::account::RuntimeAccount;
         // Adds an 8-bytes offset for:
         //   - rent epoch in case of a non-duplicated account
         //   - duplicated marker + 7 bytes of padding in case of a duplicated account
         $input = $input.add(size_of::<u64>());
 
-        if (*account).borrow_state != NON_DUP_MARKER {
-            clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
+        if (*account).borrow_state != $crate::entrypoint::NON_DUP_MARKER {
+            $crate::entrypoint::clone_account_view($accounts, $accounts_slice, (*account).borrow_state);
         } else {
-            #[cfg(feature = "account-resize")]
-            {
-                // Stores the data length in the `padding` field. This is needed
-                // to handle account resizing.
-                (*account).padding = u32::to_le_bytes((*account).data_len as u32);
-            }
-            $accounts.write(AccountView::new_unchecked(account));
-            advance_input_with_account!($input, account);
+            $crate::__store_data_length_in_padding!(account);
+            $accounts.write($crate::AccountView::new_unchecked(account));
+            $crate::__advance_input_with_account!($input, account);
         }
     };
 }
 
 /// Convenience macro to transform the number of accounts to process into a
-/// pattern of `_` tokens for the [`process_n_accounts`] macro.
-macro_rules! process_accounts {
+/// pattern of `_` tokens for the [`__process_n_accounts`] macro.
+#[macro_export]
+macro_rules! __process_accounts {
     ( 1 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
-        process_n_accounts!( (_) => ( $input, $accounts, $accounts_slice ));
+        $crate::__process_n_accounts!( (_) => ( $input, $accounts, $accounts_slice ));
     };
     ( 2 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
-        process_n_accounts!( (_ _) => ( $input, $accounts, $accounts_slice ));
+        $crate::__process_n_accounts!( (_ _) => ( $input, $accounts, $accounts_slice ));
     };
     ( 3 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
-        process_n_accounts!( (_ _ _) => ( $input, $accounts, $accounts_slice ));
+        $crate::__process_n_accounts!( (_ _ _) => ( $input, $accounts, $accounts_slice ));
     };
     ( 4 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
-        process_n_accounts!( (_ _ _ _) => ( $input, $accounts, $accounts_slice ));
+        $crate::__process_n_accounts!( (_ _ _ _) => ( $input, $accounts, $accounts_slice ));
     };
     ( 5 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
-        process_n_accounts!( (_ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+        $crate::__process_n_accounts!( (_ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 6 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        $crate::__process_n_accounts!( (_ _ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 7 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        $crate::__process_n_accounts!( (_ _ _ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 8 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        $crate::__process_n_accounts!( (_ _ _ _ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
+    };
+    ( 9 => ( $input:ident, $accounts:ident, $accounts_slice:ident ) ) => {
+        $crate::__process_n_accounts!( (_ _ _ _ _ _ _ _ _) => ( $input, $accounts, $accounts_slice ));
     };
 }
 
@@ -378,7 +408,7 @@ macro_rules! process_accounts {
 #[allow(clippy::clone_on_copy)]
 #[cold]
 #[inline(always)]
-unsafe fn clone_account_view(
+pub unsafe fn clone_account_view(
     accounts: *mut AccountView,
     accounts_slice: *const AccountView,
     index: u8,
@@ -430,16 +460,11 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
         // The first account is always non-duplicated, so process
         // it directly as such.
         let account: *mut RuntimeAccount = input as *mut RuntimeAccount;
-        #[cfg(feature = "account-resize")]
-        {
-            // Stores the data length in the `padding` field. This is needed
-            // to handle account resizing.
-            (*account).padding = u32::to_le_bytes((*account).data_len as u32);
-        }
+        __store_data_length_in_padding!(account);
         accounts.write(AccountView::new_unchecked(account));
 
         input = input.add(size_of::<u64>());
-        advance_input_with_account!(input, account);
+        __advance_input_with_account!(input, account);
 
         if processed > 1 {
             // The number of accounts to process (`to_process_plus_one`) is limited to
@@ -463,30 +488,30 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
             processed = to_process_plus_one;
 
             // This is an optimization to reduce the number of jumps required to process the
-            // accounts. The macro `process_accounts` will generate inline code to process
+            // accounts. The macro `__process_accounts` will generate inline code to process
             // the specified number of accounts.
             if to_process_plus_one == 2 {
-                process_accounts!(1 => (input, accounts, accounts_slice));
+                __process_accounts!(1 => (input, accounts, accounts_slice));
             } else {
                 while to_process_plus_one > 5 {
                     // Process 5 accounts at a time.
-                    process_accounts!(5 => (input, accounts, accounts_slice));
+                    __process_accounts!(5 => (input, accounts, accounts_slice));
                     to_process_plus_one -= 5;
                 }
 
                 // There might be remaining accounts to process.
                 match to_process_plus_one {
                     5 => {
-                        process_accounts!(4 => (input, accounts, accounts_slice));
+                        __process_accounts!(4 => (input, accounts, accounts_slice));
                     }
                     4 => {
-                        process_accounts!(3 => (input, accounts, accounts_slice));
+                        __process_accounts!(3 => (input, accounts, accounts_slice));
                     }
                     3 => {
-                        process_accounts!(2 => (input, accounts, accounts_slice));
+                        __process_accounts!(2 => (input, accounts, accounts_slice));
                     }
                     2 => {
-                        process_accounts!(1 => (input, accounts, accounts_slice));
+                        __process_accounts!(1 => (input, accounts, accounts_slice));
                     }
                     1 => (),
                     _ => {
@@ -517,7 +542,7 @@ pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
                     input = input.add(size_of::<u64>());
 
                     if (*account).borrow_state == NON_DUP_MARKER {
-                        advance_input_with_account!(input, account);
+                        __advance_input_with_account!(input, account);
                     }
                 }
             }
@@ -841,6 +866,7 @@ mod alloc {
 mod tests {
     use {
         super::*,
+        crate::BPF_ALIGN_OF_U128,
         ::alloc::{
             alloc::{alloc, dealloc, handle_alloc_error},
             vec,
