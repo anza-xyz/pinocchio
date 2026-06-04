@@ -136,20 +136,21 @@ impl SeenExtensions {
     }
 }
 
-/// Computes the byte length of a Token-2022 account for `mint`: the extensions
-/// every account of that mint requires plus any `additional_account_extensions`
-/// (e.g. the `ATA` program adds `ImmutableOwner`).
+/// Computes the byte length a Token-2022 account for `mint` needs, counting the
+/// extensions every account of that mint requires plus any
+/// `additional_account_extensions` (e.g. the `ATA` program adds
+/// `ImmutableOwner`).
 ///
-/// - `Ok(Some(len))`: Sized locally.
-/// - `Ok(None)`: Can't size locally (ext not recognized or don't track a size
-///   for). Defer to `GetAccountDataSize` CPI.
-/// - `Err(..)`: Invalid input (wrong owner, mint-only ext passed as account
-///   ext, invalid mint data bytes, etc).
+/// Returns `Err` whenever the size can't be computed locally. This can be due
+/// to invalid input (wrong owner, a mint-only ext passed as an account ext,
+/// non-mint data) or inputs it can't size (an extension it doesn't recognize
+/// or track a size for). Callers should defer to the token program's
+/// `GetAccountDataSize` if it's not recognized here.
 #[inline]
 pub fn try_calculate_account_len_from_mint(
     mint: &AccountView,
     additional_account_extensions: &[ExtensionType],
-) -> Result<Option<usize>, ProgramError> {
+) -> Result<usize, ProgramError> {
     if !mint.owned_by(&ID) {
         return Err(ProgramError::IncorrectProgramId);
     }
@@ -168,9 +169,7 @@ pub fn try_calculate_account_len_from_mint(
         if seen.insert(ext) {
             has_extensions = true;
             validate_extension_account_type(ext, AccountType::Account)?;
-            let Some(value_len) = extension_value_len(ext) else {
-                return Ok(None); // unrecognized ext
-            };
+            let value_len = extension_value_len(ext).ok_or(ProgramError::InvalidInstructionData)?;
             total_len = total_len
                 .checked_add(TLV_HEADER_LEN + value_len)
                 .ok_or(ProgramError::InvalidInstructionData)?;
@@ -185,32 +184,28 @@ pub fn try_calculate_account_len_from_mint(
 
         // Find what mint extensions are present
         let mut mint_exts = [ExtensionType::Uninitialized; MAX_EXTENSIONS];
-        let Ok(mint_ext_count) = state.write_extension_types(&mut mint_exts) else {
-            return Ok(None);
-        };
+        let mint_ext_count = state.write_extension_types(&mut mint_exts)?;
         for &mint_ext in &mint_exts[..mint_ext_count] {
-            let Some(required) = required_account_extensions_from_mint_extension(mint_ext) else {
-                return Ok(None); // unrecognized ext
-            };
+            let required = required_account_extensions_from_mint_extension(mint_ext)
+                .ok_or(ProgramError::InvalidAccountData)?;
             for &ext in required {
                 if seen.insert(ext) {
                     has_extensions = true;
-                    let Some(value_len) = extension_value_len(ext) else {
-                        return Ok(None); // unrecognized ext
-                    };
+                    let value_len =
+                        extension_value_len(ext).ok_or(ProgramError::InvalidAccountData)?;
                     total_len = total_len
                         .checked_add(TLV_HEADER_LEN + value_len)
-                        .ok_or(ProgramError::InvalidInstructionData)?;
+                        .ok_or(ProgramError::InvalidAccountData)?;
                 }
             }
         }
     }
 
     if !has_extensions {
-        return Ok(Some(Account::BASE_LEN));
+        return Ok(Account::BASE_LEN);
     }
 
-    Ok(Some(adjust_len_for_multisig(total_len)))
+    Ok(adjust_len_for_multisig(total_len))
 }
 
 #[cfg(test)]
@@ -278,14 +273,14 @@ mod tests {
         );
     }
 
-    #[test_case(&[], Ok(Some(Account::BASE_LEN)))] // no exts, bare account
-    #[test_case(&[ExtensionType::ImmutableOwner], Ok(Some(170)))] // tracked ext is sized
-    #[test_case(&[ExtensionType::ImmutableOwner, ExtensionType::ImmutableOwner], Ok(Some(170)))] // duplicates deduped
+    #[test_case(&[], Ok(Account::BASE_LEN))] // no exts, bare account
+    #[test_case(&[ExtensionType::ImmutableOwner], Ok(170))] // tracked ext is sized
+    #[test_case(&[ExtensionType::ImmutableOwner, ExtensionType::ImmutableOwner], Ok(170))] // duplicates deduped
     #[test_case(&[ExtensionType::TransferFeeConfig], Err(ProgramError::InvalidAccountData))] // mint-only ext rejected
-    #[test_case(&[ExtensionType::CpiGuard], Ok(None))] // untracked ext defers to CPI
+    #[test_case(&[ExtensionType::CpiGuard], Err(ProgramError::InvalidInstructionData))] // untracked ext can't be sized
     fn caller_extensions_against_bare_mint(
         caller_exts: &[ExtensionType],
-        expected: Result<Option<usize>, ProgramError>,
+        expected: Result<usize, ProgramError>,
     ) {
         let data = vec![0u8; Mint::BASE_LEN];
         let (_backing, mint) = build_account_view(&ID, &data);
@@ -311,9 +306,8 @@ mod tests {
     }
 
     #[test]
-    fn unparsable_mint_tlv_returns_none() {
-        // A valid mint base whose extension TLV won't parse defers to the token
-        // program (returns `None`) instead of erroring.
+    fn unparsable_mint_tlv_errors() {
+        // A valid mint base whose extension TLV won't parse
         let mut tlv = Vec::new();
         tlv.extend_from_slice(&(ExtensionType::TransferFeeConfig as u16).to_le_bytes());
         tlv.extend_from_slice(&64u16.to_le_bytes());
@@ -322,7 +316,7 @@ mod tests {
 
         assert_eq!(
             try_calculate_account_len_from_mint(&mint, &[ExtensionType::ImmutableOwner]),
-            Ok(None)
+            Err(ProgramError::InvalidAccountData)
         );
     }
 
@@ -367,7 +361,7 @@ mod tests {
 
         assert_eq!(
             try_calculate_account_len_from_mint(&mint, &[]),
-            Ok(Some(expected))
+            Ok(expected)
         );
     }
 
@@ -383,7 +377,7 @@ mod tests {
 
         assert_eq!(
             try_calculate_account_len_from_mint(&mint, &[ExtensionType::ImmutableOwner]),
-            Ok(Some(174))
+            Ok(174)
         );
     }
 }
