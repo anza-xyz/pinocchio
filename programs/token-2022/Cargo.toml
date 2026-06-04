@@ -20,3 +20,4 @@ solana-zero-copy = { workspace = true }
 
 [dev-dependencies]
 solana-address = { workspace = true, features = ["curve25519"] }
+test-case = "3.3.1"

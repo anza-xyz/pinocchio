@@ -1,9 +1,12 @@
+mod account_len;
 pub mod default_account_state;
 pub mod immutable_owner;
 pub mod non_transferable_account;
 pub mod pausable_account;
 pub mod permanent_delegate;
 pub mod permissioned_burn;
+#[cfg(test)]
+mod shared_test_helpers;
 mod state;
 pub mod transfer_fee_amount;
 pub mod transfer_hook;
@@ -14,6 +17,10 @@ use {
     solana_program_error::ProgramError,
 };
 pub use {
+    account_len::{
+        extension_value_len, required_account_extensions_from_mint_extension,
+        try_calculate_account_len, try_calculate_account_len_from_mint,
+    },
     default_account_state::DefaultAccountStateExtension,
     immutable_owner::ImmutableOwnerExtension,
     non_transferable_account::NonTransferableAccountExtension,
@@ -246,64 +253,4 @@ fn validate_token_extensions_data(data: &[u8]) -> Result<(), ProgramError> {
     }
 
     Ok(())
-}
-
-/// Returns the fixed byte length of the given extension's value payload,
-/// or `None` if the extension type is not yet supported.
-///
-/// Only a subset of extension types have known sizes registered here.
-/// Unsupported types will cause [`try_calculate_account_len`] to fail.
-#[inline(always)]
-pub const fn extension_value_len(extension_type: ExtensionType) -> Option<usize> {
-    match extension_type {
-        ExtensionType::DefaultAccountState => Some(DefaultAccountStateExtension::LEN),
-        ExtensionType::PermanentDelegate => Some(PermanentDelegateExtension::LEN),
-        ExtensionType::PermissionedBurn => Some(PermissionedBurnExtension::LEN),
-        ExtensionType::TransferHook => Some(TransferHookExtension::LEN),
-        ExtensionType::TransferHookAccount => Some(TransferHookAccountExtension::LEN),
-        ExtensionType::ImmutableOwner => Some(ImmutableOwnerExtension::LEN),
-        ExtensionType::NonTransferableAccount => Some(NonTransferableAccountExtension::LEN),
-        ExtensionType::PausableAccount => Some(PausableAccountExtension::LEN),
-        ExtensionType::TransferFeeAmount => Some(TransferFeeAmountExtension::LEN),
-        _ => None,
-    }
-}
-
-/// Returns the account data length needed for the given extension types.
-///
-/// Only extension types with sizes registered in [`extension_value_len`] are
-/// supported.
-#[inline]
-pub fn try_calculate_account_len<B: ExtensionBaseState>(
-    extension_types: &[ExtensionType],
-) -> Result<usize, ProgramError> {
-    if extension_types.is_empty() {
-        return Ok(B::BASE_LEN);
-    }
-
-    let mut total_len = TLV_START_INDEX;
-    let mut i = 0;
-
-    while i < extension_types.len() {
-        let extension_type = extension_types[i];
-        validate_extension_account_type(extension_type, B::ACCOUNT_TYPE)?;
-
-        let mut j = 0;
-        while j < i {
-            if extension_types[j] == extension_type {
-                return Err(ProgramError::InvalidInstructionData);
-            }
-            j += 1;
-        }
-
-        let value_len =
-            extension_value_len(extension_type).ok_or(ProgramError::InvalidInstructionData)?;
-
-        total_len = total_len
-            .checked_add(TLV_HEADER_LEN + value_len)
-            .ok_or(ProgramError::InvalidInstructionData)?;
-        i += 1;
-    }
-
-    Ok(adjust_len_for_multisig(total_len))
 }
