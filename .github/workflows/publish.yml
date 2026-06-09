@@ -101,10 +101,18 @@ jobs:
       contents: write
       id-token: write
     steps:
+      - name: Generate app token
+        if: github.event.inputs.dry_run != 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ vars.CLIENT_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
       - name: Git checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          token: ${{ inputs.dry_run && github.token || secrets.ANZA_TEAM_PAT }}
+          token: ${{ inputs.dry_run && github.token || steps.app-token.outputs.token }}
           fetch-depth: 0 # get the whole history for git-cliff
 
       - name: Setup Environment
@@ -123,8 +131,16 @@ jobs:
 
       - name: Set Git Author
         run: |
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "github-actions"
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            git config --global user.email "github-actions@github.com"
+            git config --global user.name "github-actions"
+          else
+            git config --global user.email "${APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+            git config --global user.name "${APP_SLUG}[bot]"
+          fi
+        env:
+          APP_ID: ${{ vars.APP_ID }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
 
       - name: Authorization
         uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe  # v1.0.4
@@ -166,3 +182,4 @@ jobs:
         with:
           tag: ${{ steps.publish.outputs.new_git_tag }}
           bodyFile: CHANGELOG.md
+          token: ${{ steps.app-token.outputs.token }}
