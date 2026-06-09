@@ -65,6 +65,7 @@ pub use lazy::{InstructionContext, MaybeAccount};
 use {
     crate::{
         account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
+        error::ProgramError,
         Address, ProgramResult, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS,
     },
     core::{
@@ -234,6 +235,13 @@ macro_rules! program_entrypoint {
     };
 }
 
+/// This function is marked as `#[cold]` to move the error conversion from the
+/// "hot path" of the entrypoint.
+#[inline(never)]
+fn program_error_to_u64(error: ProgramError) -> u64 {
+    error.into()
+}
+
 /// Entrypoint deserialization.
 ///
 /// This function inlines entrypoint deserialization for use in the
@@ -265,7 +273,7 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
         instruction_data,
     ) {
         Ok(()) => SUCCESS,
-        Err(error) => error.into(),
+        Err(e) => program_error_to_u64(e),
     }
 }
 
