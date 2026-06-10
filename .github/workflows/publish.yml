@@ -130,17 +130,13 @@ jobs:
         run: pnpm test ${{ inputs.crate }}
 
       - name: Set Git Author
-        run: |
-          if [ "${{ inputs.dry_run }}" == "true" ]; then
-            git config --global user.email "github-actions@github.com"
-            git config --global user.name "github-actions"
-          else
-            git config --global user.email "${APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
-            git config --global user.name "${APP_SLUG}[bot]"
-          fi
+        if: github.event.inputs.dry_run != 'true'
         env:
           APP_ID: ${{ vars.APP_ID }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          git config --global user.email "${APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git config --global user.name "${APP_SLUG}[bot]"
 
       - name: Authorization
         uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe  # v1.0.4
