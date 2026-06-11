@@ -1,0 +1,24 @@
+[package]
+name = "pinocchio-small-oracle"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pinocchio_small_oracle"
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+opt = []
+naive = []
+manual = []
+
+[dependencies]
+pinocchio = { path = "../../sdk", default-features = false }
+bytemuck = { version = "=1.25.0", features = ["derive"] }
+solana-address = { version = "=2.2.0", features = ["copy", "bytemuck"] }
+
+[dev-dependencies]
+mollusk-svm = "0.0.12"
+solana-sdk = "2.1"
+blake3 = "=1.5.5"
