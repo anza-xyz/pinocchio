@@ -280,10 +280,59 @@ where
 
     let slice_ptr = instruction_data.add(ix_data_len + size_of::<Address>());
 
-    let accounts = from_raw_parts_mut(
-        align_pointer!(slice_ptr),
-        *(program_input as *const u64) as usize,
-    );
+    let accounts_len = *(program_input as *const u64) as usize;
+    let accounts_ptr: *mut AccountView = align_pointer!(slice_ptr);
+
+    #[cfg(feature = "account-resize")]
+    {
+        macro_rules! store_original_data_len {
+            ( $current:ident ) => {{
+                let account = *$current;
+                let data_len = core::ptr::addr_of!((*account).data_len).read() as u32;
+
+                core::ptr::addr_of_mut!((*account).padding)
+                    .cast::<u32>()
+                    .write(data_len.to_le());
+            }};
+        }
+
+        macro_rules! store_original_data_len_and_advance {
+            ( $current:ident ) => {{
+                store_original_data_len!($current);
+                $current = $current.add(1);
+            }};
+        }
+
+        // `AccountView` is a single pointer wrapper around `RuntimeAccount`.
+        let mut current = accounts_ptr.cast::<*mut RuntimeAccount>();
+        let mut remainder = accounts_len;
+
+        while remainder >= 4 {
+            store_original_data_len_and_advance!(current);
+            store_original_data_len_and_advance!(current);
+            store_original_data_len_and_advance!(current);
+            store_original_data_len_and_advance!(current);
+            remainder -= 4;
+        }
+
+        match remainder {
+            3 => {
+                store_original_data_len_and_advance!(current);
+                store_original_data_len_and_advance!(current);
+                store_original_data_len!(current);
+            }
+            2 => {
+                store_original_data_len_and_advance!(current);
+                store_original_data_len!(current);
+            }
+            1 => {
+                store_original_data_len!(current);
+            }
+            _ => (),
+        }
+    }
+
+    let accounts = from_raw_parts_mut(accounts_ptr, accounts_len);
 
     // The instruction data slice is given by the `instruction_data` pointer.
     let instruction_data = from_raw_parts(instruction_data, ix_data_len);
