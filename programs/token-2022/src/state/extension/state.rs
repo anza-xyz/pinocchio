@@ -439,8 +439,10 @@ mod tests {
                 transfer_hook_account::TransferHookAccountExtension, try_calculate_account_len,
                 TokenError, ACCOUNT_TYPE_INDEX, EXTENSION_NOT_FOUND_ERROR_CODE,
             },
-            AccountState, ImmutableOwnerExtension, NonTransferableAccountExtension,
-            PausableAccountExtension, TransferFeeAmountExtension,
+            AccountState, CpiGuardExtension, GroupMemberPointerExtension, GroupPointerExtension,
+            ImmutableOwnerExtension, MemoTransferExtension, MetadataPointerExtension,
+            MintCloseAuthorityExtension, NonTransferableAccountExtension, NonTransferableExtension,
+            PausableAccountExtension, PausableExtension, TransferFeeAmountExtension,
         },
         core::{mem::size_of, ptr::copy_nonoverlapping},
         solana_account_view::{RuntimeAccount, NOT_BORROWED},
@@ -1382,5 +1384,109 @@ mod tests {
 
         let account = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
         account.get_extension::<PausableAccountExtension>().unwrap();
+    }
+
+    #[test]
+    fn mint_close_authority_extension_read_roundtrip() {
+        let value = [13u8; 32];
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::MintCloseAuthority, &value);
+        let data = build_mint_data(&tlv_data);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let ext = mint.get_extension::<MintCloseAuthorityExtension>().unwrap();
+        assert_eq!(ext.close_authority.as_ref().unwrap().as_ref(), &[13u8; 32]);
+    }
+
+    #[test]
+    fn non_transferable_extension_present() {
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::NonTransferable, &[]);
+        let data = build_mint_data(&tlv_data);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        mint.get_extension::<NonTransferableExtension>().unwrap();
+    }
+
+    #[test]
+    fn memo_transfer_extension_read_roundtrip() {
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::MemoTransfer, &[1u8]);
+        let data = build_token_data(&tlv_data);
+
+        let account = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
+        let ext = account.get_extension::<MemoTransferExtension>().unwrap();
+        assert!(bool::from(ext.require_incoming_transfer_memos));
+    }
+
+    #[test]
+    fn cpi_guard_extension_read_roundtrip() {
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::CpiGuard, &[1u8]);
+        let data = build_token_data(&tlv_data);
+
+        let account = StateWithExtensions::<Account>::from_bytes(&data).unwrap();
+        let ext = account.get_extension::<CpiGuardExtension>().unwrap();
+        assert!(bool::from(ext.lock_cpi));
+    }
+
+    #[test]
+    fn metadata_pointer_extension_read_roundtrip() {
+        let mut value = [0u8; 64];
+        value[..32].copy_from_slice(&[11u8; 32]);
+        value[32..64].copy_from_slice(&[22u8; 32]);
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::MetadataPointer, &value);
+        let data = build_mint_data(&tlv_data);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let ext = mint.get_extension::<MetadataPointerExtension>().unwrap();
+        assert_eq!(ext.authority.as_ref().unwrap().as_ref(), &[11u8; 32]);
+        assert_eq!(ext.metadata_address.as_ref().unwrap().as_ref(), &[22u8; 32]);
+    }
+
+    #[test]
+    fn group_pointer_extension_read_roundtrip() {
+        let mut value = [0u8; 64];
+        value[..32].copy_from_slice(&[33u8; 32]);
+        value[32..64].copy_from_slice(&[44u8; 32]);
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::GroupPointer, &value);
+        let data = build_mint_data(&tlv_data);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let ext = mint.get_extension::<GroupPointerExtension>().unwrap();
+        assert_eq!(ext.authority.as_ref().unwrap().as_ref(), &[33u8; 32]);
+        assert_eq!(ext.group_address.as_ref().unwrap().as_ref(), &[44u8; 32]);
+    }
+
+    #[test]
+    fn group_member_pointer_extension_read_roundtrip() {
+        let mut value = [0u8; 64];
+        value[..32].copy_from_slice(&[55u8; 32]);
+        value[32..64].copy_from_slice(&[66u8; 32]);
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::GroupMemberPointer, &value);
+        let data = build_mint_data(&tlv_data);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let ext = mint.get_extension::<GroupMemberPointerExtension>().unwrap();
+        assert_eq!(ext.authority.as_ref().unwrap().as_ref(), &[55u8; 32]);
+        assert_eq!(ext.member_address.as_ref().unwrap().as_ref(), &[66u8; 32]);
+    }
+
+    #[test]
+    fn pausable_extension_read_roundtrip() {
+        let mut value = [0u8; 33];
+        value[..32].copy_from_slice(&[77u8; 32]);
+        value[32] = 1;
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::Pausable, &value);
+        let data = build_mint_data(&tlv_data);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let ext = mint.get_extension::<PausableExtension>().unwrap();
+        assert_eq!(ext.authority.as_ref().unwrap().as_ref(), &[77u8; 32]);
+        assert!(bool::from(ext.paused));
     }
 }
