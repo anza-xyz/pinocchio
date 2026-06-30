@@ -292,7 +292,7 @@ where
 
                 core::ptr::addr_of_mut!((*account).padding)
                     .cast::<u32>()
-                    .write(data_len.to_le());
+                    .write(data_len);
             }};
         }
 

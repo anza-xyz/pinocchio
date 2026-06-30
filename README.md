@@ -104,7 +104,6 @@ use pinocchio::{
   Address,
   default_panic_handler,
   entrypoint::process_entrypoint,
-  MAX_TX_ACCOUNTS,
   no_allocator,
   ProgramResult,
 };
@@ -114,16 +113,19 @@ no_allocator!();
 default_panic_handler!();
 
 #[no_mangle]
-pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+pub unsafe extern "C" fn entrypoint(
+    program_input: *mut u8,
+    instruction_data: *mut u8,
+) -> u64 {
     // Fast path: check the number of accounts
-    let num_accounts = unsafe { *(input as *const u64) };
+    let num_accounts = unsafe { *(program_input as *const u64) };
     if num_accounts == 0 {
         log("Fast path - no accounts!");
         return 0;
     }
 
     // Standard path: delegate to `process_entrypoint`
-    unsafe { process_entrypoint::<MAX_TX_ACCOUNTS>(input, process_instruction) }
+    unsafe { process_entrypoint(program_input, instruction_data, process_instruction) }
 }
 
 pub fn process_instruction(
@@ -252,7 +254,7 @@ pinocchio = { version = "0.11", features = ["cpi"] }
 
 ### `account-resize`
 
-The `account-resize` feature allows a program to grow or shrink an `AccountView`'s data at runtime. At the start of execution, the entrypoint stores the original data length so it can verify that the resize stays within the permitted bounds. This operation consumes `2` CUs per account.
+The `account-resize` feature allows a program to grow or shrink an `AccountView`'s data at runtime. At the start of execution, the entrypoint stores the original data length so it can verify that the resize stays within the permitted bounds. This adds a small setup cost for each account.
 
 ### `unsafe-account-resize`
 
