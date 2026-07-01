@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
             MAX_MULTISIG_SIGNERS,
         },
@@ -16,7 +16,7 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 38;
+const DISCRIMINATOR: u8 = 11;
 
 /// Maximum number of accounts expected by this instruction.
 ///
@@ -29,36 +29,34 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 ///   - discriminator (1 byte)
 const DATA_LEN: usize = 1;
 
-/// This instruction is to be used to rescue SOL sent to any `TokenProgram`
-/// owned account by sending them to any other account, leaving behind only
-/// lamports for rent exemption.
+/// Thaw a Frozen account using the Mint's `freeze_authority` (if set).
 ///
 /// Accounts expected by this instruction:
 ///
-///   * Single owner/delegate
-///   0. `[writable]` The source account.
-///   1. `[writable]` The destination account.
-///   2. `[signer]` The source account's owner/delegate.
+///   * Single owner
+///   0. `[writable]` The account to thaw.
+///   1. `[]` The token mint.
+///   2. `[signer]` The mint freeze authority.
 ///
-///   * Multisignature owner/delegate
-///   0. `[writable]` The source account.
-///   1. `[writable]` The destination account.
-///   2. `[]` The source account's multisignature owner/delegate.
+///   * Multisignature owner
+///   0. `[writable]` The account to thaw.
+///   1. `[]` The token mint.
+///   2. `[]` The mint's multisignature freeze authority.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct WithdrawExcessLamports<
+pub struct ThawAccount<
     'account,
     'multisig,
     MultisigSigner: AsRef<AccountView>,
     Program: TokenProgram,
 > {
-    /// Source Account owned by the token program.
-    pub source: &'account AccountView,
+    ///  The account to thaw.
+    pub account: &'account AccountView,
 
-    /// Destination account.
-    pub destination: &'account AccountView,
+    /// The token mint.
+    pub mint: &'account AccountView,
 
-    /// Authority.
-    pub authority: &'account AccountView,
+    ///  The mint freeze authority.
+    pub freeze_authority: &'account AccountView,
 
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
@@ -66,37 +64,34 @@ pub struct WithdrawExcessLamports<
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram>
-    WithdrawExcessLamports<'account, '_, &'account AccountView, Program>
-{
-    /// Creates a new `WithdrawExcessLamports` instruction with a single owner
-    /// authority.
+impl<'account, Program: TokenProgram> ThawAccount<'account, '_, &'account AccountView, Program> {
+    /// Creates a new `ThawAccount` instruction with a single freeze authority.
     #[inline(always)]
     pub fn new(
-        source: &'account AccountView,
-        destination: &'account AccountView,
-        authority: &'account AccountView,
+        account: &'account AccountView,
+        mint: &'account AccountView,
+        freeze_authority: &'account AccountView,
     ) -> Self {
-        Self::with_multisig_signers(source, destination, authority, &[])
+        Self::with_multisig_signers(account, mint, freeze_authority, &[])
     }
 }
 
 impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    WithdrawExcessLamports<'account, 'multisig, MultisigSigner, Program>
+    ThawAccount<'account, 'multisig, MultisigSigner, Program>
 {
-    /// Creates a new `WithdrawExcessLamports` instruction with a
-    /// multisignature owner authority and signer accounts.
+    /// Creates a new `ThawAccount` instruction with a
+    /// multisignature freeze authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig_signers(
-        source: &'account AccountView,
-        destination: &'account AccountView,
-        authority: &'account AccountView,
+        account: &'account AccountView,
+        mint: &'account AccountView,
+        freeze_authority: &'account AccountView,
         multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
-            source,
-            destination,
-            authority,
+            account,
+            mint,
+            freeze_authority,
             multisig_signers,
             _program: PhantomData,
         }
@@ -126,7 +121,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -143,7 +138,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
-    for WithdrawExcessLamports<'_, '_, MultisigSigner, Program>
+    for ThawAccount<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn write_accounts<'cpi>(
@@ -154,9 +149,9 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_accounts(
-            self.source,
-            self.destination,
-            self.authority,
+            self.account,
+            self.mint,
+            self.freeze_authority,
             self.multisig_signers,
             accounts,
         )
@@ -171,9 +166,9 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_instruction_accounts(
-            self.source,
-            self.destination,
-            self.authority,
+            self.account,
+            self.mint,
+            self.freeze_authority,
             self.multisig_signers,
             accounts,
         )
@@ -186,7 +181,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
-    for WithdrawExcessLamports<'_, '_, MultisigSigner, Program>
+    for ThawAccount<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -199,18 +194,18 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
         batch.push(
             |accounts| {
                 write_accounts(
-                    self.source,
-                    self.destination,
-                    self.authority,
+                    self.account,
+                    self.mint,
+                    self.freeze_authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
             |accounts| {
                 write_instruction_accounts(
-                    self.source,
-                    self.destination,
-                    self.authority,
+                    self.account,
+                    self.mint,
+                    self.freeze_authority,
                     self.multisig_signers,
                     accounts,
                 )
@@ -222,9 +217,9 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
 
 #[inline(always)]
 fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    source: &'account AccountView,
-    destination: &'account AccountView,
-    authority: &'account AccountView,
+    account: &'account AccountView,
+    mint: &'account AccountView,
+    freeze_authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -238,15 +233,15 @@ where
         return Err(invalid_argument_error());
     }
 
-    if source.is_borrowed() | destination.is_borrowed() {
+    if account.is_borrowed() {
         return Err(account_borrow_failed_error());
     }
 
-    CpiAccount::init_from_account_view(source, &mut accounts[0]);
+    CpiAccount::init_from_account_view(account, &mut accounts[0]);
 
-    CpiAccount::init_from_account_view(destination, &mut accounts[1]);
+    CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
-    CpiAccount::init_from_account_view(authority, &mut accounts[2]);
+    CpiAccount::init_from_account_view(freeze_authority, &mut accounts[2]);
 
     for (account, signer) in accounts[3..expected_accounts]
         .iter_mut()
@@ -260,9 +255,9 @@ where
 
 #[inline(always)]
 fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    source: &'account AccountView,
-    destination: &'account AccountView,
-    authority: &'account AccountView,
+    account: &'account AccountView,
+    mint: &'account AccountView,
+    freeze_authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -276,12 +271,12 @@ where
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(InstructionAccount::writable(source.address()));
+    accounts[0].write(InstructionAccount::writable(account.address()));
 
-    accounts[1].write(InstructionAccount::writable(destination.address()));
+    accounts[1].write(InstructionAccount::readonly(mint.address()));
 
     accounts[2].write(InstructionAccount::new(
-        authority.address(),
+        freeze_authority.address(),
         false,
         multisig_signers.is_empty(),
     ));

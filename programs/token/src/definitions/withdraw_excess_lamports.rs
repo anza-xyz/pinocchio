@@ -1,10 +1,10 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
             MAX_MULTISIG_SIGNERS,
         },
-        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -16,7 +16,7 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 4;
+const DISCRIMINATOR: u8 = 38;
 
 /// Maximum number of accounts expected by this instruction.
 ///
@@ -27,75 +27,77 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-///   - amount (8 bytes)
-const DATA_LEN: usize = 9;
+const DATA_LEN: usize = 1;
 
-/// Approves a delegate.  A delegate is given the authority over tokens on
-/// behalf of the source account's owner.
+/// This instruction is to be used to rescue SOL sent to any `TokenProgram`
+/// owned account by sending them to any other account, leaving behind only
+/// lamports for rent exemption.
 ///
 /// Accounts expected by this instruction:
 ///
-///   * Single owner
+///   * Single owner/delegate
 ///   0. `[writable]` The source account.
-///   1. `[]` The delegate.
-///   2. `[signer]` The source account owner.
+///   1. `[writable]` The destination account.
+///   2. `[signer]` The source account's owner/delegate.
 ///
-///   * Multisignature owner
+///   * Multisignature owner/delegate
 ///   0. `[writable]` The source account.
-///   1. `[]` The delegate.
-///   2. `[]` The source account's multisignature owner.
+///   1. `[writable]` The destination account.
+///   2. `[]` The source account's multisignature owner/delegate.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct Approve<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram> {
-    /// The source account.
+pub struct WithdrawExcessLamports<
+    'account,
+    'multisig,
+    MultisigSigner: AsRef<AccountView>,
+    Program: TokenProgram,
+> {
+    /// Source Account owned by the token program.
     pub source: &'account AccountView,
 
-    /// The delegate.
-    pub delegate: &'account AccountView,
+    /// Destination account.
+    pub destination: &'account AccountView,
 
-    /// The source account owner.
+    /// Authority.
     pub authority: &'account AccountView,
 
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
 
-    /// The amount of tokens the delegate is approved for.
-    pub amount: u64,
-
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> Approve<'account, '_, &'account AccountView, Program> {
-    /// Creates a new `Approve` instruction with a single owner authority.
+impl<'account, Program: TokenProgram>
+    WithdrawExcessLamports<'account, '_, &'account AccountView, Program>
+{
+    /// Creates a new `WithdrawExcessLamports` instruction with a single owner
+    /// authority.
     #[inline(always)]
     pub fn new(
         source: &'account AccountView,
-        delegate: &'account AccountView,
+        destination: &'account AccountView,
         authority: &'account AccountView,
-        amount: u64,
     ) -> Self {
-        Self::with_multisig_signers(source, delegate, authority, amount, &[])
+        Self::with_multisig_signers(source, destination, authority, &[])
     }
 }
 
 impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    Approve<'account, 'multisig, MultisigSigner, Program>
+    WithdrawExcessLamports<'account, 'multisig, MultisigSigner, Program>
 {
-    /// Creates a new `Approve` instruction with a
+    /// Creates a new `WithdrawExcessLamports` instruction with a
     /// multisignature owner authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig_signers(
         source: &'account AccountView,
-        delegate: &'account AccountView,
+        destination: &'account AccountView,
         authority: &'account AccountView,
-        amount: u64,
         multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
             source,
-            delegate,
+            destination,
             authority,
             multisig_signers,
-            amount,
             _program: PhantomData,
         }
     }
@@ -124,7 +126,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -141,7 +143,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
-    for Approve<'_, '_, MultisigSigner, Program>
+    for WithdrawExcessLamports<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn write_accounts<'cpi>(
@@ -153,7 +155,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     {
         write_accounts(
             self.source,
-            self.delegate,
+            self.destination,
             self.authority,
             self.multisig_signers,
             accounts,
@@ -170,7 +172,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     {
         write_instruction_accounts(
             self.source,
-            self.delegate,
+            self.destination,
             self.authority,
             self.multisig_signers,
             accounts,
@@ -179,12 +181,12 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(self.amount, data)
+        write_instruction_data(data)
     }
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
-    for Approve<'_, '_, MultisigSigner, Program>
+    for WithdrawExcessLamports<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -194,21 +196,26 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
     where
         Self: 'account + 'state,
     {
-        let Self {
-            source,
-            delegate,
-            authority,
-            multisig_signers,
-            amount,
-            ..
-        } = self;
-
         batch.push(
-            |accounts| write_accounts(source, delegate, authority, multisig_signers, accounts),
             |accounts| {
-                write_instruction_accounts(source, delegate, authority, multisig_signers, accounts)
+                write_accounts(
+                    self.source,
+                    self.destination,
+                    self.authority,
+                    self.multisig_signers,
+                    accounts,
+                )
             },
-            |data| write_instruction_data(amount, data),
+            |accounts| {
+                write_instruction_accounts(
+                    self.source,
+                    self.destination,
+                    self.authority,
+                    self.multisig_signers,
+                    accounts,
+                )
+            },
+            write_instruction_data,
         )
     }
 }
@@ -216,7 +223,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
 #[inline(always)]
 fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
     source: &'account AccountView,
-    delegate: &'account AccountView,
+    destination: &'account AccountView,
     authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
@@ -231,13 +238,13 @@ where
         return Err(invalid_argument_error());
     }
 
-    if source.is_borrowed() {
+    if source.is_borrowed() | destination.is_borrowed() {
         return Err(account_borrow_failed_error());
     }
 
     CpiAccount::init_from_account_view(source, &mut accounts[0]);
 
-    CpiAccount::init_from_account_view(delegate, &mut accounts[1]);
+    CpiAccount::init_from_account_view(destination, &mut accounts[1]);
 
     CpiAccount::init_from_account_view(authority, &mut accounts[2]);
 
@@ -254,7 +261,7 @@ where
 #[inline(always)]
 fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
     source: &'account AccountView,
-    delegate: &'account AccountView,
+    destination: &'account AccountView,
     authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
@@ -271,7 +278,7 @@ where
 
     accounts[0].write(InstructionAccount::writable(source.address()));
 
-    accounts[1].write(InstructionAccount::readonly(delegate.address()));
+    accounts[1].write(InstructionAccount::writable(destination.address()));
 
     accounts[2].write(InstructionAccount::new(
         authority.address(),
@@ -292,17 +299,12 @@ where
 }
 
 #[inline(always)]
-fn write_instruction_data(
-    amount: u64,
-    data: &mut [MaybeUninit<u8>],
-) -> Result<usize, ProgramError> {
+fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
     if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
-
-    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
 
     Ok(DATA_LEN)
 }

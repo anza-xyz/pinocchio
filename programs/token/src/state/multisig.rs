@@ -1,5 +1,5 @@
 use {
-    crate::{instructions::MAX_MULTISIG_SIGNERS, ID},
+    crate::{definitions::MAX_MULTISIG_SIGNERS, ID},
     core::mem::size_of,
     solana_account_view::{AccountView, Ref},
     solana_address::Address,

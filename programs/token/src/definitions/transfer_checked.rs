@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
             MAX_MULTISIG_SIGNERS,
         },
@@ -16,43 +16,57 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 3;
+const DISCRIMINATOR: u8 = 12;
 
 /// Maximum number of accounts expected by this instruction.
 ///
 /// The required number of accounts will depend whether the
 /// source account has a single owner or a multisignature
 /// owner.
-const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+const MAX_ACCOUNTS_LEN: usize = 4 + MAX_MULTISIG_SIGNERS;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
 ///   - amount (8 bytes)
-const DATA_LEN: usize = 9;
+///   - decimals (1 byte)
+const DATA_LEN: usize = 10;
 
 /// Transfers tokens from one account to another either directly or via a
 /// delegate.  If this account is associated with the native mint then equal
 /// amounts of SOL and Tokens will be transferred to the destination
 /// account.
 ///
+/// This instruction differs from [`super::Transfer`] in that the token mint and
+/// decimals value is checked by the caller.  This may be useful when
+/// creating transactions offline or within a hardware wallet.
+///
 /// Accounts expected by this instruction:
 ///
 ///   * Single owner/delegate
 ///   0. `[writable]` The source account.
-///   1. `[writable]` The destination account.
-///   2. `[signer]` The source account's owner/delegate.
+///   1. `[]` The token mint.
+///   2. `[writable]` The destination account.
+///   3. `[signer]` The source account's owner/delegate.
 ///
 ///   * Multisignature owner/delegate
 ///   0. `[writable]` The source account.
-///   1. `[writable]` The destination account.
-///   2. `[]` The source account's multisignature owner/delegate.
-///   3. `..+M` `[signer]` M signer accounts.
-pub struct Transfer<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-{
+///   1. `[]` The token mint.
+///   2. `[writable]` The destination account.
+///   3. `[]` The source account's multisignature owner/delegate.
+///   4. `..+M` `[signer]` M signer accounts.
+pub struct TransferChecked<
+    'account,
+    'multisig,
+    MultisigSigner: AsRef<AccountView>,
+    Program: TokenProgram,
+> {
     /// The source account.
     pub from: &'account AccountView,
 
-    /// The destination account.
+    /// The token mint.
+    pub mint: &'account AccountView,
+
+    ///  The destination account.
     pub to: &'account AccountView,
 
     /// The source account's owner/delegate.
@@ -64,42 +78,53 @@ pub struct Transfer<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Pro
     /// The amount of tokens to transfer.
     pub amount: u64,
 
+    /// Expected number of base 10 digits to the right of the decimal place.
+    pub decimals: u8,
+
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> Transfer<'account, '_, &'account AccountView, Program> {
-    /// Creates a new `Transfer` instruction with a single
+impl<'account, Program: TokenProgram>
+    TransferChecked<'account, '_, &'account AccountView, Program>
+{
+    /// Creates a new `TransferChecked` instruction with a single
     /// owner/delegate authority.
     #[inline(always)]
     pub fn new(
         from: &'account AccountView,
+        mint: &'account AccountView,
         to: &'account AccountView,
         authority: &'account AccountView,
         amount: u64,
+        decimals: u8,
     ) -> Self {
-        Self::with_multisig_signers(from, to, authority, amount, &[])
+        Self::with_multisig_signers(from, mint, to, authority, amount, decimals, &[])
     }
 }
 
 impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    Transfer<'account, 'multisig, MultisigSigner, Program>
+    TransferChecked<'account, 'multisig, MultisigSigner, Program>
 {
-    /// Creates a new `Transfer` instruction with a
+    /// Creates a new `TransferChecked` instruction with a
     /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig_signers(
         from: &'account AccountView,
+        mint: &'account AccountView,
         to: &'account AccountView,
         authority: &'account AccountView,
         amount: u64,
+        decimals: u8,
         multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
             from,
+            mint,
             to,
             authority,
             multisig_signers,
             amount,
+            decimals,
             _program: PhantomData,
         }
     }
@@ -128,7 +153,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -145,7 +170,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
-    for Transfer<'_, '_, MultisigSigner, Program>
+    for TransferChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn write_accounts<'cpi>(
@@ -157,6 +182,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     {
         write_accounts(
             self.from,
+            self.mint,
             self.to,
             self.authority,
             self.multisig_signers,
@@ -174,6 +200,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     {
         write_instruction_accounts(
             self.from,
+            self.mint,
             self.to,
             self.authority,
             self.multisig_signers,
@@ -183,12 +210,12 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(self.amount, data)
+        write_instruction_data(self.amount, self.decimals, data)
     }
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
-    for Transfer<'_, '_, MultisigSigner, Program>
+    for TransferChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -202,6 +229,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
             |accounts| {
                 write_accounts(
                     self.from,
+                    self.mint,
                     self.to,
                     self.authority,
                     self.multisig_signers,
@@ -211,13 +239,14 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
             |accounts| {
                 write_instruction_accounts(
                     self.from,
+                    self.mint,
                     self.to,
                     self.authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
-            |data| write_instruction_data(self.amount, data),
+            |data| write_instruction_data(self.amount, self.decimals, data),
         )
     }
 }
@@ -225,6 +254,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
 #[inline(always)]
 fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
     from: &'account AccountView,
+    mint: &'account AccountView,
     to: &'account AccountView,
     authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
@@ -234,7 +264,7 @@ where
     'account: 'out,
     'multisig: 'out,
 {
-    let expected_accounts = 3 + multisig_signers.len();
+    let expected_accounts = 4 + multisig_signers.len();
 
     if expected_accounts > accounts.len() {
         return Err(invalid_argument_error());
@@ -246,11 +276,13 @@ where
 
     CpiAccount::init_from_account_view(from, &mut accounts[0]);
 
-    CpiAccount::init_from_account_view(to, &mut accounts[1]);
+    CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
-    CpiAccount::init_from_account_view(authority, &mut accounts[2]);
+    CpiAccount::init_from_account_view(to, &mut accounts[2]);
 
-    for (account, signer) in accounts[3..expected_accounts]
+    CpiAccount::init_from_account_view(authority, &mut accounts[3]);
+
+    for (account, signer) in accounts[4..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {
@@ -263,6 +295,7 @@ where
 #[inline(always)]
 fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
     from: &'account AccountView,
+    mint: &'account AccountView,
     to: &'account AccountView,
     authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
@@ -272,7 +305,7 @@ where
     'account: 'out,
     'multisig: 'out,
 {
-    let expected_accounts = 3 + multisig_signers.len();
+    let expected_accounts = 4 + multisig_signers.len();
 
     if expected_accounts > accounts.len() {
         return Err(invalid_argument_error());
@@ -280,15 +313,17 @@ where
 
     accounts[0].write(InstructionAccount::writable(from.address()));
 
-    accounts[1].write(InstructionAccount::writable(to.address()));
+    accounts[1].write(InstructionAccount::readonly(mint.address()));
 
-    accounts[2].write(InstructionAccount::new(
+    accounts[2].write(InstructionAccount::writable(to.address()));
+
+    accounts[3].write(InstructionAccount::new(
         authority.address(),
         false,
         multisig_signers.is_empty(),
     ));
 
-    for (account, signer) in accounts[3..expected_accounts]
+    for (account, signer) in accounts[4..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {
@@ -303,6 +338,7 @@ where
 #[inline(always)]
 fn write_instruction_data(
     amount: u64,
+    decimals: u8,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
     if data.len() < DATA_LEN {
@@ -311,7 +347,9 @@ fn write_instruction_data(
 
     data[0].write(DISCRIMINATOR);
 
-    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
+    write_bytes(&mut data[1..9], &amount.to_le_bytes());
+
+    data[9].write(decimals);
 
     Ok(DATA_LEN)
 }

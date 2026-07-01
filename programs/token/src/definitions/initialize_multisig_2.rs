@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
             MAX_MULTISIG_SIGNERS,
         },
@@ -96,7 +96,7 @@ where
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,

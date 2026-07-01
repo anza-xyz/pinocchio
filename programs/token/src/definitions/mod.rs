@@ -52,9 +52,8 @@ fn account_borrow_failed_error() -> ProgramError {
 fn invalid_argument_error() -> ProgramError {
     ProgramError::InvalidArgument
 }
-
 pub trait TokenProgram {
-    const ID: Address;
+    fn id() -> Address;
 }
 
 /// A trait for instructions that can be used in a CPI context.

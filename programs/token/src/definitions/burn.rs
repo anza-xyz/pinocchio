@@ -1,10 +1,10 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
             MAX_MULTISIG_SIGNERS,
         },
-        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -16,7 +16,7 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 11;
+const DISCRIMINATOR: u8 = 8;
 
 /// Maximum number of accounts expected by this instruction.
 ///
@@ -27,72 +27,76 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-const DATA_LEN: usize = 1;
+///   - amount (8 bytes)
+const DATA_LEN: usize = 9;
 
-/// Thaw a Frozen account using the Mint's `freeze_authority` (if set).
+/// Burns tokens by removing them from an account.  `Burn` does not support
+/// accounts associated with the native mint, use `CloseAccount` instead.
 ///
 /// Accounts expected by this instruction:
 ///
-///   * Single owner
-///   0. `[writable]` The account to thaw.
-///   1. `[]` The token mint.
-///   2. `[signer]` The mint freeze authority.
+///   * Single owner/delegate
+///   0. `[writable]` The account to burn from.
+///   1. `[writable]` The token mint.
+///   2. `[signer]` The account's owner/delegate.
 ///
-///   * Multisignature owner
-///   0. `[writable]` The account to thaw.
-///   1. `[]` The token mint.
-///   2. `[]` The mint's multisignature freeze authority.
+///   * Multisignature owner/delegate
+///   0. `[writable]` The account to burn from.
+///   1. `[writable]` The token mint.
+///   2. `[]` The account's multisignature owner/delegate.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct ThawAccount<
-    'account,
-    'multisig,
-    MultisigSigner: AsRef<AccountView>,
-    Program: TokenProgram,
-> {
-    ///  The account to thaw.
+pub struct Burn<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram> {
+    /// The account to burn from.
     pub account: &'account AccountView,
 
     /// The token mint.
     pub mint: &'account AccountView,
 
-    ///  The mint freeze authority.
-    pub freeze_authority: &'account AccountView,
+    /// The account's owner/delegate.
+    pub authority: &'account AccountView,
 
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
 
+    /// The amount of tokens to burn.
+    pub amount: u64,
+
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> ThawAccount<'account, '_, &'account AccountView, Program> {
-    /// Creates a new `ThawAccount` instruction with a single freeze authority.
+impl<'account, Program: TokenProgram> Burn<'account, '_, &'account AccountView, Program> {
+    /// Creates a new `Burn` instruction with a single
+    /// owner/delegate authority.
     #[inline(always)]
     pub fn new(
         account: &'account AccountView,
         mint: &'account AccountView,
-        freeze_authority: &'account AccountView,
+        authority: &'account AccountView,
+        amount: u64,
     ) -> Self {
-        Self::with_multisig_signers(account, mint, freeze_authority, &[])
+        Self::with_multisig_signers(account, mint, authority, amount, &[])
     }
 }
 
 impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    ThawAccount<'account, 'multisig, MultisigSigner, Program>
+    Burn<'account, 'multisig, MultisigSigner, Program>
 {
-    /// Creates a new `ThawAccount` instruction with a
-    /// multisignature freeze authority and signer accounts.
+    /// Creates a new `Burn` instruction with a
+    /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig_signers(
         account: &'account AccountView,
         mint: &'account AccountView,
-        freeze_authority: &'account AccountView,
+        authority: &'account AccountView,
+        amount: u64,
         multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
             account,
             mint,
-            freeze_authority,
+            authority,
             multisig_signers,
+            amount,
             _program: PhantomData,
         }
     }
@@ -121,7 +125,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -138,7 +142,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
-    for ThawAccount<'_, '_, MultisigSigner, Program>
+    for Burn<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn write_accounts<'cpi>(
@@ -151,7 +155,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         write_accounts(
             self.account,
             self.mint,
-            self.freeze_authority,
+            self.authority,
             self.multisig_signers,
             accounts,
         )
@@ -168,7 +172,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         write_instruction_accounts(
             self.account,
             self.mint,
-            self.freeze_authority,
+            self.authority,
             self.multisig_signers,
             accounts,
         )
@@ -176,12 +180,12 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(data)
+        write_instruction_data(self.amount, data)
     }
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
-    for ThawAccount<'_, '_, MultisigSigner, Program>
+    for Burn<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -196,7 +200,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
                 write_accounts(
                     self.account,
                     self.mint,
-                    self.freeze_authority,
+                    self.authority,
                     self.multisig_signers,
                     accounts,
                 )
@@ -205,12 +209,12 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
                 write_instruction_accounts(
                     self.account,
                     self.mint,
-                    self.freeze_authority,
+                    self.authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
-            write_instruction_data,
+            |data| write_instruction_data(self.amount, data),
         )
     }
 }
@@ -219,7 +223,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
 fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
     account: &'account AccountView,
     mint: &'account AccountView,
-    freeze_authority: &'account AccountView,
+    authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -233,7 +237,7 @@ where
         return Err(invalid_argument_error());
     }
 
-    if account.is_borrowed() {
+    if account.is_borrowed() | mint.is_borrowed() {
         return Err(account_borrow_failed_error());
     }
 
@@ -241,7 +245,7 @@ where
 
     CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
-    CpiAccount::init_from_account_view(freeze_authority, &mut accounts[2]);
+    CpiAccount::init_from_account_view(authority, &mut accounts[2]);
 
     for (account, signer) in accounts[3..expected_accounts]
         .iter_mut()
@@ -257,7 +261,7 @@ where
 fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
     account: &'account AccountView,
     mint: &'account AccountView,
-    freeze_authority: &'account AccountView,
+    authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -273,10 +277,10 @@ where
 
     accounts[0].write(InstructionAccount::writable(account.address()));
 
-    accounts[1].write(InstructionAccount::readonly(mint.address()));
+    accounts[1].write(InstructionAccount::writable(mint.address()));
 
     accounts[2].write(InstructionAccount::new(
-        freeze_authority.address(),
+        authority.address(),
         false,
         multisig_signers.is_empty(),
     ));
@@ -294,12 +298,17 @@ where
 }
 
 #[inline(always)]
-fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+fn write_instruction_data(
+    amount: u64,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
     if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
+
+    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
 
     Ok(DATA_LEN)
 }

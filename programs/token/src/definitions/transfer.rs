@@ -1,10 +1,10 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
             MAX_MULTISIG_SIGNERS,
         },
-        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -16,7 +16,7 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 9;
+const DISCRIMINATOR: u8 = 3;
 
 /// Maximum number of accounts expected by this instruction.
 ///
@@ -27,73 +27,79 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-const DATA_LEN: usize = 1;
+///   - amount (8 bytes)
+const DATA_LEN: usize = 9;
 
-/// Close an account by transferring all its SOL to the destination account.
-/// Non-native accounts may only be closed if its token amount is zero.
+/// Transfers tokens from one account to another either directly or via a
+/// delegate.  If this account is associated with the native mint then equal
+/// amounts of SOL and Tokens will be transferred to the destination
+/// account.
 ///
 /// Accounts expected by this instruction:
 ///
-///   * Single owner
-///   0. `[writable]` The account to close.
+///   * Single owner/delegate
+///   0. `[writable]` The source account.
 ///   1. `[writable]` The destination account.
-///   2. `[signer]` The account's owner.
+///   2. `[signer]` The source account's owner/delegate.
 ///
-///   * Multisignature owner
-///   0. `[writable]` The account to close.
+///   * Multisignature owner/delegate
+///   0. `[writable]` The source account.
 ///   1. `[writable]` The destination account.
-///   2. `[]` The account's multisignature owner.
+///   2. `[]` The source account's multisignature owner/delegate.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct CloseAccount<
-    'account,
-    'multisig,
-    MultisigSigner: AsRef<AccountView>,
-    Program: TokenProgram,
-> {
-    /// The account to close.
-    pub account: &'account AccountView,
+pub struct Transfer<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+{
+    /// The source account.
+    pub from: &'account AccountView,
 
     /// The destination account.
-    pub destination: &'account AccountView,
+    pub to: &'account AccountView,
 
-    /// The account's owner.
+    /// The source account's owner/delegate.
     pub authority: &'account AccountView,
 
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
 
+    /// The amount of tokens to transfer.
+    pub amount: u64,
+
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> CloseAccount<'account, '_, &'account AccountView, Program> {
-    /// Creates a new `CloseAccount` instruction with a single owner authority.
+impl<'account, Program: TokenProgram> Transfer<'account, '_, &'account AccountView, Program> {
+    /// Creates a new `Transfer` instruction with a single
+    /// owner/delegate authority.
     #[inline(always)]
     pub fn new(
-        account: &'account AccountView,
-        destination: &'account AccountView,
+        from: &'account AccountView,
+        to: &'account AccountView,
         authority: &'account AccountView,
+        amount: u64,
     ) -> Self {
-        Self::with_multisig_signers(account, destination, authority, &[])
+        Self::with_multisig_signers(from, to, authority, amount, &[])
     }
 }
 
 impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    CloseAccount<'account, 'multisig, MultisigSigner, Program>
+    Transfer<'account, 'multisig, MultisigSigner, Program>
 {
-    /// Creates a new `CloseAccount` instruction with a
-    /// multisignature owner authority and signer accounts.
+    /// Creates a new `Transfer` instruction with a
+    /// multisignature owner/delegate authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig_signers(
-        account: &'account AccountView,
-        destination: &'account AccountView,
+        from: &'account AccountView,
+        to: &'account AccountView,
         authority: &'account AccountView,
+        amount: u64,
         multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
-            account,
-            destination,
+            from,
+            to,
             authority,
             multisig_signers,
+            amount,
             _program: PhantomData,
         }
     }
@@ -122,14 +128,14 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
                     ),
                     data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
                 },
-                from_raw_parts(accounts.as_ptr() as *const CpiAccount, written_accounts),
+                from_raw_parts(accounts.as_ptr() as _, written_accounts),
                 signers,
             );
         }
@@ -139,7 +145,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
-    for CloseAccount<'_, '_, MultisigSigner, Program>
+    for Transfer<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn write_accounts<'cpi>(
@@ -150,8 +156,8 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_accounts(
-            self.account,
-            self.destination,
+            self.from,
+            self.to,
             self.authority,
             self.multisig_signers,
             accounts,
@@ -167,8 +173,8 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_instruction_accounts(
-            self.account,
-            self.destination,
+            self.from,
+            self.to,
             self.authority,
             self.multisig_signers,
             accounts,
@@ -177,12 +183,12 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(data)
+        write_instruction_data(self.amount, data)
     }
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
-    for CloseAccount<'_, '_, MultisigSigner, Program>
+    for Transfer<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -195,8 +201,8 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
         batch.push(
             |accounts| {
                 write_accounts(
-                    self.account,
-                    self.destination,
+                    self.from,
+                    self.to,
                     self.authority,
                     self.multisig_signers,
                     accounts,
@@ -204,22 +210,22 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
             },
             |accounts| {
                 write_instruction_accounts(
-                    self.account,
-                    self.destination,
+                    self.from,
+                    self.to,
                     self.authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
-            write_instruction_data,
+            |data| write_instruction_data(self.amount, data),
         )
     }
 }
 
 #[inline(always)]
 fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    account: &'account AccountView,
-    destination: &'account AccountView,
+    from: &'account AccountView,
+    to: &'account AccountView,
     authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
@@ -234,13 +240,13 @@ where
         return Err(invalid_argument_error());
     }
 
-    if account.is_borrowed() | destination.is_borrowed() {
+    if from.is_borrowed() | to.is_borrowed() {
         return Err(account_borrow_failed_error());
     }
 
-    CpiAccount::init_from_account_view(account, &mut accounts[0]);
+    CpiAccount::init_from_account_view(from, &mut accounts[0]);
 
-    CpiAccount::init_from_account_view(destination, &mut accounts[1]);
+    CpiAccount::init_from_account_view(to, &mut accounts[1]);
 
     CpiAccount::init_from_account_view(authority, &mut accounts[2]);
 
@@ -256,8 +262,8 @@ where
 
 #[inline(always)]
 fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    account: &'account AccountView,
-    destination: &'account AccountView,
+    from: &'account AccountView,
+    to: &'account AccountView,
     authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
@@ -272,9 +278,9 @@ where
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(InstructionAccount::writable(account.address()));
+    accounts[0].write(InstructionAccount::writable(from.address()));
 
-    accounts[1].write(InstructionAccount::writable(destination.address()));
+    accounts[1].write(InstructionAccount::writable(to.address()));
 
     accounts[2].write(InstructionAccount::new(
         authority.address(),
@@ -295,12 +301,17 @@ where
 }
 
 #[inline(always)]
-fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+fn write_instruction_data(
+    amount: u64,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
     if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
+
+    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
 
     Ok(DATA_LEN)
 }

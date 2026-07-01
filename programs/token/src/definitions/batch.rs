@@ -1,11 +1,11 @@
 use core::marker::PhantomData;
 
-use crate::instructions::TokenProgram;
+use crate::definitions::TokenProgram;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 use {
-    crate::instructions::{invalid_argument_error, CpiWriter},
+    crate::definitions::{invalid_argument_error, CpiWriter},
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer, MAX_CPI_ACCOUNTS},
@@ -99,7 +99,7 @@ where
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         self.instruction_accounts.as_ptr() as _,
                         self.instruction_accounts_len,

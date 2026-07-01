@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
             MAX_MULTISIG_SIGNERS,
         },
@@ -16,108 +16,100 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 13;
+const DISCRIMINATOR: u8 = 14;
 
 /// Maximum number of accounts expected by this instruction.
 ///
 /// The required number of accounts will depend whether the
 /// source account has a single owner or a multisignature
 /// owner.
-const MAX_ACCOUNTS_LEN: usize = 4 + MAX_MULTISIG_SIGNERS;
+const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-///   - amount (8 bytes)
+///   - amount to mint (8 bytes)
 ///   - decimals (1 byte)
 const DATA_LEN: usize = 10;
 
-/// Approves a delegate.  A delegate is given the authority over tokens on
-/// behalf of the source account's owner.
+/// Mints new tokens to an account.  The native mint does not support
+/// minting.
 ///
-/// This instruction differs from Approve in that the token mint and
+/// This instruction differs from [`super::MintTo`] in that the
 /// decimals value is checked by the caller.  This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:
 ///
-///   * Single owner
-///   0. `[writable]` The source account.
-///   1. `[]` The token mint.
-///   2. `[]` The delegate.
-///   3. `[signer]` The source account owner.
+///   * Single authority
+///   0. `[writable]` The mint.
+///   1. `[writable]` The account to mint tokens to.
+///   2. `[signer]` The mint's minting authority.
 ///
-///   * Multisignature owner
-///   0. `[writable]` The source account.
-///   1. `[]` The token mint.
-///   2. `[]` The delegate.
-///   3. `[]` The source account's multisignature owner.
-///   4. `..+M` `[signer]` M signer accounts.
-pub struct ApproveChecked<
+///   * Multisignature authority
+///   0. `[writable]` The mint.
+///   1. `[writable]` The account to mint tokens to.
+///   2. `[]` The mint's multisignature mint-tokens authority.
+///   3. `..+M` `[signer]` M signer accounts.
+pub struct MintToChecked<
     'account,
     'multisig,
     MultisigSigner: AsRef<AccountView>,
     Program: TokenProgram,
 > {
-    /// The source account.
-    pub source: &'account AccountView,
-
-    /// The token mint.
+    /// The mint.
     pub mint: &'account AccountView,
 
-    /// The delegate.
-    pub delegate: &'account AccountView,
+    /// The account to mint tokens to.
+    pub account: &'account AccountView,
 
-    /// The source account owner.
-    pub authority: &'account AccountView,
+    /// The mint's minting authority.
+    pub mint_authority: &'account AccountView,
 
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
 
-    /// The amount of tokens the delegate is approved for.
+    /// The amount of new tokens to mint.
     pub amount: u64,
 
-    /// Expected number of base 10 digits to the right of the decimal place.
+    /// Expected number of base 10 digits to the right of the decimal
+    ///     place.
     pub decimals: u8,
 
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> ApproveChecked<'account, '_, &'account AccountView, Program> {
-    /// Creates a new `ApproveChecked` instruction with a single owner
-    /// authority.
+impl<'account, Program: TokenProgram> MintToChecked<'account, '_, &'account AccountView, Program> {
+    /// Creates a new `MintToChecked` instruction with a single mint authority.
     #[inline(always)]
     pub fn new(
-        source: &'account AccountView,
         mint: &'account AccountView,
-        delegate: &'account AccountView,
-        authority: &'account AccountView,
+        account: &'account AccountView,
+        mint_authority: &'account AccountView,
         amount: u64,
         decimals: u8,
     ) -> Self {
-        Self::with_multisig_signers(source, mint, delegate, authority, amount, decimals, &[])
+        Self::with_multisig_signers(mint, account, mint_authority, amount, decimals, &[])
     }
 }
 
 impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    ApproveChecked<'account, 'multisig, MultisigSigner, Program>
+    MintToChecked<'account, 'multisig, MultisigSigner, Program>
 {
-    /// Creates a new `ApproveChecked` instruction with a
-    /// multisignature owner authority and signer accounts.
+    /// Creates a new `MintToChecked` instruction with a
+    /// multisignature mint authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig_signers(
-        source: &'account AccountView,
         mint: &'account AccountView,
-        delegate: &'account AccountView,
-        authority: &'account AccountView,
+        account: &'account AccountView,
+        mint_authority: &'account AccountView,
         amount: u64,
         decimals: u8,
         multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
-            source,
             mint,
-            delegate,
-            authority,
+            account,
+            mint_authority,
             multisig_signers,
             amount,
             decimals,
@@ -149,7 +141,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -166,7 +158,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
-    for ApproveChecked<'_, '_, MultisigSigner, Program>
+    for MintToChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn write_accounts<'cpi>(
@@ -177,10 +169,9 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_accounts(
-            self.source,
             self.mint,
-            self.delegate,
-            self.authority,
+            self.account,
+            self.mint_authority,
             self.multisig_signers,
             accounts,
         )
@@ -195,10 +186,9 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_instruction_accounts(
-            self.source,
             self.mint,
-            self.delegate,
-            self.authority,
+            self.account,
+            self.mint_authority,
             self.multisig_signers,
             accounts,
         )
@@ -211,7 +201,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
-    for ApproveChecked<'_, '_, MultisigSigner, Program>
+    for MintToChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -224,20 +214,18 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
         batch.push(
             |accounts| {
                 write_accounts(
-                    self.source,
                     self.mint,
-                    self.delegate,
-                    self.authority,
+                    self.account,
+                    self.mint_authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
             |accounts| {
                 write_instruction_accounts(
-                    self.source,
                     self.mint,
-                    self.delegate,
-                    self.authority,
+                    self.account,
+                    self.mint_authority,
                     self.multisig_signers,
                     accounts,
                 )
@@ -249,10 +237,9 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
 
 #[inline(always)]
 fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    source: &'account AccountView,
     mint: &'account AccountView,
-    delegate: &'account AccountView,
-    authority: &'account AccountView,
+    account: &'account AccountView,
+    mint_authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -260,25 +247,23 @@ where
     'account: 'out,
     'multisig: 'out,
 {
-    let expected_accounts = 4 + multisig_signers.len();
+    let expected_accounts = 3 + multisig_signers.len();
 
     if expected_accounts > accounts.len() {
         return Err(invalid_argument_error());
     }
 
-    if source.is_borrowed() {
+    if mint.is_borrowed() | account.is_borrowed() {
         return Err(account_borrow_failed_error());
     }
 
-    CpiAccount::init_from_account_view(source, &mut accounts[0]);
+    CpiAccount::init_from_account_view(mint, &mut accounts[0]);
 
-    CpiAccount::init_from_account_view(mint, &mut accounts[1]);
+    CpiAccount::init_from_account_view(account, &mut accounts[1]);
 
-    CpiAccount::init_from_account_view(delegate, &mut accounts[2]);
+    CpiAccount::init_from_account_view(mint_authority, &mut accounts[2]);
 
-    CpiAccount::init_from_account_view(authority, &mut accounts[3]);
-
-    for (account, signer) in accounts[4..expected_accounts]
+    for (account, signer) in accounts[3..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {
@@ -290,10 +275,9 @@ where
 
 #[inline(always)]
 fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    source: &'account AccountView,
     mint: &'account AccountView,
-    delegate: &'account AccountView,
-    authority: &'account AccountView,
+    account: &'account AccountView,
+    mint_authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -301,25 +285,23 @@ where
     'account: 'out,
     'multisig: 'out,
 {
-    let expected_accounts = 4 + multisig_signers.len();
+    let expected_accounts = 3 + multisig_signers.len();
 
     if expected_accounts > accounts.len() {
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(InstructionAccount::writable(source.address()));
+    accounts[0].write(InstructionAccount::writable(mint.address()));
 
-    accounts[1].write(InstructionAccount::readonly(mint.address()));
+    accounts[1].write(InstructionAccount::writable(account.address()));
 
-    accounts[2].write(InstructionAccount::readonly(delegate.address()));
-
-    accounts[3].write(InstructionAccount::new(
-        authority.address(),
+    accounts[2].write(InstructionAccount::new(
+        mint_authority.address(),
         false,
         multisig_signers.is_empty(),
     ));
 
-    for (account, signer) in accounts[4..expected_accounts]
+    for (account, signer) in accounts[3..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {

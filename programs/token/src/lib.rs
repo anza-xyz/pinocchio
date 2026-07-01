@@ -3,6 +3,7 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+pub mod definitions;
 pub mod instructions;
 pub mod state;
 
@@ -13,13 +14,17 @@ use {
 
 solana_address::declare_id!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
+/// Constant for an uninitialized byte.
 const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
 
+/// Constant for an uninitialized `CpiAccount`.
 const UNINIT_CPI_ACCOUNT: MaybeUninit<CpiAccount> = MaybeUninit::<CpiAccount>::uninit();
 
+/// Constant for an uninitialized `InstructionAccount`.
 const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
     MaybeUninit::<InstructionAccount>::uninit();
 
+/// A helper function to write bytes from a source slice to a destination slice of `MaybeUninit<u8>`.
 #[inline(always)]
 fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
     let len = destination.len().min(source.len());

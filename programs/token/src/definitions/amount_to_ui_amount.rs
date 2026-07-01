@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{invalid_argument_error, CpiWriter, TokenProgram},
+        definitions::{invalid_argument_error, CpiWriter, TokenProgram},
         write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
@@ -13,39 +13,40 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 24;
+const DISCRIMINATOR: u8 = 23;
 
 /// Expected number of accounts.
 const ACCOUNTS_LEN: usize = 1;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-///   - amount (variable, up to 254 bytes)
-const MAX_DATA_LEN: usize = 255;
+///   - amount (8 bytes)
+const DATA_LEN: usize = 9;
 
-/// Convert a `UiAmount` of tokens to a little-endian `u64` raw Amount,
-/// using the given mint. In this version of the program, the mint can
-/// only specify the number of decimals.
+/// Convert an Amount of tokens to a `UiAmount` string, using the given
+/// mint.
 ///
-/// Return data can be fetched using `sol_get_return_data` and deserializing
-/// the return data as a little-endian `u64`.
+/// Fails on an invalid mint.
+///
+/// Return data can be fetched using `sol_get_return_data` and deserialized
+/// with `String::from_utf8`.
 ///
 /// Accounts expected by this instruction:
 ///
 ///   0. `[]` The mint to calculate for.
-pub struct UiAmountToAmount<'account, 'amount, Program: TokenProgram> {
+pub struct AmountToUiAmount<'account, Program: TokenProgram> {
     /// The mint to calculate for.
     pub mint: &'account AccountView,
 
-    /// The `ui_amount` of tokens to reformat.
-    pub amount: &'amount str,
+    /// The amount of tokens to reformat.
+    pub amount: u64,
 
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'amount, Program: TokenProgram> UiAmountToAmount<'account, 'amount, Program> {
+impl<'account, Program: TokenProgram> AmountToUiAmount<'account, Program> {
     #[inline(always)]
-    pub fn new(mint: &'account AccountView, amount: &'amount str) -> Self {
+    pub fn new(mint: &'account AccountView, amount: u64) -> Self {
         Self {
             mint,
             amount,
@@ -62,13 +63,13 @@ impl<'account, 'amount, Program: TokenProgram> UiAmountToAmount<'account, 'amoun
         let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; MAX_DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -83,24 +84,7 @@ impl<'account, 'amount, Program: TokenProgram> UiAmountToAmount<'account, 'amoun
     }
 }
 
-impl<Program: TokenProgram> super::IntoBatch<Program> for UiAmountToAmount<'_, '_, Program> {
-    #[inline(always)]
-    fn into_batch<'account, 'state>(
-        self,
-        batch: &mut super::Batch<'account, 'state, Program>,
-    ) -> ProgramResult
-    where
-        Self: 'account + 'state,
-    {
-        batch.push(
-            |accounts| write_accounts(self.mint, accounts),
-            |accounts| write_instruction_accounts(self.mint, accounts),
-            |data| write_instruction_data(self.amount, data),
-        )
-    }
-}
-
-impl<Program: TokenProgram> CpiWriter for UiAmountToAmount<'_, '_, Program> {
+impl<Program: TokenProgram> CpiWriter for AmountToUiAmount<'_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -126,6 +110,23 @@ impl<Program: TokenProgram> CpiWriter for UiAmountToAmount<'_, '_, Program> {
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
         write_instruction_data(self.amount, data)
+    }
+}
+
+impl<Program: TokenProgram> super::IntoBatch<Program> for AmountToUiAmount<'_, Program> {
+    #[inline(always)]
+    fn into_batch<'account, 'state>(
+        self,
+        batch: &mut super::Batch<'account, 'state, Program>,
+    ) -> ProgramResult
+    where
+        Self: 'account + 'state,
+    {
+        batch.push(
+            |accounts| write_accounts(self.mint, accounts),
+            |accounts| write_instruction_accounts(self.mint, accounts),
+            |data| write_instruction_data(self.amount, data),
+        )
     }
 }
 
@@ -165,18 +166,16 @@ where
 
 #[inline(always)]
 fn write_instruction_data(
-    amount: &str,
+    amount: u64,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    let expected_data_len = 1 + amount.len();
-
-    if expected_data_len > MAX_DATA_LEN || data.len() < expected_data_len {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
 
-    write_bytes(&mut data[1..expected_data_len], amount.as_bytes());
+    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
 
-    Ok(expected_data_len)
+    Ok(DATA_LEN)
 }

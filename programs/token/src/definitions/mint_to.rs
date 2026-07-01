@@ -1,104 +1,114 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
+            MAX_MULTISIG_SIGNERS,
         },
-        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_instruction_view::{
-        cpi::{invoke_unchecked, CpiAccount},
+        cpi::{invoke_signed_unchecked, CpiAccount, Signer},
         InstructionAccount, InstructionView,
     },
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Maximum number of multisignature signers.
-pub const MAX_MULTISIG_SIGNERS: usize = 11;
-
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 2;
+const DISCRIMINATOR: u8 = 7;
 
 /// Maximum number of accounts expected by this instruction.
 ///
-/// The required number of accounts will depend on the number of signer
-/// accounts.
-const MAX_ACCOUNTS_LEN: usize = 2 + MAX_MULTISIG_SIGNERS;
+/// The required number of accounts will depend whether the
+/// source account has a single owner or a multisignature
+/// owner.
+const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-///   - number of signers (1 byte)
-const DATA_LEN: usize = 2;
+///   - amount to mint (8 bytes)
+const DATA_LEN: usize = 9;
 
-/// Initializes a multisignature account with N provided signers.
-///
-/// Multisignature accounts can used in place of any single owner/delegate
-/// accounts in any token instruction that require an owner/delegate to be
-/// present.  The variant field represents the number of signers (M)
-/// required to validate this multisignature account.
-///
-/// The [`super::InitializeMultisig`] instruction requires no
-/// signers and MUST be included within the same Transaction as the
-/// system program's `CreateAccount` instruction that creates the
-/// account being initialized. Otherwise another party can acquire
-/// ownership of the uninitialized account.
+/// Mints new tokens to an account.  The native mint does not support
+/// minting.
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]` The multisignature account to initialize.
-///   1. `[]` Rent sysvar.
-///   2. `..+N` `[signer]` The signer accounts, must equal to N where `1 <= N <=
-///      11`.
-pub struct InitializeMultisig<
-    'account,
-    'multisig,
-    MultisigSigner: AsRef<AccountView>,
-    Program: TokenProgram,
-> where
-    'account: 'multisig,
-{
-    /// The multisignature account to initialize.
-    pub multisig: &'account AccountView,
+///   * Single authority
+///   0. `[writable]` The mint.
+///   1. `[writable]` The account to mint tokens to.
+///   2. `[signer]` The mint's minting authority.
+///
+///   * Multisignature authority
+///   0. `[writable]` The mint.
+///   1. `[writable]` The account to mint tokens to.
+///   2. `[]` The mint's multisignature mint-tokens authority.
+///   3. `..+M` `[signer]` M signer accounts.
+pub struct MintTo<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram> {
+    /// The mint.
+    pub mint: &'account AccountView,
 
-    /// Rent sysvar.
-    pub rent_sysvar: &'account AccountView,
+    /// The account to mint tokens to.
+    pub account: &'account AccountView,
 
-    /// The signer accounts.
+    /// The account to mint tokens to.
+    pub mint_authority: &'account AccountView,
+
+    /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
 
-    /// The number of signers (M) required to validate this multisignature
-    /// account.
-    pub m: u8,
+    /// The amount of new tokens to mint.
+    pub amount: u64,
 
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    InitializeMultisig<'account, 'multisig, MultisigSigner, Program>
-where
-    'account: 'multisig,
-{
+impl<'account, Program: TokenProgram> MintTo<'account, '_, &'account AccountView, Program> {
+    /// Creates a new `MintTo` instruction with a single mint authority.
     #[inline(always)]
     pub fn new(
-        multisig: &'account AccountView,
-        rent_sysvar: &'account AccountView,
+        mint: &'account AccountView,
+        account: &'account AccountView,
+        mint_authority: &'account AccountView,
+        amount: u64,
+    ) -> Self {
+        Self::with_multisig_signers(mint, account, mint_authority, amount, &[])
+    }
+}
+
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+    MintTo<'account, 'multisig, MultisigSigner, Program>
+{
+    /// Creates a new `MintTo` instruction with a
+    /// multisignature mint authority and signer accounts.
+    #[inline(always)]
+    pub fn with_multisig_signers(
+        mint: &'account AccountView,
+        account: &'account AccountView,
+        mint_authority: &'account AccountView,
+        amount: u64,
         multisig_signers: &'multisig [MultisigSigner],
-        m: u8,
     ) -> Self {
         Self {
-            multisig,
-            rent_sysvar,
+            mint,
+            account,
+            mint_authority,
             multisig_signers,
-            m,
+            amount,
             _program: PhantomData,
         }
     }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
+    #[inline(always)]
+    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
-            return Err(ProgramError::InvalidArgument);
+            Err(ProgramError::InvalidArgument)?;
         }
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
@@ -112,9 +122,9 @@ where
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
-            invoke_unchecked(
+            invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -122,6 +132,7 @@ where
                     data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
                 },
                 from_raw_parts(accounts.as_ptr() as _, written_accounts),
+                signers,
             );
         }
 
@@ -130,7 +141,7 @@ where
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
-    for InitializeMultisig<'_, '_, MultisigSigner, Program>
+    for MintTo<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn write_accounts<'cpi>(
@@ -141,8 +152,9 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_accounts(
-            self.multisig,
-            self.rent_sysvar,
+            self.mint,
+            self.account,
+            self.mint_authority,
             self.multisig_signers,
             accounts,
         )
@@ -157,8 +169,9 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_instruction_accounts(
-            self.multisig,
-            self.rent_sysvar,
+            self.mint,
+            self.account,
+            self.mint_authority,
             self.multisig_signers,
             accounts,
         )
@@ -166,12 +179,12 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(self.m, data)
+        write_instruction_data(self.amount, data)
     }
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
-    for InitializeMultisig<'_, '_, MultisigSigner, Program>
+    for MintTo<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -184,29 +197,32 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
         batch.push(
             |accounts| {
                 write_accounts(
-                    self.multisig,
-                    self.rent_sysvar,
+                    self.mint,
+                    self.account,
+                    self.mint_authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
             |accounts| {
                 write_instruction_accounts(
-                    self.multisig,
-                    self.rent_sysvar,
+                    self.mint,
+                    self.account,
+                    self.mint_authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
-            |data| write_instruction_data(self.m, data),
+            |data| write_instruction_data(self.amount, data),
         )
     }
 }
 
 #[inline(always)]
 fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    multisig: &'account AccountView,
-    rent_sysvar: &'account AccountView,
+    mint: &'account AccountView,
+    account: &'account AccountView,
+    mint_authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -214,21 +230,23 @@ where
     'account: 'out,
     'multisig: 'out,
 {
-    let expected_accounts = 2 + multisig_signers.len();
+    let expected_accounts = 3 + multisig_signers.len();
 
     if expected_accounts > accounts.len() {
         return Err(invalid_argument_error());
     }
 
-    if multisig.is_borrowed() {
+    if mint.is_borrowed() | account.is_borrowed() {
         return Err(account_borrow_failed_error());
     }
 
-    CpiAccount::init_from_account_view(multisig, &mut accounts[0]);
+    CpiAccount::init_from_account_view(mint, &mut accounts[0]);
 
-    CpiAccount::init_from_account_view(rent_sysvar, &mut accounts[1]);
+    CpiAccount::init_from_account_view(account, &mut accounts[1]);
 
-    for (account, signer) in accounts[2..expected_accounts]
+    CpiAccount::init_from_account_view(mint_authority, &mut accounts[2]);
+
+    for (account, signer) in accounts[3..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {
@@ -240,8 +258,9 @@ where
 
 #[inline(always)]
 fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    multisig: &'account AccountView,
-    rent_sysvar: &'account AccountView,
+    mint: &'account AccountView,
+    account: &'account AccountView,
+    mint_authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -249,35 +268,46 @@ where
     'account: 'out,
     'multisig: 'out,
 {
-    let expected_accounts = 2 + multisig_signers.len();
+    let expected_accounts = 3 + multisig_signers.len();
 
     if expected_accounts > accounts.len() {
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(InstructionAccount::writable(multisig.address()));
+    accounts[0].write(InstructionAccount::writable(mint.address()));
 
-    accounts[1].write(InstructionAccount::readonly(rent_sysvar.address()));
+    accounts[1].write(InstructionAccount::writable(account.address()));
 
-    for (account, signer) in accounts[2..expected_accounts]
+    accounts[2].write(InstructionAccount::new(
+        mint_authority.address(),
+        false,
+        multisig_signers.is_empty(),
+    ));
+
+    for (account, signer) in accounts[3..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {
-        account.write(InstructionAccount::readonly(signer.as_ref().address()));
+        account.write(InstructionAccount::readonly_signer(
+            signer.as_ref().address(),
+        ));
     }
 
     Ok(expected_accounts)
 }
 
 #[inline(always)]
-fn write_instruction_data(m: u8, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+fn write_instruction_data(
+    amount: u64,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
     if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
 
-    data[1].write(m);
+    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
 
     Ok(DATA_LEN)
 }

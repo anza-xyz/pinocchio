@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{
+        definitions::{
             account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
         },
         write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
@@ -16,53 +16,47 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 20;
+const DISCRIMINATOR: u8 = 18;
 
 /// Expected number of accounts.
-const ACCOUNTS_LEN: usize = 1;
+const ACCOUNTS_LEN: usize = 2;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-///   - decimals (1 byte)
-///   - mint authority (32 bytes)
-///   - freeze authority (33 bytes, optional)
-const MAX_DATA_LEN: usize = 67;
+///   - owner pubkey (32 bytes)
+const DATA_LEN: usize = 33;
 
-/// Like [`super::InitializeMint`], but does not require the Rent
-/// sysvar to be provided
+/// Like [`super::InitializeAccount2`], but does not require the
+/// Rent sysvar to be provided
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]` The mint to initialize.
-pub struct InitializeMint2<'account, 'address, Program: TokenProgram> {
-    /// The mint to initialize.
+///   0. `[writable]`  The account to initialize.
+///   1. `[]` The mint this account will be associated with.
+pub struct InitializeAccount3<'account, 'address, Program: TokenProgram> {
+    /// The account to initialize.
+    pub account: &'account AccountView,
+
+    /// The mint this account will be associated with.
     pub mint: &'account AccountView,
 
-    /// The number of base 10 digits to the right of the decimal place.
-    pub decimals: u8,
-
-    /// The authority/multisignature to mint tokens.
-    pub mint_authority: &'address Address,
-
-    /// The freeze authority/multisignature of the mint.
-    pub freeze_authority: Option<&'address Address>,
+    /// The new account's owner/multisignature.
+    pub owner: &'address Address,
 
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'address, Program: TokenProgram> InitializeMint2<'account, 'address, Program> {
+impl<'account, 'address, Program: TokenProgram> InitializeAccount3<'account, 'address, Program> {
     #[inline(always)]
     pub fn new(
+        account: &'account AccountView,
         mint: &'account AccountView,
-        decimals: u8,
-        mint_authority: &'address Address,
-        freeze_authority: Option<&'address Address>,
+        owner: &'address Address,
     ) -> Self {
         Self {
+            account,
             mint,
-            decimals,
-            mint_authority,
-            freeze_authority,
+            owner,
             _program: PhantomData,
         }
     }
@@ -76,13 +70,13 @@ impl<'account, 'address, Program: TokenProgram> InitializeMint2<'account, 'addre
         let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; MAX_DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -97,7 +91,7 @@ impl<'account, 'address, Program: TokenProgram> InitializeMint2<'account, 'addre
     }
 }
 
-impl<Program: TokenProgram> CpiWriter for InitializeMint2<'_, '_, Program> {
+impl<Program: TokenProgram> CpiWriter for InitializeAccount3<'_, '_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -106,7 +100,7 @@ impl<Program: TokenProgram> CpiWriter for InitializeMint2<'_, '_, Program> {
     where
         Self: 'cpi,
     {
-        write_accounts(self.mint, accounts)
+        write_accounts(self.account, self.mint, accounts)
     }
 
     #[inline(always)]
@@ -117,21 +111,16 @@ impl<Program: TokenProgram> CpiWriter for InitializeMint2<'_, '_, Program> {
     where
         Self: 'cpi,
     {
-        write_instruction_accounts(self.mint, accounts)
+        write_instruction_accounts(self.account, self.mint, accounts)
     }
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(
-            self.decimals,
-            self.mint_authority,
-            self.freeze_authority,
-            data,
-        )
+        write_instruction_data(self.owner, data)
     }
 }
 
-impl<Program: TokenProgram> super::IntoBatch<Program> for InitializeMint2<'_, '_, Program> {
+impl<Program: TokenProgram> super::IntoBatch<Program> for InitializeAccount3<'_, '_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
@@ -141,22 +130,16 @@ impl<Program: TokenProgram> super::IntoBatch<Program> for InitializeMint2<'_, '_
         Self: 'account + 'state,
     {
         batch.push(
-            |accounts| write_accounts(self.mint, accounts),
-            |accounts| write_instruction_accounts(self.mint, accounts),
-            |data| {
-                write_instruction_data(
-                    self.decimals,
-                    self.mint_authority,
-                    self.freeze_authority,
-                    data,
-                )
-            },
+            |accounts| write_accounts(self.account, self.mint, accounts),
+            |accounts| write_instruction_accounts(self.account, self.mint, accounts),
+            |data| write_instruction_data(self.owner, data),
         )
     }
 }
 
 #[inline(always)]
 fn write_accounts<'account, 'out>(
+    account: &'account AccountView,
     mint: &'account AccountView,
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -167,17 +150,20 @@ where
         return Err(invalid_argument_error());
     }
 
-    if mint.is_borrowed() {
+    if account.is_borrowed() {
         return Err(account_borrow_failed_error());
     }
 
-    CpiAccount::init_from_account_view(mint, &mut accounts[0]);
+    CpiAccount::init_from_account_view(account, &mut accounts[0]);
+
+    CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
     Ok(ACCOUNTS_LEN)
 }
 
 #[inline(always)]
 fn write_instruction_accounts<'account, 'out>(
+    account: &'account AccountView,
     mint: &'account AccountView,
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -188,37 +174,25 @@ where
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(InstructionAccount::writable(mint.address()));
+    accounts[0].write(InstructionAccount::writable(account.address()));
+
+    accounts[1].write(InstructionAccount::readonly(mint.address()));
 
     Ok(ACCOUNTS_LEN)
 }
 
 #[inline(always)]
 fn write_instruction_data(
-    decimals: u8,
-    mint_authority: &Address,
-    freeze_authority: Option<&Address>,
+    owner: &Address,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < MAX_DATA_LEN {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
 
-    data[1].write(decimals);
+    write_bytes(&mut data[1..DATA_LEN], owner.as_array());
 
-    write_bytes(&mut data[2..34], mint_authority.as_array());
-
-    if let Some(freeze_auth) = freeze_authority {
-        data[34].write(1);
-
-        write_bytes(&mut data[35..MAX_DATA_LEN], freeze_auth.as_array());
-
-        Ok(MAX_DATA_LEN)
-    } else {
-        data[34].write(0);
-
-        Ok(35)
-    }
+    Ok(DATA_LEN)
 }

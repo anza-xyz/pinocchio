@@ -1,6 +1,6 @@
 use {
     crate::{
-        instructions::{invalid_argument_error, CpiWriter, TokenProgram},
+        definitions::{invalid_argument_error, CpiWriter, TokenProgram},
         UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
@@ -62,7 +62,7 @@ impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &Program::ID,
+                    program_id: &Program::id(),
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
