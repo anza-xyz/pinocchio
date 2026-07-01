@@ -38,6 +38,7 @@ pub use {
 };
 use {
     core::mem::MaybeUninit,
+    solana_address::Address,
     solana_instruction_view::{cpi::CpiAccount, InstructionAccount},
     solana_program_error::ProgramError,
 };
@@ -50,6 +51,10 @@ fn account_borrow_failed_error() -> ProgramError {
 #[cold]
 fn invalid_argument_error() -> ProgramError {
     ProgramError::InvalidArgument
+}
+
+pub trait TokenProgram {
+    const ID: Address;
 }
 
 /// A trait for instructions that can be used in a CPI context.

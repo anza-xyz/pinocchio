@@ -1,9 +1,11 @@
 use {
     crate::{
-        instructions::{account_borrow_failed_error, invalid_argument_error, CpiWriter},
+        instructions::{
+            account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
+        },
         write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
@@ -13,6 +15,17 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 18;
+
+/// Expected number of accounts.
+const ACCOUNTS_LEN: usize = 2;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - owner pubkey (32 bytes)
+const DATA_LEN: usize = 33;
+
 /// Like [`super::InitializeAccount2`], but does not require the
 /// Rent sysvar to be provided
 ///
@@ -20,7 +33,7 @@ use {
 ///
 ///   0. `[writable]`  The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
-pub struct InitializeAccount3<'account, 'address> {
+pub struct InitializeAccount3<'account, 'address, Program: TokenProgram> {
     /// The account to initialize.
     pub account: &'account AccountView,
 
@@ -29,20 +42,11 @@ pub struct InitializeAccount3<'account, 'address> {
 
     /// The new account's owner/multisignature.
     pub owner: &'address Address,
+
+    _program: PhantomData<Program>,
 }
 
-impl<'account, 'address> InitializeAccount3<'account, 'address> {
-    /// The instruction discriminator.
-    pub const DISCRIMINATOR: u8 = 18;
-
-    /// Expected number of accounts.
-    pub const ACCOUNTS_LEN: usize = 2;
-
-    /// Instruction data length:
-    ///   - discriminator (1 byte)
-    ///   - owner pubkey (32 bytes)
-    pub const DATA_LEN: usize = 33;
-
+impl<'account, 'address, Program: TokenProgram> InitializeAccount3<'account, 'address, Program> {
     #[inline(always)]
     pub fn new(
         account: &'account AccountView,
@@ -53,26 +57,26 @@ impl<'account, 'address> InitializeAccount3<'account, 'address> {
             account,
             mint,
             owner,
+            _program: PhantomData,
         }
     }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts =
-            [UNINIT_INSTRUCTION_ACCOUNT; InitializeAccount3::ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; Self::ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; Self::DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: &Program::ID,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -87,7 +91,7 @@ impl<'account, 'address> InitializeAccount3<'account, 'address> {
     }
 }
 
-impl CpiWriter for InitializeAccount3<'_, '_> {
+impl<Program: TokenProgram> CpiWriter for InitializeAccount3<'_, '_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -116,11 +120,11 @@ impl CpiWriter for InitializeAccount3<'_, '_> {
     }
 }
 
-impl super::IntoBatch for InitializeAccount3<'_, '_> {
+impl<Program: TokenProgram> super::IntoBatch<Program> for InitializeAccount3<'_, '_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state>,
+        batch: &mut super::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -142,7 +146,7 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < InitializeAccount3::ACCOUNTS_LEN {
+    if accounts.len() < ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -154,7 +158,7 @@ where
 
     CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
-    Ok(InitializeAccount3::ACCOUNTS_LEN)
+    Ok(ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -166,7 +170,7 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < InitializeAccount3::ACCOUNTS_LEN {
+    if accounts.len() < ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -174,7 +178,7 @@ where
 
     accounts[1].write(InstructionAccount::readonly(mint.address()));
 
-    Ok(InitializeAccount3::ACCOUNTS_LEN)
+    Ok(ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -182,13 +186,13 @@ fn write_instruction_data(
     owner: &Address,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < InitializeAccount3::DATA_LEN {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(InitializeAccount3::DISCRIMINATOR);
+    data[0].write(DISCRIMINATOR);
 
-    write_bytes(&mut data[1..InitializeAccount3::DATA_LEN], owner.as_array());
+    write_bytes(&mut data[1..DATA_LEN], owner.as_array());
 
-    Ok(InitializeAccount3::DATA_LEN)
+    Ok(DATA_LEN)
 }

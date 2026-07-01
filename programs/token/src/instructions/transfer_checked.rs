@@ -1,11 +1,12 @@
 use {
     crate::{
         instructions::{
-            account_borrow_failed_error, invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS,
+            account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
+            MAX_MULTISIG_SIGNERS,
         },
         write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer},
@@ -13,6 +14,22 @@ use {
     },
     solana_program_error::{ProgramError, ProgramResult},
 };
+
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 12;
+
+/// Maximum number of accounts expected by this instruction.
+///
+/// The required number of accounts will depend whether the
+/// source account has a single owner or a multisignature
+/// owner.
+const MAX_ACCOUNTS_LEN: usize = 4 + MAX_MULTISIG_SIGNERS;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - amount (8 bytes)
+///   - decimals (1 byte)
+const DATA_LEN: usize = 10;
 
 /// Transfers tokens from one account to another either directly or via a
 /// delegate.  If this account is associated with the native mint then equal
@@ -37,7 +54,12 @@ use {
 ///   2. `[writable]` The destination account.
 ///   3. `[]` The source account's multisignature owner/delegate.
 ///   4. `..+M` `[signer]` M signer accounts.
-pub struct TransferChecked<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
+pub struct TransferChecked<
+    'account,
+    'multisig,
+    MultisigSigner: AsRef<AccountView>,
+    Program: TokenProgram,
+> {
     /// The source account.
     pub from: &'account AccountView,
 
@@ -58,25 +80,13 @@ pub struct TransferChecked<'account, 'multisig, MultisigSigner: AsRef<AccountVie
 
     /// Expected number of base 10 digits to the right of the decimal place.
     pub decimals: u8,
+
+    _program: PhantomData<Program>,
 }
 
-impl<'account> TransferChecked<'account, '_, &'account AccountView> {
-    /// The instruction discriminator.
-    pub const DISCRIMINATOR: u8 = 12;
-
-    /// Maximum number of accounts expected by this instruction.
-    ///
-    /// The required number of accounts will depend whether the
-    /// source account has a single owner or a multisignature
-    /// owner.
-    pub const MAX_ACCOUNTS_LEN: usize = 4 + MAX_MULTISIG_SIGNERS;
-
-    /// Instruction data length:
-    ///   - discriminator (1 byte)
-    ///   - amount (8 bytes)
-    ///   - decimals (1 byte)
-    pub const DATA_LEN: usize = 10;
-
+impl<'account, Program: TokenProgram>
+    TransferChecked<'account, '_, &'account AccountView, Program>
+{
     /// Creates a new `TransferChecked` instruction with a single
     /// owner/delegate authority.
     #[inline(always)]
@@ -92,8 +102,8 @@ impl<'account> TransferChecked<'account, '_, &'account AccountView> {
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
-    TransferChecked<'account, 'multisig, MultisigSigner>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+    TransferChecked<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `TransferChecked` instruction with a
     /// multisignature owner/delegate authority and signer accounts.
@@ -115,6 +125,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             multisig_signers,
             amount,
             decimals,
+            _program: PhantomData,
         }
     }
 
@@ -129,21 +140,20 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts =
-            [UNINIT_INSTRUCTION_ACCOUNT; TransferChecked::MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; TransferChecked::MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; TransferChecked::DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: &Program::ID,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -159,7 +169,9 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> CpiWriter for TransferChecked<'_, '_, MultisigSigner> {
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+    for TransferChecked<'_, '_, MultisigSigner, Program>
+{
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -202,13 +214,13 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for TransferChecked<'_, '_, M
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
-    for TransferChecked<'_, '_, MultisigSigner>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
+    for TransferChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state>,
+        batch: &mut super::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -329,15 +341,15 @@ fn write_instruction_data(
     decimals: u8,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < TransferChecked::DATA_LEN {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(TransferChecked::DISCRIMINATOR);
+    data[0].write(DISCRIMINATOR);
 
     write_bytes(&mut data[1..9], &amount.to_le_bytes());
 
     data[9].write(decimals);
 
-    Ok(TransferChecked::DATA_LEN)
+    Ok(DATA_LEN)
 }

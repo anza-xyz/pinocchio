@@ -1,11 +1,12 @@
 use {
     crate::{
         instructions::{
-            account_borrow_failed_error, invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS,
+            account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
+            MAX_MULTISIG_SIGNERS,
         },
         UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer},
@@ -13,6 +14,20 @@ use {
     },
     solana_program_error::{ProgramError, ProgramResult},
 };
+
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 10;
+
+/// Maximum number of accounts expected by this instruction.
+///
+/// The required number of accounts will depend whether the
+/// source account has a single owner or a multisignature
+/// owner.
+const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+const DATA_LEN: usize = 1;
 
 /// Freeze an Initialized account using the Mint's `freeze_authority` (if
 /// set).
@@ -29,7 +44,12 @@ use {
 ///   1. `[]` The token mint.
 ///   2. `[]` The mint's multisignature freeze authority.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct FreezeAccount<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
+pub struct FreezeAccount<
+    'account,
+    'multisig,
+    MultisigSigner: AsRef<AccountView>,
+    Program: TokenProgram,
+> {
     /// The account to freeze.
     pub account: &'account AccountView,
 
@@ -41,23 +61,11 @@ pub struct FreezeAccount<'account, 'multisig, MultisigSigner: AsRef<AccountView>
 
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
+
+    _program: PhantomData<Program>,
 }
 
-impl<'account> FreezeAccount<'account, '_, &'account AccountView> {
-    /// The instruction discriminator.
-    pub const DISCRIMINATOR: u8 = 10;
-
-    /// Maximum number of accounts expected by this instruction.
-    ///
-    /// The required number of accounts will depend whether the
-    /// source account has a single owner or a multisignature
-    /// owner.
-    pub const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
-
-    /// Instruction data length:
-    ///   - discriminator (1 byte)
-    pub const DATA_LEN: usize = 1;
-
+impl<'account, Program: TokenProgram> FreezeAccount<'account, '_, &'account AccountView, Program> {
     /// Creates a new `FreezeAccount` instruction with a single freeze
     /// authority.
     #[inline(always)]
@@ -70,8 +78,8 @@ impl<'account> FreezeAccount<'account, '_, &'account AccountView> {
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
-    FreezeAccount<'account, 'multisig, MultisigSigner>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+    FreezeAccount<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `FreezeAccount` instruction with a
     /// multisignature freeze authority and signer accounts.
@@ -87,6 +95,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             mint,
             freeze_authority,
             multisig_signers,
+            _program: PhantomData,
         }
     }
 
@@ -101,21 +110,20 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts =
-            [UNINIT_INSTRUCTION_ACCOUNT; FreezeAccount::MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; FreezeAccount::MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; FreezeAccount::DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: &Program::ID,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -131,7 +139,9 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> CpiWriter for FreezeAccount<'_, '_, MultisigSigner> {
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+    for FreezeAccount<'_, '_, MultisigSigner, Program>
+{
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -172,13 +182,13 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for FreezeAccount<'_, '_, Mul
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
-    for FreezeAccount<'_, '_, MultisigSigner>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
+    for FreezeAccount<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state>,
+        batch: &mut super::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -287,11 +297,11 @@ where
 
 #[inline(always)]
 fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.is_empty() {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(FreezeAccount::DISCRIMINATOR);
+    data[0].write(DISCRIMINATOR);
 
-    Ok(FreezeAccount::DATA_LEN)
+    Ok(DATA_LEN)
 }

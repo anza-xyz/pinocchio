@@ -1,9 +1,11 @@
 use {
     crate::{
-        instructions::{account_borrow_failed_error, invalid_argument_error, CpiWriter},
+        instructions::{
+            account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
+        },
         UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
     },
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_instruction_view::{
         cpi::{invoke_unchecked, CpiAccount},
@@ -11,6 +13,19 @@ use {
     },
     solana_program_error::{ProgramError, ProgramResult},
 };
+
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 17;
+
+/// Maximum number of accounts expected by this instruction.
+///
+/// The required number of accounts will depend whether the instruction uses
+/// the runtime Rent sysvar or the Rent sysvar account.
+const MAX_ACCOUNTS_LEN: usize = 2;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+const DATA_LEN: usize = 1;
 
 /// Given a wrapped / native token account (a token account containing SOL)
 /// updates its amount field based on the account's underlying `lamports`.
@@ -28,27 +43,16 @@ use {
 ///   0. `[writable]`  The native token account to sync with its underlying
 ///      lamports.
 ///   1. `[]` Rent sysvar.
-pub struct SyncNative<'account> {
+pub struct SyncNative<'account, Program: TokenProgram> {
     /// Native Token Account
     pub native_token: &'account AccountView,
 
     pub rent_sysvar: Option<&'account AccountView>,
+
+    _program: PhantomData<Program>,
 }
 
-impl<'account> SyncNative<'account> {
-    pub const DISCRIMINATOR: u8 = 17;
-
-    /// Maximum number of accounts expected by this instruction.
-    ///
-    /// The required number of accounts will depend whether the
-    /// source account has a single owner or a multisignature
-    /// owner.
-    pub const MAX_ACCOUNTS_LEN: usize = 2;
-
-    /// Instruction data length:
-    ///   - discriminator (1 byte)
-    pub const DATA_LEN: usize = 1;
-
+impl<'account, Program: TokenProgram> SyncNative<'account, Program> {
     #[inline(always)]
     pub fn new(
         native_token: &'account AccountView,
@@ -57,25 +61,26 @@ impl<'account> SyncNative<'account> {
         Self {
             native_token,
             rent_sysvar,
+            _program: PhantomData,
         }
     }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; SyncNative::MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; Self::MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; Self::DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: &Program::ID,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -90,7 +95,7 @@ impl<'account> SyncNative<'account> {
     }
 }
 
-impl CpiWriter for SyncNative<'_> {
+impl<Program: TokenProgram> CpiWriter for SyncNative<'_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -119,11 +124,11 @@ impl CpiWriter for SyncNative<'_> {
     }
 }
 
-impl super::IntoBatch for SyncNative<'_> {
+impl<Program: TokenProgram> super::IntoBatch<Program> for SyncNative<'_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state>,
+        batch: &mut super::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -145,7 +150,7 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < SyncNative::MAX_ACCOUNTS_LEN {
+    if accounts.len() < MAX_ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -157,7 +162,7 @@ where
 
     if let Some(rent_sysvar) = rent_sysvar {
         CpiAccount::init_from_account_view(rent_sysvar, &mut accounts[1]);
-        Ok(SyncNative::MAX_ACCOUNTS_LEN)
+        Ok(MAX_ACCOUNTS_LEN)
     } else {
         Ok(1)
     }
@@ -172,7 +177,7 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < SyncNative::MAX_ACCOUNTS_LEN {
+    if accounts.len() < MAX_ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -180,7 +185,7 @@ where
 
     if let Some(rent_sysvar) = rent_sysvar {
         accounts[1].write(InstructionAccount::readonly(rent_sysvar.address()));
-        Ok(SyncNative::MAX_ACCOUNTS_LEN)
+        Ok(MAX_ACCOUNTS_LEN)
     } else {
         Ok(1)
     }
@@ -188,11 +193,11 @@ where
 
 #[inline(always)]
 fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.len() < SyncNative::DATA_LEN {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(SyncNative::DISCRIMINATOR);
+    data[0].write(DISCRIMINATOR);
 
-    Ok(SyncNative::DATA_LEN)
+    Ok(DATA_LEN)
 }
