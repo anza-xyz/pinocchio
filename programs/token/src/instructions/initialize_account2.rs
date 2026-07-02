@@ -80,13 +80,25 @@ impl<'account, Program: TokenProgram> InitializeAccount2<'account, Program> {
         }
     }
 
+    /// Invokes the instruction with `Program::ID`.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_with_program(&Program::ID)
+        self.invoke_with_unverified_program(&Program::ID)
     }
 
+    /// Invokes the instruction after verifying the `program` address.
     #[inline(always)]
     pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
+        Program::verify(program)?;
+        self.invoke_with_unverified_program(program)
+    }
+
+    /// Invokes the instruction with `program` without verifying it.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_with_program`.
+    #[inline(always)]
+    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;

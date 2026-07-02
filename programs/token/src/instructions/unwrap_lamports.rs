@@ -133,23 +133,52 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
         }
     }
 
+    /// Invokes the instruction with `Program::ID`.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_with_program(&Program::ID)
+        self.invoke_with_unverified_program(&Program::ID)
     }
 
+    /// Invokes the instruction with `Program::ID` and signer seeds.
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        self.invoke_signed_with_program(signers, &Program::ID)
+        self.invoke_signed_with_unverified_program(signers, &Program::ID)
     }
 
+    /// Invokes the instruction after verifying the `program` address.
     #[inline(always)]
     pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
         self.invoke_signed_with_program(&[], program)
     }
 
+    /// Invokes the instruction with signer seeds after verifying the `program`
+    /// address.
     #[inline(always)]
     pub fn invoke_signed_with_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
+        Program::verify(program)?;
+        self.invoke_signed_with_unverified_program(signers, program)
+    }
+
+    /// Invokes the instruction with `program` without verifying it.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_with_program`.
+    #[inline(always)]
+    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_unverified_program(&[], program)
+    }
+
+    /// Invokes the instruction with signer seeds and `program` without
+    /// verifying the program address.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_signed_with_program`.
+    #[inline(always)]
+    pub fn invoke_signed_with_unverified_program(
         &self,
         signers: &[Signer],
         program: &Address,
