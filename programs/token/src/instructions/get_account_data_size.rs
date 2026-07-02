@@ -1,10 +1,14 @@
 use {
     crate::{
-        definitions::{invalid_argument_error, CpiWriter, TokenProgram},
-        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        instructions::{
+            invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
+            UNINIT_INSTRUCTION_ACCOUNT,
+        },
+        TokenProgram,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_unchecked, CpiAccount},
         InstructionAccount, InstructionView,
@@ -13,19 +17,17 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 24;
+const DISCRIMINATOR: u8 = 21;
 
 /// Expected number of accounts.
 const ACCOUNTS_LEN: usize = 1;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-///   - amount (variable, up to 254 bytes)
-const MAX_DATA_LEN: usize = 255;
+const DATA_LEN: usize = 1;
 
-/// Convert a `UiAmount` of tokens to a little-endian `u64` raw Amount,
-/// using the given mint. In this version of the program, the mint can
-/// only specify the number of decimals.
+/// Gets the required size of an account for the given mint as a
+/// little-endian `u64`.
 ///
 /// Return data can be fetched using `sol_get_return_data` and deserializing
 /// the return data as a little-endian `u64`.
@@ -33,28 +35,38 @@ const MAX_DATA_LEN: usize = 255;
 /// Accounts expected by this instruction:
 ///
 ///   0. `[]` The mint to calculate for.
-pub struct UiAmountToAmount<'account, 'amount, Program: TokenProgram> {
+pub struct GetAccountDataSize<'account, Program: TokenProgram> {
     /// The mint to calculate for.
     pub mint: &'account AccountView,
-
-    /// The `ui_amount` of tokens to reformat.
-    pub amount: &'amount str,
 
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'amount, Program: TokenProgram> UiAmountToAmount<'account, 'amount, Program> {
+impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
+
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = ACCOUNTS_LEN;
+
+    /// Instruction data length.
+    pub const DATA_LEN: usize = DATA_LEN;
+
     #[inline(always)]
-    pub fn new(mint: &'account AccountView, amount: &'amount str) -> Self {
+    pub fn new(mint: &'account AccountView) -> Self {
         Self {
             mint,
-            amount,
             _program: PhantomData,
         }
     }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
+        self.invoke_with_program(&Program::ID)
+    }
+
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
@@ -62,13 +74,13 @@ impl<'account, 'amount, Program: TokenProgram> UiAmountToAmount<'account, 'amoun
         let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; MAX_DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &Program::id(),
+                    program_id: program,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -83,24 +95,7 @@ impl<'account, 'amount, Program: TokenProgram> UiAmountToAmount<'account, 'amoun
     }
 }
 
-impl<Program: TokenProgram> super::IntoBatch<Program> for UiAmountToAmount<'_, '_, Program> {
-    #[inline(always)]
-    fn into_batch<'account, 'state>(
-        self,
-        batch: &mut super::Batch<'account, 'state, Program>,
-    ) -> ProgramResult
-    where
-        Self: 'account + 'state,
-    {
-        batch.push(
-            |accounts| write_accounts(self.mint, accounts),
-            |accounts| write_instruction_accounts(self.mint, accounts),
-            |data| write_instruction_data(self.amount, data),
-        )
-    }
-}
-
-impl<Program: TokenProgram> CpiWriter for UiAmountToAmount<'_, '_, Program> {
+impl<Program: TokenProgram> CpiWriter for GetAccountDataSize<'_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -125,7 +120,24 @@ impl<Program: TokenProgram> CpiWriter for UiAmountToAmount<'_, '_, Program> {
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(self.amount, data)
+        write_instruction_data(data)
+    }
+}
+
+impl<Program: TokenProgram> super::batch::IntoBatch<Program> for GetAccountDataSize<'_, Program> {
+    #[inline(always)]
+    fn into_batch<'account, 'state>(
+        self,
+        batch: &mut super::batch::Batch<'account, 'state, Program>,
+    ) -> ProgramResult
+    where
+        Self: 'account + 'state,
+    {
+        batch.push(
+            |accounts| write_accounts(self.mint, accounts),
+            |accounts| write_instruction_accounts(self.mint, accounts),
+            write_instruction_data,
+        )
     }
 }
 
@@ -164,19 +176,12 @@ where
 }
 
 #[inline(always)]
-fn write_instruction_data(
-    amount: &str,
-    data: &mut [MaybeUninit<u8>],
-) -> Result<usize, ProgramError> {
-    let expected_data_len = 1 + amount.len();
-
-    if expected_data_len > MAX_DATA_LEN || data.len() < expected_data_len {
+fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
 
-    write_bytes(&mut data[1..expected_data_len], amount.as_bytes());
-
-    Ok(expected_data_len)
+    Ok(DATA_LEN)
 }

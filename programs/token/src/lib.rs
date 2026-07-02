@@ -2,37 +2,25 @@
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
+use solana_address::Address;
 
-pub mod definitions;
 pub mod instructions;
 pub mod state;
 
-use {
-    core::mem::MaybeUninit,
-    solana_instruction_view::{cpi::CpiAccount, InstructionAccount},
-};
-
 solana_address::declare_id!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
-/// Constant for an uninitialized byte.
-const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
+/// A trait for token programs that can be used in a CPI with a staticly known
+/// program address.
+pub trait TokenProgram {
+    const ID: Address;
+}
 
-/// Constant for an uninitialized `CpiAccount`.
-const UNINIT_CPI_ACCOUNT: MaybeUninit<CpiAccount> = MaybeUninit::<CpiAccount>::uninit();
+/// Struct to represent the SPL Token program.
+///
+/// This struct implements the `TokenProgram` trait, which statically provides the
+/// SPL Token address for instruction building.
+pub struct Program;
 
-/// Constant for an uninitialized `InstructionAccount`.
-const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
-    MaybeUninit::<InstructionAccount>::uninit();
-
-/// A helper function to write bytes from a source slice to a destination slice of `MaybeUninit<u8>`.
-#[inline(always)]
-fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
-    let len = destination.len().min(source.len());
-    // SAFETY:
-    // - Both pointers have alignment 1.
-    // - For valid (non-UB) references, the borrow checker guarantees no overlap.
-    // - `len` is bounded by both slice lengths.
-    unsafe {
-        core::ptr::copy_nonoverlapping(source.as_ptr(), destination.as_mut_ptr() as *mut u8, len);
-    }
+impl TokenProgram for Program {
+    const ID: Address = crate::ID;
 }

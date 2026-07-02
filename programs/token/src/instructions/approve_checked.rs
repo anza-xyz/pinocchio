@@ -1,13 +1,15 @@
 use {
     crate::{
-        definitions::{
-            account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
-            MAX_MULTISIG_SIGNERS,
+        instructions::{
+            account_borrow_failed_error, initialize_multisig::MAX_MULTISIG_SIGNERS,
+            invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
+            UNINIT_INSTRUCTION_ACCOUNT,
         },
-        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        TokenProgram,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer},
         InstructionAccount, InstructionView,
@@ -16,96 +18,145 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 10;
+const DISCRIMINATOR: u8 = 13;
 
 /// Maximum number of accounts expected by this instruction.
 ///
 /// The required number of accounts will depend whether the
 /// source account has a single owner or a multisignature
 /// owner.
-const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+const MAX_ACCOUNTS_LEN: usize = 4 + MAX_MULTISIG_SIGNERS;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-const DATA_LEN: usize = 1;
+///   - amount (8 bytes)
+///   - decimals (1 byte)
+const DATA_LEN: usize = 10;
 
-/// Freeze an Initialized account using the Mint's `freeze_authority` (if
-/// set).
+/// Approves a delegate.  A delegate is given the authority over tokens on
+/// behalf of the source account's owner.
+///
+/// This instruction differs from Approve in that the token mint and
+/// decimals value is checked by the caller.  This may be useful when
+/// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:
 ///
 ///   * Single owner
-///   0. `[writable]` The account to freeze.
+///   0. `[writable]` The source account.
 ///   1. `[]` The token mint.
-///   2. `[signer]` The mint freeze authority.
+///   2. `[]` The delegate.
+///   3. `[signer]` The source account owner.
 ///
 ///   * Multisignature owner
-///   0. `[writable]` The account to freeze.
+///   0. `[writable]` The source account.
 ///   1. `[]` The token mint.
-///   2. `[]` The mint's multisignature freeze authority.
-///   3. `..+M` `[signer]` M signer accounts.
-pub struct FreezeAccount<
+///   2. `[]` The delegate.
+///   3. `[]` The source account's multisignature owner.
+///   4. `..+M` `[signer]` M signer accounts.
+pub struct ApproveChecked<
     'account,
     'multisig,
     MultisigSigner: AsRef<AccountView>,
     Program: TokenProgram,
 > {
-    /// The account to freeze.
-    pub account: &'account AccountView,
+    /// The source account.
+    pub source: &'account AccountView,
 
     /// The token mint.
     pub mint: &'account AccountView,
 
-    /// The mint freeze authority.
-    pub freeze_authority: &'account AccountView,
+    /// The delegate.
+    pub delegate: &'account AccountView,
+
+    /// The source account owner.
+    pub authority: &'account AccountView,
 
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
 
+    /// The amount of tokens the delegate is approved for.
+    pub amount: u64,
+
+    /// Expected number of base 10 digits to the right of the decimal place.
+    pub decimals: u8,
+
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> FreezeAccount<'account, '_, &'account AccountView, Program> {
-    /// Creates a new `FreezeAccount` instruction with a single freeze
+impl<'account, Program: TokenProgram> ApproveChecked<'account, '_, &'account AccountView, Program> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
+
+    /// Maximum number of accounts expected by this instruction.
+    pub const MAX_ACCOUNTS_LEN: usize = MAX_ACCOUNTS_LEN;
+
+    /// Instruction data length.
+    pub const DATA_LEN: usize = DATA_LEN;
+
+    /// Creates a new `ApproveChecked` instruction with a single owner
     /// authority.
     #[inline(always)]
     pub fn new(
-        account: &'account AccountView,
+        source: &'account AccountView,
         mint: &'account AccountView,
-        freeze_authority: &'account AccountView,
+        delegate: &'account AccountView,
+        authority: &'account AccountView,
+        amount: u64,
+        decimals: u8,
     ) -> Self {
-        Self::with_multisig_signers(account, mint, freeze_authority, &[])
+        Self::with_multisig_signers(source, mint, delegate, authority, amount, decimals, &[])
     }
 }
 
 impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    FreezeAccount<'account, 'multisig, MultisigSigner, Program>
+    ApproveChecked<'account, 'multisig, MultisigSigner, Program>
 {
-    /// Creates a new `FreezeAccount` instruction with a
-    /// multisignature freeze authority and signer accounts.
+    /// Creates a new `ApproveChecked` instruction with a
+    /// multisignature owner authority and signer accounts.
     #[inline(always)]
     pub fn with_multisig_signers(
-        account: &'account AccountView,
+        source: &'account AccountView,
         mint: &'account AccountView,
-        freeze_authority: &'account AccountView,
+        delegate: &'account AccountView,
+        authority: &'account AccountView,
+        amount: u64,
+        decimals: u8,
         multisig_signers: &'multisig [MultisigSigner],
     ) -> Self {
         Self {
-            account,
+            source,
             mint,
-            freeze_authority,
+            delegate,
+            authority,
             multisig_signers,
+            amount,
+            decimals,
             _program: PhantomData,
         }
     }
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+        self.invoke_with_program(&Program::ID)
     }
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        self.invoke_signed_with_program(signers, &Program::ID)
+    }
+
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_program(&[], program)
+    }
+
+    #[inline(always)]
+    pub fn invoke_signed_with_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             Err(ProgramError::InvalidArgument)?;
         }
@@ -123,7 +174,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::id(),
+                    program_id: program,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -140,7 +191,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
 }
 
 impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
-    for FreezeAccount<'_, '_, MultisigSigner, Program>
+    for ApproveChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn write_accounts<'cpi>(
@@ -151,9 +202,10 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_accounts(
-            self.account,
+            self.source,
             self.mint,
-            self.freeze_authority,
+            self.delegate,
+            self.authority,
             self.multisig_signers,
             accounts,
         )
@@ -168,9 +220,10 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
         Self: 'cpi,
     {
         write_instruction_accounts(
-            self.account,
+            self.source,
             self.mint,
-            self.freeze_authority,
+            self.delegate,
+            self.authority,
             self.multisig_signers,
             accounts,
         )
@@ -178,17 +231,17 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(data)
+        write_instruction_data(self.amount, self.decimals, data)
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch<Program>
-    for FreezeAccount<'_, '_, MultisigSigner, Program>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+    for ApproveChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state, Program>,
+        batch: &mut super::batch::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -196,32 +249,35 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::IntoBatch
         batch.push(
             |accounts| {
                 write_accounts(
-                    self.account,
+                    self.source,
                     self.mint,
-                    self.freeze_authority,
+                    self.delegate,
+                    self.authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
             |accounts| {
                 write_instruction_accounts(
-                    self.account,
+                    self.source,
                     self.mint,
-                    self.freeze_authority,
+                    self.delegate,
+                    self.authority,
                     self.multisig_signers,
                     accounts,
                 )
             },
-            write_instruction_data,
+            |data| write_instruction_data(self.amount, self.decimals, data),
         )
     }
 }
 
 #[inline(always)]
 fn write_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    account: &'account AccountView,
+    source: &'account AccountView,
     mint: &'account AccountView,
-    freeze_authority: &'account AccountView,
+    delegate: &'account AccountView,
+    authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -229,23 +285,25 @@ where
     'account: 'out,
     'multisig: 'out,
 {
-    let expected_accounts = 3 + multisig_signers.len();
+    let expected_accounts = 4 + multisig_signers.len();
 
     if expected_accounts > accounts.len() {
         return Err(invalid_argument_error());
     }
 
-    if account.is_borrowed() {
+    if source.is_borrowed() {
         return Err(account_borrow_failed_error());
     }
 
-    CpiAccount::init_from_account_view(account, &mut accounts[0]);
+    CpiAccount::init_from_account_view(source, &mut accounts[0]);
 
     CpiAccount::init_from_account_view(mint, &mut accounts[1]);
 
-    CpiAccount::init_from_account_view(freeze_authority, &mut accounts[2]);
+    CpiAccount::init_from_account_view(delegate, &mut accounts[2]);
 
-    for (account, signer) in accounts[3..expected_accounts]
+    CpiAccount::init_from_account_view(authority, &mut accounts[3]);
+
+    for (account, signer) in accounts[4..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {
@@ -257,9 +315,10 @@ where
 
 #[inline(always)]
 fn write_instruction_accounts<'account, 'multisig, 'out, MultisigSigner: AsRef<AccountView>>(
-    account: &'account AccountView,
+    source: &'account AccountView,
     mint: &'account AccountView,
-    freeze_authority: &'account AccountView,
+    delegate: &'account AccountView,
+    authority: &'account AccountView,
     multisig_signers: &'multisig [MultisigSigner],
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
 ) -> Result<usize, ProgramError>
@@ -267,23 +326,25 @@ where
     'account: 'out,
     'multisig: 'out,
 {
-    let expected_accounts = 3 + multisig_signers.len();
+    let expected_accounts = 4 + multisig_signers.len();
 
     if expected_accounts > accounts.len() {
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(InstructionAccount::writable(account.address()));
+    accounts[0].write(InstructionAccount::writable(source.address()));
 
     accounts[1].write(InstructionAccount::readonly(mint.address()));
 
-    accounts[2].write(InstructionAccount::new(
-        freeze_authority.address(),
+    accounts[2].write(InstructionAccount::readonly(delegate.address()));
+
+    accounts[3].write(InstructionAccount::new(
+        authority.address(),
         false,
         multisig_signers.is_empty(),
     ));
 
-    for (account, signer) in accounts[3..expected_accounts]
+    for (account, signer) in accounts[4..expected_accounts]
         .iter_mut()
         .zip(multisig_signers.iter())
     {
@@ -296,12 +357,20 @@ where
 }
 
 #[inline(always)]
-fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+fn write_instruction_data(
+    amount: u64,
+    decimals: u8,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
     if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
+
+    write_bytes(&mut data[1..9], &amount.to_le_bytes());
+
+    data[9].write(decimals);
 
     Ok(DATA_LEN)
 }

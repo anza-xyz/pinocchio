@@ -1,12 +1,13 @@
 use core::marker::PhantomData;
 
-use crate::definitions::TokenProgram;
+use crate::TokenProgram;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 use {
-    crate::definitions::{invalid_argument_error, CpiWriter},
+    crate::instructions::{invalid_argument_error, CpiWriter},
     core::{mem::MaybeUninit, slice::from_raw_parts},
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer, MAX_CPI_ACCOUNTS},
         InstructionAccount, InstructionView,
@@ -63,6 +64,18 @@ impl<'account, 'state, Program: TokenProgram> Batch<'account, 'state, Program>
 where
     'account: 'state,
 {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
+
+    /// The maximum instruction data buffer length required for a batch.
+    pub const MAX_DATA_LEN: usize = MAX_DATA_LEN;
+
+    /// The maximum account buffer length required for a batch.
+    pub const MAX_ACCOUNTS_LEN: usize = MAX_ACCOUNTS_LEN;
+
+    /// The size of the batch instruction header.
+    pub const IX_HEADER_SIZE: usize = IX_HEADER_SIZE;
+
     /// Creates a new `Batch` with the provided buffers.
     #[inline(always)]
     pub fn new(
@@ -91,15 +104,29 @@ where
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+        self.invoke_with_program(&Program::ID)
     }
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        self.invoke_signed_with_program(signers, &Program::ID)
+    }
+
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_program(&[], program)
+    }
+
+    #[inline(always)]
+    pub fn invoke_signed_with_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &Program::id(),
+                    program_id: program,
                     accounts: from_raw_parts(
                         self.instruction_accounts.as_ptr() as _,
                         self.instruction_accounts_len,

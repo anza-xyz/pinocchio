@@ -1,10 +1,14 @@
 use {
     crate::{
-        definitions::{invalid_argument_error, CpiWriter, TokenProgram},
-        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        instructions::{
+            invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
+            UNINIT_INSTRUCTION_ACCOUNT,
+        },
+        TokenProgram,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_unchecked, CpiAccount},
         InstructionAccount, InstructionView,
@@ -41,10 +45,22 @@ pub struct AmountToUiAmount<'account, Program: TokenProgram> {
     /// The amount of tokens to reformat.
     pub amount: u64,
 
+    /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 
 impl<'account, Program: TokenProgram> AmountToUiAmount<'account, Program> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
+
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = ACCOUNTS_LEN;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - amount (8 bytes)
+    pub const DATA_LEN: usize = DATA_LEN;
+
     #[inline(always)]
     pub fn new(mint: &'account AccountView, amount: u64) -> Self {
         Self {
@@ -56,6 +72,11 @@ impl<'account, Program: TokenProgram> AmountToUiAmount<'account, Program> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
+        self.invoke_with_program(&Program::ID)
+    }
+
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
@@ -69,7 +90,7 @@ impl<'account, Program: TokenProgram> AmountToUiAmount<'account, Program> {
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &Program::id(),
+                    program_id: program,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -113,11 +134,11 @@ impl<Program: TokenProgram> CpiWriter for AmountToUiAmount<'_, Program> {
     }
 }
 
-impl<Program: TokenProgram> super::IntoBatch<Program> for AmountToUiAmount<'_, Program> {
+impl<Program: TokenProgram> super::batch::IntoBatch<Program> for AmountToUiAmount<'_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state, Program>,
+        batch: &mut super::batch::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,

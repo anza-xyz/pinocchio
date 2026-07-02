@@ -1,12 +1,15 @@
 use {
     crate::{
-        definitions::{
-            account_borrow_failed_error, invalid_argument_error, CpiWriter, TokenProgram,
+        instructions::{
+            account_borrow_failed_error,
+            invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
+            UNINIT_INSTRUCTION_ACCOUNT,
         },
-        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        TokenProgram,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_unchecked, CpiAccount},
         InstructionAccount, InstructionView,
@@ -53,6 +56,15 @@ pub struct SyncNative<'account, Program: TokenProgram> {
 }
 
 impl<'account, Program: TokenProgram> SyncNative<'account, Program> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
+
+    /// Maximum number of accounts expected by this instruction.
+    pub const MAX_ACCOUNTS_LEN: usize = MAX_ACCOUNTS_LEN;
+
+    /// Instruction data length.
+    pub const DATA_LEN: usize = DATA_LEN;
+
     #[inline(always)]
     pub fn new(
         native_token: &'account AccountView,
@@ -67,6 +79,11 @@ impl<'account, Program: TokenProgram> SyncNative<'account, Program> {
 
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
+        self.invoke_with_program(&Program::ID)
+    }
+
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
@@ -80,7 +97,7 @@ impl<'account, Program: TokenProgram> SyncNative<'account, Program> {
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &Program::id(),
+                    program_id: program,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -124,11 +141,11 @@ impl<Program: TokenProgram> CpiWriter for SyncNative<'_, Program> {
     }
 }
 
-impl<Program: TokenProgram> super::IntoBatch<Program> for SyncNative<'_, Program> {
+impl<Program: TokenProgram> super::batch::IntoBatch<Program> for SyncNative<'_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state, Program>,
+        batch: &mut super::batch::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
