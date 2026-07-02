@@ -1,12 +1,11 @@
-use core::marker::PhantomData;
-
-use crate::TokenProgram;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-
 use {
-    crate::instructions::{invalid_argument_error, CpiWriter},
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    crate::{
+        instructions::{invalid_argument_error, CpiWriter},
+        TokenProgram,
+    },
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer, MAX_CPI_ACCOUNTS},

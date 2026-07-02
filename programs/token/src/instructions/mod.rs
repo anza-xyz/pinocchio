@@ -518,7 +518,8 @@ fn invalid_argument_error() -> ProgramError {
     ProgramError::InvalidArgument
 }
 
-/// A helper function to write bytes from a source slice to a destination slice of `MaybeUninit<u8>`.
+/// A helper function to write bytes from a source slice to a destination slice
+/// of `MaybeUninit<u8>`.
 #[inline(always)]
 fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
     let len = destination.len().min(source.len());

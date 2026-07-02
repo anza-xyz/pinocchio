@@ -1,9 +1,8 @@
 use {
     crate::{
         instructions::{
-            account_borrow_failed_error,
-            invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
-            UNINIT_INSTRUCTION_ACCOUNT,
+            account_borrow_failed_error, invalid_argument_error, write_bytes, CpiWriter,
+            UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
         },
         TokenProgram,
     },

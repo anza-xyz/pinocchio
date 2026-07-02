@@ -1,9 +1,8 @@
 use {
     crate::{
         instructions::{
-            account_borrow_failed_error,
-            invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
-            UNINIT_INSTRUCTION_ACCOUNT,
+            account_borrow_failed_error, invalid_argument_error, CpiWriter, UNINIT_BYTE,
+            UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
         },
         TokenProgram,
     },
@@ -124,7 +123,9 @@ impl<Program: TokenProgram> CpiWriter for InitializeImmutableOwner<'_, Program> 
     }
 }
 
-impl<Program: TokenProgram> super::batch::IntoBatch<Program> for InitializeImmutableOwner<'_, Program> {
+impl<Program: TokenProgram> super::batch::IntoBatch<Program>
+    for InitializeImmutableOwner<'_, Program>
+{
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,

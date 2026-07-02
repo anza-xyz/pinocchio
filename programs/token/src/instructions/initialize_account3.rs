@@ -1,9 +1,8 @@
 use {
     crate::{
         instructions::{
-            account_borrow_failed_error,
-            invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
-            UNINIT_INSTRUCTION_ACCOUNT,
+            account_borrow_failed_error, invalid_argument_error, write_bytes, CpiWriter,
+            UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
         },
         TokenProgram,
     },
@@ -136,7 +135,9 @@ impl<Program: TokenProgram> CpiWriter for InitializeAccount3<'_, '_, Program> {
     }
 }
 
-impl<Program: TokenProgram> super::batch::IntoBatch<Program> for InitializeAccount3<'_, '_, Program> {
+impl<Program: TokenProgram> super::batch::IntoBatch<Program>
+    for InitializeAccount3<'_, '_, Program>
+{
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
