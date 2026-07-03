@@ -95,15 +95,15 @@ Any of these macros can be replaced by alternative implementations.
 
 📌 Custom entrypoints with [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html)
 
-For programs that need maximum control over the entrypoint, `pinocchio` exposes the [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html) function. This function is the same deserialization logic used internally by the `program_entrypoint!` macro, exposed as a public API and can be called directly from a custom entrypoint, allowing you to implement fast-path optimizations or custom pre-processing logic before falling back to standard input parsing.
+For programs that need maximum control over the entrypoint, `pinocchio` exposes the [`process_program_input`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_program_input.html) function. This function is the same deserialization logic used internally by the `program_entrypoint!` macro, exposed as a public API and can be called directly from a custom entrypoint, allowing you to implement fast-path optimizations or custom pre-processing logic before falling back to standard input processing.
 
-To use `process_entrypoint` in a custom entrypoint:
+To use `process_program_input` in a custom entrypoint:
 ```rust
 use pinocchio::{
   AccountView,
   Address,
   default_panic_handler,
-  entrypoint::process_entrypoint,
+  entrypoint::process_program_input,
   no_allocator,
   ProgramResult,
 };
@@ -125,7 +125,7 @@ pub unsafe extern "C" fn entrypoint(
     }
 
     // Standard path: delegate to `process_entrypoint`
-    unsafe { process_entrypoint(program_input, instruction_data, process_instruction) }
+    unsafe { process_program_input(program_input, instruction_data, process_instruction) }
 }
 
 pub fn process_instruction(

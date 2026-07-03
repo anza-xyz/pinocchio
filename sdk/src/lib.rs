@@ -71,24 +71,23 @@
 //! ```
 //! Any of these macros can be replaced by alternative implementations.
 //!
-//! ### Custom entrypoints with [`crate::entrypoint::process_entrypoint`]
+//! ### Custom entrypoints with [`crate::entrypoint::process_program_input`]
 //!
 //! For programs that need maximum control over the entrypoint, `pinocchio`
-//! exposes the [`crate::entrypoint::process_entrypoint`] function. This
-//! function is the same deserialization logic used internally by the
-//! [`program_entrypoint!`] macro, exposed as a public API and can be called
-//! directly from a custom entrypoint, allowing you to implement fast-path
-//! optimizations or custom pre-processing logic before falling back to standard
-//! input parsing.
+//! exposes the [`crate::entrypoint::process_program_input`] function. This
+//! function is the same one used by the [`program_entrypoint!`] macro, exposed
+//! as a public API and can be called directly from a custom entrypoint,
+//! allowing you to implement fast-path optimizations or custom pre-processing
+//! logic before falling back to standard input processing.
 //!
-//! To use [`crate::entrypoint::process_entrypoint`] in a custom entrypoint:
+//! To use [`crate::entrypoint::process_program_input`] in a custom entrypoint:
 //!
 //! ```ignore
 //! use pinocchio::{
 //!   AccountView,
 //!   Address,
 //!   default_panic_handler,
-//!   entrypoint::process_entrypoint,
+//!   entrypoint::process_program_input,
 //!   no_allocator,
 //!   ProgramResult,
 //! };
@@ -109,8 +108,8 @@
 //!     return 0;
 //!   }
 //!
-//!   // Standard path: delegate to `process_entrypoint`
-//!   unsafe { process_entrypoint(program_input, instruction_data, process_instruction) }
+//!   // Standard path: delegate to `process_program_input`
+//!   unsafe { process_program_input(program_input, instruction_data, process_instruction) }
 //! }
 //!
 //! pub fn process_instruction(
