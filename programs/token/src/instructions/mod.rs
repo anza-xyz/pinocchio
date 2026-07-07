@@ -1,5 +1,3 @@
-#[cfg(feature = "alloc")]
-pub use crate::instructions::batch::BatchState;
 pub use crate::instructions::{
     batch::IntoBatch, initialize_multisig::MAX_MULTISIG_SIGNERS, set_authority::AuthorityType,
     unwrap_lamports::Amount,
@@ -108,6 +106,10 @@ pub type ApproveChecked<'account, 'multisig, MultisigSigner> =
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
 pub type Batch<'account, 'state> = batch::Batch<'account, 'state, Program>;
+
+#[cfg(feature = "alloc")]
+/// A state object that contains the buffers for a `Batch` instruction.
+pub type BatchState<'account> = batch::BatchState<'account, Program>;
 
 /// Burns tokens by removing them from an account.  `Burn` does not support
 /// accounts associated with the native mint, use `CloseAccount` instead.

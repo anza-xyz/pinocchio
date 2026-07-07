@@ -213,7 +213,7 @@ where
 
 #[cfg(feature = "alloc")]
 /// A state object that contains the buffers for a `Batch` instruction.
-pub struct BatchState<'account> {
+pub struct BatchState<'account, Program: TokenProgram> {
     /// Container for the instruction data of the batch instruction.
     data: Box<[MaybeUninit<u8>]>,
 
@@ -222,21 +222,24 @@ pub struct BatchState<'account> {
 
     /// Container for the accounts of the batch instruction.
     accounts: Box<[MaybeUninit<CpiAccount<'account>>]>,
+
+    _program: PhantomData<Program>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'account> BatchState<'account> {
+impl<'account, Program: TokenProgram> BatchState<'account, Program> {
     #[inline(always)]
     pub fn new(accounts_len: usize, data_len: usize) -> Self {
         Self {
             data: Box::new_uninit_slice(data_len),
             instruction_accounts: Box::new_uninit_slice(accounts_len),
             accounts: Box::new_uninit_slice(accounts_len),
+            _program: PhantomData,
         }
     }
 
     #[inline(always)]
-    pub fn as_batch<'state, Program: TokenProgram>(
+    pub fn as_batch<'state>(
         &'state mut self,
     ) -> Result<Batch<'account, 'state, Program>, ProgramError>
     where
