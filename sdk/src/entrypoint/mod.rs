@@ -392,20 +392,6 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     }
 }
 
-/// Align a pointer to the BPF alignment of [`u128`].
-macro_rules! align_pointer {
-    ($ptr:ident) => {
-        // Integer-to-pointer cast: first compute the aligned address as a `usize`,
-        // since this is more CU-efficient than using `ptr::align_offset()` or the
-        // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
-        // back to a pointer. The resulting pointer is guaranteed to be valid
-        // because it follows the layout serialized by the runtime.
-        with_exposed_provenance_mut(
-            ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
-        )
-    };
-}
-
 /// Advance the input pointer in relation to a non-duplicated account.
 ///
 /// The macro will add `STATIC_ACCOUNT_DATA` and the account length to
