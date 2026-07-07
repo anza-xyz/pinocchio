@@ -63,6 +63,7 @@ pub struct Approve<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Prog
     /// The amount of tokens the delegate is approved for.
     pub amount: u64,
 
+    /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 
@@ -145,6 +146,13 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
         self.invoke_signed_with_unverified_program(&[], program)
@@ -155,6 +163,13 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_signed_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_signed_with_unverified_program(
         &self,

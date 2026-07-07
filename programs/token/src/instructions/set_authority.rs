@@ -76,6 +76,7 @@ pub struct SetAuthority<
     /// The new authority.
     pub new_authority: Option<&'address Address>,
 
+    /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 
@@ -160,6 +161,13 @@ impl<'account, 'address, 'multisig, MultisigSigner: AsRef<AccountView>, Program:
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
         self.invoke_signed_with_unverified_program(&[], program)
@@ -170,6 +178,13 @@ impl<'account, 'address, 'multisig, MultisigSigner: AsRef<AccountView>, Program:
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_signed_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_signed_with_unverified_program(
         &self,

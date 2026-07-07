@@ -48,6 +48,7 @@ pub struct InitializeMint2<'account, 'address, Program: TokenProgram> {
     /// The freeze authority/multisignature of the mint.
     pub freeze_authority: Option<&'address Address>,
 
+    /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 
@@ -94,6 +95,13 @@ impl<'account, 'address, Program: TokenProgram> InitializeMint2<'account, 'addre
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];

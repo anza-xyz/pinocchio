@@ -51,6 +51,7 @@ pub struct SyncNative<'account, Program: TokenProgram> {
 
     pub rent_sysvar: Option<&'account AccountView>,
 
+    /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 
@@ -93,6 +94,13 @@ impl<'account, Program: TokenProgram> SyncNative<'account, Program> {
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];

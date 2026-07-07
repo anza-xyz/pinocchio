@@ -53,6 +53,7 @@ pub struct Batch<'account, 'state, Program: TokenProgram> {
     /// The current length of the instruction accounts.    
     instruction_accounts_len: usize,
 
+    /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 
@@ -132,6 +133,13 @@ where
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
         self.invoke_signed_with_unverified_program(&[], program)
@@ -142,6 +150,13 @@ where
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_signed_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_signed_with_unverified_program(
         &self,
@@ -223,6 +238,7 @@ pub struct BatchState<'account, Program: TokenProgram> {
     /// Container for the accounts of the batch instruction.
     accounts: Box<[MaybeUninit<CpiAccount<'account>>]>,
 
+    /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 

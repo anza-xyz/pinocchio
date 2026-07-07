@@ -73,6 +73,7 @@ pub struct InitializeMultisig<
     /// account.
     pub m: u8,
 
+    /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 
@@ -126,6 +127,13 @@ where
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
     /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
     #[inline(always)]
     pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
