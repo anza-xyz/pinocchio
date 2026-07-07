@@ -1,10 +1,7 @@
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use {
-    crate::{
-        instructions::{invalid_argument_error, CpiWriter},
-        TokenProgram,
-    },
+    crate::{instructions::invalid_argument_error, TokenProgram},
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_address::Address,
     solana_instruction_view::{
@@ -254,7 +251,7 @@ impl<'account> BatchState<'account> {
 }
 
 /// A trait for instructions that can be consumed directly into a `Batch`.
-pub trait IntoBatch<Program: TokenProgram>: sealed::Sealed {
+pub trait IntoBatch<Program: TokenProgram> {
     /// Serializes `self` into the provided batch.
     fn into_batch<'account, 'state>(
         self,
@@ -262,15 +259,4 @@ pub trait IntoBatch<Program: TokenProgram>: sealed::Sealed {
     ) -> ProgramResult
     where
         Self: 'account + 'state;
-}
-
-/// Implement `Sealed` for all types that implement `CpiWriter`.
-impl<T: CpiWriter> sealed::Sealed for T {}
-
-/// A module only accessible within this crate that contains the
-/// `Sealed` trait.
-pub(crate) mod sealed {
-    /// A sealed trait that prevents external implementations of the
-    /// `IntoBatch` trait.
-    pub trait Sealed {}
 }
