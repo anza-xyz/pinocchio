@@ -26,8 +26,8 @@
 //!   in combination with the `std` panic handler
 //!
 //! When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
-//! instead of `default_panic_handler!` to declare a rust runtime panic handler.
-//! There's no need to do this when any dependency is `std` since rust compiler
+//! instead of `default_panic_handler!` to declare a Rust runtime panic handler.
+//! There's no need to do this when any dependency is `std` since Rust compiler
 //! will emit a panic handler.
 //!
 //! To use the `entrypoint!` macro, use the following in your entrypoint
@@ -53,10 +53,10 @@
 //! }
 //! ```
 //!
-//! The input is parsed into the following components:
+//! The input is split into the following components:
 //!
-//! * `program_id`: the `ID` of the program being called
-//! * `accounts`: the accounts received
+//! * `program_id`: address of the program being called
+//! * `accounts`: accounts received by the instruction
 //! * `instruction_data`: data for the instruction
 //!
 //! `pinocchio` also offers variations of the program entrypoint
@@ -224,7 +224,7 @@
 //! // static allocation:
 //! //    - 0 is the offset when the type will be allocated
 //! //    - `allocate_unchecked` returns a mutable reference to the allocated
-//! type let lamports = allocate_unchecked::<u64>(0);
+//! type let lamports = unsafe { allocate_unchecked::<u64>(0) };
 //! *lamports = 1_000_000_000;
 //! ```
 //!
