@@ -8,7 +8,7 @@ use {
         error::ProgramError,
         Address, BPF_ALIGN_OF_U128,
     },
-    core::mem::size_of,
+    core::{mem::size_of, ptr::with_exposed_provenance_mut},
 };
 
 /// Declare the lazy program entrypoint.
@@ -256,7 +256,7 @@ impl InstructionContext {
 
             self.buffer = self.buffer.add(STATIC_ACCOUNT_DATA);
             self.buffer = self.buffer.add((*account).data_len as usize);
-            self.buffer = self.buffer.add(self.buffer.align_offset(BPF_ALIGN_OF_U128));
+            self.buffer = align_pointer!(self.buffer);
 
             MaybeAccount::Account(AccountView::new_unchecked(account))
         } else {
