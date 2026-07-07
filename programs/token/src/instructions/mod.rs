@@ -1,5 +1,9 @@
 #[cfg(feature = "alloc")]
-pub use crate::instructions::batch::{BatchState, IntoBatch};
+pub use crate::instructions::batch::BatchState;
+pub use crate::instructions::{
+    batch::IntoBatch, initialize_multisig::MAX_MULTISIG_SIGNERS, set_authority::AuthorityType,
+    unwrap_lamports::Amount,
+};
 use {
     crate::Program,
     core::mem::MaybeUninit,
