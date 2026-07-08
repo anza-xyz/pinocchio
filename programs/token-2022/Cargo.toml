@@ -10,7 +10,11 @@ repository = { workspace = true }
 [lib]
 crate-type = ["rlib"]
 
+[features]
+alloc = []
+
 [dependencies]
+pinocchio-token = { workspace = true }
 solana-account-view = { workspace = true }
 solana-address = { workspace = true, features = ["decode", "nullable"] }
 solana-instruction-view = { workspace = true, features = ["cpi"] }

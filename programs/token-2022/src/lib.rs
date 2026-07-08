@@ -5,9 +5,40 @@ pub mod state;
 
 use core::mem::MaybeUninit;
 
+use pinocchio_token::TokenProgram;
+use solana_address::Address;
+use solana_program_error::{ProgramError, ProgramResult};
+
 solana_address::declare_id!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
 const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
+
+/// Struct to represent the SPL Token-2022 program.
+///
+/// This struct implements the `TokenProgram` trait, which statically provides
+/// the SPL Token address for instruction building.
+pub struct Program2022;
+
+impl TokenProgram for Program2022 {
+    const ID: Address = crate::ID;
+
+    #[inline(always)]
+    fn verify(address: &Address) -> ProgramResult {
+        if address != &Self::ID && address != &pinocchio_token::ID {
+            return Err(incorrect_program_id());
+        }
+
+        Ok(())
+    }
+}
+
+/// Cold helper for constructing `ProgramError::IncorrectProgramId` outside the
+/// hot path.
+#[doc(hidden)]
+#[cold]
+fn incorrect_program_id() -> ProgramError {
+    ProgramError::IncorrectProgramId
+}
 
 #[inline(always)]
 fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
