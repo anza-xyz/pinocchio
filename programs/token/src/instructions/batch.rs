@@ -182,7 +182,7 @@ where
     }
 
     #[inline(always)]
-    pub(crate) fn push(
+    pub fn push(
         &mut self,
         write_accounts: impl FnOnce(
             &mut [MaybeUninit<CpiAccount<'account>>],
