@@ -62,22 +62,6 @@
 //!    points to the start of the corresponding account in the input buffer.
 //! ```
 
-/// Align a pointer to the BPF alignment of [`u128`].
-macro_rules! align_pointer {
-    ($ptr:expr) => {
-        // Integer-to-pointer cast: first compute the aligned address as a `usize`,
-        // since this is more CU-efficient than using `ptr::align_offset()` or the
-        // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
-        // back to a pointer. The resulting pointer is guaranteed to be valid
-        // because it follows the layout serialized by the runtime.
-        with_exposed_provenance_mut(
-            ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
-        )
-    };
-}
-
-pub mod lazy;
-
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
 pub use lazy::{InstructionContext, MaybeAccount};
@@ -95,6 +79,22 @@ use {
         slice::{from_raw_parts, from_raw_parts_mut},
     },
 };
+
+/// Align a pointer to the BPF alignment of [`u128`].
+macro_rules! align_pointer {
+    ( $ptr:expr ) => {
+        // Integer-to-pointer cast: first compute the aligned address as a `usize`,
+        // since this is more CU-efficient than using `ptr::align_offset()` or the
+        // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
+        // back to a pointer. The resulting pointer is guaranteed to be valid
+        // because it follows the layout serialized by the runtime.
+        with_exposed_provenance_mut(
+            ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
+        )
+    };
+}
+
+pub mod lazy;
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
