@@ -33,7 +33,7 @@ const DATA_LEN: usize = 1;
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 pub struct InitializeImmutableOwner<'account, Program: TokenProgram> {
     /// The account to initialize.
     pub account: &'account AccountView,

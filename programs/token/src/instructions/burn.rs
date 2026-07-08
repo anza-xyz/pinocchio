@@ -32,7 +32,7 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 ///   - amount (8 bytes)
 const DATA_LEN: usize = 9;
 
-/// Burns tokens by removing them from an account.  `Burn` does not support
+/// Burns tokens by removing them from an account. `Burn` does not support
 /// accounts associated with the native mint, use `CloseAccount` instead.
 ///
 /// Accounts expected by this instruction:

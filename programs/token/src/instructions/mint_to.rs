@@ -32,7 +32,7 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 ///   - amount to mint (8 bytes)
 const DATA_LEN: usize = 9;
 
-/// Mints new tokens to an account.  The native mint does not support
+/// Mints new tokens to an account. The native mint does not support
 /// minting.
 ///
 /// Accounts expected by this instruction:

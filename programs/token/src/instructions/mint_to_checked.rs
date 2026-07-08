@@ -33,11 +33,11 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 ///   - decimals (1 byte)
 const DATA_LEN: usize = 10;
 
-/// Mints new tokens to an account.  The native mint does not support
+/// Mints new tokens to an account. The native mint does not support
 /// minting.
 ///
 /// This instruction differs from [`super::MintTo`] in that the
-/// decimals value is checked by the caller.  This may be useful when
+/// decimals value is checked by the caller. This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:

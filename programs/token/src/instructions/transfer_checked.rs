@@ -34,12 +34,12 @@ const MAX_ACCOUNTS_LEN: usize = 4 + MAX_MULTISIG_SIGNERS;
 const DATA_LEN: usize = 10;
 
 /// Transfers tokens from one account to another either directly or via a
-/// delegate.  If this account is associated with the native mint then equal
+/// delegate. If this account is associated with the native mint then equal
 /// amounts of SOL and Tokens will be transferred to the destination
 /// account.
 ///
 /// This instruction differs from [`super::Transfer`] in that the token mint and
-/// decimals value is checked by the caller.  This may be useful when
+/// decimals value is checked by the caller. This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:

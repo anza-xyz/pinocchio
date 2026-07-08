@@ -61,7 +61,7 @@ const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
 ///   0. `[]` The mint to calculate for.
 pub type AmountToUiAmount<'account> = amount_to_ui_amount::AmountToUiAmount<'account, Program>;
 
-/// Approves a delegate.  A delegate is given the authority over tokens on
+/// Approves a delegate. A delegate is given the authority over tokens on
 /// behalf of the source account's owner.
 ///
 /// Accounts expected by this instruction:
@@ -79,11 +79,11 @@ pub type AmountToUiAmount<'account> = amount_to_ui_amount::AmountToUiAmount<'acc
 pub type Approve<'account, 'multisig, MultisigSigner> =
     approve::Approve<'account, 'multisig, MultisigSigner, Program>;
 
-/// Approves a delegate.  A delegate is given the authority over tokens on
+/// Approves a delegate. A delegate is given the authority over tokens on
 /// behalf of the source account's owner.
 ///
 /// This instruction differs from Approve in that the token mint and
-/// decimals value is checked by the caller.  This may be useful when
+/// decimals value is checked by the caller. This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:
@@ -111,7 +111,7 @@ pub type Batch<'account, 'state> = batch::Batch<'account, 'state, Program>;
 /// A state object that contains the buffers for a `Batch` instruction.
 pub type BatchState<'account> = batch::BatchState<'account, Program>;
 
-/// Burns tokens by removing them from an account.  `Burn` does not support
+/// Burns tokens by removing them from an account. `Burn` does not support
 /// accounts associated with the native mint, use `CloseAccount` instead.
 ///
 /// Accounts expected by this instruction:
@@ -200,7 +200,7 @@ pub type FreezeAccount<'account, 'multisig, MultisigSigner> =
 pub type GetAccountDataSize<'account> =
     get_account_data_size::GetAccountDataSize<'account, Program>;
 
-/// Initializes a new account to hold tokens.  If this account is associated
+/// Initializes a new account to hold tokens. If this account is associated
 /// with the native mint then the token balance of the initialized account
 /// will be equal to the amount of SOL in the account. If this account is
 /// associated with another mint, that mint must be initialized before this
@@ -214,7 +214,7 @@ pub type GetAccountDataSize<'account> =
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 ///   2. `[]` The new account's owner/multisignature.
 ///   3. `[]` Rent sysvar.
@@ -228,7 +228,7 @@ pub type InitializeAccount<'account> = initialize_account::InitializeAccount<'ac
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 ///   2. `[]` Rent sysvar.
 pub type InitializeAccount2<'account> = initialize_account2::InitializeAccount2<'account, Program>;
@@ -238,7 +238,7 @@ pub type InitializeAccount2<'account> = initialize_account2::InitializeAccount2<
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 pub type InitializeAccount3<'account, 'address> =
     initialize_account3::InitializeAccount3<'account, 'address, Program>;
@@ -250,7 +250,7 @@ pub type InitializeAccount3<'account, 'address> =
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 pub type InitializeImmutableOwner<'account> =
     initialize_immutable_owner::InitializeImmutableOwner<'account, Program>;
 
@@ -283,7 +283,7 @@ pub type InitializeMint2<'account, 'address> =
 ///
 /// Multisignature accounts can used in place of any single owner/delegate
 /// accounts in any token instruction that require an owner/delegate to be
-/// present.  The variant field represents the number of signers (M)
+/// present. The variant field represents the number of signers (M)
 /// required to validate this multisignature account.
 ///
 /// The [`InitializeMultisig`] instruction requires no
@@ -312,7 +312,7 @@ pub type InitializeMultisig<'account, 'multisig, MultisigSigner> =
 pub type InitializeMultisig2<'account, 'multisig, MultisigSigner> =
     initialize_multisig2::InitializeMultisig2<'account, 'multisig, MultisigSigner, Program>;
 
-/// Mints new tokens to an account.  The native mint does not support
+/// Mints new tokens to an account. The native mint does not support
 /// minting.
 ///
 /// Accounts expected by this instruction:
@@ -330,11 +330,11 @@ pub type InitializeMultisig2<'account, 'multisig, MultisigSigner> =
 pub type MintTo<'account, 'multisig, MultisigSigner> =
     mint_to::MintTo<'account, 'multisig, MultisigSigner, Program>;
 
-/// Mints new tokens to an account.  The native mint does not support
+/// Mints new tokens to an account. The native mint does not support
 /// minting.
 ///
 /// This instruction differs from [`MintTo`] in that the
-/// decimals value is checked by the caller.  This may be useful when
+/// decimals value is checked by the caller. This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:
@@ -391,11 +391,11 @@ pub type SetAuthority<'account, 'address, 'multisig, MultisigSigner> =
 /// Accounts expected by this instruction:
 ///
 ///   * Using runtime Rent sysvar
-///   0. `[writable]`  The native token account to sync with its underlying
+///   0. `[writable]` The native token account to sync with its underlying
 ///      lamports.
 ///
 ///   * Using Rent sysvar account
-///   0. `[writable]`  The native token account to sync with its underlying
+///   0. `[writable]` The native token account to sync with its underlying
 ///      lamports.
 ///   1. `[]` Rent sysvar.
 pub type SyncNative<'account> = sync_native::SyncNative<'account, Program>;
@@ -418,7 +418,7 @@ pub type ThawAccount<'account, 'multisig, MultisigSigner> =
     thaw_account::ThawAccount<'account, 'multisig, MultisigSigner, Program>;
 
 /// Transfers tokens from one account to another either directly or via a
-/// delegate.  If this account is associated with the native mint then equal
+/// delegate. If this account is associated with the native mint then equal
 /// amounts of SOL and Tokens will be transferred to the destination
 /// account.
 ///
@@ -438,12 +438,12 @@ pub type Transfer<'account, 'multisig, MultisigSigner> =
     transfer::Transfer<'account, 'multisig, MultisigSigner, Program>;
 
 /// Transfers tokens from one account to another either directly or via a
-/// delegate.  If this account is associated with the native mint then equal
+/// delegate. If this account is associated with the native mint then equal
 /// amounts of SOL and Tokens will be transferred to the destination
 /// account.
 ///
 /// This instruction differs from [`Transfer`] in that the token mint and
-/// decimals value is checked by the caller.  This may be useful when
+/// decimals value is checked by the caller. This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:

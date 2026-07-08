@@ -26,7 +26,7 @@ const ACCOUNTS_LEN: usize = 4;
 ///   - discriminator (1 byte)
 const DATA_LEN: usize = 1;
 
-/// Initializes a new account to hold tokens.  If this account is associated
+/// Initializes a new account to hold tokens. If this account is associated
 /// with the native mint then the token balance of the initialized account
 /// will be equal to the amount of SOL in the account. If this account is
 /// associated with another mint, that mint must be initialized before this

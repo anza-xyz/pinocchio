@@ -32,7 +32,7 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 ///   - amount (8 bytes)
 const DATA_LEN: usize = 9;
 
-/// Approves a delegate.  A delegate is given the authority over tokens on
+/// Approves a delegate. A delegate is given the authority over tokens on
 /// behalf of the source account's owner.
 ///
 /// Accounts expected by this instruction:

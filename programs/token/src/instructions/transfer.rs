@@ -33,7 +33,7 @@ const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
 const DATA_LEN: usize = 9;
 
 /// Transfers tokens from one account to another either directly or via a
-/// delegate.  If this account is associated with the native mint then equal
+/// delegate. If this account is associated with the native mint then equal
 /// amounts of SOL and Tokens will be transferred to the destination
 /// account.
 ///

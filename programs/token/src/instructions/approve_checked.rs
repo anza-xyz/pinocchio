@@ -33,7 +33,7 @@ const MAX_ACCOUNTS_LEN: usize = 4 + MAX_MULTISIG_SIGNERS;
 ///   - decimals (1 byte)
 const DATA_LEN: usize = 10;
 
-/// Approves a delegate.  A delegate is given the authority over tokens on
+/// Approves a delegate. A delegate is given the authority over tokens on
 /// behalf of the source account's owner.
 ///
 /// This instruction differs from Approve in that the token mint and

@@ -32,7 +32,7 @@ const DATA_LEN: usize = 33;
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 pub struct InitializeAccount3<'account, 'address, Program: TokenProgram> {
     /// The account to initialize.

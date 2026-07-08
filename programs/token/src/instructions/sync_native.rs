@@ -38,11 +38,11 @@ const DATA_LEN: usize = 1;
 /// Accounts expected by this instruction:
 ///
 ///   * Using runtime Rent sysvar
-///   0. `[writable]`  The native token account to sync with its underlying
+///   0. `[writable]` The native token account to sync with its underlying
 ///      lamports.
 ///
 ///   * Using Rent sysvar account
-///   0. `[writable]`  The native token account to sync with its underlying
+///   0. `[writable]` The native token account to sync with its underlying
 ///      lamports.
 ///   1. `[]` Rent sysvar.
 pub struct SyncNative<'account, Program: TokenProgram> {
