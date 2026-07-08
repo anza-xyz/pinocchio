@@ -6,14 +6,13 @@ use {
 
 mod create_native_mint;
 mod extensions;
-mod get_account_data_size;
+pub mod get_account_data_size;
 mod initialize_non_transferable_mint;
 mod reallocate;
 
 pub use {
     create_native_mint::*,
     extensions::*,
-    get_account_data_size::*,
     initialize_non_transferable_mint::*,
     pinocchio_token::instructions::{
         batch::IntoBatch, initialize_multisig::MAX_MULTISIG_SIGNERS, set_authority::AuthorityType,
@@ -204,6 +203,18 @@ pub type FreezeAccount<'account, 'multisig, MultisigSigner> =
         MultisigSigner,
         Program2022,
     >;
+
+/// Gets the required size of an account for the given mint as a
+/// little-endian `u64`.
+///
+/// Return data can be fetched using `sol_get_return_data` and deserializing
+/// the return data as a little-endian `u64`.
+///
+/// Accounts expected by this instruction:
+///
+///   0. `[]` The mint to calculate for.
+pub type GetAccountDataSize<'account, 'extensions> =
+    get_account_data_size::GetAccountDataSize<'account, 'extensions, Program2022>;
 
 /// Initializes a new account to hold tokens.  If this account is associated
 /// with the native mint then the token balance of the initialized account

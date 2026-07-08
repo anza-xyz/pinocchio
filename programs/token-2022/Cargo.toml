@@ -11,7 +11,7 @@ repository = { workspace = true }
 crate-type = ["rlib"]
 
 [features]
-alloc = []
+alloc = ["pinocchio-token/alloc"]
 
 [dependencies]
 pinocchio-token = { workspace = true }
