@@ -22,7 +22,14 @@ pub trait TokenProgram {
     ///
     /// Instructions may accept addresses other than `Self::ID` when a
     /// compatible program can process the same instruction layout.
-    fn verify(address: &Address) -> ProgramResult;
+    #[inline(always)]
+    fn verify(address: &Address) -> ProgramResult {
+        if address != &Self::ID {
+            return Err(incorrect_program_id());
+        }
+
+        Ok(())
+    }
 }
 
 /// Struct to represent the SPL Token program.
@@ -33,15 +40,6 @@ pub struct Program;
 
 impl TokenProgram for Program {
     const ID: Address = crate::ID;
-
-    #[inline(always)]
-    fn verify(address: &Address) -> ProgramResult {
-        if address != &Self::ID {
-            return Err(incorrect_program_id());
-        }
-
-        Ok(())
-    }
 }
 
 /// Cold helper for constructing `ProgramError::IncorrectProgramId` outside the
