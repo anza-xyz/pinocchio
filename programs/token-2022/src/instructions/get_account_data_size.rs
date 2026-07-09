@@ -52,8 +52,19 @@ pub struct GetAccountDataSize<'account, 'extensions, Program: TokenProgram> {
     _program: PhantomData<Program>,
 }
 
-impl<Program: TokenProgram> GetAccountDataSize<'_, '_, Program> {
+impl<'account, 'extensions, Program: TokenProgram>
+    GetAccountDataSize<'account, 'extensions, Program>
+{
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
+
+    #[inline(always)]
+    pub fn new(mint: &'account AccountView, extensions: &'extensions [ExtensionType]) -> Self {
+        Self {
+            mint,
+            extensions,
+            _program: PhantomData,
+        }
+    }
 
     /// Invokes the instruction with `Program::ID`.
     #[inline(always)]
