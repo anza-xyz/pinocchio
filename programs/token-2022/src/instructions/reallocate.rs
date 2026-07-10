@@ -176,11 +176,15 @@ impl<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>>
         // 1 byte (discriminator) + 2 bytes per extension (extension type as `u16`).
         let mut instruction_data = [UNINIT_BYTE; EXTENSION_TYPES_INSTRUCTION_DATA_LEN];
 
-        write_extension_types_instruction_data(
-            &mut instruction_data,
-            Self::DISCRIMINATOR,
-            self.extensions,
-        );
+        // SAFETY: `self.extensions.len() <= MAX_EXTENSION_COUNT` and `instruction_data`
+        // is large enough to hold all extension types.
+        unsafe {
+            write_extension_types_instruction_data(
+                &mut instruction_data,
+                Self::DISCRIMINATOR,
+                self.extensions,
+            )
+        };
 
         invoke_signed_with_bounds::<{ 4 + MAX_MULTISIG_SIGNERS }, _>(
             &InstructionView {

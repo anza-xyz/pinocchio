@@ -221,7 +221,9 @@ fn write_instruction_data(
         return Err(invalid_argument_error());
     }
 
-    write_extension_types_instruction_data(data, DISCRIMINATOR, extensions);
+    // SAFETY: `extensions.len() <= MAX_EXTENSION_COUNT` and `data` is large enough
+    // to hold all extension types.
+    unsafe { write_extension_types_instruction_data(data, DISCRIMINATOR, extensions) };
 
     Ok(expected_data_len)
 }

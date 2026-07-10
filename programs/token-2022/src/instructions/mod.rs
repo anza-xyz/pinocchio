@@ -535,11 +535,18 @@ pub type TransferChecked<'account, 'multisig, MultisigSigner> =
     >;
 
 /// Convert a `UiAmount` of tokens to a little-endian `u64` raw Amount,
-/// using the given mint. In this version of the program, the mint can
-/// only specify the number of decimals.
+/// using the given mint.
 ///
 /// Return data can be fetched using `sol_get_return_data` and deserializing
 /// the return data as a little-endian `u64`.
+///
+/// WARNING: For mints using the interest-bearing or scaled-ui-amount
+/// extensions, this instruction uses standard floating-point arithmetic to
+/// convert values, which is not guaranteed to give consistent behavior.
+///
+/// In particular, conversions will not always work in reverse. For example,
+/// if you pass amount `A` to `UiAmountToAmount` and receive `B`, and pass
+/// the result `B` to `AmountToUiAmount`, you will not always get back `A`.
 ///
 /// Accounts expected by this instruction:
 ///
@@ -604,8 +611,15 @@ fn invalid_argument_error() -> ProgramError {
     ProgramError::InvalidArgument
 }
 
+/// Write the extensions to the instruction data buffer.
+///
+/// # Safety
+///
+/// The caller must ensure that `instruction_data` is at least `1 +
+/// extensions.len() * 2` bytes long, and that `extensions.len() <=
+/// MAX_EXTENSION_COUNT`.
 #[inline(always)]
-fn write_extension_types_instruction_data(
+unsafe fn write_extension_types_instruction_data(
     instruction_data: &mut [MaybeUninit<u8>],
     discriminator: u8,
     extensions: &[ExtensionType],
@@ -617,10 +631,8 @@ fn write_extension_types_instruction_data(
     for (i, extension) in extensions.iter().enumerate() {
         let offset = 1 + i * 2;
         let extension_type = (*extension as u16).to_le_bytes();
-        // SAFETY: `offset` and `offset + 1` are within bounds of
-        // `instruction_data` because the buffer is exactly
-        // `1 + MAX_EXTENSION_COUNT * 2` bytes and callers reject
-        // `extensions.len() > MAX_EXTENSION_COUNT`.
+        // SAFETY: The caller has ensured that `instruction_data` is large enough
+        // to hold all extension types.
         unsafe {
             instruction_data
                 .get_unchecked_mut(offset)
@@ -643,7 +655,9 @@ mod tests {
     fn write_extension_types_instruction_data_with_empty_extensions() {
         let mut instruction_data = [UNINIT_BYTE; EXTENSION_TYPES_INSTRUCTION_DATA_LEN];
 
-        write_extension_types_instruction_data(&mut instruction_data, 21, &[]);
+        // SAFETY: `instruction_data` is initialized to be
+        // `EXTENSION_TYPES_INSTRUCTION_DATA_LEN` bytes long.
+        unsafe { write_extension_types_instruction_data(&mut instruction_data, 21, &[]) };
 
         // SAFETY: the helper initialized the single discriminator byte.
         let bytes =
@@ -687,7 +701,10 @@ mod tests {
 
         let mut instruction_data = [UNINIT_BYTE; EXTENSION_TYPES_INSTRUCTION_DATA_LEN];
 
-        write_extension_types_instruction_data(&mut instruction_data, 21, &EXTENSIONS);
+        // SAFETY: `instruction_data` is initialized to be
+        // `EXTENSION_TYPES_INSTRUCTION_DATA_LEN` bytes long and
+        // `EXTENSIONS.len() <= MAX_EXTENSION_COUNT`.
+        unsafe { write_extension_types_instruction_data(&mut instruction_data, 21, &EXTENSIONS) };
 
         // SAFETY: the helper initialized all `1 + MAX_EXTENSION_COUNT * 2` bytes.
         let bytes = unsafe {
