@@ -2,32 +2,50 @@
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
+use {
+    solana_address::Address,
+    solana_program_error::{ProgramError, ProgramResult},
+};
 
 pub mod instructions;
 pub mod state;
 
-use {
-    core::mem::MaybeUninit,
-    solana_instruction_view::{cpi::CpiAccount, InstructionAccount},
-};
-
 solana_address::declare_id!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
-const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
+/// A trait for token programs that can be used in a CPI with a statically known
+/// program address.
+pub trait TokenProgram {
+    const ID: Address;
 
-const UNINIT_CPI_ACCOUNT: MaybeUninit<CpiAccount> = MaybeUninit::<CpiAccount>::uninit();
+    /// Returns `Ok(())` when `address` is accepted for cross-program
+    /// invocations.
+    ///
+    /// Instructions may accept addresses other than `Self::ID` when a
+    /// compatible program can process the same instruction layout.
+    #[inline(always)]
+    fn verify(address: &Address) -> ProgramResult {
+        if address != &Self::ID {
+            return Err(incorrect_program_id());
+        }
 
-const UNINIT_INSTRUCTION_ACCOUNT: MaybeUninit<InstructionAccount> =
-    MaybeUninit::<InstructionAccount>::uninit();
-
-#[inline(always)]
-fn write_bytes(destination: &mut [MaybeUninit<u8>], source: &[u8]) {
-    let len = destination.len().min(source.len());
-    // SAFETY:
-    // - Both pointers have alignment 1.
-    // - For valid (non-UB) references, the borrow checker guarantees no overlap.
-    // - `len` is bounded by both slice lengths.
-    unsafe {
-        core::ptr::copy_nonoverlapping(source.as_ptr(), destination.as_mut_ptr() as *mut u8, len);
+        Ok(())
     }
+}
+
+/// Struct to represent the SPL Token program.
+///
+/// This struct implements the `TokenProgram` trait, which statically provides
+/// the SPL Token address for instruction building.
+pub struct Program;
+
+impl TokenProgram for Program {
+    const ID: Address = crate::ID;
+}
+
+/// Cold helper for constructing `ProgramError::IncorrectProgramId` outside the
+/// hot path.
+#[doc(hidden)]
+#[cold]
+fn incorrect_program_id() -> ProgramError {
+    ProgramError::IncorrectProgramId
 }

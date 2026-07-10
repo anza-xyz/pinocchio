@@ -1,18 +1,35 @@
 use {
     crate::{
         instructions::{
-            account_borrow_failed_error, invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS,
+            account_borrow_failed_error, initialize_multisig::MAX_MULTISIG_SIGNERS,
+            invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
+            UNINIT_INSTRUCTION_ACCOUNT,
         },
-        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        TokenProgram,
     },
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_unchecked, CpiAccount},
         InstructionAccount, InstructionView,
     },
     solana_program_error::{ProgramError, ProgramResult},
 };
+
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 19;
+
+/// Maximum number of accounts expected by this instruction.
+///
+/// The required number of accounts will depend on the number of signer
+/// accounts.
+const MAX_ACCOUNTS_LEN: usize = 1 + MAX_MULTISIG_SIGNERS;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - number of signers (1 byte)
+const DATA_LEN: usize = 2;
 
 /// Like [`super::InitializeMultisig`], but does not require the
 /// Rent sysvar to be provided
@@ -22,8 +39,12 @@ use {
 ///   0. `[writable]` The multisignature account to initialize.
 ///   1. `..+N` `[signer]` The signer accounts, must equal to N where `1 <= N <=
 ///      11`.
-pub struct InitializeMultisig2<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
-where
+pub struct InitializeMultisig2<
+    'account,
+    'multisig,
+    MultisigSigner: AsRef<AccountView>,
+    Program: TokenProgram,
+> where
     'account: 'multisig,
 {
     /// The multisignature account to initialize.
@@ -35,26 +56,24 @@ where
     /// The number of signers (M) required to validate this multisignature
     /// account.
     pub m: u8,
+
+    /// Phantom data for the program.
+    _program: PhantomData<Program>,
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
-    InitializeMultisig2<'account, 'multisig, MultisigSigner>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+    InitializeMultisig2<'account, 'multisig, MultisigSigner, Program>
 where
     'account: 'multisig,
 {
-    pub const DISCRIMINATOR: u8 = 19;
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
     /// Maximum number of accounts expected by this instruction.
-    ///
-    /// The required number of accounts will depend whether the
-    /// source account has a single owner or a multisignature
-    /// owner.
-    pub const MAX_ACCOUNTS_LEN: usize = 1 + MAX_MULTISIG_SIGNERS;
+    pub const MAX_ACCOUNTS_LEN: usize = MAX_ACCOUNTS_LEN;
 
-    /// Instruction data length:
-    ///   - discriminator (1 byte)
-    ///   - number of signers (1 byte)
-    pub const DATA_LEN: usize = 2;
+    /// Instruction data length.
+    pub const DATA_LEN: usize = DATA_LEN;
 
     #[inline(always)]
     pub fn new(
@@ -66,31 +85,54 @@ where
             multisig,
             multisig_signers,
             m,
+            _program: PhantomData,
         }
     }
 
+    /// Invokes the instruction with `Program::ID`.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
+        self.invoke_with_unverified_program(&Program::ID)
+    }
+
+    /// Invokes the instruction after verifying the `program` address.
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
+        Program::verify(program)?;
+        self.invoke_with_unverified_program(program)
+    }
+
+    /// Invokes the instruction with `program` without verifying it.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
+    #[inline(always)]
+    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let mut instruction_accounts =
-            [UNINIT_INSTRUCTION_ACCOUNT; InitializeMultisig2::<&AccountView>::MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts =
-            [UNINIT_CPI_ACCOUNT; InitializeMultisig2::<&AccountView>::MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; InitializeMultisig2::<&AccountView>::DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: program,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -105,7 +147,9 @@ where
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> CpiWriter for InitializeMultisig2<'_, '_, MultisigSigner> {
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+    for InitializeMultisig2<'_, '_, MultisigSigner, Program>
+{
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -134,13 +178,13 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for InitializeMultisig2<'_, '
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch
-    for InitializeMultisig2<'_, '_, MultisigSigner>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+    for InitializeMultisig2<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state>,
+        batch: &mut super::batch::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -215,13 +259,13 @@ where
 
 #[inline(always)]
 fn write_instruction_data(m: u8, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.len() < InitializeMultisig2::<&AccountView>::DATA_LEN {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(InitializeMultisig2::<&AccountView>::DISCRIMINATOR);
+    data[0].write(DISCRIMINATOR);
 
     data[1].write(m);
 
-    Ok(InitializeMultisig2::<&AccountView>::DATA_LEN)
+    Ok(DATA_LEN)
 }

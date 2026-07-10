@@ -1,9 +1,12 @@
 use {
     crate::{
-        instructions::{account_borrow_failed_error, invalid_argument_error, CpiWriter},
-        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        instructions::{
+            account_borrow_failed_error, invalid_argument_error, write_bytes, CpiWriter,
+            UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        },
+        TokenProgram,
     },
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
     solana_instruction_view::{
@@ -13,13 +16,26 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 20;
+
+/// Expected number of accounts.
+const ACCOUNTS_LEN: usize = 1;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - decimals (1 byte)
+///   - mint authority (32 bytes)
+///   - freeze authority (33 bytes, optional)
+const MAX_DATA_LEN: usize = 67;
+
 /// Like [`super::InitializeMint`], but does not require the Rent
 /// sysvar to be provided
 ///
 /// Accounts expected by this instruction:
 ///
 ///   0. `[writable]` The mint to initialize.
-pub struct InitializeMint2<'account, 'address> {
+pub struct InitializeMint2<'account, 'address, Program: TokenProgram> {
     /// The mint to initialize.
     pub mint: &'account AccountView,
 
@@ -31,21 +47,20 @@ pub struct InitializeMint2<'account, 'address> {
 
     /// The freeze authority/multisignature of the mint.
     pub freeze_authority: Option<&'address Address>,
+
+    /// Phantom data for the program.
+    _program: PhantomData<Program>,
 }
 
-impl<'account, 'address> InitializeMint2<'account, 'address> {
+impl<'account, 'address, Program: TokenProgram> InitializeMint2<'account, 'address, Program> {
     /// The instruction discriminator.
-    pub const DISCRIMINATOR: u8 = 20;
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
     /// Expected number of accounts.
-    pub const ACCOUNTS_LEN: usize = 1;
+    pub const ACCOUNTS_LEN: usize = ACCOUNTS_LEN;
 
-    /// Instruction data length:
-    ///   - discriminator (1 byte)
-    ///   - decimals (1 byte)
-    ///   - mint authority (32 bytes)
-    ///   - freeze authority (33 bytes, optional)
-    pub const MAX_DATA_LEN: usize = 67;
+    /// Maximum instruction data length.
+    pub const MAX_DATA_LEN: usize = MAX_DATA_LEN;
 
     #[inline(always)]
     pub fn new(
@@ -59,25 +74,50 @@ impl<'account, 'address> InitializeMint2<'account, 'address> {
             decimals,
             mint_authority,
             freeze_authority,
+            _program: PhantomData,
         }
     }
 
+    /// Invokes the instruction with `Program::ID`.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; InitializeMint2::ACCOUNTS_LEN];
+        self.invoke_with_unverified_program(&Program::ID)
+    }
+
+    /// Invokes the instruction after verifying the `program` address.
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
+        Program::verify(program)?;
+        self.invoke_with_unverified_program(program)
+    }
+
+    /// Invokes the instruction with `program` without verifying it.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
+    #[inline(always)]
+    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; Self::ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; Self::MAX_DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; MAX_DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: program,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -92,7 +132,7 @@ impl<'account, 'address> InitializeMint2<'account, 'address> {
     }
 }
 
-impl CpiWriter for InitializeMint2<'_, '_> {
+impl<Program: TokenProgram> CpiWriter for InitializeMint2<'_, '_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -126,11 +166,11 @@ impl CpiWriter for InitializeMint2<'_, '_> {
     }
 }
 
-impl super::IntoBatch for InitializeMint2<'_, '_> {
+impl<Program: TokenProgram> super::batch::IntoBatch<Program> for InitializeMint2<'_, '_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state>,
+        batch: &mut super::batch::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -158,7 +198,7 @@ fn write_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < InitializeMint2::ACCOUNTS_LEN {
+    if accounts.len() < ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
@@ -168,7 +208,7 @@ where
 
     CpiAccount::init_from_account_view(mint, &mut accounts[0]);
 
-    Ok(InitializeMint2::ACCOUNTS_LEN)
+    Ok(ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -179,13 +219,13 @@ fn write_instruction_accounts<'account, 'out>(
 where
     'account: 'out,
 {
-    if accounts.len() < InitializeMint2::ACCOUNTS_LEN {
+    if accounts.len() < ACCOUNTS_LEN {
         return Err(invalid_argument_error());
     }
 
     accounts[0].write(InstructionAccount::writable(mint.address()));
 
-    Ok(InitializeMint2::ACCOUNTS_LEN)
+    Ok(ACCOUNTS_LEN)
 }
 
 #[inline(always)]
@@ -195,11 +235,11 @@ fn write_instruction_data(
     freeze_authority: Option<&Address>,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < InitializeMint2::MAX_DATA_LEN {
+    if data.len() < MAX_DATA_LEN {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(InitializeMint2::DISCRIMINATOR);
+    data[0].write(DISCRIMINATOR);
 
     data[1].write(decimals);
 
@@ -208,12 +248,9 @@ fn write_instruction_data(
     if let Some(freeze_auth) = freeze_authority {
         data[34].write(1);
 
-        write_bytes(
-            &mut data[35..InitializeMint2::MAX_DATA_LEN],
-            freeze_auth.as_array(),
-        );
+        write_bytes(&mut data[35..MAX_DATA_LEN], freeze_auth.as_array());
 
-        Ok(InitializeMint2::MAX_DATA_LEN)
+        Ok(MAX_DATA_LEN)
     } else {
         data[34].write(0);
 

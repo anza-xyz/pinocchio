@@ -1,18 +1,35 @@
 use {
     crate::{
         instructions::{
-            account_borrow_failed_error, invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS,
+            account_borrow_failed_error, initialize_multisig::MAX_MULTISIG_SIGNERS,
+            invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
+            UNINIT_INSTRUCTION_ACCOUNT,
         },
-        UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        TokenProgram,
     },
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer},
         InstructionAccount, InstructionView,
     },
     solana_program_error::{ProgramError, ProgramResult},
 };
+
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 5;
+
+/// Maximum number of accounts expected by this instruction.
+///
+/// The required number of accounts will depend whether the
+/// source account has a single owner or a multisignature
+/// owner.
+const MAX_ACCOUNTS_LEN: usize = 2 + MAX_MULTISIG_SIGNERS;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+const DATA_LEN: usize = 1;
 
 /// Revokes the delegate's authority.
 ///
@@ -26,7 +43,7 @@ use {
 ///   0. `[writable]` The source account.
 ///   1. `[]` The source account's multisignature owner/delegate.
 ///   2. `..+M` `[signer]` M signer accounts.
-pub struct Revoke<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
+pub struct Revoke<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram> {
     /// The source account.
     pub source: &'account AccountView,
 
@@ -35,22 +52,20 @@ pub struct Revoke<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
 
     /// Multisignature signers.
     pub multisig_signers: &'multisig [MultisigSigner],
+
+    /// Phantom data for the program.
+    _program: PhantomData<Program>,
 }
 
-impl<'account> Revoke<'account, '_, &'account AccountView> {
+impl<'account, Program: TokenProgram> Revoke<'account, '_, &'account AccountView, Program> {
     /// The instruction discriminator.
-    pub const DISCRIMINATOR: u8 = 5;
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
     /// Maximum number of accounts expected by this instruction.
-    ///
-    /// The required number of accounts will depend whether the
-    /// source account has a single owner or a multisignature
-    /// owner.
-    pub const MAX_ACCOUNTS_LEN: usize = 2 + MAX_MULTISIG_SIGNERS;
+    pub const MAX_ACCOUNTS_LEN: usize = MAX_ACCOUNTS_LEN;
 
-    /// Instruction data length:
-    ///   - discriminator (1 byte)
-    pub const DATA_LEN: usize = 1;
+    /// Instruction data length.
+    pub const DATA_LEN: usize = DATA_LEN;
 
     /// Creates a new `Revoke` instruction with a single owner authority.
     #[inline(always)]
@@ -59,8 +74,8 @@ impl<'account> Revoke<'account, '_, &'account AccountView> {
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
-    Revoke<'account, 'multisig, MultisigSigner>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+    Revoke<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `Revoke` instruction with a
     /// multisignature owner authority and signer accounts.
@@ -74,34 +89,92 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             source,
             authority,
             multisig_signers,
+            _program: PhantomData,
         }
     }
 
+    /// Invokes the instruction with `Program::ID`.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+        self.invoke_with_unverified_program(&Program::ID)
     }
 
+    /// Invokes the instruction with `Program::ID` and signer seeds.
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        self.invoke_signed_with_unverified_program(signers, &Program::ID)
+    }
+
+    /// Invokes the instruction after verifying the `program` address.
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_program(&[], program)
+    }
+
+    /// Invokes the instruction with signer seeds after verifying the `program`
+    /// address.
+    #[inline(always)]
+    pub fn invoke_signed_with_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
+        Program::verify(program)?;
+        self.invoke_signed_with_unverified_program(signers, program)
+    }
+
+    /// Invokes the instruction with `program` without verifying it.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
+    #[inline(always)]
+    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_unverified_program(&[], program)
+    }
+
+    /// Invokes the instruction with signer seeds and `program` without
+    /// verifying the program address.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_signed_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
+    #[inline(always)]
+    pub fn invoke_signed_with_unverified_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; Revoke::MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; Revoke::MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; Revoke::DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: program,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -117,7 +190,9 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> CpiWriter for Revoke<'_, '_, MultisigSigner> {
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+    for Revoke<'_, '_, MultisigSigner, Program>
+{
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -146,11 +221,13 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for Revoke<'_, '_, MultisigSi
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch for Revoke<'_, '_, MultisigSigner> {
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+    for Revoke<'_, '_, MultisigSigner, Program>
+{
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state>,
+        batch: &mut super::batch::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -244,11 +321,11 @@ where
 
 #[inline(always)]
 fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-    if data.len() < Revoke::DATA_LEN {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(Revoke::DISCRIMINATOR);
+    data[0].write(DISCRIMINATOR);
 
-    Ok(Revoke::DATA_LEN)
+    Ok(DATA_LEN)
 }

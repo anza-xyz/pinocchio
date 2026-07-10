@@ -1,8 +1,8 @@
 use {
     crate::{
         instructions::{
-            invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
-            UNINIT_INSTRUCTION_ACCOUNT,
+            account_borrow_failed_error, invalid_argument_error, write_bytes, CpiWriter,
+            UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
         },
         TokenProgram,
     },
@@ -17,33 +17,45 @@ use {
 };
 
 /// The instruction discriminator.
-const DISCRIMINATOR: u8 = 21;
+const DISCRIMINATOR: u8 = 16;
 
 /// Expected number of accounts.
-const ACCOUNTS_LEN: usize = 1;
+const ACCOUNTS_LEN: usize = 3;
 
 /// Instruction data length:
 ///   - discriminator (1 byte)
-const DATA_LEN: usize = 1;
+///   - owner pubkey (32 bytes)
+const DATA_LEN: usize = 33;
 
-/// Gets the required size of an account for the given mint as a
-/// little-endian `u64`.
-///
-/// Return data can be fetched using `sol_get_return_data` and deserializing
-/// the return data as a little-endian `u64`.
+/// Like [`super::InitializeAccount`], but the owner pubkey is
+/// passed via instruction data rather than the accounts list. This
+/// variant may be preferable when using Cross Program Invocation from
+/// an instruction that does not need the owner's `AccountInfo`
+/// otherwise.
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[]` The mint to calculate for.
-pub struct GetAccountDataSize<'account, Program: TokenProgram> {
-    /// The mint to calculate for.
+///   0. `[writable]` The account to initialize.
+///   1. `[]` The mint this account will be associated with.
+///   2. `[]` Rent sysvar.
+pub struct InitializeAccount2<'account, Program: TokenProgram> {
+    /// The account to initialize.
+    pub account: &'account AccountView,
+
+    /// The mint this account will be associated with.
     pub mint: &'account AccountView,
+
+    /// Rent sysvar.
+    pub rent_sysvar: &'account AccountView,
+
+    /// The new account's owner/multisignature.
+    pub owner: &'account Address,
 
     /// Phantom data for the program.
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
+impl<'account, Program: TokenProgram> InitializeAccount2<'account, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -54,9 +66,17 @@ impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
     pub const DATA_LEN: usize = DATA_LEN;
 
     #[inline(always)]
-    pub fn new(mint: &'account AccountView) -> Self {
+    pub fn new(
+        account: &'account AccountView,
+        mint: &'account AccountView,
+        rent_sysvar: &'account AccountView,
+        owner: &'account Address,
+    ) -> Self {
         Self {
+            account,
             mint,
+            rent_sysvar,
+            owner,
             _program: PhantomData,
         }
     }
@@ -107,7 +127,7 @@ impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
                     ),
                     data: from_raw_parts(instruction_data.as_ptr() as _, written_instruction_data),
                 },
-                from_raw_parts(accounts.as_ptr() as _, written_accounts),
+                from_raw_parts(accounts.as_ptr() as *const CpiAccount, written_accounts),
             );
         }
 
@@ -115,7 +135,7 @@ impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
     }
 }
 
-impl<Program: TokenProgram> CpiWriter for GetAccountDataSize<'_, Program> {
+impl<Program: TokenProgram> CpiWriter for InitializeAccount2<'_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -124,7 +144,7 @@ impl<Program: TokenProgram> CpiWriter for GetAccountDataSize<'_, Program> {
     where
         Self: 'cpi,
     {
-        write_accounts(self.mint, accounts)
+        write_accounts(self.account, self.mint, self.rent_sysvar, accounts)
     }
 
     #[inline(always)]
@@ -135,16 +155,16 @@ impl<Program: TokenProgram> CpiWriter for GetAccountDataSize<'_, Program> {
     where
         Self: 'cpi,
     {
-        write_instruction_accounts(self.mint, accounts)
+        write_instruction_accounts(self.account, self.mint, self.rent_sysvar, accounts)
     }
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(data)
+        write_instruction_data(self.owner, data)
     }
 }
 
-impl<Program: TokenProgram> super::batch::IntoBatch<Program> for GetAccountDataSize<'_, Program> {
+impl<Program: TokenProgram> super::batch::IntoBatch<Program> for InitializeAccount2<'_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
@@ -154,16 +174,20 @@ impl<Program: TokenProgram> super::batch::IntoBatch<Program> for GetAccountDataS
         Self: 'account + 'state,
     {
         batch.push(
-            |accounts| write_accounts(self.mint, accounts),
-            |accounts| write_instruction_accounts(self.mint, accounts),
-            write_instruction_data,
+            |accounts| write_accounts(self.account, self.mint, self.rent_sysvar, accounts),
+            |accounts| {
+                write_instruction_accounts(self.account, self.mint, self.rent_sysvar, accounts)
+            },
+            |data| write_instruction_data(self.owner, data),
         )
     }
 }
 
 #[inline(always)]
 fn write_accounts<'account, 'out>(
+    account: &'account AccountView,
     mint: &'account AccountView,
+    rent_sysvar: &'account AccountView,
     accounts: &mut [MaybeUninit<CpiAccount<'out>>],
 ) -> Result<usize, ProgramError>
 where
@@ -173,14 +197,24 @@ where
         return Err(invalid_argument_error());
     }
 
-    CpiAccount::init_from_account_view(mint, &mut accounts[0]);
+    if account.is_borrowed() {
+        return Err(account_borrow_failed_error());
+    }
+
+    CpiAccount::init_from_account_view(account, &mut accounts[0]);
+
+    CpiAccount::init_from_account_view(mint, &mut accounts[1]);
+
+    CpiAccount::init_from_account_view(rent_sysvar, &mut accounts[2]);
 
     Ok(ACCOUNTS_LEN)
 }
 
 #[inline(always)]
 fn write_instruction_accounts<'account, 'out>(
+    account: &'account AccountView,
     mint: &'account AccountView,
+    rent_sysvar: &'account AccountView,
     accounts: &mut [MaybeUninit<InstructionAccount<'out>>],
 ) -> Result<usize, ProgramError>
 where
@@ -190,18 +224,27 @@ where
         return Err(invalid_argument_error());
     }
 
-    accounts[0].write(InstructionAccount::readonly(mint.address()));
+    accounts[0].write(InstructionAccount::writable(account.address()));
+
+    accounts[1].write(InstructionAccount::readonly(mint.address()));
+
+    accounts[2].write(InstructionAccount::readonly(rent_sysvar.address()));
 
     Ok(ACCOUNTS_LEN)
 }
 
 #[inline(always)]
-fn write_instruction_data(data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+fn write_instruction_data(
+    owner: &Address,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
     if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
     data[0].write(DISCRIMINATOR);
+
+    write_bytes(&mut data[1..DATA_LEN], owner.as_array());
 
     Ok(DATA_LEN)
 }

@@ -1,12 +1,15 @@
 use {
     crate::{
         instructions::{
-            account_borrow_failed_error, invalid_argument_error, CpiWriter, MAX_MULTISIG_SIGNERS,
+            account_borrow_failed_error, initialize_multisig::MAX_MULTISIG_SIGNERS,
+            invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
+            UNINIT_INSTRUCTION_ACCOUNT,
         },
-        write_bytes, UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
+        TokenProgram,
     },
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer},
         InstructionAccount, InstructionView,
@@ -14,7 +17,22 @@ use {
     solana_program_error::{ProgramError, ProgramResult},
 };
 
-/// Mints new tokens to an account.  The native mint does not support
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 7;
+
+/// Maximum number of accounts expected by this instruction.
+///
+/// The required number of accounts will depend whether the
+/// source account has a single owner or a multisignature
+/// owner.
+const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+
+/// Instruction data length:
+///   - discriminator (1 byte)
+///   - amount to mint (8 bytes)
+const DATA_LEN: usize = 9;
+
+/// Mints new tokens to an account. The native mint does not support
 /// minting.
 ///
 /// Accounts expected by this instruction:
@@ -29,7 +47,7 @@ use {
 ///   1. `[writable]` The account to mint tokens to.
 ///   2. `[]` The mint's multisignature mint-tokens authority.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct MintTo<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
+pub struct MintTo<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram> {
     /// The mint.
     pub mint: &'account AccountView,
 
@@ -44,23 +62,20 @@ pub struct MintTo<'account, 'multisig, MultisigSigner: AsRef<AccountView>> {
 
     /// The amount of new tokens to mint.
     pub amount: u64,
+
+    /// Phantom data for the program.
+    _program: PhantomData<Program>,
 }
 
-impl<'account> MintTo<'account, '_, &'account AccountView> {
+impl<'account, Program: TokenProgram> MintTo<'account, '_, &'account AccountView, Program> {
     /// The instruction discriminator.
-    pub const DISCRIMINATOR: u8 = 7;
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
     /// Maximum number of accounts expected by this instruction.
-    ///
-    /// The required number of accounts will depend whether the
-    /// source account has a single owner or a multisignature
-    /// owner.
-    pub const MAX_ACCOUNTS_LEN: usize = 3 + MAX_MULTISIG_SIGNERS;
+    pub const MAX_ACCOUNTS_LEN: usize = MAX_ACCOUNTS_LEN;
 
-    /// Instruction data length:
-    ///   - discriminator (1 byte)
-    ///   - amount to mint (8 bytes)
-    pub const DATA_LEN: usize = 9;
+    /// Instruction data length.
+    pub const DATA_LEN: usize = DATA_LEN;
 
     /// Creates a new `MintTo` instruction with a single mint authority.
     #[inline(always)]
@@ -74,8 +89,8 @@ impl<'account> MintTo<'account, '_, &'account AccountView> {
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
-    MintTo<'account, 'multisig, MultisigSigner>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+    MintTo<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `MintTo` instruction with a
     /// multisignature mint authority and signer accounts.
@@ -93,34 +108,92 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
             mint_authority,
             multisig_signers,
             amount,
+            _program: PhantomData,
         }
     }
 
+    /// Invokes the instruction with `Program::ID`.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+        self.invoke_with_unverified_program(&Program::ID)
     }
 
+    /// Invokes the instruction with `Program::ID` and signer seeds.
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        self.invoke_signed_with_unverified_program(signers, &Program::ID)
+    }
+
+    /// Invokes the instruction after verifying the `program` address.
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_program(&[], program)
+    }
+
+    /// Invokes the instruction with signer seeds after verifying the `program`
+    /// address.
+    #[inline(always)]
+    pub fn invoke_signed_with_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
+        Program::verify(program)?;
+        self.invoke_signed_with_unverified_program(signers, program)
+    }
+
+    /// Invokes the instruction with `program` without verifying it.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
+    #[inline(always)]
+    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_unverified_program(&[], program)
+    }
+
+    /// Invokes the instruction with signer seeds and `program` without
+    /// verifying the program address.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_signed_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
+    #[inline(always)]
+    pub fn invoke_signed_with_unverified_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
             Err(ProgramError::InvalidArgument)?;
         }
 
-        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MintTo::MAX_ACCOUNTS_LEN];
+        let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_instruction_accounts =
             self.write_instruction_accounts(&mut instruction_accounts)?;
 
-        let mut accounts = [UNINIT_CPI_ACCOUNT; MintTo::MAX_ACCOUNTS_LEN];
+        let mut accounts = [UNINIT_CPI_ACCOUNT; MAX_ACCOUNTS_LEN];
         let written_accounts = self.write_accounts(&mut accounts)?;
 
-        let mut instruction_data = [UNINIT_BYTE; MintTo::DATA_LEN];
+        let mut instruction_data = [UNINIT_BYTE; DATA_LEN];
         let written_instruction_data = self.write_instruction_data(&mut instruction_data)?;
 
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: program,
                     accounts: from_raw_parts(
                         instruction_accounts.as_ptr() as _,
                         written_instruction_accounts,
@@ -136,7 +209,9 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>>
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> CpiWriter for MintTo<'_, '_, MultisigSigner> {
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+    for MintTo<'_, '_, MultisigSigner, Program>
+{
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -177,11 +252,13 @@ impl<MultisigSigner: AsRef<AccountView>> CpiWriter for MintTo<'_, '_, MultisigSi
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>> super::IntoBatch for MintTo<'_, '_, MultisigSigner> {
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+    for MintTo<'_, '_, MultisigSigner, Program>
+{
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
-        batch: &mut super::Batch<'account, 'state>,
+        batch: &mut super::batch::Batch<'account, 'state, Program>,
     ) -> ProgramResult
     where
         Self: 'account + 'state,
@@ -293,13 +370,13 @@ fn write_instruction_data(
     amount: u64,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    if data.len() < MintTo::DATA_LEN {
+    if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
 
-    data[0].write(MintTo::DISCRIMINATOR);
+    data[0].write(DISCRIMINATOR);
 
-    write_bytes(&mut data[1..MintTo::DATA_LEN], &amount.to_le_bytes());
+    write_bytes(&mut data[1..DATA_LEN], &amount.to_le_bytes());
 
-    Ok(MintTo::DATA_LEN)
+    Ok(DATA_LEN)
 }

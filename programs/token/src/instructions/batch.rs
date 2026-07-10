@@ -1,14 +1,24 @@
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use {
-    crate::instructions::{invalid_argument_error, CpiWriter},
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    crate::{instructions::invalid_argument_error, TokenProgram},
+    core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
+    solana_address::Address,
     solana_instruction_view::{
         cpi::{invoke_signed_unchecked, CpiAccount, Signer, MAX_CPI_ACCOUNTS},
         InstructionAccount, InstructionView,
     },
     solana_program_error::{ProgramError, ProgramResult},
 };
+
+/// The instruction discriminator.
+const DISCRIMINATOR: u8 = 255;
+
+/// The maximum instruction data buffer length required for a batch.
+const MAX_DATA_LEN: usize = 10 * 1024;
+
+/// The maximum account buffer length required for a batch.
+const MAX_ACCOUNTS_LEN: usize = MAX_CPI_ACCOUNTS;
 
 /// The size of the batch instruction header.
 ///
@@ -19,7 +29,7 @@ const IX_HEADER_SIZE: usize = 2;
 
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
-pub struct Batch<'account, 'state> {
+pub struct Batch<'account, 'state, Program: TokenProgram> {
     /// The instruction data for the batch instruction.
     ///
     /// The first byte is reserved for the batch instruction discriminator,
@@ -42,20 +52,26 @@ pub struct Batch<'account, 'state> {
 
     /// The current length of the instruction accounts.    
     instruction_accounts_len: usize,
+
+    /// Phantom data for the program.
+    _program: PhantomData<Program>,
 }
 
-impl<'account, 'state> Batch<'account, 'state>
+impl<'account, 'state, Program: TokenProgram> Batch<'account, 'state, Program>
 where
     'account: 'state,
 {
     /// The instruction discriminator.
-    pub const DISCRIMINATOR: u8 = 255;
+    pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
     /// The maximum instruction data buffer length required for a batch.
-    pub const MAX_DATA_LEN: usize = 10 * 1024;
+    pub const MAX_DATA_LEN: usize = MAX_DATA_LEN;
 
     /// The maximum account buffer length required for a batch.
-    pub const MAX_ACCOUNTS_LEN: usize = MAX_CPI_ACCOUNTS;
+    pub const MAX_ACCOUNTS_LEN: usize = MAX_ACCOUNTS_LEN;
+
+    /// The size of the batch instruction header.
+    pub const IX_HEADER_SIZE: usize = IX_HEADER_SIZE;
 
     /// Creates a new `Batch` with the provided buffers.
     #[inline(always)]
@@ -70,7 +86,7 @@ where
 
         // The first byte of the instruction data is reserved for
         // the batch discriminator.
-        data[0].write(Self::DISCRIMINATOR);
+        data[0].write(DISCRIMINATOR);
 
         Ok(Self {
             data,
@@ -79,20 +95,78 @@ where
             data_len: 1,
             accounts_len: 0,
             instruction_accounts_len: 0,
+            _program: PhantomData,
         })
     }
 
+    /// Invokes the instruction with `Program::ID`.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
-        self.invoke_signed(&[])
+        self.invoke_with_unverified_program(&Program::ID)
     }
 
+    /// Invokes the instruction with `Program::ID` and signer seeds.
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+        self.invoke_signed_with_unverified_program(signers, &Program::ID)
+    }
+
+    /// Invokes the instruction after verifying the `program` address.
+    #[inline(always)]
+    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_program(&[], program)
+    }
+
+    /// Invokes the instruction with signer seeds after verifying the `program`
+    /// address.
+    #[inline(always)]
+    pub fn invoke_signed_with_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
+        Program::verify(program)?;
+        self.invoke_signed_with_unverified_program(signers, program)
+    }
+
+    /// Invokes the instruction with `program` without verifying it.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
+    #[inline(always)]
+    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_unverified_program(&[], program)
+    }
+
+    /// Invokes the instruction with signer seeds and `program` without
+    /// verifying the program address.
+    ///
+    /// Use this when `program` has already been verified. Otherwise, prefer
+    /// `invoke_signed_with_program`.
+    ///
+    /// # Important
+    ///
+    /// This method does not verify that `program` satisfies
+    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// has already been checked and corresponds to the expected
+    /// token program.
+    #[inline(always)]
+    pub fn invoke_signed_with_unverified_program(
+        &self,
+        signers: &[Signer],
+        program: &Address,
+    ) -> ProgramResult {
         unsafe {
             invoke_signed_unchecked(
                 &InstructionView {
-                    program_id: &crate::ID,
+                    program_id: program,
                     accounts: from_raw_parts(
                         self.instruction_accounts.as_ptr() as _,
                         self.instruction_accounts_len,
@@ -108,7 +182,7 @@ where
     }
 
     #[inline(always)]
-    pub(crate) fn push(
+    pub fn push(
         &mut self,
         write_accounts: impl FnOnce(
             &mut [MaybeUninit<CpiAccount<'account>>],
@@ -154,7 +228,7 @@ where
 
 #[cfg(feature = "alloc")]
 /// A state object that contains the buffers for a `Batch` instruction.
-pub struct BatchState<'account> {
+pub struct BatchState<'account, Program: TokenProgram> {
     /// Container for the instruction data of the batch instruction.
     data: Box<[MaybeUninit<u8>]>,
 
@@ -163,21 +237,27 @@ pub struct BatchState<'account> {
 
     /// Container for the accounts of the batch instruction.
     accounts: Box<[MaybeUninit<CpiAccount<'account>>]>,
+
+    /// Phantom data for the program.
+    _program: PhantomData<Program>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'account> BatchState<'account> {
+impl<'account, Program: TokenProgram> BatchState<'account, Program> {
     #[inline(always)]
     pub fn new(accounts_len: usize, data_len: usize) -> Self {
         Self {
             data: Box::new_uninit_slice(data_len),
             instruction_accounts: Box::new_uninit_slice(accounts_len),
             accounts: Box::new_uninit_slice(accounts_len),
+            _program: PhantomData,
         }
     }
 
     #[inline(always)]
-    pub fn as_batch<'state>(&'state mut self) -> Result<Batch<'account, 'state>, ProgramError>
+    pub fn as_batch<'state>(
+        &'state mut self,
+    ) -> Result<Batch<'account, 'state, Program>, ProgramError>
     where
         Self: 'account,
     {
@@ -190,20 +270,12 @@ impl<'account> BatchState<'account> {
 }
 
 /// A trait for instructions that can be consumed directly into a `Batch`.
-pub trait IntoBatch: sealed::Sealed {
+pub trait IntoBatch<Program: TokenProgram> {
     /// Serializes `self` into the provided batch.
-    fn into_batch<'account, 'state>(self, batch: &mut Batch<'account, 'state>) -> ProgramResult
+    fn into_batch<'account, 'state>(
+        self,
+        batch: &mut Batch<'account, 'state, Program>,
+    ) -> ProgramResult
     where
         Self: 'account + 'state;
-}
-
-/// Implement `Sealed` for all types that implement `CpiWriter`.
-impl<T: CpiWriter> sealed::Sealed for T {}
-
-/// A module only accessible within this crate that contains the
-/// `Sealed` trait.
-pub(crate) mod sealed {
-    /// A sealed trait that prevents external implementations of the
-    /// `IntoBatch` trait.
-    pub trait Sealed {}
 }
