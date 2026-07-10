@@ -30,8 +30,8 @@ InitializeMint::new(
     mint,
     rent_sysvar,
     9,
-    authority,
-    Some(authority),
+    &authority,
+    Some(&authority),
 ).invoke()?;
 ```
 
