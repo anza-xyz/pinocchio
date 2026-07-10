@@ -4,7 +4,7 @@ use {
             account_borrow_failed_error, invalid_argument_error, CpiWriter, UNINIT_BYTE,
             UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -34,7 +34,7 @@ const DATA_LEN: usize = 1;
 /// Accounts expected by this instruction:
 ///
 ///   0. `[writable]` The account to initialize.
-pub struct InitializeImmutableOwner<'account, Program: TokenProgram> {
+pub struct InitializeImmutableOwner<'account, Program: TokenInterface> {
     /// The account to initialize.
     pub account: &'account AccountView,
 
@@ -42,7 +42,7 @@ pub struct InitializeImmutableOwner<'account, Program: TokenProgram> {
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> InitializeImmutableOwner<'account, Program> {
+impl<'account, Program: TokenInterface> InitializeImmutableOwner<'account, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -114,7 +114,7 @@ impl<'account, Program: TokenProgram> InitializeImmutableOwner<'account, Program
     }
 }
 
-impl<Program: TokenProgram> CpiWriter for InitializeImmutableOwner<'_, Program> {
+impl<Program: TokenInterface> CpiWriter for InitializeImmutableOwner<'_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -143,7 +143,7 @@ impl<Program: TokenProgram> CpiWriter for InitializeImmutableOwner<'_, Program> 
     }
 }
 
-impl<Program: TokenProgram> super::batch::IntoBatch<Program>
+impl<Program: TokenInterface> super::batch::IntoBatch<Program>
     for InitializeImmutableOwner<'_, Program>
 {
     #[inline(always)]

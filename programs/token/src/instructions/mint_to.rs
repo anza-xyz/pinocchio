@@ -5,7 +5,7 @@ use {
             invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -47,7 +47,8 @@ const DATA_LEN: usize = 9;
 ///   1. `[writable]` The account to mint tokens to.
 ///   2. `[]` The mint's multisignature mint-tokens authority.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct MintTo<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram> {
+pub struct MintTo<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
+{
     /// The mint.
     pub mint: &'account AccountView,
 
@@ -67,7 +68,7 @@ pub struct MintTo<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Progr
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> MintTo<'account, '_, &'account AccountView, Program> {
+impl<'account, Program: TokenInterface> MintTo<'account, '_, &'account AccountView, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -89,7 +90,7 @@ impl<'account, Program: TokenProgram> MintTo<'account, '_, &'account AccountView
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
     MintTo<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `MintTo` instruction with a
@@ -209,7 +210,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     for MintTo<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
@@ -252,7 +253,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
     for MintTo<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]

@@ -5,7 +5,7 @@ use {
             invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -50,7 +50,7 @@ pub struct CloseAccount<
     'account,
     'multisig,
     MultisigSigner: AsRef<AccountView>,
-    Program: TokenProgram,
+    Program: TokenInterface,
 > {
     /// The account to close.
     pub account: &'account AccountView,
@@ -68,7 +68,7 @@ pub struct CloseAccount<
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> CloseAccount<'account, '_, &'account AccountView, Program> {
+impl<'account, Program: TokenInterface> CloseAccount<'account, '_, &'account AccountView, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -89,7 +89,7 @@ impl<'account, Program: TokenProgram> CloseAccount<'account, '_, &'account Accou
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
     CloseAccount<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `CloseAccount` instruction with a
@@ -207,7 +207,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     for CloseAccount<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
@@ -250,7 +250,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
     for CloseAccount<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]

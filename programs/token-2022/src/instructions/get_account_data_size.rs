@@ -10,7 +10,7 @@ use {
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     pinocchio_token::{
         instructions::{batch::Batch, CpiWriter},
-        TokenProgram,
+        TokenInterface,
     },
     solana_account_view::AccountView,
     solana_address::Address,
@@ -41,7 +41,7 @@ const MAX_DATA_LEN: usize = EXTENSION_TYPES_INSTRUCTION_DATA_LEN;
 /// Accounts expected by this instruction:
 ///
 ///   0. `[]` The mint to calculate for.
-pub struct GetAccountDataSize<'account, 'extensions, Program: TokenProgram> {
+pub struct GetAccountDataSize<'account, 'extensions, Program: TokenInterface> {
     /// The mint to calculate for.
     pub mint: &'account AccountView,
 
@@ -52,7 +52,7 @@ pub struct GetAccountDataSize<'account, 'extensions, Program: TokenProgram> {
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'extensions, Program: TokenProgram>
+impl<'account, 'extensions, Program: TokenInterface>
     GetAccountDataSize<'account, 'extensions, Program>
 {
     /// The instruction discriminator.
@@ -130,7 +130,7 @@ impl<'account, 'extensions, Program: TokenProgram>
     }
 }
 
-impl<Program: TokenProgram> CpiWriter for GetAccountDataSize<'_, '_, Program> {
+impl<Program: TokenInterface> CpiWriter for GetAccountDataSize<'_, '_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -159,7 +159,7 @@ impl<Program: TokenProgram> CpiWriter for GetAccountDataSize<'_, '_, Program> {
     }
 }
 
-impl<Program: TokenProgram> super::IntoBatch<Program> for GetAccountDataSize<'_, '_, Program> {
+impl<Program: TokenInterface> super::IntoBatch<Program> for GetAccountDataSize<'_, '_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,

@@ -14,7 +14,7 @@ solana_address::declare_id!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
 /// A trait for token programs that can be used in a CPI with a statically known
 /// program address.
-pub trait TokenProgram {
+pub trait TokenInterface {
     const ID: Address;
 
     /// Returns `Ok(())` when `address` is accepted for cross-program
@@ -36,9 +36,9 @@ pub trait TokenProgram {
 ///
 /// This struct implements the `TokenProgram` trait, which statically provides
 /// the SPL Token address for instruction building.
-pub struct Program;
+pub struct TokenProgram;
 
-impl TokenProgram for Program {
+impl TokenInterface for TokenProgram {
     const ID: Address = crate::ID;
 }
 

@@ -1,5 +1,5 @@
 use {
-    crate::{state::ExtensionType, Program2022},
+    crate::{state::ExtensionType, Token2022Program},
     core::mem::MaybeUninit,
     solana_program_error::ProgramError,
 };
@@ -48,7 +48,10 @@ const EXTENSION_TYPES_INSTRUCTION_DATA_LEN: usize = 1 + MAX_EXTENSION_COUNT * 2;
 ///
 ///   0. `[]` The mint to calculate for.
 pub type AmountToUiAmount<'account> =
-    pinocchio_token::instructions::amount_to_ui_amount::AmountToUiAmount<'account, Program2022>;
+    pinocchio_token::instructions::amount_to_ui_amount::AmountToUiAmount<
+        'account,
+        Token2022Program,
+    >;
 
 /// Approves a delegate. A delegate is given the authority over tokens on
 /// behalf of the source account's owner.
@@ -70,7 +73,7 @@ pub type Approve<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Approves a delegate. A delegate is given the authority over tokens on
@@ -99,18 +102,18 @@ pub type ApproveChecked<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
 pub type Batch<'account, 'state> =
-    pinocchio_token::instructions::batch::Batch<'account, 'state, Program2022>;
+    pinocchio_token::instructions::batch::Batch<'account, 'state, Token2022Program>;
 
 #[cfg(feature = "alloc")]
 /// A state object that contains the buffers for a `Batch` instruction.
 pub type BatchState<'account> =
-    pinocchio_token::instructions::batch::BatchState<'account, Program2022>;
+    pinocchio_token::instructions::batch::BatchState<'account, Token2022Program>;
 
 /// Burns tokens by removing them from an account.  `Burn` does not support
 /// accounts associated with the native mint, use `CloseAccount` instead.
@@ -127,8 +130,12 @@ pub type BatchState<'account> =
 ///   1. `[writable]` The token mint.
 ///   2. `[]` The account's multisignature owner/delegate.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub type Burn<'account, 'multisig, MultisigSigner> =
-    pinocchio_token::instructions::burn::Burn<'account, 'multisig, MultisigSigner, Program2022>;
+pub type Burn<'account, 'multisig, MultisigSigner> = pinocchio_token::instructions::burn::Burn<
+    'account,
+    'multisig,
+    MultisigSigner,
+    Token2022Program,
+>;
 
 /// Burns tokens by removing them from an account.
 /// [`BurnChecked`] does not support accounts
@@ -155,7 +162,7 @@ pub type BurnChecked<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Close an account by transferring all its SOL to the destination account.
@@ -178,7 +185,7 @@ pub type CloseAccount<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Freeze an Initialized account using the Mint's `freeze_authority` (if
@@ -201,7 +208,7 @@ pub type FreezeAccount<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Gets the required size of an account for the given mint as a
@@ -214,7 +221,7 @@ pub type FreezeAccount<'account, 'multisig, MultisigSigner> =
 ///
 ///   0. `[]` The mint to calculate for.
 pub type GetAccountDataSize<'account, 'extensions> =
-    get_account_data_size::GetAccountDataSize<'account, 'extensions, Program2022>;
+    get_account_data_size::GetAccountDataSize<'account, 'extensions, Token2022Program>;
 
 /// Initializes a new account to hold tokens. If this account is associated
 /// with the native mint then the token balance of the initialized account
@@ -235,7 +242,10 @@ pub type GetAccountDataSize<'account, 'extensions> =
 ///   2. `[]` The new account's owner/multisignature.
 ///   3. `[]` Rent sysvar.
 pub type InitializeAccount<'account> =
-    pinocchio_token::instructions::initialize_account::InitializeAccount<'account, Program2022>;
+    pinocchio_token::instructions::initialize_account::InitializeAccount<
+        'account,
+        Token2022Program,
+    >;
 
 /// Like [`InitializeAccount`], but the owner pubkey is
 /// passed via instruction data rather than the accounts list. This
@@ -249,7 +259,10 @@ pub type InitializeAccount<'account> =
 ///   1. `[]` The mint this account will be associated with.
 ///   2. `[]` Rent sysvar.
 pub type InitializeAccount2<'account> =
-    pinocchio_token::instructions::initialize_account2::InitializeAccount2<'account, Program2022>;
+    pinocchio_token::instructions::initialize_account2::InitializeAccount2<
+        'account,
+        Token2022Program,
+    >;
 
 /// Like [`InitializeAccount2`], but does not require the
 /// Rent sysvar to be provided
@@ -262,7 +275,7 @@ pub type InitializeAccount3<'account, 'address> =
     pinocchio_token::instructions::initialize_account3::InitializeAccount3<
         'account,
         'address,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Initialize the Immutable Owner extension for the given token account
@@ -276,7 +289,7 @@ pub type InitializeAccount3<'account, 'address> =
 pub type InitializeImmutableOwner<'account> =
     pinocchio_token::instructions::initialize_immutable_owner::InitializeImmutableOwner<
         'account,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Initializes a new mint and optionally deposits all the newly minted
@@ -293,7 +306,11 @@ pub type InitializeImmutableOwner<'account> =
 ///   0. `[writable]` The mint to initialize.
 ///   1. `[]` Rent sysvar.
 pub type InitializeMint<'account, 'address> =
-    pinocchio_token::instructions::initialize_mint::InitializeMint<'account, 'address, Program2022>;
+    pinocchio_token::instructions::initialize_mint::InitializeMint<
+        'account,
+        'address,
+        Token2022Program,
+    >;
 
 /// Like [`InitializeMint`], but does not require the Rent
 /// sysvar to be provided
@@ -305,7 +322,7 @@ pub type InitializeMint2<'account, 'address> =
     pinocchio_token::instructions::initialize_mint2::InitializeMint2<
         'account,
         'address,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Initializes a multisignature account with N provided signers.
@@ -332,7 +349,7 @@ pub type InitializeMultisig<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Like [`InitializeMultisig`], but does not require the
@@ -348,7 +365,7 @@ pub type InitializeMultisig2<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Mints new tokens to an account. The native mint does not support
@@ -371,7 +388,7 @@ pub type MintTo<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Mints new tokens to an account. The native mint does not support
@@ -398,7 +415,7 @@ pub type MintToChecked<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Revokes the delegate's authority.
@@ -414,7 +431,12 @@ pub type MintToChecked<'account, 'multisig, MultisigSigner> =
 ///   1. `[]` The source account's multisignature owner/delegate.
 ///   2. `..+M` `[signer]` M signer accounts.
 pub type Revoke<'account, 'multisig, MultisigSigner> =
-    pinocchio_token::instructions::revoke::Revoke<'account, 'multisig, MultisigSigner, Program2022>;
+    pinocchio_token::instructions::revoke::Revoke<
+        'account,
+        'multisig,
+        MultisigSigner,
+        Token2022Program,
+    >;
 
 /// Sets a new authority of a mint or account.
 ///
@@ -434,7 +456,7 @@ pub type SetAuthority<'account, 'address, 'multisig, MultisigSigner> =
         'address,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Given a wrapped / native token account (a token account containing SOL)
@@ -454,7 +476,7 @@ pub type SetAuthority<'account, 'address, 'multisig, MultisigSigner> =
 ///      lamports.
 ///   1. `[]` Rent sysvar.
 pub type SyncNative<'account> =
-    pinocchio_token::instructions::sync_native::SyncNative<'account, Program2022>;
+    pinocchio_token::instructions::sync_native::SyncNative<'account, Token2022Program>;
 
 /// Thaw a Frozen account using the Mint's `freeze_authority` (if set).
 ///
@@ -475,7 +497,7 @@ pub type ThawAccount<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Transfers tokens from one account to another either directly or via a
@@ -500,7 +522,7 @@ pub type Transfer<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Transfers tokens from one account to another either directly or via a
@@ -531,7 +553,7 @@ pub type TransferChecked<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Convert a `UiAmount` of tokens to a little-endian `u64` raw Amount,
@@ -555,7 +577,7 @@ pub type UiAmountToAmount<'account, 'amount> =
     pinocchio_token::instructions::ui_amount_to_amount::UiAmountToAmount<
         'account,
         'amount,
-        Program2022,
+        Token2022Program,
     >;
 
 /// Transfer lamports from a native SOL account to a destination account.
@@ -579,7 +601,7 @@ pub type UnwrapLamports<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 /// This instruction is to be used to rescue SOL sent to any `TokenProgram`
@@ -603,7 +625,7 @@ pub type WithdrawExcessLamports<'account, 'multisig, MultisigSigner> =
         'account,
         'multisig,
         MultisigSigner,
-        Program2022,
+        Token2022Program,
     >;
 
 #[cold]

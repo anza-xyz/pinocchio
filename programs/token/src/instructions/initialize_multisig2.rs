@@ -5,7 +5,7 @@ use {
             invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -43,7 +43,7 @@ pub struct InitializeMultisig2<
     'account,
     'multisig,
     MultisigSigner: AsRef<AccountView>,
-    Program: TokenProgram,
+    Program: TokenInterface,
 > where
     'account: 'multisig,
 {
@@ -61,7 +61,7 @@ pub struct InitializeMultisig2<
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
     InitializeMultisig2<'account, 'multisig, MultisigSigner, Program>
 where
     'account: 'multisig,
@@ -147,7 +147,7 @@ where
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     for InitializeMultisig2<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
@@ -178,7 +178,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
     for InitializeMultisig2<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]

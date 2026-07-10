@@ -5,7 +5,7 @@ use {
             invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -50,7 +50,7 @@ pub struct FreezeAccount<
     'account,
     'multisig,
     MultisigSigner: AsRef<AccountView>,
-    Program: TokenProgram,
+    Program: TokenInterface,
 > {
     /// The account to freeze.
     pub account: &'account AccountView,
@@ -68,7 +68,9 @@ pub struct FreezeAccount<
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> FreezeAccount<'account, '_, &'account AccountView, Program> {
+impl<'account, Program: TokenInterface>
+    FreezeAccount<'account, '_, &'account AccountView, Program>
+{
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -90,7 +92,7 @@ impl<'account, Program: TokenProgram> FreezeAccount<'account, '_, &'account Acco
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
     FreezeAccount<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `FreezeAccount` instruction with a
@@ -208,7 +210,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     for FreezeAccount<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
@@ -251,7 +253,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
     for FreezeAccount<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]

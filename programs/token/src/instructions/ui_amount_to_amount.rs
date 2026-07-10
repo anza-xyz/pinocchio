@@ -4,7 +4,7 @@ use {
             invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -37,7 +37,7 @@ const MAX_DATA_LEN: usize = 255;
 /// Accounts expected by this instruction:
 ///
 ///   0. `[]` The mint to calculate for.
-pub struct UiAmountToAmount<'account, 'amount, Program: TokenProgram> {
+pub struct UiAmountToAmount<'account, 'amount, Program: TokenInterface> {
     /// The mint to calculate for.
     pub mint: &'account AccountView,
 
@@ -48,7 +48,7 @@ pub struct UiAmountToAmount<'account, 'amount, Program: TokenProgram> {
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'amount, Program: TokenProgram> UiAmountToAmount<'account, 'amount, Program> {
+impl<'account, 'amount, Program: TokenInterface> UiAmountToAmount<'account, 'amount, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -121,7 +121,9 @@ impl<'account, 'amount, Program: TokenProgram> UiAmountToAmount<'account, 'amoun
     }
 }
 
-impl<Program: TokenProgram> super::batch::IntoBatch<Program> for UiAmountToAmount<'_, '_, Program> {
+impl<Program: TokenInterface> super::batch::IntoBatch<Program>
+    for UiAmountToAmount<'_, '_, Program>
+{
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
@@ -138,7 +140,7 @@ impl<Program: TokenProgram> super::batch::IntoBatch<Program> for UiAmountToAmoun
     }
 }
 
-impl<Program: TokenProgram> CpiWriter for UiAmountToAmount<'_, '_, Program> {
+impl<Program: TokenInterface> CpiWriter for UiAmountToAmount<'_, '_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,

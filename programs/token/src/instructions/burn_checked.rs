@@ -5,7 +5,7 @@ use {
             invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -57,7 +57,7 @@ pub struct BurnChecked<
     'account,
     'multisig,
     MultisigSigner: AsRef<AccountView>,
-    Program: TokenProgram,
+    Program: TokenInterface,
 > {
     /// The account to burn from.
     pub account: &'account AccountView,
@@ -81,7 +81,7 @@ pub struct BurnChecked<
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> BurnChecked<'account, '_, &'account AccountView, Program> {
+impl<'account, Program: TokenInterface> BurnChecked<'account, '_, &'account AccountView, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -105,7 +105,7 @@ impl<'account, Program: TokenProgram> BurnChecked<'account, '_, &'account Accoun
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
     BurnChecked<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `BurnChecked` instruction with a
@@ -227,7 +227,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     for BurnChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
@@ -270,7 +270,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
     for BurnChecked<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
