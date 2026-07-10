@@ -131,7 +131,7 @@ pub type Burn<'account, 'multisig, MultisigSigner> =
     pinocchio_token::instructions::burn::Burn<'account, 'multisig, MultisigSigner, Program2022>;
 
 /// Burns tokens by removing them from an account.
-/// [`super::BurnChecked`] does not support accounts
+/// [`BurnChecked`] does not support accounts
 /// associated with the native mint, use `CloseAccount` instead.
 ///
 /// This instruction differs from Burn in that the decimals value is checked
