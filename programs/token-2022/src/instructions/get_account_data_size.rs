@@ -2,7 +2,7 @@ use {
     crate::{
         instructions::{
             invalid_argument_error, write_extension_types_instruction_data,
-            EXTENSION_TYPES_INSTRUCTION_DATA_LEN,
+            EXTENSION_TYPES_INSTRUCTION_DATA_LEN, MAX_EXTENSION_COUNT,
         },
         state::ExtensionType,
         UNINIT_BYTE,
@@ -55,7 +55,16 @@ pub struct GetAccountDataSize<'account, 'extensions, Program: TokenProgram> {
 impl<'account, 'extensions, Program: TokenProgram>
     GetAccountDataSize<'account, 'extensions, Program>
 {
+    /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
+
+    /// Expected number of accounts.
+    pub const ACCOUNTS_LEN: usize = ACCOUNTS_LEN;
+
+    /// Instruction data length:
+    ///   - discriminator (1 byte)
+    ///   - extension types (2 bytes per extension)
+    pub const MAX_DATA_LEN: usize = MAX_DATA_LEN;
 
     #[inline(always)]
     pub fn new(mint: &'account AccountView, extensions: &'extensions [ExtensionType]) -> Self {
@@ -208,7 +217,7 @@ fn write_instruction_data(
 ) -> Result<usize, ProgramError> {
     let expected_data_len = 1 + (extensions.len() * 2);
 
-    if data.len() > MAX_DATA_LEN || data.len() < expected_data_len {
+    if extensions.len() > MAX_EXTENSION_COUNT || data.len() < expected_data_len {
         return Err(invalid_argument_error());
     }
 

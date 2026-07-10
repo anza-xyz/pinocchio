@@ -3,11 +3,12 @@
 pub mod instructions;
 pub mod state;
 
-use core::mem::MaybeUninit;
-
-use pinocchio_token::TokenProgram;
-use solana_address::Address;
-use solana_program_error::{ProgramError, ProgramResult};
+use {
+    core::mem::MaybeUninit,
+    pinocchio_token::TokenProgram,
+    solana_address::Address,
+    solana_program_error::{ProgramError, ProgramResult},
+};
 
 solana_address::declare_id!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
@@ -16,7 +17,7 @@ const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::<u8>::uninit();
 /// Struct to represent the SPL Token-2022 program.
 ///
 /// This struct implements the `TokenProgram` trait, which statically provides
-/// the SPL Token address for instruction building.
+/// the SPL Token-2022 address for instruction building.
 pub struct Program2022;
 
 impl TokenProgram for Program2022 {

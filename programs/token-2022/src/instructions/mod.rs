@@ -50,7 +50,7 @@ const EXTENSION_TYPES_INSTRUCTION_DATA_LEN: usize = 1 + MAX_EXTENSION_COUNT * 2;
 pub type AmountToUiAmount<'account> =
     pinocchio_token::instructions::amount_to_ui_amount::AmountToUiAmount<'account, Program2022>;
 
-/// Approves a delegate.  A delegate is given the authority over tokens on
+/// Approves a delegate. A delegate is given the authority over tokens on
 /// behalf of the source account's owner.
 ///
 /// Accounts expected by this instruction:
@@ -77,7 +77,7 @@ pub type Approve<'account, 'multisig, MultisigSigner> =
 /// behalf of the source account's owner.
 ///
 /// This instruction differs from Approve in that the token mint and
-/// decimals value is checked by the caller.  This may be useful when
+/// decimals value is checked by the caller. This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:
@@ -216,7 +216,7 @@ pub type FreezeAccount<'account, 'multisig, MultisigSigner> =
 pub type GetAccountDataSize<'account, 'extensions> =
     get_account_data_size::GetAccountDataSize<'account, 'extensions, Program2022>;
 
-/// Initializes a new account to hold tokens.  If this account is associated
+/// Initializes a new account to hold tokens. If this account is associated
 /// with the native mint then the token balance of the initialized account
 /// will be equal to the amount of SOL in the account. If this account is
 /// associated with another mint, that mint must be initialized before this
@@ -230,7 +230,7 @@ pub type GetAccountDataSize<'account, 'extensions> =
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 ///   2. `[]` The new account's owner/multisignature.
 ///   3. `[]` Rent sysvar.
@@ -245,7 +245,7 @@ pub type InitializeAccount<'account> =
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 ///   2. `[]` Rent sysvar.
 pub type InitializeAccount2<'account> =
@@ -256,7 +256,7 @@ pub type InitializeAccount2<'account> =
 ///
 /// Accounts expected by this instruction:
 ///
-///   0. `[writable]`  The account to initialize.
+///   0. `[writable]` The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 pub type InitializeAccount3<'account, 'address> =
     pinocchio_token::instructions::initialize_account3::InitializeAccount3<
@@ -312,7 +312,7 @@ pub type InitializeMint2<'account, 'address> =
 ///
 /// Multisignature accounts can used in place of any single owner/delegate
 /// accounts in any token instruction that require an owner/delegate to be
-/// present.  The variant field represents the number of signers (M)
+/// present. The variant field represents the number of signers (M)
 /// required to validate this multisignature account.
 ///
 /// The [`InitializeMultisig`] instruction requires no
@@ -374,11 +374,11 @@ pub type MintTo<'account, 'multisig, MultisigSigner> =
         Program2022,
     >;
 
-/// Mints new tokens to an account.  The native mint does not support
+/// Mints new tokens to an account. The native mint does not support
 /// minting.
 ///
 /// This instruction differs from [`MintTo`] in that the
-/// decimals value is checked by the caller.  This may be useful when
+/// decimals value is checked by the caller. This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:
@@ -446,11 +446,11 @@ pub type SetAuthority<'account, 'address, 'multisig, MultisigSigner> =
 /// Accounts expected by this instruction:
 ///
 ///   * Using runtime Rent sysvar
-///   0. `[writable]`  The native token account to sync with its underlying
+///   0. `[writable]` The native token account to sync with its underlying
 ///      lamports.
 ///
 ///   * Using Rent sysvar account
-///   0. `[writable]`  The native token account to sync with its underlying
+///   0. `[writable]` The native token account to sync with its underlying
 ///      lamports.
 ///   1. `[]` Rent sysvar.
 pub type SyncNative<'account> =
@@ -479,7 +479,7 @@ pub type ThawAccount<'account, 'multisig, MultisigSigner> =
     >;
 
 /// Transfers tokens from one account to another either directly or via a
-/// delegate.  If this account is associated with the native mint then equal
+/// delegate. If this account is associated with the native mint then equal
 /// amounts of SOL and Tokens will be transferred to the destination
 /// account.
 ///
@@ -504,12 +504,12 @@ pub type Transfer<'account, 'multisig, MultisigSigner> =
     >;
 
 /// Transfers tokens from one account to another either directly or via a
-/// delegate.  If this account is associated with the native mint then equal
+/// delegate. If this account is associated with the native mint then equal
 /// amounts of SOL and Tokens will be transferred to the destination
 /// account.
 ///
 /// This instruction differs from [`Transfer`] in that the token mint and
-/// decimals value is checked by the caller.  This may be useful when
+/// decimals value is checked by the caller. This may be useful when
 /// creating transactions offline or within a hardware wallet.
 ///
 /// Accounts expected by this instruction:
