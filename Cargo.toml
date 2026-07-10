@@ -17,6 +17,7 @@ rust-version = "1.89.0"
 
 [workspace.dependencies]
 pinocchio = { path = "sdk", default-features = false }
+pinocchio-token = { path = "programs/token" }
 solana-account-view = "2.0"
 solana-address = "2.0"
 solana-define-syscall = "5.0"

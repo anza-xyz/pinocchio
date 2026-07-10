@@ -15,8 +15,6 @@ This crate contains [`pinocchio`](https://crates.io/crates/pinocchio) helpers to
 
 Each instruction defines a `struct` with the accounts and parameters required. Once all values are set, you can call directly `invoke` or `invoke_signed` to perform the CPI.
 
-Instruction that are common to both SPL Token and SPL Token-2022 programs expect the program address, so they can be used to invoke either token program.
-
 This is a `no_std` crate.
 
 > **Note:** The API defined in this crate is subject to change.
@@ -28,15 +26,13 @@ Initializing a mint account:
 ```rust
 // This example assumes that the instruction receives a writable `mint`
 // account; `authority` is an `Address`.
-// The SPL Token program is being invoked.
-InitializeMint {
+InitializeMint::new(
     mint,
     rent_sysvar,
-    decimals: 9,
-    mint_authority: authority,
-    freeze_authority: Some(authority),
-    token_program: Address::from_str_const("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-}.invoke()?;
+    9,
+    &authority,
+    Some(&authority),
+).invoke()?;
 ```
 
 Performing a transfer of tokens:
@@ -44,14 +40,12 @@ Performing a transfer of tokens:
 ```rust
 // This example assumes that the instruction receives writable `from` and `to`
 // accounts, and a signer `authority` account.
-// The SPL Token-2022 is being invoked.
-Transfer {
+Transfer::new(
     from,
     to,
     authority,
-    amount: 10,
-    token_program: Address::from_str_const("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
-}.invoke()?;
+    10,
+).invoke()?;
 ```
 
 ## License
