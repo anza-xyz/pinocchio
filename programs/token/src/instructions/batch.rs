@@ -1,7 +1,7 @@
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use {
-    crate::{instructions::invalid_argument_error, TokenProgram},
+    crate::{instructions::invalid_argument_error, TokenInterface},
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_address::Address,
     solana_instruction_view::{
@@ -29,7 +29,7 @@ const IX_HEADER_SIZE: usize = 2;
 
 /// A collection of instructions that can be serialized into a token `Batch`
 /// instruction.
-pub struct Batch<'account, 'state, Program: TokenProgram> {
+pub struct Batch<'account, 'state, Program: TokenInterface> {
     /// The instruction data for the batch instruction.
     ///
     /// The first byte is reserved for the batch instruction discriminator,
@@ -57,7 +57,7 @@ pub struct Batch<'account, 'state, Program: TokenProgram> {
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'state, Program: TokenProgram> Batch<'account, 'state, Program>
+impl<'account, 'state, Program: TokenInterface> Batch<'account, 'state, Program>
 where
     'account: 'state,
 {
@@ -137,7 +137,7 @@ where
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -154,7 +154,7 @@ where
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -228,7 +228,7 @@ where
 
 #[cfg(feature = "alloc")]
 /// A state object that contains the buffers for a `Batch` instruction.
-pub struct BatchState<'account, Program: TokenProgram> {
+pub struct BatchState<'account, Program: TokenInterface> {
     /// Container for the instruction data of the batch instruction.
     data: Box<[MaybeUninit<u8>]>,
 
@@ -243,7 +243,7 @@ pub struct BatchState<'account, Program: TokenProgram> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'account, Program: TokenProgram> BatchState<'account, Program> {
+impl<'account, Program: TokenInterface> BatchState<'account, Program> {
     #[inline(always)]
     pub fn new(accounts_len: usize, data_len: usize) -> Self {
         Self {
@@ -270,7 +270,7 @@ impl<'account, Program: TokenProgram> BatchState<'account, Program> {
 }
 
 /// A trait for instructions that can be consumed directly into a `Batch`.
-pub trait IntoBatch<Program: TokenProgram> {
+pub trait IntoBatch<Program: TokenInterface> {
     /// Serializes `self` into the provided batch.
     fn into_batch<'account, 'state>(
         self,

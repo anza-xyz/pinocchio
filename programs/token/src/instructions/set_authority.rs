@@ -5,7 +5,7 @@ use {
             invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -59,7 +59,7 @@ pub struct SetAuthority<
     'address,
     'multisig,
     MultisigSigner: AsRef<AccountView>,
-    Program: TokenProgram,
+    Program: TokenInterface,
 > {
     /// The mint or account to change the authority of.
     pub account: &'account AccountView,
@@ -80,7 +80,7 @@ pub struct SetAuthority<
     _program: PhantomData<Program>,
 }
 
-impl<'account, 'address, Program: TokenProgram>
+impl<'account, 'address, Program: TokenInterface>
     SetAuthority<'account, 'address, '_, &'account AccountView, Program>
 {
     /// The instruction discriminator.
@@ -104,8 +104,13 @@ impl<'account, 'address, Program: TokenProgram>
     }
 }
 
-impl<'account, 'address, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-    SetAuthority<'account, 'address, 'multisig, MultisigSigner, Program>
+impl<
+        'account,
+        'address,
+        'multisig,
+        MultisigSigner: AsRef<AccountView>,
+        Program: TokenInterface,
+    > SetAuthority<'account, 'address, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `SetAuthority` instruction with a
     /// multisignature authority and signer accounts.
@@ -165,7 +170,7 @@ impl<'account, 'address, 'multisig, MultisigSigner: AsRef<AccountView>, Program:
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -182,7 +187,7 @@ impl<'account, 'address, 'multisig, MultisigSigner: AsRef<AccountView>, Program:
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -224,7 +229,7 @@ impl<'account, 'address, 'multisig, MultisigSigner: AsRef<AccountView>, Program:
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     for SetAuthority<'_, '_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
@@ -265,7 +270,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
     for SetAuthority<'_, '_, '_, MultisigSigner, Program>
 {
     #[inline(always)]

@@ -5,7 +5,7 @@ use {
             invalid_argument_error, write_bytes, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -49,8 +49,12 @@ const DATA_LEN: usize = 9;
 ///   1. `[writable]` The destination account.
 ///   2. `[]` The source account's multisignature owner/delegate.
 ///   3. `..+M` `[signer]` M signer accounts.
-pub struct Transfer<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
-{
+pub struct Transfer<
+    'account,
+    'multisig,
+    MultisigSigner: AsRef<AccountView>,
+    Program: TokenInterface,
+> {
     /// The source account.
     pub from: &'account AccountView,
 
@@ -70,7 +74,7 @@ pub struct Transfer<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Pro
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> Transfer<'account, '_, &'account AccountView, Program> {
+impl<'account, Program: TokenInterface> Transfer<'account, '_, &'account AccountView, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -93,7 +97,7 @@ impl<'account, Program: TokenProgram> Transfer<'account, '_, &'account AccountVi
     }
 }
 
-impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProgram>
+impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
     Transfer<'account, 'multisig, MultisigSigner, Program>
 {
     /// Creates a new `Transfer` instruction with a
@@ -154,7 +158,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -171,7 +175,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -213,7 +217,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenProg
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     for Transfer<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
@@ -256,7 +260,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenProgram> super::batch::IntoBatch<Program>
+impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
     for Transfer<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]

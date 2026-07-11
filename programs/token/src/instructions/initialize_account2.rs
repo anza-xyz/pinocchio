@@ -4,7 +4,7 @@ use {
             account_borrow_failed_error, invalid_argument_error, write_bytes, CpiWriter,
             UNINIT_BYTE, UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -38,7 +38,7 @@ const DATA_LEN: usize = 33;
 ///   0. `[writable]` The account to initialize.
 ///   1. `[]` The mint this account will be associated with.
 ///   2. `[]` Rent sysvar.
-pub struct InitializeAccount2<'account, Program: TokenProgram> {
+pub struct InitializeAccount2<'account, Program: TokenInterface> {
     /// The account to initialize.
     pub account: &'account AccountView,
 
@@ -55,7 +55,7 @@ pub struct InitializeAccount2<'account, Program: TokenProgram> {
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> InitializeAccount2<'account, Program> {
+impl<'account, Program: TokenInterface> InitializeAccount2<'account, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -102,7 +102,7 @@ impl<'account, Program: TokenProgram> InitializeAccount2<'account, Program> {
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -135,7 +135,7 @@ impl<'account, Program: TokenProgram> InitializeAccount2<'account, Program> {
     }
 }
 
-impl<Program: TokenProgram> CpiWriter for InitializeAccount2<'_, Program> {
+impl<Program: TokenInterface> CpiWriter for InitializeAccount2<'_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -164,7 +164,7 @@ impl<Program: TokenProgram> CpiWriter for InitializeAccount2<'_, Program> {
     }
 }
 
-impl<Program: TokenProgram> super::batch::IntoBatch<Program> for InitializeAccount2<'_, Program> {
+impl<Program: TokenInterface> super::batch::IntoBatch<Program> for InitializeAccount2<'_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,

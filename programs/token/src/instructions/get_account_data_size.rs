@@ -4,7 +4,7 @@ use {
             invalid_argument_error, CpiWriter, UNINIT_BYTE, UNINIT_CPI_ACCOUNT,
             UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -35,7 +35,7 @@ const DATA_LEN: usize = 1;
 /// Accounts expected by this instruction:
 ///
 ///   0. `[]` The mint to calculate for.
-pub struct GetAccountDataSize<'account, Program: TokenProgram> {
+pub struct GetAccountDataSize<'account, Program: TokenInterface> {
     /// The mint to calculate for.
     pub mint: &'account AccountView,
 
@@ -43,7 +43,7 @@ pub struct GetAccountDataSize<'account, Program: TokenProgram> {
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
+impl<'account, Program: TokenInterface> GetAccountDataSize<'account, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -82,7 +82,7 @@ impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -115,7 +115,7 @@ impl<'account, Program: TokenProgram> GetAccountDataSize<'account, Program> {
     }
 }
 
-impl<Program: TokenProgram> CpiWriter for GetAccountDataSize<'_, Program> {
+impl<Program: TokenInterface> CpiWriter for GetAccountDataSize<'_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -144,7 +144,7 @@ impl<Program: TokenProgram> CpiWriter for GetAccountDataSize<'_, Program> {
     }
 }
 
-impl<Program: TokenProgram> super::batch::IntoBatch<Program> for GetAccountDataSize<'_, Program> {
+impl<Program: TokenInterface> super::batch::IntoBatch<Program> for GetAccountDataSize<'_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,

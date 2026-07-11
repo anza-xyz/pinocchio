@@ -4,7 +4,7 @@ use {
             account_borrow_failed_error, invalid_argument_error, CpiWriter, UNINIT_BYTE,
             UNINIT_CPI_ACCOUNT, UNINIT_INSTRUCTION_ACCOUNT,
         },
-        TokenProgram,
+        TokenInterface,
     },
     core::{marker::PhantomData, mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
@@ -45,7 +45,7 @@ const DATA_LEN: usize = 1;
 ///   0. `[writable]` The native token account to sync with its underlying
 ///      lamports.
 ///   1. `[]` Rent sysvar.
-pub struct SyncNative<'account, Program: TokenProgram> {
+pub struct SyncNative<'account, Program: TokenInterface> {
     /// Native Token Account
     pub native_token: &'account AccountView,
 
@@ -55,7 +55,7 @@ pub struct SyncNative<'account, Program: TokenProgram> {
     _program: PhantomData<Program>,
 }
 
-impl<'account, Program: TokenProgram> SyncNative<'account, Program> {
+impl<'account, Program: TokenInterface> SyncNative<'account, Program> {
     /// The instruction discriminator.
     pub const DISCRIMINATOR: u8 = DISCRIMINATOR;
 
@@ -98,7 +98,7 @@ impl<'account, Program: TokenProgram> SyncNative<'account, Program> {
     /// # Important
     ///
     /// This method does not verify that `program` satisfies
-    /// [`TokenProgram::verify`]. The caller must ensure the program address
+    /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
@@ -131,7 +131,7 @@ impl<'account, Program: TokenProgram> SyncNative<'account, Program> {
     }
 }
 
-impl<Program: TokenProgram> CpiWriter for SyncNative<'_, Program> {
+impl<Program: TokenInterface> CpiWriter for SyncNative<'_, Program> {
     #[inline(always)]
     fn write_accounts<'cpi>(
         &self,
@@ -160,7 +160,7 @@ impl<Program: TokenProgram> CpiWriter for SyncNative<'_, Program> {
     }
 }
 
-impl<Program: TokenProgram> super::batch::IntoBatch<Program> for SyncNative<'_, Program> {
+impl<Program: TokenInterface> super::batch::IntoBatch<Program> for SyncNative<'_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
