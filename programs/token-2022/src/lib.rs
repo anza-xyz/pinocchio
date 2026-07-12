@@ -3,12 +3,7 @@
 pub mod instructions;
 pub mod state;
 
-use {
-    core::mem::MaybeUninit,
-    pinocchio_token::TokenInterface,
-    solana_address::Address,
-    solana_program_error::{ProgramError, ProgramResult},
-};
+use {core::mem::MaybeUninit, pinocchio_token::TokenInterface, solana_address::Address};
 
 solana_address::declare_id!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
@@ -22,23 +17,6 @@ pub struct Token2022Program;
 
 impl TokenInterface for Token2022Program {
     const ID: Address = crate::ID;
-
-    #[inline(always)]
-    fn verify(address: &Address) -> ProgramResult {
-        if address != &Self::ID && address != &pinocchio_token::ID {
-            return Err(incorrect_program_id());
-        }
-
-        Ok(())
-    }
-}
-
-/// Cold helper for constructing `ProgramError::IncorrectProgramId` outside the
-/// hot path.
-#[doc(hidden)]
-#[cold]
-fn incorrect_program_id() -> ProgramError {
-    ProgramError::IncorrectProgramId
 }
 
 #[inline(always)]

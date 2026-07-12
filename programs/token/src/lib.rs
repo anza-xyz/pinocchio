@@ -12,6 +12,9 @@ pub mod state;
 
 solana_address::declare_id!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
+/// The address of the SPL Token-2022 program.
+const TOKEN_2022: Address = Address::from_str_const("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+
 /// A trait for token programs that can be used in a CPI with a statically known
 /// program address.
 pub trait TokenInterface {
@@ -40,6 +43,20 @@ pub struct TokenProgram;
 
 impl TokenInterface for TokenProgram {
     const ID: Address = crate::ID;
+
+    /// Returns `Ok(())` when `address` is accepted for cross-program
+    /// invocations.
+    ///
+    /// This implementation accepts both SPL Token and the SPL Token-2022
+    /// programs.
+    #[inline(always)]
+    fn verify(address: &Address) -> ProgramResult {
+        if address != &Self::ID && address != &TOKEN_2022 {
+            return Err(incorrect_program_id());
+        }
+
+        Ok(())
+    }
 }
 
 /// Cold helper for constructing `ProgramError::IncorrectProgramId` outside the
