@@ -57,6 +57,7 @@ jobs:
         with:
           toolchain: test
           components: release, semver-checks
+          cache: false
 
       - name: Set Version
         env:
@@ -121,6 +122,7 @@ jobs:
           toolchain: test
           components: release
           solana: true
+          cache: false
 
       - name: Build
         env:
