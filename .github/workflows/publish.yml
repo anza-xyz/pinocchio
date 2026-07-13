@@ -44,9 +44,6 @@ on:
         type: boolean
         default: true
 
-env:
-  CACHE: true
-
 jobs:
   semver_check:
     name: Check Semver
@@ -58,7 +55,6 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          cargo-cache-key: cargo-semver-checks
           toolchain: test
           components: release, semver-checks
 
@@ -118,7 +114,6 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          cargo-cache-key: cargo-publish
           toolchain: test
           components: release
           solana: true
