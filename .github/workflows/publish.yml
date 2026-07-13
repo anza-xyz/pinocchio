@@ -59,21 +59,25 @@ jobs:
           components: release, semver-checks
 
       - name: Set Version
+        env:
+          CRATE: ${{ inputs.crate }}
+          LEVEL: ${{ inputs.level }}
+          VERSION: ${{ inputs.version }}
         run: |
-          if [ "${{ inputs.level }}" == "version" ]; then
-            LEVEL=${{ inputs.version }}
-          else
-            LEVEL=${{ inputs.level }}
+          if [ "$LEVEL" == "version" ]; then
+            LEVEL="$VERSION"
           fi
 
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
 
-          cargo release $LEVEL --manifest-path ${{ inputs.crate }}/Cargo.toml --no-tag --no-publish --no-push --no-confirm --execute
+          cargo release "$LEVEL" --manifest-path "$CRATE/Cargo.toml" --no-tag --no-publish --no-push --no-confirm --execute
 
       - name: Check semver
+        env:
+          CRATE: ${{ inputs.crate }}
         run: |
-          pnpm semver ${{ inputs.crate }}
+          pnpm semver "$CRATE"
 
       - name: Summary
         run: |
@@ -119,10 +123,14 @@ jobs:
           solana: true
 
       - name: Build
-        run: pnpm build-sbf ${{ inputs.crate }}
+        env:
+          CRATE: ${{ inputs.crate }}
+        run: pnpm build-sbf "$CRATE"
 
       - name: Test
-        run: pnpm test ${{ inputs.crate }}
+        env:
+          CRATE: ${{ inputs.crate }}
+        run: pnpm test "$CRATE"
 
       - name: Set Git Author
         if: github.event.inputs.dry_run != 'true'
@@ -142,20 +150,22 @@ jobs:
         id: publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          CRATE: ${{ inputs.crate }}
+          LEVEL: ${{ inputs.level }}
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          if [ "${{ inputs.level }}" == "version" ]; then
-            LEVEL=${{ inputs.version }}
-          else
-            LEVEL=${{ inputs.level }}
+          if [ "$LEVEL" == "version" ]; then
+            LEVEL="$VERSION"
           fi
 
-          if [ "${{ inputs.dry_run }}" == "true" ]; then
+          if [ "$DRY_RUN" == "true" ]; then
             OPTIONS="--dry-run"
           else
             OPTIONS=""
           fi
 
-          pnpm tsx ./scripts/publish.mts ${{ inputs.crate }} $LEVEL $OPTIONS
+          pnpm tsx ./scripts/publish.mts "$CRATE" "$LEVEL" $OPTIONS
 
       - name: Generate a changelog
         if: github.event.inputs.dry_run != 'true' && github.event.inputs.create_release == 'true'
