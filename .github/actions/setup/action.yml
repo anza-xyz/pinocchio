@@ -14,6 +14,10 @@ inputs:
   solana:
     description: Install Solana if `true`. Defaults to `false`.
     required: false
+  cache:
+    description: Enable dependency caching if `true`. Defaults to `true`.
+    required: false
+    default: true
 
 runs:
   using: 'composite'
@@ -25,7 +29,7 @@ runs:
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
       with:
         node-version: 20
-        cache: 'pnpm'
+        cache: ${{ inputs.cache == 'true' && 'pnpm' || '' }}
 
     - name: Install Dependencies
       run: pnpm install --frozen-lockfile
@@ -74,7 +78,7 @@ runs:
       uses: solana-program/actions/install-solana@678f622be092844a943327c17430401d871e6998  # v1
       with:
         version: ${{ env.SOLANA_VERSION }}
-        cache: true
+        cache: ${{ inputs.cache }}
 
     - name: Install 'cargo-audit'
       if: ${{ contains(inputs.components, 'audit') }}
