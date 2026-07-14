@@ -55,7 +55,7 @@ The [`entrypoint!`](https://docs.rs/pinocchio/latest/pinocchio/macro.entrypoint.
 * [`default_allocator!`](https://docs.rs/pinocchio/latest/pinocchio/macro.default_allocator.html): declares the default (bump) global allocator
 * [`default_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.default_panic_handler.html): declares the default panic "hook" that works in combination with the `std` panic handler
 
-When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html) instead of `default_panic_handler!` to declare a rust runtime panic handler. There's no need to do this when any dependency is `std` since rust compiler will emit a panic handler.
+When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html) instead of `default_panic_handler!` to define a Rust runtime panic handler. There's no need to do this when any dependency is `std` since Rust compiler will emit a panic handler.
 
 To use the `entrypoint!` macro, use the following in your entrypoint definition:
 ```rust
@@ -79,10 +79,10 @@ pub fn process_instruction(
 }
 ```
 
-The information from the input is parsed into their own entities:
+The information from the input is split into their own entities:
 
-* `program_id`: the `ID` of the program being called
-* `accounts`: the accounts received
+* `program_id`: address of the program being called
+* `accounts`: accounts received by the instruction
 * `instruction_data`: data for the instruction
 
 `pinocchio` also offers variations of the program entrypoint (`lazy_program_entrypoint`) and global allocator (`no_allocator`). In order to use these, the program needs to specify the program entrypoint, global allocator and panic handler individually. The `entrypoint!` macro is equivalent to writing:
@@ -93,18 +93,20 @@ default_panic_handler!();
 ```
 Any of these macros can be replaced by alternative implementations.
 
-📌 Custom entrypoints with [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html)
+📌 Custom entrypoints with [`process_program_input`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_program_input.html)
 
-For programs that need maximum control over the entrypoint, `pinocchio` exposes the [`process_entrypoint`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_entrypoint.html) function. This function is the same deserialization logic used internally by the `program_entrypoint!` macro, exposed as a public API and can be called directly from a custom entrypoint, allowing you to implement fast-path optimizations or custom pre-processing logic before falling back to standard input parsing.
+For programs that need maximum control over the entrypoint, `pinocchio` exposes the [`process_program_input`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_program_input.html) function. This function is the same one 
+used by the `program_entrypoint!` macro, exposed as a public API and can be called directly from a custom entrypoint,
+allowing you to implement fast-path optimizations or custom pre-processinglogic before falling back to standard input 
+processing.
 
-To use `process_entrypoint` in a custom entrypoint:
+To use `process_program_input` in a custom entrypoint:
 ```rust
 use pinocchio::{
   AccountView,
   Address,
   default_panic_handler,
-  entrypoint::process_entrypoint,
-  MAX_TX_ACCOUNTS,
+  entrypoint::process_program_input,
   no_allocator,
   ProgramResult,
 };
@@ -114,16 +116,19 @@ no_allocator!();
 default_panic_handler!();
 
 #[no_mangle]
-pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+pub unsafe extern "C" fn entrypoint(
+    program_input: *mut u8,
+    instruction_data: *mut u8,
+) -> u64 {
     // Fast path: check the number of accounts
-    let num_accounts = unsafe { *(input as *const u64) };
+    let num_accounts = unsafe { *(program_input as *const u64) };
     if num_accounts == 0 {
         log("Fast path - no accounts!");
         return 0;
     }
 
-    // Standard path: delegate to `process_entrypoint`
-    unsafe { process_entrypoint::<MAX_TX_ACCOUNTS>(input, process_instruction) }
+    // Standard path: delegate to `process_program_input`
+    unsafe { process_program_input(program_input, instruction_data, process_instruction) }
 }
 
 pub fn process_instruction(
@@ -181,11 +186,11 @@ To use the `no_allocator!` macro, use the following in your entrypoint definitio
 ```rust
 use pinocchio::{
   AccountView,
+  Address,
   default_panic_handler,
   no_allocator,
   program_entrypoint,
-  ProgramResult,
-  Address
+  ProgramResult
 };
 
 program_entrypoint!(process_instruction);
@@ -209,7 +214,7 @@ Since the `no_allocator!` macro does not allocate memory, the `32kb` memory regi
 // static allocation:
 //    - 0 is the offset when the type will be allocated
 //    - `allocate_unchecked` returns a mutable reference to the allocated type
-let lamports = allocate_unchecked::<u64>(0);
+let lamports = unsafe { allocate_unchecked::<u64>(0) };
 *lamports = 1_000_000_000;
 ```
 
@@ -252,7 +257,7 @@ pinocchio = { version = "0.11", features = ["cpi"] }
 
 ### `account-resize`
 
-The `account-resize` feature allows a program to grow or shrink an `AccountView`'s data at runtime. At the start of execution, the entrypoint stores the original data length so it can verify that the resize stays within the permitted bounds. This operation consumes `2` CUs per account.
+The `account-resize` feature allows a program to grow or shrink an `AccountView`'s data at runtime. At the start of execution, the entrypoint stores the original data length so it can verify that the resize stays within the permitted bounds. This adds a small setup cost for each account.
 
 ### `unsafe-account-resize`
 
@@ -267,9 +272,9 @@ The components emitted by the entrypoint macros &mdash; program entrypoint, glob
 mod entrypoint {
   use pinocchio::{
     AccountView,
+    Address,
     entrypoint,
-    ProgramResult,
-    Address
+    ProgramResult
   };
 
   entrypoint!(process_instruction);

@@ -54,24 +54,13 @@
 //! │
 //! ├─ <variable> bytes of instruction data
 //! │
-//! └─ 32 bytes: address of the program account
+//! ├─ 32 bytes: address of the program account
+//! │
+//! ├─ <variable> bytes to align the offset to 8 bytes
+//! │
+//! └─ <variable> bytes of account pointers (8 bytes x number of accounts), where each pointer
+//!    points to the start of the corresponding account in the input buffer.
 //! ```
-
-/// Align a pointer to the BPF alignment of [`u128`].
-macro_rules! align_pointer {
-    ($ptr:expr) => {
-        // Integer-to-pointer cast: first compute the aligned address as a `usize`,
-        // since this is more CU-efficient than using `ptr::align_offset()` or the
-        // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
-        // back to a pointer. The resulting pointer is guaranteed to be valid
-        // because it follows the layout serialized by the runtime.
-        with_exposed_provenance_mut(
-            ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
-        )
-    };
-}
-
-pub mod lazy;
 
 #[cfg(feature = "alloc")]
 pub use alloc::BumpAllocator;
@@ -90,6 +79,22 @@ use {
         slice::{from_raw_parts, from_raw_parts_mut},
     },
 };
+
+/// Align a pointer to the BPF alignment of [`u128`].
+macro_rules! align_pointer {
+    ( $ptr:expr ) => {
+        // Integer-to-pointer cast: first compute the aligned address as a `usize`,
+        // since this is more CU-efficient than using `ptr::align_offset()` or the
+        // strict provenance API (e.g., `ptr::with_addr()`). Then cast the result
+        // back to a pointer. The resulting pointer is guaranteed to be valid
+        // because it follows the layout serialized by the runtime.
+        with_exposed_provenance_mut(
+            ($ptr.expose_provenance() + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1),
+        )
+    };
+}
+
+pub mod lazy;
 
 /// Start address of the memory region used for program heap.
 pub const HEAP_START_ADDRESS: u64 = 0x300000000;
@@ -125,7 +130,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// It also sets up a [global allocator] and [custom panic hook], using the
 /// [`crate::default_allocator!`] and [`crate::default_panic_handler!`] macros.
 ///
-/// The first argument is the name of a function with this type signature:
+/// The macro argument is the name of a function with this type signature:
 ///
 /// ```ignore
 /// fn process_instruction(
@@ -137,14 +142,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// The argument is defined as an `expr`, which allows the use of any function
 /// pointer not just identifiers in the current scope.
 ///
-/// There is a second optional argument that allows to specify the maximum
-/// number of accounts expected by instructions of the program. This is useful
-/// to reduce the stack size requirement for the entrypoint, as the default is
-/// set to [`crate::MAX_TX_ACCOUNTS`]. If the program receives more accounts
-/// than the specified maximum, these accounts will be ignored.
-///
 /// [global allocator]: https://doc.rust-lang.org/stable/alloc/alloc/trait.GlobalAlloc.html
-/// [maximum number of accounts]: https://github.com/anza-xyz/agave/blob/ccabfcf84921977202fd06d3197cbcea83742133/runtime/src/bank.rs#L3207-L3219
 /// [custom panic hook]: https://github.com/anza-xyz/rust/blob/2830febbc59d44bdd7ad2c3b81731f1d08b96eba/library/std/src/sys/pal/sbf/mod.rs#L49
 ///
 /// # Examples
@@ -197,18 +195,18 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// sizable CPI account arrays, consider adding `#[inline(never)]` to the
 /// instruction handler to keep it out of the entrypoint stack frame and avoid
 /// BPF stack overflows.
-///
-/// [`crate::nostd_panic_handler`]: https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:expr ) => {
-        $crate::entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
-    };
-    ( $process_instruction:expr, $maximum:expr ) => {
-        $crate::program_entrypoint!($process_instruction, $maximum);
+        $crate::program_entrypoint!($process_instruction);
         $crate::default_allocator!();
         $crate::default_panic_handler!();
+    };
+    // Use of the `maximum` argument is deprecated and ignored. It is kept for
+    // backwards compatibility.
+    ( $process_instruction:expr, $maximum:expr ) => {
+        $crate::entrypoint!($process_instruction);
     };
 }
 
@@ -218,42 +216,139 @@ macro_rules! entrypoint {
 /// set up a global allocator nor a panic handler. This is useful when the
 /// program will set up its own allocator and panic handler.
 ///
-/// The first argument is the name of a function with this type signature:
+/// The macro argument is the name of a function with this type signature:
 ///
 /// ```ignore
 /// fn process_instruction(
-///     program_id: &Address,     // Address of the account the program was loaded into
+///     program_id: &Address,         // Address of the account the program was loaded into
 ///     accounts: &mut [AccountView], // All accounts required to process the instruction
-///     instruction_data: &[u8],  // Serialized instruction-specific data
+///     instruction_data: &[u8],      // Serialized instruction-specific data
 /// ) -> ProgramResult;
 /// ```
 /// The argument is defined as an `expr`, which allows the use of any function
 /// pointer not just identifiers in the current scope.
-///
-/// There is a second optional argument that allows to specify the maximum
-/// number of accounts expected by instructions of the program. This is useful
-/// to reduce the stack size requirement for the entrypoint, as the default is
-/// set to [`MAX_TX_ACCOUNTS`]. If the program receives more accounts than the
-/// specified maximum, these accounts will be ignored.
 #[macro_export]
 macro_rules! program_entrypoint {
     ( $process_instruction:expr ) => {
-        $crate::program_entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
-    };
-    ( $process_instruction:expr, $maximum:expr ) => {
         /// Program entrypoint.
         #[no_mangle]
-        pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-            $crate::entrypoint::process_entrypoint::<$maximum>(input, $process_instruction)
+        pub unsafe extern "C" fn entrypoint(
+            program_input: *mut u8,
+            instruction_data: *mut u8,
+        ) -> u64 {
+            $crate::entrypoint::process_program_input(
+                program_input,
+                instruction_data,
+                $process_instruction,
+            )
         }
+    };
+    // Use of the `maximum` argument is deprecated and ignored. It is kept for
+    // backwards compatibility.
+    ( $process_instruction:expr, $maximum:expr ) => {
+        $crate::program_entrypoint!($process_instruction);
     };
 }
 
+/// Convert a `ProgramError` into a `u64`.
+///
 /// This function is marked as `#[cold]` to move the error conversion from the
 /// "hot path" of the entrypoint.
+#[cold]
 #[inline(never)]
 fn program_error_to_u64(error: ProgramError) -> u64 {
     error.into()
+}
+
+/// Process the program input.
+///
+/// # Safety
+///
+/// The caller must ensure that both `program_input` and `instruction_data`
+/// pointers are valid, i.e., they represent the input parameters serialized by
+/// the SVM loader and their lifetimes last for the duration of the program
+/// execution.
+#[inline(always)]
+pub unsafe fn process_program_input<F>(
+    program_input: *mut u8,
+    instruction_data: *mut u8,
+    process_instruction: F,
+) -> u64
+where
+    F: FnOnce(&Address, &mut [AccountView], &[u8]) -> ProgramResult,
+{
+    // Loads the instruction data length (8-bytes before the instruction data).
+    let ix_data_len = *(instruction_data.sub(size_of::<u64>()) as *const u64) as usize;
+    // Loads the `program_id`.
+    let program_id = &*(instruction_data.add(ix_data_len) as *const Address);
+
+    // The slice of account pointers is located right after the `program_id` +
+    // alignment padding. The length of the slice is determined by the first
+    // 8-bytes of `program_input`.
+
+    let slice_ptr = instruction_data.add(ix_data_len + size_of::<Address>());
+
+    let accounts_len = *(program_input as *const u64) as usize;
+    let accounts_ptr: *mut AccountView = align_pointer!(slice_ptr);
+
+    #[cfg(feature = "account-resize")]
+    {
+        macro_rules! store_original_data_len {
+            ( $current:ident ) => {{
+                let account = *$current;
+                let data_len = core::ptr::addr_of!((*account).data_len).read() as u32;
+
+                core::ptr::addr_of_mut!((*account).padding)
+                    .cast::<u32>()
+                    .write(data_len);
+            }};
+        }
+
+        macro_rules! store_original_data_len_and_advance {
+            ( $current:ident ) => {{
+                store_original_data_len!($current);
+                $current = $current.add(1);
+            }};
+        }
+
+        // `AccountView` is a single pointer wrapper around `RuntimeAccount`.
+        let mut current = accounts_ptr.cast::<*mut RuntimeAccount>();
+        let mut remainder = accounts_len;
+
+        while remainder >= 4 {
+            store_original_data_len_and_advance!(current);
+            store_original_data_len_and_advance!(current);
+            store_original_data_len_and_advance!(current);
+            store_original_data_len_and_advance!(current);
+            remainder -= 4;
+        }
+
+        match remainder {
+            3 => {
+                store_original_data_len_and_advance!(current);
+                store_original_data_len_and_advance!(current);
+                store_original_data_len!(current);
+            }
+            2 => {
+                store_original_data_len_and_advance!(current);
+                store_original_data_len!(current);
+            }
+            1 => {
+                store_original_data_len!(current);
+            }
+            _ => (),
+        }
+    }
+
+    let accounts = from_raw_parts_mut(accounts_ptr, accounts_len);
+
+    // The instruction data slice is given by the `instruction_data` pointer.
+    let instruction_data = from_raw_parts(instruction_data, ix_data_len);
+
+    match process_instruction(program_id, accounts, instruction_data) {
+        Ok(_) => SUCCESS,
+        Err(e) => program_error_to_u64(e),
+    }
 }
 
 /// Entrypoint deserialization.
@@ -267,6 +362,12 @@ fn program_error_to_u64(error: ProgramError) -> u64 {
 /// the program input parameters serialized by the SVM loader. Additionally, the
 /// `input` should last for the lifetime of the program execution since the
 /// returned values reference the `input`.
+#[deprecated(
+    since = "0.11.3",
+    note = "Use `process_program_input` instead; this function will be removed in the next major \
+            release"
+)]
+#[allow(deprecated)]
 #[inline(always)]
 pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     input: *mut u8,
@@ -408,6 +509,11 @@ unsafe fn clone_account_view(
 /// the program input parameters serialized by the SVM loader. Additionally, the
 /// `input` should last for the lifetime of the program execution since the
 /// returned values reference the `input`.
+#[deprecated(
+    since = "0.11.3",
+    note = "Use `process_program_input` instead of manual account deserialization; this function \
+            will be removed in the next major release"
+)]
 #[inline(always)]
 pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
@@ -646,7 +752,7 @@ macro_rules! default_allocator {
 ///
 /// This macro sets up a global allocator that denies all dynamic allocations,
 /// while allowing static ("manual") allocations. This is useful when the
-/// program does not need to dynamically allocate memory and manages their own
+/// program does not need to dynamically allocate memory and manages its own
 /// allocations.
 ///
 /// The program will panic if it tries to dynamically allocate memory.
@@ -849,12 +955,14 @@ mod alloc {
 mod tests {
     use {
         super::*,
+        crate::MAX_TX_ACCOUNTS,
         ::alloc::{
             alloc::{alloc, dealloc, handle_alloc_error},
             vec,
         },
         core::{
             alloc::Layout,
+            hint::black_box,
             ptr::{copy_nonoverlapping, null_mut},
         },
     };
@@ -862,8 +970,8 @@ mod tests {
     /// The mock program ID used for testing.
     const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
 
-    /// An uninitialized account view.
-    const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
+    /// The mock instruction data used for testing.
+    const MOCK_INSTRUCTION_DATA: [u8; 100] = [3u8; 100];
 
     /// Struct representing a memory region with a specific alignment.
     struct AlignedMemory {
@@ -912,7 +1020,7 @@ mod tests {
     /// Creates an input buffer with a specified number of accounts and
     /// instruction data.
     ///
-    /// This function mimics the input buffer created by the SVM loader.  Each
+    /// This function mimics the input buffer created by the SVM loader. Each
     /// account created has zeroed data, apart from the `data_len` field,
     /// which is set to the index of the account.
     ///
@@ -920,13 +1028,15 @@ mod tests {
     ///
     /// The returned `AlignedMemory` should only be used within the test
     /// context.
-    unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemory {
+    unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> (AlignedMemory, *mut u8) {
         let mut input = AlignedMemory::new(1_000_000_000);
         // Number of accounts.
         input.write(&(accounts as u64).to_le_bytes(), 0);
         let mut offset = size_of::<u64>();
+        let mut pointers = vec![];
 
         for i in 0..accounts {
+            pointers.push(offset);
             // Account data.
             let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
             account[0] = NON_DUP_MARKER;
@@ -943,13 +1053,28 @@ mod tests {
         // Instruction data length.
         input.write(&instruction_data.len().to_le_bytes(), offset);
         offset += size_of::<u64>();
+        // Store the pointer to the instruction data.
+        let instruction_data_ptr = input.as_mut_ptr().add(offset);
         // Instruction data.
         input.write(instruction_data, offset);
         offset += instruction_data.len();
         // Program ID (mock).
         input.write(MOCK_PROGRAM_ID.as_array(), offset);
+        offset += size_of::<Address>();
 
-        input
+        offset = (offset + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1);
+
+        // Slice of account pointers.
+        let accounts_ptr = input.as_mut_ptr().add(offset) as *mut AccountView;
+
+        for (i, pointer) in pointers.into_iter().enumerate() {
+            let account_ptr = input.as_mut_ptr().add(pointer) as *mut RuntimeAccount;
+            accounts_ptr
+                .add(i)
+                .write(AccountView::new_unchecked(account_ptr));
+        }
+
+        (input, instruction_data_ptr)
     }
 
     /// Creates an input buffer with a specified number of accounts, including
@@ -957,10 +1082,10 @@ mod tests {
     ///
     /// This function differs from `create_input` in that it creates accounts
     /// with a marker indicating that they are duplicated. There will be
-    /// `accounts - duplicated` unique accounts, and the remaining
-    /// `duplicated` accounts will be duplicates of the last unique account.
+    /// `accounts / 2` unique accounts, and the remaining `duplicated` accounts
+    /// will be duplicates of the last unique account.
     ///
-    /// This function mimics the input buffer created by the SVM loader.  Each
+    /// This function mimics the input buffer created by the SVM loader. Each
     /// account created has zeroed data, apart from the `data_len` field,
     /// which is set to the index of the account.
     ///
@@ -972,11 +1097,12 @@ mod tests {
         accounts: usize,
         instruction_data: &[u8],
         duplicated: usize,
-    ) -> AlignedMemory {
+    ) -> (AlignedMemory, *mut u8) {
         let mut input = AlignedMemory::new(1_000_000_000);
         // Number of accounts.
         input.write(&(accounts as u64).to_le_bytes(), 0);
         let mut offset = size_of::<u64>();
+        let mut pointers = vec![];
 
         if accounts > 0 {
             assert!(
@@ -986,6 +1112,7 @@ mod tests {
             let unique = accounts - duplicated;
 
             for i in 0..unique {
+                pointers.push(offset);
                 // Account data.
                 let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
                 account[0] = NON_DUP_MARKER;
@@ -999,8 +1126,11 @@ mod tests {
                 offset += padding_for_data;
             }
 
+            let last_unique_offset = *pointers.last().unwrap();
+
             // Remaining accounts are duplicated of the last unique account.
             for _ in unique..accounts {
+                pointers.push(last_unique_offset);
                 input.write(&[(unique - 1) as u8, 0, 0, 0, 0, 0, 0, 0], offset);
                 offset += size_of::<u64>();
             }
@@ -1009,157 +1139,194 @@ mod tests {
         // Instruction data length.
         input.write(&instruction_data.len().to_le_bytes(), offset);
         offset += size_of::<u64>();
+        // Store the offset of the instruction data.
+        let instruction_data_ptr = input.as_mut_ptr().add(offset);
         // Instruction data.
         input.write(instruction_data, offset);
         offset += instruction_data.len();
         // Program ID (mock).
         input.write(MOCK_PROGRAM_ID.as_array(), offset);
+        offset += size_of::<Address>();
 
-        input
+        offset = (offset + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1);
+
+        // Slice of account pointers.
+        let accounts_ptr = input.as_mut_ptr().add(offset) as *mut AccountView;
+
+        for (i, pointer) in pointers.into_iter().enumerate() {
+            let ptr = input.as_mut_ptr().add(pointer) as *mut RuntimeAccount;
+            accounts_ptr.add(i).write(AccountView::new_unchecked(ptr));
+        }
+
+        (input, instruction_data_ptr)
     }
 
-    /// Asserts that the accounts slice contains the expected number of accounts
-    /// and that each account's data length matches its index.
-    fn assert_accounts(accounts: &[MaybeUninit<AccountView>]) {
+    /// Asserts that each account's data length matches its index.
+    fn assert_accounts(
+        program_id: &Address,
+        accounts: &mut [AccountView],
+        instruction_data: &[u8],
+    ) -> ProgramResult {
+        assert!(program_id == &MOCK_PROGRAM_ID);
+
         for (i, account) in accounts.iter().enumerate() {
-            let account_view = unsafe { account.assume_init_ref() };
-            assert_eq!(account_view.data_len(), i);
+            assert_eq!(account.data_len(), i);
         }
+
+        assert_eq!(instruction_data, &MOCK_INSTRUCTION_DATA);
+
+        Ok(())
     }
 
-    /// Asserts that the accounts slice contains the expected number of accounts
-    /// and all accounts are duplicated, apart from the first one.
-    fn assert_duplicated_accounts(accounts: &mut [MaybeUninit<AccountView>], duplicated: usize) {
-        assert!(accounts.len() > duplicated);
+    /// Asserts that each account's data length matches its index for unique
+    /// accounts, and that duplicated accounts reference the last unique
+    /// account.
+    fn assert_duplicated_accounts(
+        program_id: &Address,
+        accounts: &mut [AccountView],
+        instruction_data: &[u8],
+    ) -> ProgramResult {
+        assert!(program_id == &MOCK_PROGRAM_ID);
 
-        let unique = accounts.len() - duplicated;
+        if !accounts.is_empty() {
+            // Half of the accounts are duplicated.
+            let unique = accounts.len() / 2;
+            let (unique_accounts, duplicated_accounts) = accounts.split_at_mut(unique);
 
-        // Unique accounts should have `data_len` equal to their index.
-        for (i, account) in accounts[..unique].iter().enumerate() {
-            let account_view = unsafe { account.assume_init_ref() };
-            assert_eq!(account_view.data_len(), i);
+            // Unique accounts should have `data_len` equal to their index.
+            for (i, account) in unique_accounts.iter().enumerate() {
+                assert_eq!(account.data_len(), i);
+            }
+
+            // Last unique account.
+            let last_unique = unique_accounts.last_mut().unwrap();
+
+            // No mutable borrow active at this point.
+            assert!(last_unique.try_borrow_mut().is_ok());
+
+            // Duplicated accounts should reference (share) the account pointer
+            // to the last unique account.
+            for account in duplicated_accounts.iter_mut() {
+                assert_eq!(account, last_unique);
+                assert_eq!(account.data_len(), last_unique.data_len());
+
+                let borrowed = account.try_borrow_mut().unwrap();
+                // Only one mutable borrow at the same time should be allowed
+                // on the duplicated account.
+                assert!(last_unique.try_borrow_mut().is_err());
+                black_box(borrowed);
+            }
+
+            // There should not be any mutable borrow on the duplicated account
+            // at this point.
+            assert!(last_unique.try_borrow_mut().is_ok());
         }
 
-        // Last unique account.
-        let (unique_accounts, duplicated_accounts) = accounts.split_at_mut(unique);
-        let last_unique = unsafe { unique_accounts.last_mut().unwrap().assume_init_mut() };
+        assert_eq!(instruction_data, &MOCK_INSTRUCTION_DATA);
 
-        // No mutable borrow active at this point.
-        assert!(last_unique.try_borrow_mut().is_ok());
-
-        // Duplicated accounts should reference (share) the account pointer
-        // to the last unique account.
-        for account in duplicated_accounts.iter_mut() {
-            let account_view = unsafe { account.assume_init_mut() };
-
-            assert_eq!(account_view, last_unique);
-            assert_eq!(account_view.data_len(), last_unique.data_len());
-
-            let borrowed = account_view.try_borrow_mut().unwrap();
-            // Only one mutable borrow at the same time should be allowed
-            // on the duplicated account.
-            assert!(last_unique.try_borrow_mut().is_err());
-            drop(borrowed);
-        }
-
-        // There should not be any mutable borrow on the duplicated account
-        // at this point.
-        assert!(last_unique.try_borrow_mut().is_ok());
+        Ok(())
     }
 
     #[test]
-    fn test_deserialize() {
-        let ix_data = [3u8; 100];
-
+    fn test_process_entrypoint() {
         // Input with 0 accounts.
 
-        let mut input = unsafe { create_input(0, &ix_data) };
-        let mut accounts = [UNINIT; 1];
+        let (mut program_input, instruction_data) =
+            unsafe { create_input(0, &MOCK_INSTRUCTION_DATA) };
 
-        let (program_id, count, parsed_ix_data) =
-            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+        unsafe {
+            assert_eq!(
+                process_program_input(
+                    program_input.as_mut_ptr(),
+                    instruction_data,
+                    assert_accounts,
+                ),
+                0
+            );
+        };
 
-        assert_eq!(count, 0);
-        assert!(program_id == &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
+        // Input with 3 accounts.
 
-        // Input with 3 accounts but the accounts array has only space
-        // for 1.
+        let (mut program_input, instruction_data) =
+            unsafe { create_input(3, &MOCK_INSTRUCTION_DATA) };
 
-        let mut input = unsafe { create_input(3, &ix_data) };
-        let mut accounts = [UNINIT; 1];
+        unsafe {
+            assert_eq!(
+                process_program_input(
+                    program_input.as_mut_ptr(),
+                    instruction_data,
+                    assert_accounts,
+                ),
+                0
+            );
+        };
 
-        let (program_id, count, parsed_ix_data) =
-            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+        // Input with `MAX_TX_ACCOUNTS` accounts.
 
-        assert_eq!(count, 1);
-        assert!(program_id == &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
-        assert_accounts(&accounts[..count]);
+        let (mut program_input, instruction_data) =
+            unsafe { create_input(MAX_TX_ACCOUNTS, &MOCK_INSTRUCTION_DATA) };
 
-        // Input with `MAX_TX_ACCOUNTS` accounts but accounts array has
-        // only space for 64.
-
-        let mut input = unsafe { create_input(MAX_TX_ACCOUNTS, &ix_data) };
-        let mut accounts = [UNINIT; 64];
-
-        let (program_id, count, parsed_ix_data) =
-            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
-
-        assert_eq!(count, 64);
-        assert!(program_id == &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
-        assert_accounts(&accounts);
+        unsafe {
+            assert_eq!(
+                process_program_input(
+                    program_input.as_mut_ptr(),
+                    instruction_data,
+                    assert_accounts,
+                ),
+                0
+            );
+        }
     }
 
     #[test]
     fn test_deserialize_duplicated() {
-        let ix_data = [3u8; 100];
-
         // Input with 0 accounts.
 
-        let mut input = unsafe { create_input_with_duplicates(0, &ix_data, 0) };
-        let mut accounts = [UNINIT; 1];
+        let (mut program_input, instruction_data) =
+            unsafe { create_input_with_duplicates(0, &MOCK_INSTRUCTION_DATA, 0) };
 
-        let (program_id, count, parsed_ix_data) =
-            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+        unsafe {
+            assert_eq!(
+                process_program_input(
+                    program_input.as_mut_ptr(),
+                    instruction_data,
+                    assert_duplicated_accounts,
+                ),
+                0
+            );
+        }
 
-        assert_eq!(count, 0);
-        assert!(program_id == &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
+        // Input with 64 (32 duplicated) accounts.
 
-        // Input with 3 (1 + 2 duplicated) accounts but the accounts array has only
-        // space for 2. The assert checks that the second account is a duplicate
-        // of the first one and the first one is unique.
+        let (mut program_input, instruction_data) =
+            unsafe { create_input_with_duplicates(64, &MOCK_INSTRUCTION_DATA, 32) };
 
-        let mut input = unsafe { create_input_with_duplicates(3, &ix_data, 2) };
-        let mut accounts = [UNINIT; 2];
+        unsafe {
+            assert_eq!(
+                process_program_input(
+                    program_input.as_mut_ptr(),
+                    instruction_data,
+                    assert_duplicated_accounts,
+                ),
+                0
+            );
+        }
 
-        let (program_id, count, parsed_ix_data) =
-            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
+        // Input with 250 (125 duplicated) accounts.
 
-        assert_eq!(count, 2);
-        assert!(program_id == &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
-        assert_duplicated_accounts(&mut accounts[..count], 1);
+        let (mut program_input, instruction_data) =
+            unsafe { create_input_with_duplicates(250, &MOCK_INSTRUCTION_DATA, 125) };
 
-        // Input with `MAX_TX_ACCOUNTS` accounts (only 32 unique ones) but accounts
-        // array has only space for 64. The assert checks that the first 32
-        // accounts are unique and the rest are duplicates of the account at
-        // index 31.
-
-        let mut input = unsafe {
-            create_input_with_duplicates(MAX_TX_ACCOUNTS, &ix_data, MAX_TX_ACCOUNTS - 32)
-        };
-        let mut accounts = [UNINIT; 64];
-
-        let (program_id, count, parsed_ix_data) =
-            unsafe { deserialize(input.as_mut_ptr(), &mut accounts) };
-
-        assert_eq!(count, 64);
-        assert!(program_id == &MOCK_PROGRAM_ID);
-        assert_eq!(&ix_data, parsed_ix_data);
-        assert_duplicated_accounts(&mut accounts, 32);
+        unsafe {
+            assert_eq!(
+                process_program_input(
+                    program_input.as_mut_ptr(),
+                    instruction_data,
+                    assert_duplicated_accounts,
+                ),
+                0
+            );
+        }
     }
 
     #[test]

@@ -26,8 +26,8 @@
 //!   in combination with the `std` panic handler
 //!
 //! When all dependencies are `no_std`, you should use [`nostd_panic_handler!`](https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html)
-//! instead of `default_panic_handler!` to declare a rust runtime panic handler.
-//! There's no need to do this when any dependency is `std` since rust compiler
+//! instead of `default_panic_handler!` to declare a Rust runtime panic handler.
+//! There's no need to do this when any dependency is `std` since Rust compiler
 //! will emit a panic handler.
 //!
 //! To use the `entrypoint!` macro, use the following in your entrypoint
@@ -53,10 +53,10 @@
 //! }
 //! ```
 //!
-//! The input is parsed into the following components:
+//! The input is split into the following components:
 //!
-//! * `program_id`: the `ID` of the program being called
-//! * `accounts`: the accounts received
+//! * `program_id`: address of the program being called
+//! * `accounts`: accounts received by the instruction
 //! * `instruction_data`: data for the instruction
 //!
 //! `pinocchio` also offers variations of the program entrypoint
@@ -71,25 +71,23 @@
 //! ```
 //! Any of these macros can be replaced by alternative implementations.
 //!
-//! ### Custom entrypoints with [`crate::entrypoint::process_entrypoint`]
+//! ### Custom entrypoints with [`crate::entrypoint::process_program_input`]
 //!
 //! For programs that need maximum control over the entrypoint, `pinocchio`
-//! exposes the [`crate::entrypoint::process_entrypoint`] function. This
-//! function is the same deserialization logic used internally by the
-//! [`program_entrypoint!`] macro, exposed as a public API and can be called
-//! directly from a custom entrypoint, allowing you to implement fast-path
-//! optimizations or custom pre-processing logic before falling back to standard
-//! input parsing.
+//! exposes the [`crate::entrypoint::process_program_input`] function. This
+//! function is the same one used by the [`program_entrypoint!`] macro, exposed
+//! as a public API and can be called directly from a custom entrypoint,
+//! allowing you to implement fast-path optimizations or custom pre-processing
+//! logic before falling back to standard input processing.
 //!
-//! To use [`crate::entrypoint::process_entrypoint`] in a custom entrypoint:
+//! To use [`crate::entrypoint::process_program_input`] in a custom entrypoint:
 //!
 //! ```ignore
 //! use pinocchio::{
 //!   AccountView,
 //!   Address,
 //!   default_panic_handler,
-//!   entrypoint::process_entrypoint,
-//!   MAX_TX_ACCOUNTS,
+//!   entrypoint::process_program_input,
 //!   no_allocator,
 //!   ProgramResult,
 //! };
@@ -99,16 +97,19 @@
 //! default_panic_handler!();
 //!
 //! #[no_mangle]
-//! pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+//! pub unsafe extern "C" fn entrypoint(
+//!   program_input: *mut u8,
+//!   instruction_data: *mut u8,
+//! ) -> u64 {
 //!   // Fast path: check the number of accounts
-//!   let num_accounts = unsafe { *(input as *const u64) };
+//!   let num_accounts = unsafe { *(program_input as *const u64) };
 //!   if num_accounts == 0 {
 //!     log("Fast path - no accounts!");
 //!     return 0;
 //!   }
 //!
-//!   // Standard path: delegate to `process_entrypoint`
-//!   unsafe { process_entrypoint::<MAX_TX_ACCOUNTS>(input, process_instruction) }
+//!   // Standard path: delegate to `process_program_input`
+//!   unsafe { process_program_input(program_input, instruction_data, process_instruction) }
 //! }
 //!
 //! pub fn process_instruction(
@@ -223,7 +224,7 @@
 //! // static allocation:
 //! //    - 0 is the offset when the type will be allocated
 //! //    - `allocate_unchecked` returns a mutable reference to the allocated
-//! type let lamports = allocate_unchecked::<u64>(0);
+//! type let lamports = unsafe { allocate_unchecked::<u64>(0) };
 //! *lamports = 1_000_000_000;
 //! ```
 //!
@@ -275,7 +276,7 @@
 //! The `account-resize` feature allows a program to grow or shrink an
 //! `AccountView`'s data at runtime. At the start of execution, the entrypoint
 //! stores the original data length so it can verify that the resize stays
-//! within the permitted bounds. This operation consumes `2` CUs per account.
+//! within the permitted bounds. This adds a small setup cost for each account.
 //!
 //! ### `unsafe-account-resize`
 //!
@@ -372,9 +373,6 @@ pub use {solana_instruction_view as instruction, solana_instruction_view::cpi};
 /// number of accounts that a transaction can process given that indices
 /// of accounts are represented by an `u8` value and the last
 /// value (`255`) is reserved to indicate non-duplicated accounts.
-///
-/// The `MAX_TX_ACCOUNTS` is used to statically initialize the array of
-/// `AccountView`s when parsing accounts in an instruction.
 pub const MAX_TX_ACCOUNTS: usize = u8::MAX as usize;
 
 /// `assert_eq(core::mem::align_of::<u128>(), 8)` is true for BPF but not
