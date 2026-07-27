@@ -788,8 +788,14 @@ macro_rules! no_allocator {
 
         #[inline(always)]
         const fn calculate_offset<T: Sized>(offset: usize) -> usize {
-            let start = $crate::entrypoint::HEAP_START_ADDRESS as usize + offset;
-            let end = start + core::mem::size_of::<T>();
+            let start = match ($crate::entrypoint::HEAP_START_ADDRESS as usize).checked_add(offset) {
+                Some(s) => s,
+                None => panic!("offset overflow"),
+            };
+            let end = match start.checked_add(core::mem::size_of::<T>()) {
+                Some(e) => e,
+                None => panic!("size overflow"),
+            };
 
             // Assert if the allocation does not exceed the heap size.
             assert!(

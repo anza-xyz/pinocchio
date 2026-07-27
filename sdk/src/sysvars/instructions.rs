@@ -74,10 +74,8 @@ where
         &self,
         index: usize,
     ) -> IntrospectedInstruction<'_> {
-        let offset = *(self
-            .data
-            .as_ptr()
-            .add(size_of::<u16>() + index * size_of::<u16>()) as *const u16);
+        let ptr = self.data.as_ptr().add(size_of::<u16>() + index * size_of::<u16>());
+        let offset = u16::from_le_bytes(*(ptr as *const [u8; 2]));
 
         IntrospectedInstruction::new_unchecked(self.data.as_ptr().add(offset as usize))
     }
