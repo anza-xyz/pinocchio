@@ -6,6 +6,7 @@ members = [
     "programs/system",
     "programs/token",
     "programs/token-2022",
+    "programs/zk-elgamal-proof",
     "sdk",
 ]
 
