@@ -102,3 +102,91 @@ impl Fees {
 impl Sysvar for Fees {
     impl_sysvar_get!(sol_get_fees_sysvar);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fee_calculator_new() {
+        let calc = FeeCalculator::new(5000);
+        assert_eq!(calc.lamports_per_signature, 5000);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_default() {
+        let gov = FeeRateGovernor::default();
+        assert_eq!(gov.burn_percent, DEFAULT_BURN_PERCENT);
+        assert_eq!(
+            gov.target_lamports_per_signature,
+            DEFAULT_TARGET_LAMPORTS_PER_SIGNATURE
+        );
+    }
+
+    #[test]
+    fn test_fee_rate_governor_burn_50_percent() {
+        let gov = FeeRateGovernor {
+            lamports_per_signature: 0,
+            target_lamports_per_signature: 10_000,
+            target_signatures_per_slot: 0,
+            min_lamports_per_signature: 0,
+            max_lamports_per_signature: 0,
+            burn_percent: 50,
+        };
+        let (unburned, burned) = gov.burn(1000);
+        assert_eq!(unburned, 500);
+        assert_eq!(burned, 500);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_burn_0_percent() {
+        let gov = FeeRateGovernor {
+            lamports_per_signature: 0,
+            target_lamports_per_signature: 10_000,
+            target_signatures_per_slot: 0,
+            min_lamports_per_signature: 0,
+            max_lamports_per_signature: 0,
+            burn_percent: 0,
+        };
+        let (unburned, burned) = gov.burn(1000);
+        assert_eq!(unburned, 1000);
+        assert_eq!(burned, 0);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_burn_100_percent() {
+        let gov = FeeRateGovernor {
+            lamports_per_signature: 0,
+            target_lamports_per_signature: 10_000,
+            target_signatures_per_slot: 0,
+            min_lamports_per_signature: 0,
+            max_lamports_per_signature: 0,
+            burn_percent: 100,
+        };
+        let (unburned, burned) = gov.burn(1000);
+        assert_eq!(unburned, 0);
+        assert_eq!(burned, 1000);
+    }
+
+    #[test]
+    fn test_fee_rate_governor_create_fee_calculator() {
+        let gov = FeeRateGovernor {
+            lamports_per_signature: 7000,
+            target_lamports_per_signature: 10_000,
+            target_signatures_per_slot: 0,
+            min_lamports_per_signature: 0,
+            max_lamports_per_signature: 0,
+            burn_percent: 50,
+        };
+        let calc = gov.create_fee_calculator();
+        assert_eq!(calc.lamports_per_signature, 7000);
+    }
+
+    #[test]
+    fn test_fees_new() {
+        let calc = FeeCalculator::new(5000);
+        let gov = FeeRateGovernor::default();
+        let fees = Fees::new(calc, gov);
+        assert_eq!(fees.fee_calculator.lamports_per_signature, 5000);
+    }
+}
