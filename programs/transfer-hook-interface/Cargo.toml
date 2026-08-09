@@ -1,0 +1,25 @@
+[package]
+name = "pinocchio-transfer-hook-interface"
+description = "Pinocchio helpers for SPL Transfer Hook interface programs"
+version = "0.1.0"
+edition = { workspace = true }
+license = { workspace = true }
+readme = "./README.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+find-pda = ["solana-address/curve25519"]
+
+[dependencies]
+solana-account-view = { workspace = true }
+solana-address = { workspace = true, features = ["decode"] }
+solana-instruction-view = { workspace = true, features = ["cpi"] }
+solana-program-error = { workspace = true }
+
+[dev-dependencies]
+sha2 = "0.10"
+solana-address = { workspace = true, features = ["curve25519"] }
