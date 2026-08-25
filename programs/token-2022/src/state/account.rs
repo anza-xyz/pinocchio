@@ -60,7 +60,7 @@ impl Account {
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Account>, ProgramError> {
         if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(ProgramError::InvalidAccountOwner);
         }
 
         let bytes = account_view.try_borrow()?;
@@ -85,7 +85,7 @@ impl Account {
         account_view: &AccountView,
     ) -> Result<&Account, ProgramError> {
         if account_view.owner() != &ID {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(ProgramError::InvalidAccountOwner);
         }
 
         let bytes = account_view.borrow_unchecked();
