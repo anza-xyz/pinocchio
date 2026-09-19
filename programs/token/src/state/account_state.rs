@@ -14,13 +14,16 @@ pub enum AccountState {
     Frozen,
 }
 
-impl From<u8> for AccountState {
-    fn from(value: u8) -> Self {
+impl TryFrom<u8> for AccountState {
+    type Error = solana_program_error::ProgramError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => AccountState::Uninitialized,
-            1 => AccountState::Initialized,
-            2 => AccountState::Frozen,
-            _ => panic!("invalid account state value: {value}"),
+            0..=2 => {
+                // SAFETY: `value` is guaranteed to be in the range of the enum variants.
+                Ok(unsafe { core::mem::transmute::<u8, AccountState>(value) })
+            }
+            _ => Err(solana_program_error::ProgramError::InvalidAccountData),
         }
     }
 }
@@ -32,5 +35,18 @@ impl From<AccountState> for u8 {
             AccountState::Initialized => 1,
             AccountState::Frozen => 2,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, solana_program_error::ProgramError};
+
+    #[test]
+    fn try_from_rejects_invalid_state() {
+        assert!(matches!(
+            AccountState::try_from(3),
+            Err(ProgramError::InvalidAccountData)
+        ));
     }
 }
