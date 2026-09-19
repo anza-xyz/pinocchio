@@ -60,7 +60,7 @@ impl Account {
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Account>, ProgramError> {
         if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(ProgramError::IncorrectProgramId);
         }
 
         let bytes = account_view.try_borrow()?;
@@ -85,7 +85,7 @@ impl Account {
         account_view: &AccountView,
     ) -> Result<&Account, ProgramError> {
         if account_view.owner() != &ID {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(ProgramError::IncorrectProgramId);
         }
 
         let bytes = account_view.borrow_unchecked();
@@ -206,5 +206,67 @@ impl Account {
     #[inline(always)]
     pub fn is_frozen(&self) -> bool {
         self.state == AccountState::Frozen as u8
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+
+    use {
+        super::*,
+        core::{mem::size_of, ptr::copy_nonoverlapping},
+        solana_account_view::{RuntimeAccount, NOT_BORROWED},
+        solana_address::Address,
+        std::{vec, vec::Vec},
+    };
+
+    fn build_account_view(owner: &Address, data: &[u8]) -> (Vec<u64>, AccountView) {
+        let runtime_len = size_of::<RuntimeAccount>();
+        let total_len = runtime_len + data.len();
+        let backing_len = total_len.div_ceil(size_of::<u64>());
+        let mut backing = vec![0u64; backing_len];
+        let raw = backing.as_mut_ptr() as *mut RuntimeAccount;
+
+        unsafe {
+            (*raw).borrow_state = NOT_BORROWED;
+            (*raw).is_signer = 0;
+            (*raw).is_writable = 1;
+            (*raw).executable = 0;
+            (*raw).padding = [0; 4];
+            (*raw).address = Address::new_from_array([42u8; 32]);
+            (*raw).owner = owner.clone();
+            (*raw).lamports = 1;
+            (*raw).data_len = data.len() as u64;
+
+            let data_ptr = (raw as *mut u8).add(runtime_len);
+            copy_nonoverlapping(data.as_ptr(), data_ptr, data.len());
+
+            (backing, AccountView::new_unchecked(raw))
+        }
+    }
+
+    #[test]
+    fn from_account_view_rejects_wrong_owner() {
+        let wrong_owner = Address::new_from_array([7u8; 32]);
+        let data = vec![0u8; Account::BASE_LEN];
+        let (_backing, account_view) = build_account_view(&wrong_owner, &data);
+
+        assert!(matches!(
+            Account::from_account_view(&account_view),
+            Err(ProgramError::IncorrectProgramId)
+        ));
+    }
+
+    #[test]
+    fn from_account_view_unchecked_rejects_wrong_owner() {
+        let wrong_owner = Address::new_from_array([7u8; 32]);
+        let data = vec![0u8; Account::BASE_LEN];
+        let (_backing, account_view) = build_account_view(&wrong_owner, &data);
+
+        assert!(matches!(
+            unsafe { Account::from_account_view_unchecked(&account_view) },
+            Err(ProgramError::IncorrectProgramId)
+        ));
     }
 }
