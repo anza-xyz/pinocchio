@@ -278,8 +278,7 @@ impl<'a> SlotHashes<Ref<'a, [u8]>> {
 
         let sysvar_data = account_view.try_borrow()?;
 
-        // SAFETY: The account was validated to be the `SlotHashes` sysvar.
-        Ok(unsafe { SlotHashes::new_unchecked(sysvar_data) })
+        SlotHashes::new(sysvar_data)
     }
 }
 
@@ -303,7 +302,7 @@ impl SlotHashes<Box<[u8]>> {
             #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
             core::ptr::write_bytes(sysvar_data.as_mut_ptr(), 0, MAX_SIZE);
         }
-        // SAFETY: The data was initialized by the syscall.
-        Ok(unsafe { SlotHashes::new_unchecked(sysvar_data.assume_init()) })
+        let sysvar_data = unsafe { sysvar_data.assume_init() };
+        SlotHashes::new(sysvar_data)
     }
 }
