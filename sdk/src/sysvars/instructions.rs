@@ -90,12 +90,29 @@ where
         &self,
         index: usize,
     ) -> Result<IntrospectedInstruction<'_>, ProgramError> {
+        if self.data.len() < size_of::<u16>() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
         if index >= self.num_instructions() {
             return Err(ProgramError::InvalidInstructionData);
         }
 
-        // SAFETY: The index was checked to be in bounds.
-        Ok(unsafe { self.deserialize_instruction_unchecked(index) })
+        let table_offset = size_of::<u16>() + index * size_of::<u16>();
+        if table_offset + size_of::<u16>() > self.data.len() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        let offset = u16::from_le_bytes(unsafe {
+            *(self.data.as_ptr().add(table_offset) as *const [u8; 2])
+        }) as usize;
+
+        if offset >= self.data.len() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        // SAFETY: `offset` is in bounds for `self.data`.
+        Ok(unsafe { IntrospectedInstruction::new_unchecked(self.data.as_ptr().add(offset)) })
     }
 
     /// Creates and returns an `IntrospectedInstruction` relative to the current
@@ -288,5 +305,21 @@ impl IntrospectedInstructionAccount {
     #[inline(always)]
     pub fn to_instruction_account(&self) -> InstructionAccount<'_> {
         InstructionAccount::new(&self.key, self.is_writable(), self.is_signer())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_instruction_at_rejects_empty_sysvar() {
+        let data: &[u8] = &[];
+        let instructions = unsafe { Instructions::new_unchecked(data) };
+
+        assert!(matches!(
+            instructions.load_instruction_at(0),
+            Err(ProgramError::InvalidInstructionData)
+        ));
     }
 }
