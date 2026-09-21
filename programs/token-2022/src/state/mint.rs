@@ -47,7 +47,7 @@ impl Mint {
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Mint>, ProgramError> {
         if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountOwner);
+            return Err(ProgramError::IncorrectProgramId);
         }
 
         let bytes = account_view.try_borrow()?;
@@ -72,7 +72,7 @@ impl Mint {
         account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
         if account_view.owner() != &ID {
-            return Err(ProgramError::InvalidAccountOwner);
+            return Err(ProgramError::IncorrectProgramId);
         }
 
         let bytes = account_view.borrow_unchecked();
