@@ -14,6 +14,7 @@ on:
           - programs/system
           - programs/token
           - programs/token-2022
+          - programs/transfer-hook-interface
           - sdk
       level:
         description: Level
