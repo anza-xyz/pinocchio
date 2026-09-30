@@ -248,7 +248,7 @@ impl<B: ExtensionBaseState> StateWithExtensions<B> {
     #[inline]
     pub fn from_account_view(account_view: &AccountView) -> Result<Ref<'_, Self>, ProgramError> {
         if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountOwner);
+            return Err(ProgramError::IncorrectProgramId);
         }
 
         Ref::try_map(account_view.try_borrow()?, Self::from_bytes).map_err(|(_, error)| error)
@@ -268,7 +268,7 @@ impl<B: ExtensionBaseState> StateWithExtensions<B> {
         account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
         if account_view.owner() != &ID {
-            return Err(ProgramError::InvalidAccountOwner);
+            return Err(ProgramError::IncorrectProgramId);
         }
 
         Self::from_bytes(account_view.borrow_unchecked())
@@ -338,7 +338,7 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
         account_view: &mut AccountView,
     ) -> Result<RefMut<'_, Self>, ProgramError> {
         if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountOwner);
+            return Err(ProgramError::IncorrectProgramId);
         }
 
         RefMut::try_map(account_view.try_borrow_mut()?, Self::from_bytes_mut)
@@ -359,7 +359,7 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
         account_view: &mut AccountView,
     ) -> Result<&mut Self, ProgramError> {
         if account_view.owner() != &ID {
-            return Err(ProgramError::InvalidAccountOwner);
+            return Err(ProgramError::IncorrectProgramId);
         }
 
         Self::from_bytes_mut(account_view.borrow_unchecked_mut())
@@ -600,7 +600,7 @@ mod tests {
 
         assert!(matches!(
             unsafe { StateWithExtensions::<Mint>::from_account_view_unchecked(&account_view) },
-            Err(ProgramError::InvalidAccountOwner)
+            Err(ProgramError::IncorrectProgramId)
         ));
     }
 
