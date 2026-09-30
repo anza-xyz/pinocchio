@@ -48,7 +48,7 @@
 //!   accounts: &mut [AccountView],
 //!   instruction_data: &[u8],
 //! ) -> ProgramResult {
-//!   log!("Hello from my pinocchio program!");
+//!   log("Hello from my pinocchio program!");
 //!   Ok(())
 //! }
 //! ```

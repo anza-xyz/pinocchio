@@ -14,7 +14,7 @@ use {
 /// Declare the lazy program entrypoint.
 ///
 /// This entrypoint is defined as *lazy* because it does not read the accounts
-/// upfront. Instead, it provides an [`InstructionContext`] to the access input
+/// upfront. Instead, it provides an [`InstructionContext`] to access the input
 /// information on demand. This is useful when the program needs more control
 /// over the compute units it uses. The trade-off is that the program is
 /// responsible for managing potential duplicated accounts and set up a `global
@@ -134,7 +134,7 @@ impl InstructionContext {
     /// Reads the next account for the instruction.
     ///
     /// The account is represented as a [`MaybeAccount`], since it can either
-    /// represent and [`AccountView`] or the index of a duplicated account. It
+    /// represent an [`AccountView`] or the index of a duplicated account. It
     /// is up to the caller to handle the mapping back to the source
     /// account.
     ///
