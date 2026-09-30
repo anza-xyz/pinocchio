@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "pinocchio-transfer-hook-interface"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "solana-account-view",
  "solana-address 2.7.0",
