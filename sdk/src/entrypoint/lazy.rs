@@ -199,7 +199,8 @@ impl InstructionContext {
     /// undefined behavior.
     #[inline(always)]
     pub unsafe fn instruction_data_unchecked(&self) -> &[u8] {
-        let data_len = *(self.buffer as *const usize);
+        let data_len =
+            u64::from_le_bytes(*(self.buffer as *const [u8; core::mem::size_of::<u64>()])) as usize;
         // shadowing the input to avoid leaving it in an inconsistent position
         let data = self.buffer.add(core::mem::size_of::<u64>());
         core::slice::from_raw_parts(data, data_len)
@@ -228,7 +229,8 @@ impl InstructionContext {
     /// undefined behavior.
     #[inline(always)]
     pub unsafe fn program_id_unchecked(&self) -> &Address {
-        let data_len = *(self.buffer as *const usize);
+        let data_len =
+            u64::from_le_bytes(*(self.buffer as *const [u8; core::mem::size_of::<u64>()])) as usize;
         &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Address)
     }
 

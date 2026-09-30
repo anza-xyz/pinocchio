@@ -86,6 +86,23 @@ fn test_zero_len_minimal_slice_iterates_empty() {
 }
 
 #[test]
+fn test_from_account_view_rejects_truncated_payload() {
+    let num_entries: u64 = 1;
+    let required_size = NUM_ENTRIES_SIZE + (num_entries as usize) * ENTRY_SIZE;
+    let mut small_buffer = alloc::vec![0u8; required_size - 1];
+    small_buffer[0..NUM_ENTRIES_SIZE].copy_from_slice(&num_entries.to_le_bytes());
+
+    let (view, _backing) = unsafe {
+        make_account_view(SLOTHASHES_ID, &small_buffer, crate::entrypoint::NON_DUP_MARKER)
+    };
+
+    assert!(matches!(
+        SlotHashes::from_account_view(&view),
+        Err(ProgramError::AccountDataTooSmall)
+    ));
+}
+
+#[test]
 fn test_borrow_state_failure_from_account_view() {
     let bytes = raw_slot_hashes(0, &[]);
     let (view, _backing) = unsafe { make_account_view(SLOTHASHES_ID, &bytes, 0) };
