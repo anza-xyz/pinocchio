@@ -10,6 +10,8 @@ pub mod pausable;
 pub mod permanent_delegate;
 pub mod permissioned_burn;
 pub mod scaled_ui_amount;
+pub mod token_group;
+pub mod token_metadata;
 pub mod transfer_fee;
 pub mod transfer_hook;
 
