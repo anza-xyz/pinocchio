@@ -629,6 +629,11 @@ pub type WithdrawExcessLamports<'account, 'multisig, MultisigSigner> =
     >;
 
 #[cold]
+fn account_borrow_failed_error() -> ProgramError {
+    ProgramError::AccountBorrowFailed
+}
+
+#[cold]
 fn invalid_argument_error() -> ProgramError {
     ProgramError::InvalidArgument
 }

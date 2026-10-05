@@ -13,6 +13,9 @@ pub mod pausable_account;
 pub mod permanent_delegate;
 pub mod permissioned_burn;
 mod state;
+pub mod token_group;
+pub mod token_group_member;
+pub mod token_metadata;
 pub mod transfer_fee_amount;
 pub mod transfer_hook;
 pub mod transfer_hook_account;
@@ -37,6 +40,9 @@ pub use {
     permanent_delegate::PermanentDelegateExtension,
     permissioned_burn::PermissionedBurnExtension,
     state::{StateWithExtensions, StateWithExtensionsMut},
+    token_group::TokenGroupExtension,
+    token_group_member::TokenGroupMemberExtension,
+    token_metadata::TokenMetadataExtension,
     transfer_fee_amount::TransferFeeAmountExtension,
     transfer_hook::TransferHookExtension,
     transfer_hook_account::TransferHookAccountExtension,
@@ -156,6 +162,14 @@ impl TryFrom<u16> for ExtensionType {
 /// bit-patterns.
 pub unsafe trait ExtensionValue: sealed::Sealed + 'static {
     const TYPE: ExtensionType;
+}
+
+/// Marker for extension values with a variable-length encoding that are
+/// parsed from TLV entries instead of cast in place.
+pub trait VariableLenExtension<'a>: sealed::Sealed + Sized {
+    const TYPE: ExtensionType;
+
+    fn from_bytes(data: &'a [u8]) -> Result<Self, ProgramError>;
 }
 
 /// Trait for supported token-2022 base account types that can host TLV
@@ -288,6 +302,8 @@ pub const fn extension_value_len(extension_type: ExtensionType) -> Option<usize>
         ExtensionType::MetadataPointer => Some(MetadataPointerExtension::LEN),
         ExtensionType::GroupPointer => Some(GroupPointerExtension::LEN),
         ExtensionType::GroupMemberPointer => Some(GroupMemberPointerExtension::LEN),
+        ExtensionType::TokenGroup => Some(TokenGroupExtension::LEN),
+        ExtensionType::TokenGroupMember => Some(TokenGroupMemberExtension::LEN),
         ExtensionType::Pausable => Some(PausableExtension::LEN),
         _ => None,
     }
