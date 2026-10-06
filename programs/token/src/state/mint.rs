@@ -47,7 +47,7 @@ impl Mint {
             return Err(ProgramError::InvalidAccountData);
         }
         if !account_view.owned_by(&ID) {
-            return Err(ProgramError::InvalidAccountOwner);
+            return Err(ProgramError::IncorrectProgramId);
         }
         Ok(Ref::map(account_view.try_borrow()?, |data| unsafe {
             Self::from_bytes_unchecked(data)
@@ -71,7 +71,7 @@ impl Mint {
             return Err(ProgramError::InvalidAccountData);
         }
         if account_view.owner() != &ID {
-            return Err(ProgramError::InvalidAccountOwner);
+            return Err(ProgramError::IncorrectProgramId);
         }
         Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
     }
