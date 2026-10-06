@@ -97,7 +97,8 @@ Any of these macros can be replaced by alternative implementations.
 
 For programs that need maximum control over the entrypoint, `pinocchio` exposes the [`process_program_input`](https://docs.rs/pinocchio/latest/pinocchio/entrypoint/fn.process_program_input.html) function. This function is the same one 
 used by the `program_entrypoint!` macro, exposed as a public API and can be called directly from a custom entrypoint,
-allowing you to implement fast-path optimizations or custom pre-processinglogic before falling back to standard input 
+allowing you to implement fast-path optimizations or custom pre-processing
+logic before falling back to standard input 
 processing.
 
 To use `process_program_input` in a custom entrypoint:
