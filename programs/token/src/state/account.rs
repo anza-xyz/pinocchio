@@ -135,8 +135,8 @@ impl Account {
     }
 
     #[inline(always)]
-    pub fn state(&self) -> AccountState {
-        self.state.into()
+    pub fn state(&self) -> Result<AccountState, ProgramError> {
+        AccountState::try_from(self.state)
     }
 
     #[inline(always)]
