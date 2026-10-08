@@ -71,7 +71,7 @@ macro_rules! impl_sysvar_get {
             let mut var = core::mem::MaybeUninit::<Self>::uninit();
             let var_addr = var.as_mut_ptr() as *mut _ as *mut u8;
 
-            #[cfg(target_os = "solana")]
+            #[cfg(any(target_os = "solana", target_arch = "bpf"))]
             // SAFETY: The allocation is valid for the size of `Self`. It fixes
             // the size to `size_of::<Self>() - $padding` for the syscall since
             // the byte layout follows bincode serialization; the remaining bytes
@@ -89,7 +89,7 @@ macro_rules! impl_sysvar_get {
                 )
             };
 
-            #[cfg(not(target_os = "solana"))]
+            #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
             let result = {
                 // SAFETY: The allocation is valid for the size of `Self`.
                 unsafe { var_addr.write_bytes(0, size_of::<Self>()) };
