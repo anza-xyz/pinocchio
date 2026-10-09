@@ -71,7 +71,7 @@ impl Mint {
     pub unsafe fn from_account_view_unchecked(
         account_view: &AccountView,
     ) -> Result<&Self, ProgramError> {
-        if account_view.owner() != &ID {
+        if !account_view.owned_by(&ID) {
             return Err(ProgramError::IncorrectProgramId);
         }
 

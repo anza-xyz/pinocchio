@@ -70,7 +70,7 @@ impl Mint {
         if account_view.data_len() != Self::LEN {
             return Err(ProgramError::InvalidAccountData);
         }
-        if account_view.owner() != &ID {
+        if !account_view.owned_by(&ID) {
             return Err(ProgramError::IncorrectProgramId);
         }
         Ok(Self::from_bytes_unchecked(account_view.borrow_unchecked()))
