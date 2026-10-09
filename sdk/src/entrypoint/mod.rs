@@ -328,8 +328,9 @@ macro_rules! program_entrypoint {
 /// When the program and all its dependencies are `no_std`, it is necessary to
 /// set a `#[panic_handler]` to handle panics. This is done by the
 /// [`crate::nostd_panic_handler`] macro. In this case, it is not possible to
-/// use the `entrypoint_with_r2` macro. Use the [`crate::program_entrypoint_with_r2!`]
-/// macro instead and set up the allocator and panic handler manually.
+/// use the `entrypoint_with_r2` macro. Use the
+/// [`crate::program_entrypoint_with_r2!`] macro instead and set up the
+/// allocator and panic handler manually.
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! entrypoint_with_r2 {
