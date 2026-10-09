@@ -354,7 +354,7 @@ version = "0.11.2"
 dependencies = [
  "pinocchio",
  "solana-account-view",
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-define-syscall 5.2.0",
  "solana-instruction-view",
  "solana-program-error",
@@ -365,7 +365,7 @@ name = "pinocchio-associated-token-account"
 version = "0.4.0"
 dependencies = [
  "solana-account-view",
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-instruction-view",
  "solana-program-error",
 ]
@@ -375,7 +375,7 @@ name = "pinocchio-memo"
 version = "0.4.0"
 dependencies = [
  "solana-account-view",
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-instruction-view",
  "solana-program-error",
 ]
@@ -385,7 +385,7 @@ name = "pinocchio-system"
 version = "0.6.1"
 dependencies = [
  "pinocchio",
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
 ]
 
 [[package]]
@@ -393,7 +393,7 @@ name = "pinocchio-token"
 version = "0.7.0"
 dependencies = [
  "solana-account-view",
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-instruction-view",
  "solana-program-error",
  "strum",
@@ -406,7 +406,7 @@ version = "0.4.0"
 dependencies = [
  "pinocchio-token",
  "solana-account-view",
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-instruction-view",
  "solana-nullable",
  "solana-program-error",
@@ -418,7 +418,7 @@ name = "pinocchio-transfer-hook-interface"
 version = "0.1.0"
 dependencies = [
  "solana-account-view",
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-instruction-view",
  "solana-program-error",
  "spl-discriminator",
@@ -554,18 +554,18 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9cf16495d9eb53e3d04e72366a33bb1c20c24e78c171d8b8f5978357b63ae95"
 dependencies = [
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-program-error",
  "solana-program-memory",
 ]
 
 [[package]]
 name = "solana-account-view"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc141b940560430425ebaadb7645496c45f6a10fad9911d719bd03eab7f4d422"
+checksum = "6d648359fbdc962a6d4435b8a05b6f4920fa9ea2c12bb92d0284c7eefb81551f"
 dependencies = [
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-program-error",
 ]
 
@@ -575,14 +575,14 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2ecac8e1b7f74c2baa9e774c42817e3e75b20787134b76cc4d45e8a604488f5"
 dependencies = [
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
 ]
 
 [[package]]
 name = "solana-address"
-version = "2.7.0"
+version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01332a01c0a3098404d55a724c8d9a92aed4a50fe40a7dd0c7a51e29274c14de"
+checksum = "451294fdd4dde59ae27213695e2333eaaa39035e1f099f68644d2aa3ca0e2edd"
 dependencies = [
  "borsh",
  "curve25519-dalek",
@@ -649,12 +649,12 @@ dependencies = [
 
 [[package]]
 name = "solana-instruction-view"
-version = "2.1.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ab7a27d0c4214b9f7389c3dd00b68c93093a67f1dcc5b7893aebe299bbcbb47"
+checksum = "e145b112003bc400015bac7cc36196bd37404defb112daa9ac9ca7f47450ada8"
 dependencies = [
  "solana-account-view",
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
  "solana-define-syscall 5.2.0",
  "solana-program-error",
 ]
@@ -695,7 +695,7 @@ version = "4.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10f71b7a414de2ced1071f015834e9be581592d013432adbd06d02e4af11eba9"
 dependencies = [
- "solana-address 2.7.0",
+ "solana-address 2.9.0",
 ]
 
 [[package]]
