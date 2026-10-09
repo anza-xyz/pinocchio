@@ -68,7 +68,7 @@ pub use lazy::{InstructionContext, MaybeAccount};
 use {
     crate::{
         account::{AccountView, RuntimeAccount, MAX_PERMITTED_DATA_INCREASE},
-        error::ProgramError,
+        hint::cold_path,
         Address, ProgramResult, BPF_ALIGN_OF_U128, MAX_TX_ACCOUNTS, SUCCESS,
     },
     core::{
@@ -130,7 +130,7 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// It also sets up a [global allocator] and [custom panic hook], using the
 /// [`crate::default_allocator!`] and [`crate::default_panic_handler!`] macros.
 ///
-/// The macro argument is the name of a function with this type signature:
+/// The first argument is the name of a function with this type signature:
 ///
 /// ```ignore
 /// fn process_instruction(
@@ -142,7 +142,14 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// The argument is defined as an `expr`, which allows the use of any function
 /// pointer not just identifiers in the current scope.
 ///
+/// There is a second optional argument that allows to specify the maximum
+/// number of accounts expected by instructions of the program. This is useful
+/// to reduce the stack size requirement for the entrypoint, as the default is
+/// set to [`crate::MAX_TX_ACCOUNTS`]. If the program receives more accounts
+/// than the specified maximum, these accounts will be ignored.
+///
 /// [global allocator]: https://doc.rust-lang.org/stable/alloc/alloc/trait.GlobalAlloc.html
+/// [maximum number of accounts]: https://github.com/anza-xyz/agave/blob/ccabfcf84921977202fd06d3197cbcea83742133/runtime/src/bank.rs#L3207-L3219
 /// [custom panic hook]: https://github.com/anza-xyz/rust/blob/2830febbc59d44bdd7ad2c3b81731f1d08b96eba/library/std/src/sys/pal/sbf/mod.rs#L49
 ///
 /// # Examples
@@ -195,18 +202,18 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// sizable CPI account arrays, consider adding `#[inline(never)]` to the
 /// instruction handler to keep it out of the entrypoint stack frame and avoid
 /// BPF stack overflows.
+///
+/// [`crate::nostd_panic_handler`]: https://docs.rs/pinocchio/latest/pinocchio/macro.nostd_panic_handler.html
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! entrypoint {
     ( $process_instruction:expr ) => {
-        $crate::program_entrypoint!($process_instruction);
+        $crate::entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
+    };
+    ( $process_instruction:expr, $maximum:expr ) => {
+        $crate::program_entrypoint!($process_instruction, $maximum);
         $crate::default_allocator!();
         $crate::default_panic_handler!();
-    };
-    // Use of the `maximum` argument is deprecated and ignored. It is kept for
-    // backwards compatibility.
-    ( $process_instruction:expr, $maximum:expr ) => {
-        $crate::entrypoint!($process_instruction);
     };
 }
 
@@ -215,6 +222,55 @@ macro_rules! entrypoint {
 /// This macro is similar to the [`crate::entrypoint!`] macro, but it does not
 /// set up a global allocator nor a panic handler. This is useful when the
 /// program will set up its own allocator and panic handler.
+///
+/// The first argument is the name of a function with this type signature:
+///
+/// ```ignore
+/// fn process_instruction(
+///     program_id: &Address,     // Address of the account the program was loaded into
+///     accounts: &mut [AccountView], // All accounts required to process the instruction
+///     instruction_data: &[u8],  // Serialized instruction-specific data
+/// ) -> ProgramResult;
+/// ```
+/// The argument is defined as an `expr`, which allows the use of any function
+/// pointer not just identifiers in the current scope.
+///
+/// There is a second optional argument that allows to specify the maximum
+/// number of accounts expected by instructions of the program. This is useful
+/// to reduce the stack size requirement for the entrypoint, as the default is
+/// set to [`MAX_TX_ACCOUNTS`]. If the program receives more accounts than the
+/// specified maximum, these accounts will be ignored.
+#[macro_export]
+macro_rules! program_entrypoint {
+    ( $process_instruction:expr ) => {
+        $crate::program_entrypoint!($process_instruction, { $crate::MAX_TX_ACCOUNTS });
+    };
+    ( $process_instruction:expr, $maximum:expr ) => {
+        /// Program entrypoint.
+        #[no_mangle]
+        pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+            $crate::entrypoint::process_entrypoint::<$maximum>(input, $process_instruction)
+        }
+    };
+}
+
+/// Declare the program entrypoint and set up global handlers.
+///
+/// The entrypoint takes advantage of the `r2` register and the slice of account
+/// pointers passed by the runtime to avoid parsing the input data.
+///
+/// The main difference from the standard (SDK) [`entrypoint`] macro is that
+/// this macro represents an entrypoint that does not perform allocations or
+/// copies when reading the input buffer.
+///
+/// [`entrypoint`]: https://docs.rs/solana-program-entrypoint/latest/solana_program_entrypoint/macro.entrypoint.html
+///
+/// This macro emits the common boilerplate necessary to begin program
+/// execution, calling a provided function to process the program instruction
+/// supplied by the runtime, and reporting its result to the runtime.
+///
+/// It also sets up a [global allocator] and [custom panic hook], using the
+/// [`crate::default_allocator!`] and [`crate::default_panic_handler!`] macros.
 ///
 /// The macro argument is the name of a function with this type signature:
 ///
@@ -227,8 +283,86 @@ macro_rules! entrypoint {
 /// ```
 /// The argument is defined as an `expr`, which allows the use of any function
 /// pointer not just identifiers in the current scope.
+///
+/// [global allocator]: https://doc.rust-lang.org/stable/alloc/alloc/trait.GlobalAlloc.html
+/// [custom panic hook]: https://github.com/anza-xyz/rust/blob/2830febbc59d44bdd7ad2c3b81731f1d08b96eba/library/std/src/sys/pal/sbf/mod.rs#L49
+///
+/// # Examples
+///
+/// Defining an entrypoint conditional on the `bpf-entrypoint` feature. Although
+/// the `entrypoint` module is written inline in this example, it is common to
+/// put it into its own file.
+///
+/// ```no_run
+/// #[cfg(feature = "bpf-entrypoint")]
+/// pub mod entrypoint {
+///
+///     use pinocchio::{
+///         AccountView,
+///         entrypoint_with_r2,
+///         Address,
+///         ProgramResult
+///     };
+///
+///     entrypoint_with_r2!(process_instruction);
+///
+///     pub fn process_instruction(
+///         program_id: &Address,
+///         accounts: &mut [AccountView],
+///         instruction_data: &[u8],
+///     ) -> ProgramResult {
+///         Ok(())
+///     }
+///
+/// }
+/// ```
+///
+/// # Important
+///
+/// The panic handler set up is different depending on whether the `std` library
+/// is available to the linker or not. The `entrypoint` macro will set up a
+/// default panic "hook", that works with the `#[panic_handler]` set by the
+/// `std`. Therefore, this macro should be used when the program or any of its
+/// dependencies are dependent on the `std` library.
+///
+/// When the program and all its dependencies are `no_std`, it is necessary to
+/// set a `#[panic_handler]` to handle panics. This is done by the
+/// [`crate::nostd_panic_handler`] macro. In this case, it is not possible to
+/// use the `entrypoint_with_r2` macro. Use the
+/// [`crate::program_entrypoint_with_r2!`] macro instead and set up the
+/// allocator and panic handler manually.
+#[cfg(feature = "alloc")]
 #[macro_export]
-macro_rules! program_entrypoint {
+macro_rules! entrypoint_with_r2 {
+    ( $process_instruction:expr ) => {
+        $crate::program_entrypoint_with_r2!($process_instruction);
+        $crate::default_allocator!();
+        $crate::default_panic_handler!();
+    };
+}
+
+/// Declare the program entrypoint.
+///
+/// The entrypoint takes advantage of the `r2` register and the slice of account
+/// pointers passed by the runtime to avoid parsing the input data.
+///
+/// This macro is similar to the [`crate::entrypoint_with_r2!`] macro, but it
+/// does not set up a global allocator nor a panic handler. This is useful when
+/// the program will set up its own allocator and panic handler.
+///
+/// The macro argument is the name of a function with this type signature:
+///
+/// ```ignore
+/// fn process_instruction_with_r2(
+///     program_id: &Address,         // Address of the account the program was loaded into
+///     accounts: &mut [AccountView], // All accounts required to process the instruction
+///     instruction_data: &[u8],      // Serialized instruction-specific data
+/// ) -> ProgramResult;
+/// ```
+/// The argument is defined as an `expr`, which allows the use of any function
+/// pointer not just identifiers in the current scope.
+#[macro_export]
+macro_rules! program_entrypoint_with_r2 {
     ( $process_instruction:expr ) => {
         /// Program entrypoint.
         #[no_mangle]
@@ -243,21 +377,6 @@ macro_rules! program_entrypoint {
             )
         }
     };
-    // Use of the `maximum` argument is deprecated and ignored. It is kept for
-    // backwards compatibility.
-    ( $process_instruction:expr, $maximum:expr ) => {
-        $crate::program_entrypoint!($process_instruction);
-    };
-}
-
-/// Convert a `ProgramError` into a `u64`.
-///
-/// This function is marked as `#[cold]` to move the error conversion from the
-/// "hot path" of the entrypoint.
-#[cold]
-#[inline(never)]
-fn program_error_to_u64(error: ProgramError) -> u64 {
-    error.into()
 }
 
 /// Process the program input.
@@ -347,7 +466,14 @@ where
 
     match process_instruction(program_id, accounts, instruction_data) {
         Ok(_) => SUCCESS,
-        Err(e) => program_error_to_u64(e),
+        // Inline the conversion at the call site. Because each `?`/`Err(..)`
+        // site constructs a concrete `ProgramError`, inlining lets the compiler
+        // constant-fold the discriminant and emit a single `lddw` per reachable
+        // error instead of the full `From<ProgramError>` match table.
+        Err(e) => {
+            cold_path();
+            e.into()
+        }
     }
 }
 
@@ -362,12 +488,6 @@ where
 /// the program input parameters serialized by the SVM loader. Additionally, the
 /// `input` should last for the lifetime of the program execution since the
 /// returned values reference the `input`.
-#[deprecated(
-    since = "0.11.3",
-    note = "Use `process_program_input` instead; this function will be removed in the next major \
-            release"
-)]
-#[allow(deprecated)]
 #[inline(always)]
 pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
     input: *mut u8,
@@ -388,7 +508,14 @@ pub unsafe fn process_entrypoint<const MAX_ACCOUNTS: usize>(
         instruction_data,
     ) {
         Ok(()) => SUCCESS,
-        Err(e) => program_error_to_u64(e),
+        // Inline the conversion at the call site. Because each `?`/`Err(..)`
+        // site constructs a concrete `ProgramError`, inlining lets the compiler
+        // constant-fold the discriminant and emit a single `lddw` per reachable
+        // error instead of the full `From<ProgramError>` match table.
+        Err(e) => {
+            cold_path();
+            e.into()
+        }
     }
 }
 
@@ -509,11 +636,6 @@ unsafe fn clone_account_view(
 /// the program input parameters serialized by the SVM loader. Additionally, the
 /// `input` should last for the lifetime of the program execution since the
 /// returned values reference the `input`.
-#[deprecated(
-    since = "0.11.3",
-    note = "Use `process_program_input` instead of manual account deserialization; this function \
-            will be removed in the next major release"
-)]
 #[inline(always)]
 pub unsafe fn deserialize<const MAX_ACCOUNTS: usize>(
     mut input: *mut u8,
