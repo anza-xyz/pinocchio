@@ -254,7 +254,7 @@
 //!
 //! When no allocation is needed or desired, the feature can be disabled:
 //! ```ignore
-//! pinocchio = { version = "0.11", default-features = false }
+//! pinocchio = { version = "0.12", default-features = false }
 //! ```
 //!
 //! ### `copy`
@@ -268,7 +268,7 @@
 //! The `cpi` feature enables the cross-program invocation helpers, as well as
 //! types to define instructions and signer information.
 //! ```ignore
-//! pinocchio = { version = "0.11", features = ["cpi"] }
+//! pinocchio = { version = "0.12", features = ["cpi"] }
 //! ```
 //!
 //! ### `account-resize`
