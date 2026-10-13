@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "programs/address-lookup-table",
     "programs/associated-token-account",
     "programs/memo",
     "programs/system",
