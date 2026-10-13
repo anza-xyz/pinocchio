@@ -70,7 +70,7 @@ pub struct InitializeMultisig<
     pub multisig_signers: &'multisig [MultisigSigner],
 
     /// The number of signers (M) required to validate this multisignature
-    /// account.
+    /// account, where `1 <= M <= N`.
     pub m: u8,
 
     /// Phantom data for the program.
@@ -205,7 +205,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
 
     #[inline(always)]
     fn write_instruction_data(&self, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
-        write_instruction_data(self.m, data)
+        write_instruction_data(self.m, self.multisig_signers.len(), data)
     }
 }
 
@@ -237,7 +237,7 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::
                     accounts,
                 )
             },
-            |data| write_instruction_data(self.m, data),
+            |data| write_instruction_data(self.m, self.multisig_signers.len(), data),
         )
     }
 }
@@ -309,7 +309,17 @@ where
 }
 
 #[inline(always)]
-fn write_instruction_data(m: u8, data: &mut [MaybeUninit<u8>]) -> Result<usize, ProgramError> {
+fn write_instruction_data(
+    m: u8,
+    n: usize,
+    data: &mut [MaybeUninit<u8>],
+) -> Result<usize, ProgramError> {
+    // The Token program checks `M` and `N` separately but never compares
+    // them, so it would accept a multisig that can never reach its threshold.
+    if n == 0 || n > MAX_MULTISIG_SIGNERS || m == 0 || m as usize > n {
+        return Err(invalid_argument_error());
+    }
+
     if data.len() < DATA_LEN {
         return Err(invalid_argument_error());
     }
@@ -319,4 +329,35 @@ fn write_instruction_data(m: u8, data: &mut [MaybeUninit<u8>]) -> Result<usize, 
     data[1].write(m);
 
     Ok(DATA_LEN)
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, crate::instructions::UNINIT_BYTE};
+
+    #[test]
+    fn write_instruction_data_requires_a_reachable_threshold() {
+        for n in 0..=MAX_MULTISIG_SIGNERS + 1 {
+            for m in 0..=u8::MAX {
+                let mut data = [UNINIT_BYTE; DATA_LEN];
+                let result = write_instruction_data(m, n, &mut data);
+
+                if (1..=MAX_MULTISIG_SIGNERS).contains(&n) && m >= 1 && m as usize <= n {
+                    assert_eq!(result, Ok(DATA_LEN), "n = {n}, m = {m}");
+
+                    // SAFETY: the helper initialized `DATA_LEN` bytes.
+                    let bytes = unsafe {
+                        core::slice::from_raw_parts(data.as_ptr().cast::<u8>(), DATA_LEN)
+                    };
+                    assert_eq!(bytes, &[2, m]);
+                } else {
+                    assert_eq!(
+                        result,
+                        Err(ProgramError::InvalidArgument),
+                        "n = {n}, m = {m}"
+                    );
+                }
+            }
+        }
+    }
 }
