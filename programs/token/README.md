@@ -132,4 +132,4 @@ The helpers in this crate offer two ways to use a different token program during
 
 ## License
 
-The code is licensed under the [Apache License Version 2.0](../LICENSE)
+The code is licensed under the [Apache License Version 2.0](../../LICENSE)
