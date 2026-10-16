@@ -8,7 +8,7 @@ use {
         error::ProgramError,
         Address, BPF_ALIGN_OF_U128,
     },
-    core::{mem::size_of, ptr::with_exposed_provenance_mut},
+    core::{mem::size_of, ptr::with_exposed_provenance_mut, slice::from_raw_parts},
 };
 
 /// Declare the lazy program entrypoint.
@@ -21,8 +21,9 @@ use {
 /// allocator` and `panic handler`.
 ///
 /// The usual use-case for a [`crate::lazy_program_entrypoint!`] is small
-/// programs with a single instruction. For most use-cases, it is recommended to
-/// use the [`crate::program_entrypoint!`] macro instead.
+/// programs that need more control over the account parsing. For most
+/// use-cases, it is recommended to use the [`crate::program_entrypoint!`] macro
+/// instead.
 ///
 /// This macro emits the boilerplate necessary to begin program execution,
 /// calling a provided function to process the program instruction supplied by
@@ -72,10 +73,10 @@ macro_rules! lazy_program_entrypoint {
     ( $process_instruction:expr ) => {
         /// Program entrypoint.
         #[no_mangle]
-        pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+        pub unsafe extern "C" fn entrypoint(input: *mut u8, instruction_data: *const u8) -> u64 {
             // SAFETY: Passing the program input received from the runtime.
             match $process_instruction(unsafe {
-                $crate::entrypoint::lazy::InstructionContext::new_unchecked(input)
+                $crate::entrypoint::lazy::InstructionContext::new_unchecked(input, instruction_data)
             }) {
                 Ok(_) => $crate::SUCCESS,
                 Err(error) => error.into(),
@@ -96,6 +97,9 @@ pub struct InstructionContext {
     /// This pointer is moved forward as accounts are read from the buffer.
     buffer: *mut u8,
 
+    /// Pointer to the instruction data.
+    instruction_data: *const u8,
+
     /// Number of remaining accounts.
     ///
     /// This value is decremented each time [`next_account`] is called.
@@ -107,19 +111,22 @@ impl InstructionContext {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the input buffer is valid, i.e., it
-    /// represents the program input parameters serialized by the SVM
-    /// loader. The SVM loader serializes the input parameters aligned to
-    /// `8` bytes, with the first `8` bytes representing the number of
-    /// accounts, followed by the accounts themselves, the instruction data
-    /// and the program id.
+    /// The caller must ensure that both input buffer and instruction data
+    /// pointers are valid, i.e., they represents the program input parameters
+    /// serialized by the SVM loader. The SVM loader serializes the input
+    /// parameters aligned to `8` bytes, with the first `8` bytes representing
+    /// the number of accounts, followed by the accounts themselves, the
+    /// instruction data and the program id. It also passes the instruction
+    /// data pointer to the program entrypoint, so programs can read the
+    /// instruction data directly from the pointer instead of parsing the
+    /// account section first.
     ///
     /// More information on the input buffer format can be found in the
     /// [SVM documentation].
     ///
     /// [SVM documentation]: https://solana.com/docs/programs/faq#input-parameter-serialization
     #[inline(always)]
-    pub unsafe fn new_unchecked(input: *mut u8) -> Self {
+    pub unsafe fn new_unchecked(input: *mut u8, instruction_data: *const u8) -> Self {
         Self {
             // SAFETY: The first 8 bytes of the input buffer represent the
             // number of accounts when serialized by the SVM loader, which is read
@@ -127,6 +134,7 @@ impl InstructionContext {
             buffer: unsafe { input.add(size_of::<u64>()) },
             // SAFETY: Read the number of accounts from the input buffer serialized
             // by the SVM loader.
+            instruction_data,
             remaining: unsafe { *(input as *const u64) },
         }
     }
@@ -177,59 +185,25 @@ impl InstructionContext {
     }
 
     /// Returns the data for the instruction.
-    ///
-    /// This method can only be used after all accounts have been read;
-    /// otherwise, it will return a [`ProgramError::InvalidInstructionData`]
-    /// error.
     #[inline(always)]
-    pub fn instruction_data(&self) -> Result<&[u8], ProgramError> {
-        if self.remaining > 0 {
-            return Err(ProgramError::InvalidInstructionData);
+    pub fn instruction_data(&self) -> &[u8] {
+        // SAFETY: The instruction data length is stored in the previous 8 bytes of the
+        // instruction data pointer, which is guaranteed to be valid by the SVM loader.
+        unsafe {
+            let data_len = *(self.instruction_data.sub(size_of::<u64>()) as *const u64);
+            from_raw_parts(self.instruction_data, data_len as usize)
         }
-
-        Ok(unsafe { self.instruction_data_unchecked() })
-    }
-
-    /// Returns the instruction data for the instruction.
-    ///
-    /// # Safety
-    ///
-    /// It is up to the caller to guarantee that all accounts have been read;
-    /// calling this method before reading all accounts will result in
-    /// undefined behavior.
-    #[inline(always)]
-    pub unsafe fn instruction_data_unchecked(&self) -> &[u8] {
-        let data_len = *(self.buffer as *const usize);
-        // shadowing the input to avoid leaving it in an inconsistent position
-        let data = self.buffer.add(core::mem::size_of::<u64>());
-        core::slice::from_raw_parts(data, data_len)
     }
 
     /// Returns the program id for the instruction.
-    ///
-    /// This method can only be used after all accounts have been read;
-    /// otherwise, it will return a [`ProgramError::InvalidInstructionData`]
-    /// error.
     #[inline(always)]
-    pub fn program_id(&self) -> Result<&Address, ProgramError> {
-        if self.remaining > 0 {
-            return Err(ProgramError::InvalidInstructionData);
+    pub fn program_id(&self) -> &Address {
+        // SAFETY: The program id is stored in the next 32 bytes after the instruction
+        // data, which is guaranteed to be valid by the SVM loader.
+        unsafe {
+            let data_len = *(self.instruction_data.sub(size_of::<u64>()) as *const u64);
+            &*(self.instruction_data.add(data_len as usize) as *const Address)
         }
-
-        Ok(unsafe { self.program_id_unchecked() })
-    }
-
-    /// Returns the program id for the instruction.
-    ///
-    /// # Safety
-    ///
-    /// It is up to the caller to guarantee that all accounts have been read;
-    /// calling this method before reading all accounts will result in
-    /// undefined behavior.
-    #[inline(always)]
-    pub unsafe fn program_id_unchecked(&self) -> &Address {
-        let data_len = *(self.buffer as *const usize);
-        &*(self.buffer.add(core::mem::size_of::<u64>() + data_len) as *const Address)
     }
 
     /// Read an account from the input buffer.

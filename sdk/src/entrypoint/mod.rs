@@ -1077,7 +1077,7 @@ mod alloc {
 mod tests {
     use {
         super::*,
-        crate::MAX_TX_ACCOUNTS,
+        crate::{error::ProgramError, lazy_program_entrypoint, MAX_TX_ACCOUNTS},
         ::alloc::{
             alloc::{alloc, dealloc, handle_alloc_error},
             vec,
@@ -1520,6 +1520,76 @@ mod tests {
             };
             assert_ne!(ptr, null_mut());
             assert_eq!(0, ptr.align_offset(size_of::<u64>()));
+        }
+    }
+
+    #[test]
+    fn test_lazy_program_entrypoint() {
+        lazy_program_entrypoint!(process_accounts_lazy);
+
+        // Mimics the program entrypoint.
+        fn process_accounts_lazy(mut context: InstructionContext) -> ProgramResult {
+            let accounts = context.remaining();
+            let mut last_unique = None;
+
+            // Instruction data and program ID are available before parsing accounts.
+            assert_eq!(context.instruction_data(), &MOCK_INSTRUCTION_DATA);
+            assert_eq!(context.program_id(), &MOCK_PROGRAM_ID);
+
+            for i in 0..accounts {
+                match context.next_account().unwrap() {
+                    MaybeAccount::Account(account) => {
+                        assert_eq!(account.data_len(), i as usize);
+                        last_unique = Some(i as u8);
+                    }
+                    MaybeAccount::Duplicated(index) => {
+                        assert_eq!(Some(index), last_unique);
+                    }
+                }
+
+                // Advancing the account cursor must not affect these pointers.
+                assert_eq!(context.instruction_data(), &MOCK_INSTRUCTION_DATA);
+                assert_eq!(context.program_id(), &MOCK_PROGRAM_ID);
+                assert_eq!(context.remaining(), accounts - i - 1);
+            }
+
+            // There should be no more accounts to process.
+            assert!(matches!(
+                context.next_account(),
+                Err(ProgramError::NotEnoughAccountKeys)
+            ));
+
+            // After processing all accounts, the remaining count should be zero and
+            // the instruction data and program ID should still be accessible.
+            assert_eq!(context.remaining(), 0);
+            assert_eq!(context.instruction_data(), &MOCK_INSTRUCTION_DATA);
+            assert_eq!(context.program_id(), &MOCK_PROGRAM_ID);
+
+            Ok(())
+        }
+
+        for (accounts, duplicated) in [(0, 0), (3, 0), (MAX_TX_ACCOUNTS, 0), (64, 32), (250, 125)] {
+            let (mut program_input, instruction_data) = unsafe {
+                if duplicated == 0 {
+                    create_input(accounts, &MOCK_INSTRUCTION_DATA)
+                } else {
+                    create_input_with_duplicates(accounts, &MOCK_INSTRUCTION_DATA, duplicated)
+                }
+            };
+
+            // Check the initial count against the fixture independently of the
+            // count used by the entrypoint's account-processing loop.
+            let context = unsafe {
+                InstructionContext::new_unchecked(program_input.as_mut_ptr(), instruction_data)
+            };
+            assert_eq!(context.remaining(), accounts as u64);
+
+            // SAFETY: Both pointers refer to the serialized input, which stays alive
+            // for the duration of the entrypoint call.
+            assert_eq!(
+                unsafe { entrypoint(program_input.as_mut_ptr(), instruction_data) },
+                SUCCESS
+            );
         }
     }
 }
