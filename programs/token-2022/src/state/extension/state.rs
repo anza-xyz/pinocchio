@@ -2,7 +2,7 @@ use {
     super::{
         extension_not_found_error, validate_extension_account_type, validate_mint_extensions_data,
         validate_token_extensions_data, ExtensionBaseState, ExtensionType, ExtensionValue,
-        BASE_ACCOUNT_LEN, TLV_HEADER_LEN, TLV_START_INDEX,
+        VariableLenExtension, BASE_ACCOUNT_LEN, TLV_HEADER_LEN, TLV_START_INDEX,
     },
     crate::{
         state::{Account, AccountType, Mint, Multisig},
@@ -308,6 +308,13 @@ impl<B: ExtensionBaseState> StateWithExtensions<B> {
         let bytes = self.get_extension_bytes(V::TYPE)?;
         extension_from_bytes(bytes)
     }
+
+    #[inline]
+    pub fn get_variable_len_extension<'a, V: VariableLenExtension<'a>>(
+        &'a self,
+    ) -> Result<V, ProgramError> {
+        V::from_bytes(self.get_extension_bytes(V::TYPE)?)
+    }
 }
 
 /// A base state with TLV extension data backed by an unchecked mutable borrow.
@@ -396,6 +403,13 @@ impl<B: ExtensionBaseState> StateWithExtensionsMut<B> {
     }
 
     #[inline]
+    pub fn get_variable_len_extension<'a, V: VariableLenExtension<'a>>(
+        &'a self,
+    ) -> Result<V, ProgramError> {
+        V::from_bytes(self.get_extension_bytes(V::TYPE)?)
+    }
+
+    #[inline]
     pub fn get_extension_mut<V: ExtensionValue>(&mut self) -> Result<&mut V, ProgramError> {
         let bytes = self.get_extension_bytes_mut(V::TYPE)?;
         extension_from_bytes_mut(bytes)
@@ -442,7 +456,8 @@ mod tests {
             AccountState, CpiGuardExtension, GroupMemberPointerExtension, GroupPointerExtension,
             ImmutableOwnerExtension, MemoTransferExtension, MetadataPointerExtension,
             MintCloseAuthorityExtension, NonTransferableAccountExtension, NonTransferableExtension,
-            PausableAccountExtension, PausableExtension, TransferFeeAmountExtension,
+            PausableAccountExtension, PausableExtension, TokenGroupExtension,
+            TokenGroupMemberExtension, TokenMetadataExtension, TransferFeeAmountExtension,
         },
         core::{mem::size_of, ptr::copy_nonoverlapping},
         solana_account_view::{RuntimeAccount, NOT_BORROWED},
@@ -493,6 +508,32 @@ mod tests {
 
             (backing, AccountView::new_unchecked(raw))
         }
+    }
+
+    fn push_borsh_str(buffer: &mut Vec<u8>, value: &[u8]) {
+        buffer.extend_from_slice(&(value.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(value);
+    }
+
+    fn token_metadata_value(additional_metadata: &[(&[u8], &[u8])]) -> Vec<u8> {
+        let mut value = Vec::new();
+        value.extend_from_slice(&[12u8; 32]);
+        value.extend_from_slice(&[34u8; 32]);
+        push_borsh_str(&mut value, b"Attestation");
+        push_borsh_str(&mut value, b"SAS");
+        push_borsh_str(&mut value, b"https://sas.xyz");
+        value.extend_from_slice(&(additional_metadata.len() as u32).to_le_bytes());
+        for (key, entry) in additional_metadata {
+            push_borsh_str(&mut value, key);
+            push_borsh_str(&mut value, entry);
+        }
+        value
+    }
+
+    fn mint_with_token_metadata(value: &[u8]) -> Vec<u8> {
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::TokenMetadata, value);
+        build_mint_data(&tlv_data)
     }
 
     #[test]
@@ -1107,6 +1148,14 @@ mod tests {
             try_calculate_account_len::<Mint>(&[ExtensionType::PermissionedBurn]).unwrap(),
             TLV_START_INDEX + TLV_HEADER_LEN + size_of::<Address>()
         );
+        assert_eq!(
+            try_calculate_account_len::<Mint>(&[ExtensionType::TokenGroup]).unwrap(),
+            TLV_START_INDEX + TLV_HEADER_LEN + 80
+        );
+        assert_eq!(
+            try_calculate_account_len::<Mint>(&[ExtensionType::TokenGroupMember]).unwrap(),
+            TLV_START_INDEX + TLV_HEADER_LEN + 72
+        );
     }
 
     #[test]
@@ -1473,6 +1522,123 @@ mod tests {
         let ext = mint.get_extension::<GroupMemberPointerExtension>().unwrap();
         assert_eq!(ext.authority.as_ref().unwrap().as_ref(), &[55u8; 32]);
         assert_eq!(ext.member_address.as_ref().unwrap().as_ref(), &[66u8; 32]);
+    }
+
+    #[test]
+    fn token_metadata_extension_read_roundtrip() {
+        let data = mint_with_token_metadata(&token_metadata_value(&[
+            (b"schema", b"abc"),
+            (b"attestation", b""),
+        ]));
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let metadata = mint
+            .get_variable_len_extension::<TokenMetadataExtension>()
+            .unwrap();
+        assert_eq!(
+            metadata.update_authority.as_ref().unwrap().as_ref(),
+            &[12u8; 32]
+        );
+        assert_eq!(metadata.mint.as_ref(), &[34u8; 32]);
+        assert_eq!(metadata.name, "Attestation");
+        assert_eq!(metadata.symbol, "SAS");
+        assert_eq!(metadata.uri, "https://sas.xyz");
+        assert_eq!(
+            metadata.additional_metadata().collect::<Vec<_>>(),
+            [("schema", "abc"), ("attestation", "")]
+        );
+    }
+
+    #[test]
+    fn token_metadata_extension_without_additional_metadata() {
+        let data = mint_with_token_metadata(&token_metadata_value(&[]));
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let metadata = mint
+            .get_variable_len_extension::<TokenMetadataExtension>()
+            .unwrap();
+        assert_eq!(metadata.additional_metadata().count(), 0);
+    }
+
+    #[test]
+    fn token_metadata_extension_rejects_malformed_data() {
+        let value = token_metadata_value(&[(b"schema", b"abc")]);
+
+        let truncated = mint_with_token_metadata(&value[..value.len() - 1]);
+        let mint = StateWithExtensions::<Mint>::from_bytes(&truncated).unwrap();
+        assert_eq!(
+            mint.get_variable_len_extension::<TokenMetadataExtension>(),
+            Err(ProgramError::InvalidAccountData)
+        );
+
+        let mut trailing = value.clone();
+        trailing.push(0);
+        let trailing = mint_with_token_metadata(&trailing);
+        let mint = StateWithExtensions::<Mint>::from_bytes(&trailing).unwrap();
+        let metadata = mint
+            .get_variable_len_extension::<TokenMetadataExtension>()
+            .unwrap();
+        assert_eq!(
+            metadata.additional_metadata().collect::<Vec<_>>(),
+            [("schema", "abc")]
+        );
+
+        let mut invalid_utf8 = value;
+        invalid_utf8[68] = 0xff;
+        let invalid_utf8 = mint_with_token_metadata(&invalid_utf8);
+        let mint = StateWithExtensions::<Mint>::from_bytes(&invalid_utf8).unwrap();
+        assert_eq!(
+            mint.get_variable_len_extension::<TokenMetadataExtension>(),
+            Err(ProgramError::InvalidAccountData)
+        );
+    }
+
+    #[test]
+    fn token_metadata_extension_not_found() {
+        let data = build_mint_data(&[]);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        assert!(is_extension_not_found_error(
+            &mint
+                .get_variable_len_extension::<TokenMetadataExtension>()
+                .unwrap_err()
+        ));
+    }
+
+    #[test]
+    fn token_group_extension_read_roundtrip() {
+        let mut value = [0u8; 80];
+        value[..32].copy_from_slice(&[77u8; 32]);
+        value[32..64].copy_from_slice(&[88u8; 32]);
+        value[64..72].copy_from_slice(&3u64.to_le_bytes());
+        value[72..80].copy_from_slice(&10u64.to_le_bytes());
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::TokenGroup, &value);
+        let data = build_mint_data(&tlv_data);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let ext = mint.get_extension::<TokenGroupExtension>().unwrap();
+        assert_eq!(ext.update_authority.as_ref().unwrap().as_ref(), &[77u8; 32]);
+        assert_eq!(ext.mint.as_ref(), &[88u8; 32]);
+        assert_eq!(u64::from(ext.size), 3);
+        assert_eq!(u64::from(ext.max_size), 10);
+    }
+
+    #[test]
+    fn token_group_member_extension_read_roundtrip() {
+        let mut value = [0u8; 72];
+        value[..32].copy_from_slice(&[99u8; 32]);
+        value[32..64].copy_from_slice(&[111u8; 32]);
+        value[64..72].copy_from_slice(&7u64.to_le_bytes());
+        let mut tlv_data = Vec::new();
+        push_tlv_entry(&mut tlv_data, ExtensionType::TokenGroupMember, &value);
+        let data = build_mint_data(&tlv_data);
+
+        let mint = StateWithExtensions::<Mint>::from_bytes(&data).unwrap();
+        let ext = mint.get_extension::<TokenGroupMemberExtension>().unwrap();
+        assert_eq!(ext.mint.as_ref(), &[99u8; 32]);
+        assert_eq!(ext.group.as_ref(), &[111u8; 32]);
+        assert_eq!(u64::from(ext.member_number), 7);
     }
 
     #[test]
