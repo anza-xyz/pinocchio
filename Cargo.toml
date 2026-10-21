@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "programs/associated-token-account",
+    "programs/feature-gate",
     "programs/memo",
     "programs/system",
     "programs/token",
