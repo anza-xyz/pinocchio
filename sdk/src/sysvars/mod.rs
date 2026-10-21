@@ -7,6 +7,7 @@ use crate::{error::ProgramError, Address};
 use core::hint::black_box;
 
 pub mod clock;
+pub mod epoch_schedule;
 pub mod fees;
 pub mod instructions;
 pub mod rent;
