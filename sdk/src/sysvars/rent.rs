@@ -197,6 +197,10 @@ impl Rent {
 
     /// Determines if an account can be considered rent exempt.
     ///
+    /// Returns `false` when `data_len` exceeds the maximum permitted data
+    /// length or `lamports_per_byte` is too large for
+    /// [`Self::try_minimum_balance`].
+    ///
     /// # Arguments
     ///
     /// * `lamports` - The balance of the account in lamports
@@ -204,11 +208,12 @@ impl Rent {
     ///
     /// # Returns
     ///
-    /// `true`` if the account is rent exempt, `false`` otherwise.
-    #[allow(deprecated)]
+    /// `true` if the account is rent exempt, `false` otherwise.
     #[inline]
     pub fn is_exempt(&self, lamports: u64, data_len: usize) -> bool {
-        lamports >= self.minimum_balance(data_len)
+        self.try_minimum_balance(data_len)
+            .map(|minimum| lamports >= minimum)
+            .unwrap_or(false)
     }
 }
 
@@ -261,5 +266,24 @@ mod tests {
         let bytes = [0u8; 7];
         let result = super::Rent::from_bytes(&bytes);
         assert!(result.is_err());
+    }
+
+    #[test]
+    pub fn test_is_exempt() {
+        let rent = super::Rent {
+            lamports_per_byte: DEFAULT_LAMPORTS_PER_BYTE,
+        };
+        let minimum = rent.try_minimum_balance(100).unwrap();
+
+        assert!(rent.is_exempt(minimum, 100));
+        assert!(!rent.is_exempt(minimum - 1, 100));
+
+        let too_large = super::MAX_PERMITTED_DATA_LENGTH as usize + 1;
+        assert!(!rent.is_exempt(u64::MAX, too_large));
+
+        let rent = super::Rent {
+            lamports_per_byte: super::MAX_LAMPORTS_PER_BYTE + 1,
+        };
+        assert!(!rent.is_exempt(u64::MAX, 0));
     }
 }
