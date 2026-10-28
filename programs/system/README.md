@@ -47,4 +47,4 @@ Transfer {
 
 ## License
 
-The code is licensed under the [Apache License Version 2.0](../LICENSE)
+The code is licensed under the [Apache License Version 2.0](../../LICENSE)

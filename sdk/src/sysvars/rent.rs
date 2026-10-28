@@ -234,7 +234,7 @@ mod tests {
         assert!(calculated > 0);
         assert_eq!(balance, calculated);
 
-        // Using diferent lamports per byte value
+        // Using different lamports per byte value
         rent.lamports_per_byte = DEFAULT_LAMPORTS_PER_BYTE * 2;
 
         let balance = rent.minimum_balance(100);
