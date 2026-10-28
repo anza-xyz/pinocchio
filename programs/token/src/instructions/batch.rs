@@ -100,18 +100,39 @@ where
     }
 
     /// Invokes the instruction with `Program::ID`.
+    ///
+    /// # Important
+    ///
+    /// The borrow state of the accounts is only checked when an instruction
+    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
+    /// the batch is invoked. Accounts must not be borrowed between adding
+    /// an instruction to the batch and invoking the batch.
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_with_unverified_program(&Program::ID)
     }
 
     /// Invokes the instruction with `Program::ID` and signer seeds.
+    ///
+    /// # Important
+    ///
+    /// The borrow state of the accounts is only checked when an instruction
+    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
+    /// the batch is invoked. Accounts must not be borrowed between adding
+    /// an instruction to the batch and invoking the batch.
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         self.invoke_signed_with_unverified_program(signers, &Program::ID)
     }
 
     /// Invokes the instruction after verifying the `program` address.
+    ///
+    /// # Important
+    ///
+    /// The borrow state of the accounts is only checked when an instruction
+    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
+    /// the batch is invoked. Accounts must not be borrowed between adding
+    /// an instruction to the batch and invoking the batch.
     #[inline(always)]
     pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
         self.invoke_signed_with_program(&[], program)
@@ -119,6 +140,13 @@ where
 
     /// Invokes the instruction with signer seeds after verifying the `program`
     /// address.
+    ///
+    /// # Important
+    ///
+    /// The borrow state of the accounts is only checked when an instruction
+    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
+    /// the batch is invoked. Accounts must not be borrowed between adding
+    /// an instruction to the batch and invoking the batch.
     #[inline(always)]
     pub fn invoke_signed_with_program(
         &self,
@@ -136,6 +164,11 @@ where
     ///
     /// # Important
     ///
+    /// The borrow state of the accounts is only checked when an instruction
+    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
+    /// the batch is invoked. Accounts must not be borrowed between adding
+    /// an instruction to the batch and invoking the batch.
+    ///
     /// This method does not verify that `program` satisfies
     /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
@@ -152,6 +185,11 @@ where
     /// `invoke_signed_with_program`.
     ///
     /// # Important
+    ///
+    /// The borrow state of the accounts is only checked when an instruction
+    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
+    /// the batch is invoked. Accounts must not be borrowed between adding
+    /// an instruction to the batch and invoking the batch.
     ///
     /// This method does not verify that `program` satisfies
     /// [`TokenInterface::verify`]. The caller must ensure the program address
