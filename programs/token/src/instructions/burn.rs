@@ -253,8 +253,8 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
-    for Burn<'_, '_, MultisigSigner, Program>
+unsafe impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
+    super::batch::IntoBatch<Program> for Burn<'_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -264,27 +264,43 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| {
-                write_accounts(
-                    self.account,
-                    self.mint,
-                    self.authority,
-                    self.multisig_signers,
-                    accounts,
-                )
-            },
-            |accounts| {
-                write_instruction_accounts(
-                    self.account,
-                    self.mint,
-                    self.authority,
-                    self.multisig_signers,
-                    accounts,
-                )
-            },
-            |data| write_instruction_data(self.amount, data),
-        )
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
+            Err(ProgramError::InvalidArgument)?;
+        }
+
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and
+        //   `write_instruction_data` check that the slice they receive is large
+        //   enough, and initialize exactly the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write
+        //   `3 + multisig_signers.len()` accounts, in the same order.
+        // - At most `3 + MAX_MULTISIG_SIGNERS` accounts (checked above) and
+        //   `DATA_LEN` bytes of data are written.
+        // - `write_accounts` checks that the writable `account` and `mint`
+        //   accounts are not borrowed.
+        unsafe {
+            batch.push(
+                |accounts| {
+                    write_accounts(
+                        self.account,
+                        self.mint,
+                        self.authority,
+                        self.multisig_signers,
+                        accounts,
+                    )
+                },
+                |accounts| {
+                    write_instruction_accounts(
+                        self.account,
+                        self.mint,
+                        self.authority,
+                        self.multisig_signers,
+                        accounts,
+                    )
+                },
+                |data| write_instruction_data(self.amount, data),
+            )
+        }
     }
 }
 

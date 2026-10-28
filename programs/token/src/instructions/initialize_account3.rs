@@ -155,7 +155,7 @@ impl<Program: TokenInterface> CpiWriter for InitializeAccount3<'_, '_, Program> 
     }
 }
 
-impl<Program: TokenInterface> super::batch::IntoBatch<Program>
+unsafe impl<Program: TokenInterface> super::batch::IntoBatch<Program>
     for InitializeAccount3<'_, '_, Program>
 {
     #[inline(always)]
@@ -166,11 +166,23 @@ impl<Program: TokenInterface> super::batch::IntoBatch<Program>
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| write_accounts(self.account, self.mint, accounts),
-            |accounts| write_instruction_accounts(self.account, self.mint, accounts),
-            |data| write_instruction_data(self.owner, data),
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and
+        //   `write_instruction_data` check that the slice they receive is large
+        //   enough, and initialize exactly the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write
+        //   `ACCOUNTS_LEN` accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `DATA_LEN` bytes of data are
+        //   written.
+        // - `write_accounts` checks that the writable `account` account is not
+        //   borrowed.
+        unsafe {
+            batch.push(
+                |accounts| write_accounts(self.account, self.mint, accounts),
+                |accounts| write_instruction_accounts(self.account, self.mint, accounts),
+                |data| write_instruction_data(self.owner, data),
+            )
+        }
     }
 }
 

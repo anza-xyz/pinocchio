@@ -181,8 +181,37 @@ where
         Ok(())
     }
 
+    /// Appends an instruction to the batch.
+    ///
+    /// Each closure receives the remaining (uninitialized) space of the
+    /// corresponding buffer and returns the number of elements it wrote:
+    ///   - `write_accounts`: the `CpiAccount`s of the instruction.
+    ///   - `write_instruction_accounts`: the `InstructionAccount`s of the
+    ///     instruction.
+    ///   - `write_data`: the instruction data, including the instruction
+    ///     discriminator.
+    ///
+    /// The instruction header (number of accounts and data length) is written
+    /// by this method and must not be included in the instruction data.
+    ///
+    /// If any of the closures returns an error, the error is propagated and
+    /// the batch is left unchanged.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that:
+    ///   - Each closure initializes the first `n` elements of the slice it
+    ///     receives, where `n` is the value it returns, and `n` is not greater
+    ///     than the length of that slice.
+    ///   - `write_accounts` and `write_instruction_accounts` return the same
+    ///     number of accounts, written in the same order.
+    ///   - The number of accounts and the length of the instruction data are
+    ///     not greater than the length of the corresponding slice passed to
+    ///     the closure.
+    ///   - Writable accounts are not borrowed when the batch is invoked, since
+    ///     the `invoke*` methods do not check the borrow state of the accounts.
     #[inline(always)]
-    pub fn push(
+    pub unsafe fn push(
         &mut self,
         write_accounts: impl FnOnce(
             &mut [MaybeUninit<CpiAccount<'account>>],
@@ -270,8 +299,27 @@ impl<'account, Program: TokenInterface> BatchState<'account, Program> {
 }
 
 /// A trait for instructions that can be consumed directly into a `Batch`.
-pub trait IntoBatch<Program: TokenInterface> {
+///
+/// Implementations serialize the instruction accounts and data into the
+/// batch buffers, typically through [`Batch::push`]. The instruction is
+/// executed when the batch is invoked, together with all other instructions
+/// in the batch, in a single CPI to the token program.
+///
+/// # Safety
+///
+/// [`Batch`] uses the lengths written by implementations to build the CPI
+/// without further validation, so implementors must ensure that
+/// `into_batch`:
+///   - Upholds all the safety requirements of [`Batch::push`] when
+///     appending the instruction.
+///   - Checks that writable accounts are not borrowed, returning an error
+///     otherwise.
+pub unsafe trait IntoBatch<Program: TokenInterface> {
     /// Serializes `self` into the provided batch.
+    ///
+    /// Returns an error if the batch buffers do not have enough space for
+    /// the instruction, or if any of the instruction accounts cannot be used
+    /// in a CPI (e.g., a writable account is already borrowed).
     fn into_batch<'account, 'state>(
         self,
         batch: &mut Batch<'account, 'state, Program>,

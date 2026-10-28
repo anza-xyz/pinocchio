@@ -166,7 +166,7 @@ impl<Program: TokenInterface> CpiWriter for InitializeMint2<'_, '_, Program> {
     }
 }
 
-impl<Program: TokenInterface> super::batch::IntoBatch<Program>
+unsafe impl<Program: TokenInterface> super::batch::IntoBatch<Program>
     for InitializeMint2<'_, '_, Program>
 {
     #[inline(always)]
@@ -177,18 +177,30 @@ impl<Program: TokenInterface> super::batch::IntoBatch<Program>
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| write_accounts(self.mint, accounts),
-            |accounts| write_instruction_accounts(self.mint, accounts),
-            |data| {
-                write_instruction_data(
-                    self.decimals,
-                    self.mint_authority,
-                    self.freeze_authority,
-                    data,
-                )
-            },
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and
+        //   `write_instruction_data` check that the slice they receive is large
+        //   enough, and initialize exactly the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write
+        //   `ACCOUNTS_LEN` accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `MAX_DATA_LEN` bytes of data
+        //   are written.
+        // - `write_accounts` checks that the writable `mint` account is not
+        //   borrowed.
+        unsafe {
+            batch.push(
+                |accounts| write_accounts(self.mint, accounts),
+                |accounts| write_instruction_accounts(self.mint, accounts),
+                |data| {
+                    write_instruction_data(
+                        self.decimals,
+                        self.mint_authority,
+                        self.freeze_authority,
+                        data,
+                    )
+                },
+            )
+        }
     }
 }
 
