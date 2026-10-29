@@ -99,104 +99,142 @@ where
         })
     }
 
-    /// Invokes the instruction with `Program::ID`.
+    /// Invokes the instruction with `Program::ID` without checking the
+    /// borrow state of the accounts.
     ///
-    /// # Important
+    /// # Safety
     ///
-    /// The borrow state of the accounts is only checked when an instruction
-    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
-    /// the batch is invoked. Accounts must not be borrowed between adding
-    /// an instruction to the batch and invoking the batch.
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_with_unverified_program(&Program::ID)
+    pub unsafe fn invoke_unchecked(&self) -> ProgramResult {
+        self.invoke_with_unverified_program_unchecked(&Program::ID)
     }
 
-    /// Invokes the instruction with `Program::ID` and signer seeds.
+    /// Invokes the instruction with `Program::ID` and signer seeds without
+    /// checking the borrow state of the accounts.
     ///
-    /// # Important
+    /// # Safety
     ///
-    /// The borrow state of the accounts is only checked when an instruction
-    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
-    /// the batch is invoked. Accounts must not be borrowed between adding
-    /// an instruction to the batch and invoking the batch.
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        self.invoke_signed_with_unverified_program(signers, &Program::ID)
+    pub unsafe fn invoke_signed_unchecked(&self, signers: &[Signer]) -> ProgramResult {
+        self.invoke_signed_with_unverified_program_unchecked(signers, &Program::ID)
     }
 
-    /// Invokes the instruction after verifying the `program` address.
+    /// Invokes the instruction after verifying the `program` address without
+    /// checking the borrow state of the accounts.
     ///
-    /// # Important
+    /// # Safety
     ///
-    /// The borrow state of the accounts is only checked when an instruction
-    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
-    /// the batch is invoked. Accounts must not be borrowed between adding
-    /// an instruction to the batch and invoking the batch.
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     #[inline(always)]
-    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
-        self.invoke_signed_with_program(&[], program)
+    pub unsafe fn invoke_with_program_unchecked(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_program_unchecked(&[], program)
     }
 
     /// Invokes the instruction with signer seeds after verifying the `program`
-    /// address.
+    /// address without checking the borrow state of the accounts.
     ///
-    /// # Important
+    /// # Safety
     ///
-    /// The borrow state of the accounts is only checked when an instruction
-    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
-    /// the batch is invoked. Accounts must not be borrowed between adding
-    /// an instruction to the batch and invoking the batch.
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     #[inline(always)]
-    pub fn invoke_signed_with_program(
+    pub unsafe fn invoke_signed_with_program_unchecked(
         &self,
         signers: &[Signer],
         program: &Address,
     ) -> ProgramResult {
         Program::verify(program)?;
-        self.invoke_signed_with_unverified_program(signers, program)
+        self.invoke_signed_with_unverified_program_unchecked(signers, program)
     }
 
-    /// Invokes the instruction with `program` without verifying it.
+    /// Invokes the instruction with `program` without verifying it and
+    /// without checking the borrow state of the accounts.
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
-    /// `invoke_with_program`.
+    /// `invoke_with_program_unchecked`.
     ///
-    /// # Important
+    /// # Safety
     ///
-    /// The borrow state of the accounts is only checked when an instruction
-    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
-    /// the batch is invoked. Accounts must not be borrowed between adding
-    /// an instruction to the batch and invoking the batch.
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     ///
     /// This method does not verify that `program` satisfies
     /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
-    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
-        self.invoke_signed_with_unverified_program(&[], program)
+    pub unsafe fn invoke_with_unverified_program_unchecked(
+        &self,
+        program: &Address,
+    ) -> ProgramResult {
+        self.invoke_signed_with_unverified_program_unchecked(&[], program)
     }
 
     /// Invokes the instruction with signer seeds and `program` without
-    /// verifying the program address.
+    /// verifying the program address and without checking the borrow state
+    /// of the accounts.
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
-    /// `invoke_signed_with_program`.
+    /// `invoke_signed_with_program_unchecked`.
     ///
-    /// # Important
+    /// # Safety
     ///
-    /// The borrow state of the accounts is only checked when an instruction
-    /// is added to the batch (e.g., via [`IntoBatch::into_batch`]), not when
-    /// the batch is invoked. Accounts must not be borrowed between adding
-    /// an instruction to the batch and invoking the batch.
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     ///
     /// This method does not verify that `program` satisfies
     /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
-    pub fn invoke_signed_with_unverified_program(
+    pub unsafe fn invoke_signed_with_unverified_program_unchecked(
         &self,
         signers: &[Signer],
         program: &Address,
