@@ -2,9 +2,5 @@
 
 pub mod instructions;
 
-/// Legacy symbols from Memo version 1
-pub mod v1 {
-    solana_address::declare_id!("Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo");
-}
-
-solana_address::declare_id!("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+// Program ID for the Memo v4 program.
+solana_address::declare_id!("Memo4c2pN8afCj432Lb7RMVKi9PbQnnW7ewFFaV3oAH");
