@@ -160,6 +160,9 @@ jobs:
         if: github.event.inputs.dry_run != 'true'
         id: auth
 
+      - name: Rebase (in case any changes landed after)
+        run: git pull --rebase origin
+
       - name: Publish Crate
         id: publish
         env:
