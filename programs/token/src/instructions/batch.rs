@@ -243,11 +243,11 @@ where
     ///     than the length of that slice.
     ///   - `write_accounts` and `write_instruction_accounts` return the same
     ///     number of accounts, written in the same order.
+    ///   - `write_data` does not write more than `255` bytes of instruction
+    ///     data.
     ///   - The number of accounts and the length of the instruction data are
     ///     not greater than the length of the corresponding slice passed to the
-    ///     closure.
-    ///   - Writable accounts are not borrowed when the batch is invoked, since
-    ///     the `invoke*` methods do not check the borrow state of the accounts.
+    ///     closure and do not exceed `255` accounts.
     #[inline(always)]
     pub unsafe fn push(
         &mut self,

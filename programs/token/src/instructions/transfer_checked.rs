@@ -206,7 +206,7 @@ impl<'account, 'multisig, MultisigSigner: AsRef<AccountView>, Program: TokenInte
         program: &Address,
     ) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
-            Err(ProgramError::InvalidArgument)?;
+            return Err(invalid_argument_error());
         }
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
@@ -295,7 +295,7 @@ unsafe impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
         Self: 'account + 'state,
     {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
-            Err(ProgramError::InvalidArgument)?;
+            return Err(invalid_argument_error());
         }
 
         // SAFETY:

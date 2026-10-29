@@ -1,8 +1,8 @@
 use {
     crate::{
         instructions::{
-            write_extension_types_instruction_data, EXTENSION_TYPES_INSTRUCTION_DATA_LEN,
-            MAX_EXTENSION_COUNT, MAX_MULTISIG_SIGNERS,
+            invalid_argument_error, write_extension_types_instruction_data,
+            EXTENSION_TYPES_INSTRUCTION_DATA_LEN, MAX_EXTENSION_COUNT, MAX_MULTISIG_SIGNERS,
         },
         state::ExtensionType,
         UNINIT_BYTE,
@@ -116,7 +116,7 @@ impl<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>>
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
-            Err(ProgramError::InvalidArgument)?;
+            return Err(invalid_argument_error());
         }
 
         let expected_accounts = 4 + self.multisig_signers.len();
