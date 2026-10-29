@@ -1,5 +1,5 @@
 use {
-    crate::instructions::{ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
+    crate::instructions::{invalid_argument_error, ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
@@ -7,7 +7,7 @@ use {
         cpi::{invoke_signed_with_bounds, Signer},
         InstructionAccount, InstructionView,
     },
-    solana_program_error::{ProgramError, ProgramResult},
+    solana_program_error::ProgramResult,
 };
 
 /// Transfer all withheld tokens in the mint to an account. Signed by the
@@ -88,7 +88,7 @@ impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>>
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
-            return Err(ProgramError::InvalidArgument);
+            return Err(invalid_argument_error());
         }
 
         let expected_accounts = 3 + self.multisig_signers.len();

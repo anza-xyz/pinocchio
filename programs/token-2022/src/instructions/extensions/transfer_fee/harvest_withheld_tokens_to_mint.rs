@@ -1,5 +1,5 @@
 use {
-    crate::instructions::ExtensionDiscriminator,
+    crate::instructions::{invalid_argument_error, ExtensionDiscriminator},
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
@@ -7,7 +7,7 @@ use {
         cpi::{invoke_with_bounds, MAX_STATIC_CPI_ACCOUNTS},
         InstructionAccount, InstructionView,
     },
-    solana_program_error::{ProgramError, ProgramResult},
+    solana_program_error::ProgramResult,
 };
 
 /// Permissionless instruction to transfer all withheld tokens to the mint.
@@ -40,7 +40,7 @@ impl<Source: AsRef<AccountView>> HarvestWithheldTokensToMint<'_, '_, '_, Source>
         let expected_accounts = 1 + self.sources.len();
 
         if expected_accounts > MAX_STATIC_CPI_ACCOUNTS {
-            return Err(ProgramError::InvalidArgument);
+            return Err(invalid_argument_error());
         }
 
         // Instruction accounts.

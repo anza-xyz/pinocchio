@@ -1,6 +1,8 @@
 use {
     crate::{
-        instructions::{extensions::ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
+        instructions::{
+            extensions::ExtensionDiscriminator, invalid_argument_error, MAX_MULTISIG_SIGNERS,
+        },
         write_bytes, UNINIT_BYTE,
     },
     core::{mem::MaybeUninit, slice::from_raw_parts},
@@ -10,7 +12,7 @@ use {
         cpi::{invoke_signed_with_bounds, Signer},
         InstructionAccount, InstructionView,
     },
-    solana_program_error::{ProgramError, ProgramResult},
+    solana_program_error::ProgramResult,
 };
 
 /// Update the multiplier. Only supported for mints that include the
@@ -105,7 +107,7 @@ impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> UpdateMultiplier<'a, 'b, 'c
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
-            return Err(ProgramError::InvalidArgument);
+            return Err(invalid_argument_error());
         }
 
         let expected_accounts = 2 + self.multisig_signers.len();

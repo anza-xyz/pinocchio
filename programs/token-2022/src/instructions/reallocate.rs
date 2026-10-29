@@ -14,7 +14,7 @@ use {
         cpi::{invoke_signed_with_bounds, Signer},
         InstructionAccount, InstructionView,
     },
-    solana_program_error::{ProgramError, ProgramResult},
+    solana_program_error::ProgramResult,
 };
 
 /// Check to see if a token account is large enough for a list of
@@ -168,7 +168,7 @@ impl<'a, 'b, 'c, 'd, MultisigSigner: AsRef<AccountView>>
         // Instruction data.
 
         if self.extensions.len() > MAX_EXTENSION_COUNT {
-            return Err(ProgramError::InvalidArgument);
+            return Err(invalid_argument_error());
         }
 
         let expected_data = 1 + self.extensions.len() * 2;
