@@ -190,15 +190,14 @@ unsafe impl<Program: TokenInterface> super::batch::IntoBatch<Program>
         Self: 'account + 'state,
     {
         // SAFETY:
-        // - `write_accounts`, `write_instruction_accounts` and
-        //   `write_instruction_data` check that the slice they receive is large
-        //   enough, and initialize exactly the number of elements they return.
-        // - `write_accounts` and `write_instruction_accounts` both write
-        //   `ACCOUNTS_LEN` accounts, in the same order.
-        // - At most `ACCOUNTS_LEN` accounts and `MAX_DATA_LEN` bytes of data
-        //   are written.
-        // - `write_accounts` checks that the writable `mint` account is not
-        //   borrowed.
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `ACCOUNTS_LEN`
+        //   accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `MAX_DATA_LEN` bytes of data are
+        //   written.
+        // - `write_accounts` checks that the writable `mint` account is not borrowed.
         unsafe {
             batch.push(
                 |accounts| write_accounts(self.mint, self.rent_sysvar, accounts),

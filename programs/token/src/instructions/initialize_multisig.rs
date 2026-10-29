@@ -225,13 +225,13 @@ unsafe impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
         }
 
         // SAFETY:
-        // - `write_accounts`, `write_instruction_accounts` and
-        //   `write_instruction_data` check that the slice they receive is large
-        //   enough, and initialize exactly the number of elements they return.
-        // - `write_accounts` and `write_instruction_accounts` both write
-        //   `2 + multisig_signers.len()` accounts, in the same order.
-        // - At most `2 + MAX_MULTISIG_SIGNERS` accounts (checked above) and
-        //   `DATA_LEN` bytes of data are written.
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `2 +
+        //   multisig_signers.len()` accounts, in the same order.
+        // - At most `2 + MAX_MULTISIG_SIGNERS` accounts (checked above) and `DATA_LEN`
+        //   bytes of data are written.
         // - `write_accounts` checks that the writable `multisig` account is not
         //   borrowed.
         unsafe {

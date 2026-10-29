@@ -244,8 +244,8 @@ where
     ///   - `write_accounts` and `write_instruction_accounts` return the same
     ///     number of accounts, written in the same order.
     ///   - The number of accounts and the length of the instruction data are
-    ///     not greater than the length of the corresponding slice passed to
-    ///     the closure.
+    ///     not greater than the length of the corresponding slice passed to the
+    ///     closure.
     ///   - Writable accounts are not borrowed when the batch is invoked, since
     ///     the `invoke*` methods do not check the borrow state of the accounts.
     #[inline(always)]
@@ -346,10 +346,10 @@ impl<'account, Program: TokenInterface> BatchState<'account, Program> {
 /// # Safety
 ///
 /// [`Batch`] uses the lengths written by implementations to build the CPI
-/// without further validation, so implementors must ensure that
+/// without further validation, so implementations must ensure that
 /// `into_batch`:
-///   - Upholds all the safety requirements of [`Batch::push`] when
-///     appending the instruction.
+///   - Upholds all the safety requirements of [`Batch::push`] when appending
+///     the instruction.
 ///   - Checks that writable accounts are not borrowed, returning an error
 ///     otherwise.
 pub unsafe trait IntoBatch<Program: TokenInterface> {

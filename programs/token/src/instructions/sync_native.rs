@@ -170,16 +170,15 @@ unsafe impl<Program: TokenInterface> super::batch::IntoBatch<Program> for SyncNa
         Self: 'account + 'state,
     {
         // SAFETY:
-        // - `write_accounts`, `write_instruction_accounts` and
-        //   `write_instruction_data` check that the slice they receive is large
-        //   enough, and initialize exactly the number of elements they return.
-        // - `write_accounts` and `write_instruction_accounts` both write the
-        //   same number of accounts (1 or 2, depending on `rent_sysvar`), in
-        //   the same order.
-        // - At most `MAX_ACCOUNTS_LEN` accounts and `DATA_LEN` bytes of data
-        //   are written.
-        // - `write_accounts` checks that the writable `native_token` account is
-        //   not borrowed.
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write the same
+        //   number of accounts (1 or 2, depending on `rent_sysvar`), in the same order.
+        // - At most `MAX_ACCOUNTS_LEN` accounts and `DATA_LEN` bytes of data are
+        //   written.
+        // - `write_accounts` checks that the writable `native_token` account is not
+        //   borrowed.
         unsafe {
             batch.push(
                 |accounts| write_accounts(self.native_token, self.rent_sysvar, accounts),
