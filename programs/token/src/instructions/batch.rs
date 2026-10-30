@@ -99,66 +99,142 @@ where
         })
     }
 
-    /// Invokes the instruction with `Program::ID`.
+    /// Invokes the instruction with `Program::ID` without checking the
+    /// borrow state of the accounts.
+    ///
+    /// # Safety
+    ///
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
-        self.invoke_with_unverified_program(&Program::ID)
+    pub unsafe fn invoke_unchecked(&self) -> ProgramResult {
+        self.invoke_with_unverified_program_unchecked(&Program::ID)
     }
 
-    /// Invokes the instruction with `Program::ID` and signer seeds.
+    /// Invokes the instruction with `Program::ID` and signer seeds without
+    /// checking the borrow state of the accounts.
+    ///
+    /// # Safety
+    ///
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     #[inline(always)]
-    pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
-        self.invoke_signed_with_unverified_program(signers, &Program::ID)
+    pub unsafe fn invoke_signed_unchecked(&self, signers: &[Signer]) -> ProgramResult {
+        self.invoke_signed_with_unverified_program_unchecked(signers, &Program::ID)
     }
 
-    /// Invokes the instruction after verifying the `program` address.
+    /// Invokes the instruction after verifying the `program` address without
+    /// checking the borrow state of the accounts.
+    ///
+    /// # Safety
+    ///
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     #[inline(always)]
-    pub fn invoke_with_program(&self, program: &Address) -> ProgramResult {
-        self.invoke_signed_with_program(&[], program)
+    pub unsafe fn invoke_with_program_unchecked(&self, program: &Address) -> ProgramResult {
+        self.invoke_signed_with_program_unchecked(&[], program)
     }
 
     /// Invokes the instruction with signer seeds after verifying the `program`
-    /// address.
+    /// address without checking the borrow state of the accounts.
+    ///
+    /// # Safety
+    ///
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     #[inline(always)]
-    pub fn invoke_signed_with_program(
+    pub unsafe fn invoke_signed_with_program_unchecked(
         &self,
         signers: &[Signer],
         program: &Address,
     ) -> ProgramResult {
         Program::verify(program)?;
-        self.invoke_signed_with_unverified_program(signers, program)
+        self.invoke_signed_with_unverified_program_unchecked(signers, program)
     }
 
-    /// Invokes the instruction with `program` without verifying it.
+    /// Invokes the instruction with `program` without verifying it and
+    /// without checking the borrow state of the accounts.
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
-    /// `invoke_with_program`.
+    /// `invoke_with_program_unchecked`.
     ///
-    /// # Important
+    /// # Safety
+    ///
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     ///
     /// This method does not verify that `program` satisfies
     /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
-    pub fn invoke_with_unverified_program(&self, program: &Address) -> ProgramResult {
-        self.invoke_signed_with_unverified_program(&[], program)
+    pub unsafe fn invoke_with_unverified_program_unchecked(
+        &self,
+        program: &Address,
+    ) -> ProgramResult {
+        self.invoke_signed_with_unverified_program_unchecked(&[], program)
     }
 
     /// Invokes the instruction with signer seeds and `program` without
-    /// verifying the program address.
+    /// verifying the program address and without checking the borrow state
+    /// of the accounts.
     ///
     /// Use this when `program` has already been verified. Otherwise, prefer
-    /// `invoke_signed_with_program`.
+    /// `invoke_signed_with_program_unchecked`.
     ///
-    /// # Important
+    /// # Safety
+    ///
+    /// This method does not perform any account borrow checking. The borrow
+    /// state of the accounts is only checked when an instruction is added to
+    /// the batch (e.g., via [`IntoBatch::into_batch`]), not when the batch is
+    /// invoked.
+    ///
+    /// The caller must ensure that none of the batch accounts are borrowed
+    /// between adding an instruction to the batch and invoking the batch.
+    /// Otherwise, the CPI may modify account data or lamports while a
+    /// reference to them is still alive, which is undefined behavior.
     ///
     /// This method does not verify that `program` satisfies
     /// [`TokenInterface::verify`]. The caller must ensure the program address
     /// has already been checked and corresponds to the expected
     /// token program.
     #[inline(always)]
-    pub fn invoke_signed_with_unverified_program(
+    pub unsafe fn invoke_signed_with_unverified_program_unchecked(
         &self,
         signers: &[Signer],
         program: &Address,
@@ -181,8 +257,37 @@ where
         Ok(())
     }
 
+    /// Appends an instruction to the batch.
+    ///
+    /// Each closure receives the remaining (uninitialized) space of the
+    /// corresponding buffer and returns the number of elements it wrote:
+    ///   - `write_accounts`: the `CpiAccount`s of the instruction.
+    ///   - `write_instruction_accounts`: the `InstructionAccount`s of the
+    ///     instruction.
+    ///   - `write_data`: the instruction data, including the instruction
+    ///     discriminator.
+    ///
+    /// The instruction header (number of accounts and data length) is written
+    /// by this method and must not be included in the instruction data.
+    ///
+    /// If any of the closures returns an error, the error is propagated and
+    /// the batch is left unchanged.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that:
+    ///   - Each closure initializes the first `n` elements of the slice it
+    ///     receives, where `n` is the value it returns, and `n` is not greater
+    ///     than the length of that slice.
+    ///   - `write_accounts` and `write_instruction_accounts` return the same
+    ///     number of accounts, written in the same order.
+    ///   - `write_data` does not write more than `255` bytes of instruction
+    ///     data.
+    ///   - The number of accounts and the length of the instruction data are
+    ///     not greater than the length of the corresponding slice passed to the
+    ///     closure and do not exceed `255` accounts.
     #[inline(always)]
-    pub fn push(
+    pub unsafe fn push(
         &mut self,
         write_accounts: impl FnOnce(
             &mut [MaybeUninit<CpiAccount<'account>>],
@@ -270,8 +375,27 @@ impl<'account, Program: TokenInterface> BatchState<'account, Program> {
 }
 
 /// A trait for instructions that can be consumed directly into a `Batch`.
-pub trait IntoBatch<Program: TokenInterface> {
+///
+/// Implementations serialize the instruction accounts and data into the
+/// batch buffers, typically through [`Batch::push`]. The instruction is
+/// executed when the batch is invoked, together with all other instructions
+/// in the batch, in a single CPI to the token program.
+///
+/// # Safety
+///
+/// [`Batch`] uses the lengths written by implementations to build the CPI
+/// without further validation, so implementations must ensure that
+/// `into_batch`:
+///   - Upholds all the safety requirements of [`Batch::push`] when appending
+///     the instruction.
+///   - Checks that writable accounts are not borrowed, returning an error
+///     otherwise.
+pub unsafe trait IntoBatch<Program: TokenInterface> {
     /// Serializes `self` into the provided batch.
+    ///
+    /// Returns an error if the batch buffers do not have enough space for
+    /// the instruction, or if any of the instruction accounts cannot be used
+    /// in a CPI (e.g., a writable account is already borrowed).
     fn into_batch<'account, 'state>(
         self,
         batch: &mut Batch<'account, 'state, Program>,

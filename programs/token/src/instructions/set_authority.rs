@@ -197,7 +197,7 @@ impl<
         program: &Address,
     ) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
-            Err(ProgramError::InvalidArgument)?;
+            return Err(invalid_argument_error());
         }
 
         let mut instruction_accounts = [UNINIT_INSTRUCTION_ACCOUNT; MAX_ACCOUNTS_LEN];
@@ -270,8 +270,8 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> CpiWriter
     }
 }
 
-impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::IntoBatch<Program>
-    for SetAuthority<'_, '_, '_, MultisigSigner, Program>
+unsafe impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface>
+    super::batch::IntoBatch<Program> for SetAuthority<'_, '_, '_, MultisigSigner, Program>
 {
     #[inline(always)]
     fn into_batch<'account, 'state>(
@@ -281,25 +281,41 @@ impl<MultisigSigner: AsRef<AccountView>, Program: TokenInterface> super::batch::
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| {
-                write_accounts(
-                    self.account,
-                    self.authority,
-                    self.multisig_signers,
-                    accounts,
-                )
-            },
-            |accounts| {
-                write_instruction_accounts(
-                    self.account,
-                    self.authority,
-                    self.multisig_signers,
-                    accounts,
-                )
-            },
-            |data| write_instruction_data(self.authority_type, self.new_authority, data),
-        )
+        if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
+            return Err(invalid_argument_error());
+        }
+
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `2 +
+        //   multisig_signers.len()` accounts, in the same order.
+        // - At most `2 + MAX_MULTISIG_SIGNERS` accounts (checked above) and `DATA_LEN`
+        //   bytes of data are written.
+        // - `write_accounts` checks that the writable `account` account is not
+        //   borrowed.
+        unsafe {
+            batch.push(
+                |accounts| {
+                    write_accounts(
+                        self.account,
+                        self.authority,
+                        self.multisig_signers,
+                        accounts,
+                    )
+                },
+                |accounts| {
+                    write_instruction_accounts(
+                        self.account,
+                        self.authority,
+                        self.multisig_signers,
+                        accounts,
+                    )
+                },
+                |data| write_instruction_data(self.authority_type, self.new_authority, data),
+            )
+        }
     }
 }
 

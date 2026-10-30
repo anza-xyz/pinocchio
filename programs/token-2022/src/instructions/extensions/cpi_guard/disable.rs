@@ -1,5 +1,7 @@
 use {
-    crate::instructions::{extensions::ExtensionDiscriminator, MAX_MULTISIG_SIGNERS},
+    crate::instructions::{
+        extensions::ExtensionDiscriminator, invalid_argument_error, MAX_MULTISIG_SIGNERS,
+    },
     core::{mem::MaybeUninit, slice::from_raw_parts},
     solana_account_view::AccountView,
     solana_address::Address,
@@ -7,7 +9,7 @@ use {
         cpi::{invoke_signed_with_bounds, Signer},
         InstructionAccount, InstructionView,
     },
-    solana_program_error::{ProgramError, ProgramResult},
+    solana_program_error::ProgramResult,
 };
 
 /// Allow all token operations to happen via CPI as normal.
@@ -77,7 +79,7 @@ impl<'a, 'b, 'c, MultisigSigner: AsRef<AccountView>> Disable<'a, 'b, 'c, Multisi
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         if self.multisig_signers.len() > MAX_MULTISIG_SIGNERS {
-            return Err(ProgramError::InvalidArgument);
+            return Err(invalid_argument_error());
         }
 
         let expected_accounts = 2 + self.multisig_signers.len();

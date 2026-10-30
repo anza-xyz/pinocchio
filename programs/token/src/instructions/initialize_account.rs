@@ -182,7 +182,9 @@ impl<Program: TokenInterface> CpiWriter for InitializeAccount<'_, Program> {
     }
 }
 
-impl<Program: TokenInterface> super::batch::IntoBatch<Program> for InitializeAccount<'_, Program> {
+unsafe impl<Program: TokenInterface> super::batch::IntoBatch<Program>
+    for InitializeAccount<'_, Program>
+{
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
@@ -191,27 +193,38 @@ impl<Program: TokenInterface> super::batch::IntoBatch<Program> for InitializeAcc
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| {
-                write_accounts(
-                    self.account,
-                    self.mint,
-                    self.owner,
-                    self.rent_sysvar,
-                    accounts,
-                )
-            },
-            |accounts| {
-                write_instruction_accounts(
-                    self.account,
-                    self.mint,
-                    self.owner,
-                    self.rent_sysvar,
-                    accounts,
-                )
-            },
-            write_instruction_data,
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `ACCOUNTS_LEN`
+        //   accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `DATA_LEN` bytes of data are written.
+        // - `write_accounts` checks that the writable `account` account is not
+        //   borrowed.
+        unsafe {
+            batch.push(
+                |accounts| {
+                    write_accounts(
+                        self.account,
+                        self.mint,
+                        self.owner,
+                        self.rent_sysvar,
+                        accounts,
+                    )
+                },
+                |accounts| {
+                    write_instruction_accounts(
+                        self.account,
+                        self.mint,
+                        self.owner,
+                        self.rent_sysvar,
+                        accounts,
+                    )
+                },
+                write_instruction_data,
+            )
+        }
     }
 }
 

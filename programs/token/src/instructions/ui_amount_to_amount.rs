@@ -121,7 +121,7 @@ impl<'account, 'amount, Program: TokenInterface> UiAmountToAmount<'account, 'amo
     }
 }
 
-impl<Program: TokenInterface> super::batch::IntoBatch<Program>
+unsafe impl<Program: TokenInterface> super::batch::IntoBatch<Program>
     for UiAmountToAmount<'_, '_, Program>
 {
     #[inline(always)]
@@ -132,11 +132,22 @@ impl<Program: TokenInterface> super::batch::IntoBatch<Program>
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| write_accounts(self.mint, accounts),
-            |accounts| write_instruction_accounts(self.mint, accounts),
-            |data| write_instruction_data(self.amount, data),
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `ACCOUNTS_LEN`
+        //   accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `MAX_DATA_LEN` bytes of data are
+        //   written.
+        // - The instruction has no writable accounts.
+        unsafe {
+            batch.push(
+                |accounts| write_accounts(self.mint, accounts),
+                |accounts| write_instruction_accounts(self.mint, accounts),
+                |data| write_instruction_data(self.amount, data),
+            )
+        }
     }
 }
 
