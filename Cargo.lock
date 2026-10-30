@@ -390,7 +390,7 @@ dependencies = [
 
 [[package]]
 name = "pinocchio-token"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "solana-account-view",
  "solana-address 2.9.0",
