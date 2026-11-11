@@ -1,15 +1,8 @@
 #![no_std]
 
-#[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
-use pinocchio::{error::ProgramError, hint::unlikely};
 use {
-    crate::instructions::{Allocate, Assign, CreateAccount, Transfer},
-    pinocchio::{
-        address::declare_id,
-        cpi::Signer,
-        sysvars::{rent::Rent, Sysvar},
-        AccountView, Address, ProgramResult,
-    },
+    crate::instructions::CreateAccountAllowPrefund,
+    pinocchio::{address::declare_id, cpi::Signer, AccountView, Address, ProgramResult},
 };
 
 pub mod instructions;
@@ -20,6 +13,11 @@ declare_id!("11111111111111111111111111111111");
 ///
 /// Calling this function on an account that is already initialized with
 /// the requested size will fail.
+#[deprecated(
+    since = "0.7.1",
+    note = "Use `CreateAccountAllowPrefund::with_minimum_balance` instead"
+)]
+#[allow(deprecated)]
 #[inline(always)]
 pub fn create_account_with_minimum_balance(
     account: &mut AccountView,
@@ -43,6 +41,10 @@ pub fn create_account_with_minimum_balance(
 ///
 /// Calling this function on an account that is already initialized with
 /// the requested size will fail.
+#[deprecated(
+    since = "0.7.1",
+    note = "Use `CreateAccountAllowPrefund::with_minimum_balance` instead"
+)]
 #[inline(always)]
 pub fn create_account_with_minimum_balance_signed(
     account: &mut AccountView,
@@ -52,58 +54,27 @@ pub fn create_account_with_minimum_balance_signed(
     rent_sysvar: Option<&AccountView>,
     signers: &[Signer],
 ) -> ProgramResult {
-    let lamports = if let Some(rent_sysvar) = rent_sysvar {
-        let rent = Rent::from_account_view(rent_sysvar)?;
-        rent.try_minimum_balance(space)?
-    } else {
-        Rent::get()?.try_minimum_balance(space)?
-    };
-
-    if account.lamports() == 0 {
-        // Create the account if it does not exist.
-        CreateAccount {
-            from: payer,
-            to: account,
-            lamports,
-            space: space as u64,
-            owner,
-        }
-        .invoke_signed(signers)
-    } else {
-        let required_lamports = lamports.saturating_sub(account.lamports());
-
-        // Transfer lamports from `payer` to `account` if needed.
-        if required_lamports > 0 {
-            Transfer {
-                from: payer,
-                to: account,
-                lamports: required_lamports,
-            }
-            .invoke_signed(signers)?;
-        }
-
-        // Allocate the required space.
-        Allocate {
-            account,
-            space: space as u64,
-        }
-        .invoke_signed(signers)?;
-
-        // Assign the account to the specified owner.
-        Assign { account, owner }.invoke_signed(signers)
-    }
+    CreateAccountAllowPrefund::with_minimum_balance(
+        payer,
+        account,
+        space as u64,
+        owner,
+        rent_sysvar,
+    )?
+    .invoke_signed(signers)
 }
 
 #[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
 /// Create a program account with the minimum balance required for rent
 /// exemption.
 ///
-/// This can only be used for accounts owned by the current program. For
-/// accounts owned by other programs, use
-/// [`create_account_with_minimum_balance`] instead.
-///
 /// Calling this function on an account that is already initialized with
 /// the requested size will fail.
+#[deprecated(
+    since = "0.7.1",
+    note = "Use `CreateAccountAllowPrefund::with_minimum_balance` instead"
+)]
+#[allow(deprecated)]
 #[inline(always)]
 pub fn create_program_account_with_minimum_balance(
     account: &mut AccountView,
@@ -112,14 +83,7 @@ pub fn create_program_account_with_minimum_balance(
     payer: &AccountView,
     rent_sysvar: Option<&AccountView>,
 ) -> ProgramResult {
-    create_program_account_with_minimum_balance_signed(
-        account,
-        space,
-        owner,
-        payer,
-        rent_sysvar,
-        &[],
-    )
+    create_account_with_minimum_balance(account, space, owner, payer, rent_sysvar)
 }
 
 #[cfg(any(feature = "account-resize", feature = "unsafe-account-resize"))]
@@ -133,12 +97,13 @@ pub fn create_program_account_with_minimum_balance(
 /// owned by the system program and its signer seeds can be provided
 /// via the `signers`.
 ///
-/// This can only be used for accounts owned by the current program. For
-/// accounts owned by other programs, use
-/// [`create_account_with_minimum_balance_signed`] instead.
-///
 /// Calling this function on an account that is already initialized with
 /// the requested size will fail.
+#[deprecated(
+    since = "0.7.1",
+    note = "Use `CreateAccountAllowPrefund::with_minimum_balance` instead"
+)]
+#[allow(deprecated)]
 #[inline(always)]
 pub fn create_program_account_with_minimum_balance_signed(
     account: &mut AccountView,
@@ -148,58 +113,5 @@ pub fn create_program_account_with_minimum_balance_signed(
     rent_sysvar: Option<&AccountView>,
     signers: &[Signer],
 ) -> ProgramResult {
-    let lamports = if let Some(rent_sysvar) = rent_sysvar {
-        let rent = Rent::from_account_view(rent_sysvar)?;
-        rent.try_minimum_balance(space)?
-    } else {
-        Rent::get()?.try_minimum_balance(space)?
-    };
-
-    if account.lamports() == 0 {
-        // Create the account if it does not exist.
-        CreateAccount {
-            from: payer,
-            to: account,
-            lamports,
-            space: space as u64,
-            owner,
-        }
-        .invoke_signed(signers)
-    } else {
-        // If the account already exists, prevent re-initialization by
-        // checking if its data length is greater than zero.
-        if unlikely(account.data_len() > 0) {
-            return Err(ProgramError::AccountAlreadyInitialized);
-        }
-
-        let required_lamports = lamports.saturating_sub(account.lamports());
-
-        // Transfer lamports from `payer` to `account` if needed.
-        if required_lamports > 0 {
-            Transfer {
-                from: payer,
-                to: account,
-                lamports: required_lamports,
-            }
-            .invoke_signed(signers)?;
-        }
-
-        // Assign the account to the specified owner.
-        Assign { account, owner }.invoke_signed(signers)?;
-
-        // Allocate the required space for the account using
-        // `AccountView::resize`.
-        //
-        // SAFETY: There are no active borrows of the `account`.
-        // This was checked by the `Assign` CPI above.
-        unsafe {
-            #[cfg(feature = "account-resize")]
-            <AccountView as pinocchio::Resize>::resize_unchecked(account, space)?;
-
-            #[cfg(all(feature = "unsafe-account-resize", not(feature = "account-resize")))]
-            <AccountView as pinocchio::UnsafeResize>::resize(account, space);
-        }
-
-        Ok(())
-    }
+    create_account_with_minimum_balance_signed(account, space, owner, payer, rent_sysvar, signers)
 }
