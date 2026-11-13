@@ -11,6 +11,7 @@ use {
     pinocchio_spl_reference_tests::TestAccount,
     pinocchio_token_2022::{
         state::{
+            extension_not_found_error, extension_value_len, is_extension_not_found_error,
             try_calculate_account_len, CpiGuardExtension, DefaultAccountStateExtension,
             ExtensionBaseState, ExtensionType, ExtensionValue, GroupMemberPointerExtension,
             GroupPointerExtension, ImmutableOwnerExtension, MemoTransferExtension,
@@ -18,7 +19,7 @@ use {
             NonTransferableExtension, PausableAccountExtension, PausableExtension,
             PermanentDelegateExtension, PermissionedBurnExtension, StateWithExtensions,
             StateWithExtensionsMut, TransferFeeAmountExtension, TransferHookAccountExtension,
-            TransferHookExtension, MAX_EXTENSIONS,
+            TransferHookExtension, EXTENSION_NOT_FOUND_ERROR_CODE, MAX_EXTENSIONS,
         },
         ID,
     },
@@ -47,9 +48,9 @@ use {
             scaled_ui_amount::ScaledUiAmountConfig,
             transfer_fee::{TransferFeeAmount, TransferFeeConfig},
             transfer_hook::{TransferHook, TransferHookAccount},
-            BaseState, BaseStateWithExtensions, BaseStateWithExtensionsMut, Extension,
-            ExtensionType as RefType, StateWithExtensions as RefState,
-            StateWithExtensionsMut as RefStateMut,
+            AccountType as RefAccountType, BaseState, BaseStateWithExtensions,
+            BaseStateWithExtensionsMut, Extension, ExtensionType as RefType,
+            StateWithExtensions as RefState, StateWithExtensionsMut as RefStateMut,
         },
         state::{Account, AccountState, Mint, Multisig},
     },
@@ -70,6 +71,12 @@ macro_rules! extensions {
     ($($pin:ident = $reference:ident, |$p:ident, $r:ident| $copy:block)*) => {
         fn pinocchio_lookups(state: &mut impl PinocchioState) -> Lookups {
             vec![$(($pin::TYPE as u16, state.lookup::<$pin>()),)*]
+        }
+
+        /// Each extension type with Pinocchio's `LEN` and the size of the
+        /// reference value.
+        fn value_lens() -> Vec<(ExtensionType, usize, usize)> {
+            vec![$(($pin::TYPE, $pin::LEN, size_of::<$reference>()),)*]
         }
 
         fn reference_lookups<S: BaseState>(state: &impl BaseStateWithExtensions<S>) -> Lookups {
@@ -479,6 +486,12 @@ fn reads_match_the_reference<K: Kind>() {
                 // reports an absent extension as `InvalidAccountData`, because
                 // its lookup shares `get_extension_indices` with initialization,
                 // which needs space. Pinocchio reports `ExtensionNotFound`.
+                //
+                // This pin stays: accounts sized by `try_calculate_account_len`
+                // are always full, so matching the reference would turn the
+                // usual "extension absent" answer into a data error for most
+                // real accounts, and callers that test it with
+                // `is_extension_not_found_error` would start failing.
                 if full && ty.get_account_type() == K::ACCOUNT_TYPE && !types.contains(&ty) {
                     assert_eq!(*lookup, Err(INVALID));
                     *lookup = Err(NOT_FOUND);
@@ -588,7 +601,9 @@ fn other_owner_is_refused_for_mints_and_token_accounts() {
 }
 
 /// Like the base readers, the extension states accept an uninitialized base,
-/// which the reference refuses.
+/// which the reference refuses. This pin stays: the readers leave the check to
+/// `is_initialized`, and refusing here would change what every constructor
+/// returns for an account that has been allocated but not yet initialized.
 fn uninitialized_base_is_readable<K: Kind>() {
     for len in [K::LEN, TLV_START] {
         let mut data = vec![0; len];
@@ -833,4 +848,103 @@ fn malformed_token_accounts() {
         &account(&[&entry(0, 1, &[0]), &memo]),
         Read(T::MemoTransfer, Err(NOT_FOUND), Ok(0)),
     );
+}
+
+// Public helpers around the extension values.
+
+/// `ExtensionType::try_from` accepts the same discriminants as the reference
+/// and names them the same way.
+#[test]
+fn extension_types_match_the_reference() {
+    for raw in 0..=u16::MAX {
+        let pinocchio = ExtensionType::try_from(raw);
+        let reference = RefType::try_from(raw);
+        assert_eq!(pinocchio.is_ok(), reference.is_ok(), "{raw}");
+        match (pinocchio, reference) {
+            (Ok(pinocchio), Ok(reference)) => {
+                assert_eq!(pinocchio as u16, raw);
+                assert_eq!(format!("{pinocchio:?}"), format!("{reference:?}"));
+            }
+            (pinocchio, _) => assert_eq!(pinocchio.map(drop), Err(INVALID), "{raw}"),
+        }
+    }
+}
+
+/// Each value type has the reference's size, and `extension_value_len`
+/// returns it for exactly the types Pinocchio has a value type for, sized as
+/// the reference sizes an account holding that extension alone.
+#[test]
+fn extension_value_lens_match_the_reference() {
+    let lens = value_lens();
+    for &(ty, len, reference) in &lens {
+        assert_eq!(len, reference, "{ty:?}");
+        assert_eq!(extension_value_len(ty), Some(len), "{ty:?}");
+    }
+
+    let mut sized = 0;
+    for raw in 0..MAX_EXTENSIONS as u16 {
+        let ty = ExtensionType::try_from(raw).unwrap();
+        let Some(len) = extension_value_len(ty) else {
+            continue;
+        };
+        sized += 1;
+        let reference = RefType::try_from(raw).unwrap();
+        let account_len = match reference.get_account_type() {
+            RefAccountType::Mint => RefType::try_calculate_account_len::<Mint>(&[reference]),
+            RefAccountType::Account => RefType::try_calculate_account_len::<Account>(&[reference]),
+            RefAccountType::Uninitialized => unreachable!("{reference:?}"),
+        };
+        assert_eq!(account_len, Ok(TLV_START + 4 + len), "{reference:?}");
+    }
+    assert_eq!(sized, lens.len());
+}
+
+/// `DefaultAccountStateExtension::state` decodes every byte the reference
+/// writes as the reference's `AccountState` does, and refuses the rest.
+#[test]
+fn default_account_state_matches_the_reference() {
+    for byte in 0..=u8::MAX {
+        let (mut data, _) = build::<Mint>(&[RefType::DefaultAccountState], Some(0), 1);
+        RefStateMut::<Mint>::unpack(&mut data)
+            .unwrap()
+            .get_extension_mut::<DefaultAccountState>()
+            .unwrap()
+            .state = byte;
+
+        let reference = AccountState::try_from(byte).map(u8::from);
+        let state = StateWithExtensions::<<Mint as Kind>::Pin>::from_bytes(&data)
+            .unwrap()
+            .get_extension::<DefaultAccountStateExtension>()
+            .unwrap()
+            .state()
+            .map(|state| state as u8);
+        assert_eq!(state.clone().ok(), reference.ok(), "{byte}");
+        if state.is_err() {
+            assert_eq!(state, Err(INVALID), "{byte}");
+        }
+    }
+}
+
+/// Pinocchio's `ExtensionNotFound` helpers use the reference's error code.
+#[test]
+fn extension_not_found_error_matches_the_reference() {
+    let reference = ProgramError::from(TokenError::ExtensionNotFound);
+    assert_eq!(reference, NOT_FOUND);
+    assert_eq!(extension_not_found_error(), reference);
+    assert_eq!(
+        ProgramError::Custom(EXTENSION_NOT_FOUND_ERROR_CODE),
+        reference
+    );
+    assert_eq!(
+        ProgramError::from(pinocchio_token_2022::state::TokenError::ExtensionNotFound),
+        reference
+    );
+    assert!(is_extension_not_found_error(&reference));
+    for other in [
+        INVALID,
+        ProgramError::from(TokenError::ExtensionTypeMismatch),
+        ProgramError::from(TokenError::ExtensionBaseMismatch),
+    ] {
+        assert!(!is_extension_not_found_error(&other), "{other:?}");
+    }
 }
