@@ -8,6 +8,7 @@ members = [
     "programs/token-2022",
     "programs/transfer-hook-interface",
     "sdk",
+    "tests/spl-reference",
 ]
 
 [workspace.package]
