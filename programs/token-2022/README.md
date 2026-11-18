@@ -116,7 +116,9 @@ MintTo::new(
 
 // Invoke the batch instruction to execute all instructions in a single CPI.
 
-batch.invoke()?;
+// SAFETY: No batch account is borrowed between adding it to the batch
+// and invoking the batch.
+unsafe { batch.invoke_unchecked() }?;
 ```
 
 ## Using different Token programs
