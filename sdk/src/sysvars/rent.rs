@@ -4,7 +4,7 @@
 use {
     crate::{
         account::AccountView, error::ProgramError, hint::unlikely, impl_sysvar_get,
-        sysvars::Sysvar, Address,
+        sysvars::Sysvar, Address, MAX_PERMITTED_DATA_LENGTH,
     },
     core::mem::{align_of, size_of},
 };
@@ -14,9 +14,6 @@ pub const RENT_ID: Address = Address::new_from_array([
     6, 167, 213, 23, 25, 44, 92, 81, 33, 140, 201, 76, 61, 74, 241, 127, 88, 218, 238, 8, 155, 161,
     253, 68, 227, 219, 217, 138, 0, 0, 0, 0,
 ]);
-
-/// Maximum permitted size of account data (10 MiB).
-const MAX_PERMITTED_DATA_LENGTH: u64 = 10 * 1024 * 1024;
 
 /// Default rental rate in lamports/byte.
 ///
@@ -181,7 +178,7 @@ impl Rent {
     /// overflow.
     #[inline(always)]
     pub fn try_minimum_balance(&self, data_len: usize) -> Result<u64, ProgramError> {
-        if data_len as u64 > MAX_PERMITTED_DATA_LENGTH {
+        if data_len > MAX_PERMITTED_DATA_LENGTH {
             return Err(ProgramError::InvalidArgument);
         }
 
