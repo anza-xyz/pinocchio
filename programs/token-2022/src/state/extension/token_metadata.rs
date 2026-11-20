@@ -18,6 +18,8 @@ pub struct TokenMetadataExtension<'a> {
     pub symbol: &'a str,
     pub uri: &'a str,
     additional_metadata_len: u32,
+    /// Borsh-encoded `Vec<(String, String)>` of additional `(key, value)`
+    /// pairs, without the leading `u32` length.
     additional_metadata: &'a [u8],
 }
 
@@ -25,11 +27,11 @@ impl<'a> TokenMetadataExtension<'a> {
     /// Parse the token metadata from the extension value bytes.
     #[inline]
     pub fn from_bytes(data: &'a [u8]) -> Result<Self, ProgramError> {
-        if data.len() < 64 {
+        if data.len() < 2 * size_of::<Address>() {
             return Err(ProgramError::InvalidAccountData);
         }
-        let (update_authority, rest) = data.split_at(32);
-        let (mint, mut rest) = rest.split_at(32);
+        let (update_authority, rest) = data.split_at(size_of::<Address>());
+        let (mint, mut rest) = rest.split_at(size_of::<Address>());
 
         let name = read_str(&mut rest)?;
         let symbol = read_str(&mut rest)?;
@@ -38,8 +40,8 @@ impl<'a> TokenMetadataExtension<'a> {
         let additional_metadata = rest;
 
         for _ in 0..additional_metadata_len {
-            read_str(&mut rest)?;
-            read_str(&mut rest)?;
+            skip_str(&mut rest)?;
+            skip_str(&mut rest)?;
         }
 
         Ok(Self {
@@ -57,6 +59,8 @@ impl<'a> TokenMetadataExtension<'a> {
     }
 
     /// Iterate over the additional `(key, value)` metadata pairs.
+    ///
+    /// Iteration stops at the first key or value that is not valid UTF-8.
     #[inline]
     pub fn additional_metadata(&self) -> impl Iterator<Item = (&'a str, &'a str)> {
         let mut rest = self.additional_metadata;
@@ -86,6 +90,13 @@ fn read_u32(data: &mut &[u8]) -> Result<u32, ProgramError> {
         .ok_or(ProgramError::InvalidAccountData)?;
     *data = rest;
     Ok(u32::from_le_bytes(*len))
+}
+
+#[inline(always)]
+fn skip_str(data: &mut &[u8]) -> Result<(), ProgramError> {
+    let len = read_u32(data)? as usize;
+    *data = data.get(len..).ok_or(ProgramError::InvalidAccountData)?;
+    Ok(())
 }
 
 #[inline(always)]

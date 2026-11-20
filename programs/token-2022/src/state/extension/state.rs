@@ -1150,11 +1150,11 @@ mod tests {
         );
         assert_eq!(
             try_calculate_account_len::<Mint>(&[ExtensionType::TokenGroup]).unwrap(),
-            TLV_START_INDEX + TLV_HEADER_LEN + 80
+            TLV_START_INDEX + TLV_HEADER_LEN + TokenGroupExtension::LEN
         );
         assert_eq!(
             try_calculate_account_len::<Mint>(&[ExtensionType::TokenGroupMember]).unwrap(),
-            TLV_START_INDEX + TLV_HEADER_LEN + 72
+            TLV_START_INDEX + TLV_HEADER_LEN + TokenGroupMemberExtension::LEN
         );
     }
 
@@ -1590,6 +1590,20 @@ mod tests {
         assert_eq!(
             mint.get_variable_len_extension::<TokenMetadataExtension>(),
             Err(ProgramError::InvalidAccountData)
+        );
+
+        let invalid_pair = mint_with_token_metadata(&token_metadata_value(&[
+            (b"schema", b"abc"),
+            (b"bad", &[0xff]),
+            (b"after", b"xyz"),
+        ]));
+        let mint = StateWithExtensions::<Mint>::from_bytes(&invalid_pair).unwrap();
+        let metadata = mint
+            .get_variable_len_extension::<TokenMetadataExtension>()
+            .unwrap();
+        assert_eq!(
+            metadata.additional_metadata().collect::<Vec<_>>(),
+            [("schema", "abc")]
         );
     }
 

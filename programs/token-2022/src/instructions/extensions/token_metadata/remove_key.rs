@@ -205,7 +205,7 @@ impl<Program: TokenInterface> CpiWriter for RemoveKey<'_, '_, Program> {
     }
 }
 
-impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
+unsafe impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
     for RemoveKey<'_, '_, Program>
 {
     #[inline(always)]
@@ -216,14 +216,29 @@ impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| write_accounts(self.metadata, self.update_authority, accounts),
-            |accounts| write_instruction_accounts(self.metadata, self.update_authority, accounts),
-            |data| {
-                let len = data.len().min(MAX_BATCH_DATA_LEN);
-                write_instruction_data(self.idempotent, self.key, &mut data[..len])
-            },
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `ACCOUNTS_LEN`
+        //   accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `MAX_BATCH_DATA_LEN` bytes of data are
+        //   written. The data slice is truncated to `MAX_BATCH_DATA_LEN` before
+        //   writing.
+        // - `write_accounts` checks that the writable `metadata` account is not
+        //   borrowed.
+        unsafe {
+            batch.push(
+                |accounts| write_accounts(self.metadata, self.update_authority, accounts),
+                |accounts| {
+                    write_instruction_accounts(self.metadata, self.update_authority, accounts)
+                },
+                |data| {
+                    let len = data.len().min(MAX_BATCH_DATA_LEN);
+                    write_instruction_data(self.idempotent, self.key, &mut data[..len])
+                },
+            )
+        }
     }
 }
 
@@ -279,7 +294,7 @@ fn write_instruction_data(
     key: &str,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    let expected_data_len = 8 + 1 + 4 + key.len();
+    let expected_data_len = DISCRIMINATOR.len() + size_of::<bool>() + size_of::<u32>() + key.len();
 
     if expected_data_len > MAX_DATA_LEN || data.len() < expected_data_len {
         return Err(invalid_argument_error());

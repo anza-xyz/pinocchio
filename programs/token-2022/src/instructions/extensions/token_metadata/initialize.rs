@@ -240,7 +240,7 @@ impl<Program: TokenInterface> CpiWriter for Initialize<'_, '_, Program> {
     }
 }
 
-impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
+unsafe impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
     for Initialize<'_, '_, Program>
 {
     #[inline(always)]
@@ -251,30 +251,43 @@ impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| {
-                write_accounts(
-                    self.metadata,
-                    self.update_authority,
-                    self.mint,
-                    self.mint_authority,
-                    accounts,
-                )
-            },
-            |accounts| {
-                write_instruction_accounts(
-                    self.metadata,
-                    self.update_authority,
-                    self.mint,
-                    self.mint_authority,
-                    accounts,
-                )
-            },
-            |data| {
-                let len = data.len().min(MAX_BATCH_DATA_LEN);
-                write_instruction_data(self.name, self.symbol, self.uri, &mut data[..len])
-            },
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `ACCOUNTS_LEN`
+        //   accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `MAX_BATCH_DATA_LEN` bytes of data are
+        //   written. The data slice is truncated to `MAX_BATCH_DATA_LEN` before
+        //   writing.
+        // - `write_accounts` checks that the writable `metadata` account is not
+        //   borrowed.
+        unsafe {
+            batch.push(
+                |accounts| {
+                    write_accounts(
+                        self.metadata,
+                        self.update_authority,
+                        self.mint,
+                        self.mint_authority,
+                        accounts,
+                    )
+                },
+                |accounts| {
+                    write_instruction_accounts(
+                        self.metadata,
+                        self.update_authority,
+                        self.mint,
+                        self.mint_authority,
+                        accounts,
+                    )
+                },
+                |data| {
+                    let len = data.len().min(MAX_BATCH_DATA_LEN);
+                    write_instruction_data(self.name, self.symbol, self.uri, &mut data[..len])
+                },
+            )
+        }
     }
 }
 
@@ -343,7 +356,8 @@ fn write_instruction_data(
     uri: &str,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    let expected_data_len = 8 + 12 + name.len() + symbol.len() + uri.len();
+    let expected_data_len =
+        DISCRIMINATOR.len() + (3 * size_of::<u32>()) + name.len() + symbol.len() + uri.len();
 
     if expected_data_len > MAX_DATA_LEN || data.len() < expected_data_len {
         return Err(invalid_argument_error());

@@ -225,7 +225,7 @@ impl<Program: TokenInterface> CpiWriter for InitializeMember<'_, Program> {
     }
 }
 
-impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
+unsafe impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
     for InitializeMember<'_, Program>
 {
     #[inline(always)]
@@ -236,29 +236,40 @@ impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| {
-                write_accounts(
-                    self.member,
-                    self.member_mint,
-                    self.member_mint_authority,
-                    self.group,
-                    self.group_update_authority,
-                    accounts,
-                )
-            },
-            |accounts| {
-                write_instruction_accounts(
-                    self.member,
-                    self.member_mint,
-                    self.member_mint_authority,
-                    self.group,
-                    self.group_update_authority,
-                    accounts,
-                )
-            },
-            write_instruction_data,
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `ACCOUNTS_LEN`
+        //   accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `DATA_LEN` bytes of data are written.
+        // - `write_accounts` checks that the writable `member` and `group` accounts are
+        //   not borrowed.
+        unsafe {
+            batch.push(
+                |accounts| {
+                    write_accounts(
+                        self.member,
+                        self.member_mint,
+                        self.member_mint_authority,
+                        self.group,
+                        self.group_update_authority,
+                        accounts,
+                    )
+                },
+                |accounts| {
+                    write_instruction_accounts(
+                        self.member,
+                        self.member_mint,
+                        self.member_mint_authority,
+                        self.group,
+                        self.group_update_authority,
+                        accounts,
+                    )
+                },
+                write_instruction_data,
+            )
+        }
     }
 }
 

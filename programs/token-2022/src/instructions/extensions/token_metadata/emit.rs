@@ -154,7 +154,7 @@ impl<Program: TokenInterface> CpiWriter for Emit<'_, Program> {
     }
 }
 
-impl<Program: TokenInterface> crate::instructions::IntoBatch<Program> for Emit<'_, Program> {
+unsafe impl<Program: TokenInterface> crate::instructions::IntoBatch<Program> for Emit<'_, Program> {
     #[inline(always)]
     fn into_batch<'account, 'state>(
         self,
@@ -163,11 +163,22 @@ impl<Program: TokenInterface> crate::instructions::IntoBatch<Program> for Emit<'
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| write_accounts(self.metadata, accounts),
-            |accounts| write_instruction_accounts(self.metadata, accounts),
-            |data| write_instruction_data(self.start, self.end, data),
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `ACCOUNTS_LEN`
+        //   accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `MAX_DATA_LEN` bytes of data are
+        //   written.
+        // - The instruction has no writable accounts.
+        unsafe {
+            batch.push(
+                |accounts| write_accounts(self.metadata, accounts),
+                |accounts| write_instruction_accounts(self.metadata, accounts),
+                |data| write_instruction_data(self.start, self.end, data),
+            )
+        }
     }
 }
 
@@ -211,7 +222,8 @@ fn write_instruction_data(
     end: Option<u64>,
     data: &mut [MaybeUninit<u8>],
 ) -> Result<usize, ProgramError> {
-    let expected_data_len = 10 + start.map_or(0, |_| 8) + end.map_or(0, |_| 8);
+    let bound_count = usize::from(start.is_some()) + usize::from(end.is_some());
+    let expected_data_len = DISCRIMINATOR.len() + 2 + bound_count * size_of::<u64>();
 
     if data.len() < expected_data_len {
         return Err(invalid_argument_error());

@@ -223,7 +223,7 @@ impl<Program: TokenInterface> CpiWriter for UpdateField<'_, '_, Program> {
     }
 }
 
-impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
+unsafe impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
     for UpdateField<'_, '_, Program>
 {
     #[inline(always)]
@@ -234,14 +234,29 @@ impl<Program: TokenInterface> crate::instructions::IntoBatch<Program>
     where
         Self: 'account + 'state,
     {
-        batch.push(
-            |accounts| write_accounts(self.metadata, self.update_authority, accounts),
-            |accounts| write_instruction_accounts(self.metadata, self.update_authority, accounts),
-            |data| {
-                let len = data.len().min(MAX_BATCH_DATA_LEN);
-                write_instruction_data(self.field, self.value, &mut data[..len])
-            },
-        )
+        // SAFETY:
+        // - `write_accounts`, `write_instruction_accounts` and `write_instruction_data`
+        //   check that the slice they receive is large enough, and initialize exactly
+        //   the number of elements they return.
+        // - `write_accounts` and `write_instruction_accounts` both write `ACCOUNTS_LEN`
+        //   accounts, in the same order.
+        // - At most `ACCOUNTS_LEN` accounts and `MAX_BATCH_DATA_LEN` bytes of data are
+        //   written. The data slice is truncated to `MAX_BATCH_DATA_LEN` before
+        //   writing.
+        // - `write_accounts` checks that the writable `metadata` account is not
+        //   borrowed.
+        unsafe {
+            batch.push(
+                |accounts| write_accounts(self.metadata, self.update_authority, accounts),
+                |accounts| {
+                    write_instruction_accounts(self.metadata, self.update_authority, accounts)
+                },
+                |data| {
+                    let len = data.len().min(MAX_BATCH_DATA_LEN);
+                    write_instruction_data(self.field, self.value, &mut data[..len])
+                },
+            )
+        }
     }
 }
 
@@ -302,7 +317,11 @@ fn write_instruction_data(
         _ => None,
     };
 
-    let expected_data_len = 8 + 1 + key.map_or(0, |key| 4 + key.len()) + 4 + value.len();
+    let expected_data_len = DISCRIMINATOR.len()
+        + size_of::<u8>()
+        + key.map_or(0, |key| size_of::<u32>() + key.len())
+        + size_of::<u32>()
+        + value.len();
 
     if expected_data_len > MAX_DATA_LEN || data.len() < expected_data_len {
         return Err(invalid_argument_error());
@@ -320,15 +339,13 @@ fn write_instruction_data(
     let mut offset = 9;
 
     for value in key.into_iter().chain([value]) {
+        let value_start = offset + size_of::<u32>();
         write_bytes(
-            &mut data[offset..offset + 4],
+            &mut data[offset..value_start],
             &(value.len() as u32).to_le_bytes(),
         );
-        write_bytes(
-            &mut data[offset + 4..offset + 4 + value.len()],
-            value.as_bytes(),
-        );
-        offset += 4 + value.len();
+        offset = value_start + value.len();
+        write_bytes(&mut data[value_start..offset], value.as_bytes());
     }
 
     Ok(expected_data_len)
