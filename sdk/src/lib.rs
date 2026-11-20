@@ -367,6 +367,9 @@ pub use {
 #[cfg(feature = "cpi")]
 pub use {solana_instruction_view as instruction, solana_instruction_view::cpi};
 
+/// Maximum permitted size of account data (10 MiB).
+const MAX_PERMITTED_DATA_LENGTH: usize = 10 * 1024 * 1024;
+
 /// Maximum number of accounts that a transaction may process.
 ///
 /// This value is set to `u8::MAX`, which is the theoretical maximum
@@ -385,6 +388,18 @@ pub const SUCCESS: u64 = 0;
 #[cfg(feature = "account-resize")]
 /// Trait to indicate that an account can be resized.
 pub trait Resize: sealed::Sealed {
+    /// Return the account's data length limit in the current instruction.
+    ///
+    /// This is the original data length recorded by the entrypoint with the
+    /// `account-resize` feature, plus [`MAX_PERMITTED_DATA_INCREASE`], capped
+    /// at 10 MiB. It stays the same as the account grows or shrinks.
+    ///
+    /// The query can be used while the account data is borrowed. An actual
+    /// resize is still subject to borrow checks, account permissions,
+    /// transaction-wide data allocation limits, and growth limits in callers
+    /// higher in the invocation stack.
+    fn max_resize_len(&self) -> usize;
+
     /// Resize (either truncating or zero extending) the account's data.
     ///
     /// The account data can be increased by up to
@@ -452,7 +467,24 @@ pub trait UnsafeResize: sealed::Sealed {
 impl sealed::Sealed for AccountView {}
 
 #[cfg(feature = "account-resize")]
+#[inline(always)]
+unsafe fn original_data_len(account: *const RuntimeAccount) -> usize {
+    // SAFETY: The caller guarantees the pointer is valid for reading the
+    // header. The padding is separate from the borrowable account data.
+    u32::from_le_bytes(unsafe { (*account).padding }) as usize
+}
+
+#[cfg(feature = "account-resize")]
 impl Resize for AccountView {
+    #[inline]
+    fn max_resize_len(&self) -> usize {
+        // SAFETY: `AccountView` guarantees a valid account header.
+        let original_len = unsafe { original_data_len(self.account_ptr()) };
+        original_len
+            .saturating_add(MAX_PERMITTED_DATA_INCREASE)
+            .min(MAX_PERMITTED_DATA_LENGTH)
+    }
+
     fn resize(&mut self, new_len: usize) -> Result<(), ProgramError> {
         // Check whether the account data is already borrowed.
         self.check_borrow_mut()?;
@@ -467,11 +499,12 @@ impl Resize for AccountView {
             return Ok(());
         }
 
-        let account = self.account_ptr() as *mut RuntimeAccount;
-        let original_data_len = u32::from_le_bytes(unsafe { (*account).padding }) as usize;
+        let account = self.account_mut_ptr();
+        // SAFETY: `AccountView` guarantees a valid account header.
+        let original_len = unsafe { original_data_len(account) };
         // Return early if the length increase from the original serialized data
         // length is too large and would result in an out-of-bounds allocation.
-        if new_len.saturating_sub(original_data_len) > MAX_PERMITTED_DATA_INCREASE {
+        if new_len.saturating_sub(original_len) > MAX_PERMITTED_DATA_INCREASE {
             return Err(ProgramError::InvalidRealloc);
         }
 
@@ -562,8 +595,10 @@ mod tests {
 
     #[test]
     fn test_resize() {
+        let max_len = 100 + MAX_PERMITTED_DATA_INCREASE;
         // 8-bytes aligned account data.
-        let mut data = [0u64; 100 * size_of::<u64>()];
+        let mut data =
+            alloc::vec![0u64; (size_of::<RuntimeAccount>() + max_len).div_ceil(size_of::<u64>())];
 
         // Set the borrow state.
         data[0] = NOT_BORROWED as u64;
@@ -580,6 +615,7 @@ mod tests {
         let mut account = unsafe { AccountView::new_unchecked(runtime_account) };
 
         assert_eq!(account.data_len(), 100);
+        assert_eq!(account.max_resize_len(), max_len);
         assert_eq!(
             u32::from_le_bytes(unsafe { (*runtime_account).padding }),
             100
@@ -591,25 +627,30 @@ mod tests {
 
         // increase the size.
 
-        account.resize(200).unwrap();
+        account.resize(max_len).unwrap();
 
         let data_ptr_after = account.data_ptr();
         // The data pointer should point to the same address regardless of the
         // resize.
         assert_eq!(data_ptr_before, data_ptr_after);
 
-        assert_eq!(account.data_len(), 200);
+        assert_eq!(account.data_len(), max_len);
+        assert_eq!(account.max_resize_len(), max_len);
 
         // decrease the size.
 
         account.resize(0).unwrap();
 
         assert_eq!(account.data_len(), 0);
+        assert_eq!(account.max_resize_len(), max_len);
 
         // Invalid resize.
 
-        let invalid_resize = account.resize(10_000_000_001);
-        assert!(invalid_resize.is_err());
+        assert_eq!(
+            account.resize(max_len + 1),
+            Err(ProgramError::InvalidRealloc)
+        );
+        assert_eq!(account.data_len(), 0);
 
         // Reset to its original size.
 
@@ -626,6 +667,28 @@ mod tests {
         assert_eq!(account.data_len(), 500);
 
         let data = account.try_borrow().unwrap();
+        assert_eq!(account.max_resize_len(), max_len);
         assert_eq!(data.len(), 500);
+    }
+
+    #[test]
+    fn test_max_resize_len_caps_at_maximum_data_length() {
+        let original_len = MAX_PERMITTED_DATA_LENGTH - 1;
+        let buffer_len = size_of::<RuntimeAccount>() + original_len + MAX_PERMITTED_DATA_INCREASE;
+        let mut data = alloc::vec![0u64; buffer_len.div_ceil(size_of::<u64>())];
+        let runtime_account = data.as_mut_ptr().cast::<RuntimeAccount>();
+        // SAFETY: The aligned buffer holds the account header, data and resize
+        // padding for the duration of this test.
+        let account = unsafe {
+            runtime_account.write(RuntimeAccount {
+                borrow_state: NOT_BORROWED,
+                padding: (original_len as u32).to_le_bytes(),
+                data_len: original_len as u64,
+                ..RuntimeAccount::default()
+            });
+            AccountView::new_unchecked(runtime_account)
+        };
+
+        assert_eq!(account.max_resize_len(), MAX_PERMITTED_DATA_LENGTH);
     }
 }
