@@ -33,6 +33,12 @@ pub struct Create<'a> {
 }
 
 impl Create<'_> {
+    /// The instruction discriminator.
+    pub const DISCRIMINATOR: u8 = 0;
+
+    /// The number of accounts required by this instruction.
+    pub const ACCOUNTS_LEN: usize = 6;
+
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -41,7 +47,7 @@ impl Create<'_> {
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
         // Instruction accounts
-        let instruction_accounts: [InstructionAccount; 6] = [
+        let instruction_accounts: [InstructionAccount; Create::ACCOUNTS_LEN] = [
             InstructionAccount::writable_signer(self.funding_account.address()),
             InstructionAccount::writable(self.account.address()),
             InstructionAccount::readonly(self.wallet.address()),
@@ -53,7 +59,7 @@ impl Create<'_> {
         // Instruction data:
         // - [0]: Instruction discriminator (1 byte, u8) (0 for Create)
 
-        let instruction_data = [0u8];
+        let instruction_data = [Self::DISCRIMINATOR];
 
         let instruction = InstructionView {
             program_id: &crate::ID,
